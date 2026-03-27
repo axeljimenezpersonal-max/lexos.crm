@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>403 — Sin permiso · LexOS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div style="text-align:center; max-width:440px;">
+    <div style="font-size:6rem; font-weight:800; color:var(--danger-soft); line-height:1; margin-bottom:16px;">403</div>
+    <h1 style="font-size:1.3rem; font-weight:700; margin-bottom:8px;">Acceso denegado</h1>
+    <p class="text-muted text-sm" style="margin-bottom:28px;">No tienes permisos para acceder a esta sección.</p>
+    <div class="d-flex gap-2" style="justify-content:center;">
+      <a href="/" class="btn btn-primary">Ir al dashboard</a>
+      <button onclick="history.back()" class="btn btn-ghost">← Volver</button>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

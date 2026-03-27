@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>500 — Error interno · LexOS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div style="text-align:center; max-width:440px;">
+    <div style="font-size:6rem; font-weight:800; color:var(--warning-soft); line-height:1; margin-bottom:16px;">500</div>
+    <h1 style="font-size:1.3rem; font-weight:700; margin-bottom:8px;">Error interno del servidor</h1>
+    <p class="text-muted text-sm" style="margin-bottom:28px;">Ocurrió un error inesperado. Por favor intenta de nuevo o contacta al administrador.</p>
+    <div class="d-flex gap-2" style="justify-content:center;">
+      <a href="/" class="btn btn-primary">Ir al dashboard</a>
+      <button onclick="location.reload()" class="btn btn-ghost">Reintentar</button>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

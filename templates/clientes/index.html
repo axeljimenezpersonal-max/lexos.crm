@@ -1,0 +1,941 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon_users, icon_user, icon_settings, icon_file_text, icon_mail, icon_phone, icon_map_pin, icon_building, icon_folder %}
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Clientes{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/clientes.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/contrapartes.css') }}">
+<style>
+.cl-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.filters-panel { display:none; background:var(--c); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px; }
+.filters-panel.open { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
+.filter-group label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.15em; text-transform:uppercase; color:var(--ash); margin-bottom:5px; display:block; }
+.filter-group input, .filter-group select { background:var(--n); border:1px solid var(--border); border-radius:6px; color:var(--fog); font-family:'DM Mono',monospace; font-size:11px; padding:8px 10px; width:100%; outline:none; transition:border-color .15s; }
+.filter-group input:focus, .filter-group select:focus { border-color:var(--e); }
+.search-wrap { position:relative; flex:1; min-width:200px; max-width:380px; }
+.search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ash); pointer-events:none; }
+.search-input { background:var(--n); border:1px solid var(--border); border-radius:6px; color:var(--fog); font-family:'DM Mono',monospace; font-size:11px; padding:8px 10px 8px 32px; width:100%; outline:none; }
+.search-input:focus { border-color:var(--e); }
+.search-input::placeholder { color:var(--ash); opacity:0.5; font-size:10px; }
+.view-toggle { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.view-toggle button { background:none; border:none; color:var(--ash); padding:7px 12px; cursor:pointer; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; display:flex; align-items:center; gap:5px; transition:all .15s; }
+.view-toggle button:hover { background:var(--edim); color:var(--e); }
+.view-toggle button.active { background:var(--edim); color:var(--e); }
+
+/* Table view */
+.cl-table-wrap { background:var(--c); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.cl-table { width:100%; border-collapse:collapse; }
+.cl-table th { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash); padding:10px 14px; border-bottom:1px solid var(--border); font-weight:400; text-align:left; }
+.cl-table td { padding:12px 14px; border-bottom:1px solid var(--border); font-family:'Libre Baskerville',serif; font-size:13px; color:var(--fog); vertical-align:middle; }
+.cl-table tr:hover td { background:rgba(0,223,162,.03); }
+.cl-table tr:last-child td { border-bottom:none; }
+
+/* Name cell */
+.cl-name-cell { display:flex; align-items:center; gap:10px; }
+.cl-avatar { width:36px; height:36px; border-radius:50%; background:var(--edim); border:1px solid var(--border-m); display:flex; align-items:center; justify-content:center; font-family:'DM Mono',monospace; font-size:12px; font-weight:500; color:var(--e); flex-shrink:0; text-transform:uppercase; }
+.cl-name { font-family:'Libre Baskerville',serif; font-size:13px; font-weight:700; color:var(--fog); text-decoration:none; display:block; }
+.cl-name:hover { color:var(--e); }
+.cl-rfc { font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); margin-top:1px; }
+
+/* Cards view */
+.cl-cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+.cl-card { background:var(--c); border:1px solid var(--border); border-radius:8px; padding:18px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; transition:border-color .2s,box-shadow .2s; text-decoration:none; animation:fadeUp .35s ease both; animation-delay:calc(var(--i,0)*50ms); }
+.cl-card:hover { border-color:var(--border-m); box-shadow:0 4px 20px rgba(0,223,162,.06); }
+.cl-card-avatar { width:52px; height:52px; border-radius:50%; background:var(--edim); border:1px solid var(--border-m); display:flex; align-items:center; justify-content:center; font-family:'DM Mono',monospace; font-size:18px; font-weight:500; color:var(--e); text-transform:uppercase; }
+.cl-card-name { font-family:'Libre Baskerville',serif; font-size:14px; font-weight:700; color:var(--fog); }
+.cl-card-meta { font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); letter-spacing:.08em; }
+.cl-card-stats { display:flex; gap:16px; margin-top:4px; }
+.cl-card-stat { text-align:center; }
+.cl-card-stat-val { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; color:var(--e); display:block; }
+.cl-card-stat-lbl { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <div class="page-eyebrow">Gestión · LexOS</div>
+  <h1 class="page-title">Clientes</h1>
+  <div class="page-meta-row">
+    <span class="page-count">{{ total }} cliente{{ 's' if total != 1 else '' }}</span>
+    <div class="page-actions">
+      <div class="dropdown-wrap" style="position:relative;">
+        <button class="btn btn-ghost btn-sm" id="importMenuBtn" onclick="this.nextElementSibling.classList.toggle('open')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importar
+        </button>
+        <div class="tb-dropdown" id="importMenu" style="min-width:180px;right:0;top:calc(100% + 6px);">
+          <a href="{{ url_for('clientes.plantilla_importar') }}" class="td-item">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            Descargar plantilla
+          </a>
+          <button class="td-item" onclick="closeAllTbDropdowns();openImportModal()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16,16 12,12 8,16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+            Cargar archivo
+          </button>
+        </div>
+      </div>
+      <a href="{{ url_for('clientes.exportar') }}" class="btn btn-ghost btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar
+      </a>
+      <button class="btn btn-primary btn-sm" onclick="openCrearModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nuevo cliente
+      </button>
+    </div>
+  </div>
+</div>
+<div class="page-divider"></div>
+
+<!-- Tabs Stakeholders -->
+<div class="sh-tabs">
+  <a class="sh-tab active" href="{{ url_for('clientes.index') }}">Clientes</a>
+  <a class="sh-tab" href="{{ url_for('contrapartes.index') }}">Contrapartes</a>
+</div>
+
+<!-- ── Toolbar ───────────────────────────────────────────────────────────── -->
+<div class="cl-toolbar">
+  <form id="searchForm" method="GET" action="" style="display:contents;">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" class="search-input" placeholder="Buscar por nombre, RFC, correo…"
+             value="{{ q }}" id="searchInput" autocomplete="off">
+    </div>
+    <!-- Hidden filters -->
+    <input type="hidden" name="estatus" id="hEstatus" value="{{ estatus }}">
+    <input type="hidden" name="tipo"    id="hTipo"    value="{{ tipo }}">
+    <input type="hidden" name="abogado" id="hAbogado" value="{{ abogado }}">
+    <input type="hidden" name="desde"   id="hDesde"   value="{{ desde }}">
+    <input type="hidden" name="hasta"   id="hHasta"   value="{{ hasta }}">
+  </form>
+
+  <button class="btn btn-ghost btn-sm" id="filtersToggleBtn" onclick="toggleFilters()" title="Filtros">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+    Filtros
+    {% if estatus or tipo or abogado or desde or hasta %}
+    <span class="badge badge-activo" style="font-size:.65rem;padding:1px 6px;margin-left:2px;">ON</span>
+    {% endif %}
+  </button>
+
+  <div class="view-toggle" id="viewToggle">
+    <button id="btnTable" onclick="setView('table')" title="Vista tabla">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+      Tabla
+    </button>
+    <button id="btnCards" onclick="setView('cards')" title="Vista tarjetas">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Tarjetas
+    </button>
+  </div>
+</div>
+
+<!-- ── Filters panel ─────────────────────────────────────────────────────── -->
+<div class="filters-panel" id="filtersPanel">
+  <div class="filter-group">
+    <label>Estado</label>
+    <select id="fEstatus" onchange="applyFilters()">
+      <option value="">Todos</option>
+      <option value="activo"    {% if estatus=='activo' %}selected{% endif %}>Activo</option>
+      <option value="inactivo"  {% if estatus=='inactivo' %}selected{% endif %}>Inactivo</option>
+      <option value="prospecto" {% if estatus=='prospecto' %}selected{% endif %}>Prospecto</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Tipo</label>
+    <select id="fTipo" onchange="applyFilters()">
+      <option value="">Todos</option>
+      <option value="persona_fisica" {% if tipo=='persona_fisica' %}selected{% endif %}>Persona Física</option>
+      <option value="persona_moral"  {% if tipo=='persona_moral' %}selected{% endif %}>Persona Moral</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Abogado asignado</label>
+    <select id="fAbogado" onchange="applyFilters()">
+      <option value="">Todos</option>
+      {% for a in abogados %}
+      <option value="{{ a.id }}" {% if abogado == a.id|string %}selected{% endif %}>{{ a.nombre }} {{ a.apellidos }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Alta desde</label>
+    <input type="date" id="fDesde" value="{{ desde }}" onchange="applyFilters()">
+  </div>
+  <div class="filter-group">
+    <label>Alta hasta</label>
+    <input type="date" id="fHasta" value="{{ hasta }}" onchange="applyFilters()">
+  </div>
+  <div class="filter-group" style="align-self:flex-end;">
+    <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Limpiar filtros</button>
+  </div>
+</div>
+
+<!-- ── TABLE VIEW ────────────────────────────────────────────────────────── -->
+<div id="viewTable">
+  {% if clientes %}
+  <div class="cl-table-wrap">
+    <table class="cl-table">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Contacto</th>
+          <th>Tipo</th>
+          <th>Estatus</th>
+          <th>Salud</th>
+          <th>Asuntos</th>
+          <th>Alta</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+        <tr>
+          <td>
+            <div class="cl-name-cell">
+              <div class="cl-avatar">
+                {%- if c.tipo == 'persona_moral' -%}
+                  {{ (c.razon_social or c.nombre or '?')[0].upper() }}
+                {%- else -%}
+                  {{ (c.nombre or '?')[0].upper() }}{{ (c.apellidos or '')[0].upper() if c.apellidos else '' }}
+                {%- endif -%}
+              </div>
+              <div>
+                <a href="{{ url_for('clientes.detalle', id=c.id) }}" class="cl-name">
+                  {% if c.tipo == 'persona_moral' %}{{ c.razon_social or c.nombre }}
+                  {% else %}{{ c.nombre }} {{ c.apellidos or '' }}{% endif %}
+                </a>
+                {% if c.rfc %}<div class="cl-rfc">{{ c.rfc }}</div>{% endif %}
+              </div>
+            </div>
+          </td>
+          <td>
+            {% if c.email %}<div style="font-family:'DM Mono',monospace;font-size:11px;">{{ c.email }}</div>{% endif %}
+            {% if c.celular %}<div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);margin-top:2px;">{{ c.celular }}</div>{% endif %}
+          </td>
+          <td>
+            <span class="badge" style="font-size:.7rem;">
+              {{ 'Persona Física' if c.tipo == 'persona_fisica' else 'Empresa' }}
+            </span>
+          </td>
+          <td>
+            <span class="badge badge-{{ c.estatus or 'activo' }}">{{ c.estatus or 'activo' }}</span>
+          </td>
+          <td>
+            <div class="health-bar-wrap {{ c.salud.class }}">
+              <div class="health-bar">
+                <div class="health-fill" style="width:{{ c.salud.score }}%"></div>
+              </div>
+              <span class="health-label">{{ c.salud.label }}</span>
+            </div>
+          </td>
+          <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:var(--e);">{{ c.asuntos_count }}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">{{ (c.fecha_alta or '')[:10] }}</td>
+          <td>
+            <div style="display:flex;gap:4px;">
+              <a href="{{ url_for('clientes.detalle', id=c.id) }}" class="btn-icon-only" title="Ver ficha">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a>
+              <a href="{{ url_for('clientes.exportar_pdf', id=c.id) }}" class="btn-icon-only" title="Exportar PDF">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+              </a>
+              <button class="btn-icon-only" style="color:var(--danger);" title="Eliminar"
+                      onclick="confirmarEliminar({{ c.id }}, '{{ (c.razon_social or c.nombre)|replace("'", "\\'")|truncate(30) }}')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:60px 20px;">
+    <div class="es-icon">{{ icon_users(14,14) }}</div>
+    <h3>Sin clientes todavía</h3>
+    <p>Registra el primer cliente de tu despacho.</p>
+    <button class="btn btn-primary mt-3" onclick="openCrearModal()">+ Nuevo cliente</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── CARD VIEW ─────────────────────────────────────────────────────────── -->
+<div id="viewCards" style="display:none;">
+  {% if clientes %}
+  <div class="cl-cards-grid">
+    {% for c in clientes %}
+    <a href="{{ url_for('clientes.detalle', id=c.id) }}" class="cl-card" style="--i:{{ loop.index0 }};">
+      <div class="cl-card-avatar">
+        {%- if c.tipo == 'persona_moral' -%}
+          {{ (c.razon_social or c.nombre or '?')[0].upper() }}
+        {%- else -%}
+          {{ (c.nombre or '?')[0].upper() }}{{ (c.apellidos or '')[0].upper() if c.apellidos else '' }}
+        {%- endif -%}
+      </div>
+      <div class="cl-card-name">
+        {% if c.tipo == 'persona_moral' %}{{ c.razon_social or c.nombre }}
+        {% else %}{{ c.nombre }} {{ c.apellidos or '' }}{% endif %}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;">
+        <span class="badge" style="font-size:.68rem;">
+          {{ 'Persona Física' if c.tipo == 'persona_fisica' else 'Empresa' }}
+        </span>
+        <span class="badge badge-{{ c.estatus or 'activo' }}" style="font-size:.68rem;">{{ c.estatus or 'activo' }}</span>
+      </div>
+      {% if c.rfc %}
+      <div class="cl-card-meta">{{ c.rfc }}</div>
+      {% endif %}
+      <div class="cl-card-stats">
+        <div class="cl-card-stat">
+          <span class="cl-card-stat-val">{{ c.asuntos_count }}</span>
+          <span class="cl-card-stat-lbl">Asunto{{ 's' if c.asuntos_count != 1 else '' }}</span>
+        </div>
+        {% if c.salud %}
+        <div class="cl-card-stat">
+          <span class="cl-card-stat-val">{{ c.salud.score }}</span>
+          <span class="cl-card-stat-lbl">Salud</span>
+        </div>
+        {% endif %}
+      </div>
+      {% if c.fecha_alta %}
+      <div class="cl-card-meta">Alta {{ (c.fecha_alta or '')[:10] }}</div>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:60px 20px;">
+    <div class="es-icon">{{ icon_users(14,14) }}</div>
+    <h3>Sin clientes</h3>
+    <p>Registra el primer cliente de tu despacho.</p>
+    <button class="btn btn-primary mt-3" onclick="openCrearModal()">+ Nuevo cliente</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Pagination ────────────────────────────────────────────────────────── -->
+{% if total_pages > 1 %}
+<div class="lex-pagination">
+  <span>Mostrando {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} de {{ total }}</span>
+  <div class="lex-page-btns">
+    {% if page > 1 %}
+    <a href="{{ request.path }}?{{ request.query_string.decode().split('&') | reject('startswith', 'page=') | join('&') }}&page={{ page - 1 }}" class="lex-page-btn">‹</a>
+    {% else %}
+    <button class="lex-page-btn" disabled>‹</button>
+    {% endif %}
+    {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+    <a href="{{ request.path }}?{{ request.query_string.decode().split('&') | reject('startswith', 'page=') | join('&') }}&page={{ p }}"
+       class="lex-page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="{{ request.path }}?{{ request.query_string.decode().split('&') | reject('startswith', 'page=') | join('&') }}&page={{ page + 1 }}" class="lex-page-btn">›</a>
+    {% else %}
+    <button class="lex-page-btn" disabled>›</button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL — CREAR CLIENTE
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="crearModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Nuevo cliente</span>
+      <button class="modal-close" onclick="closeCrearModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="crearForm">
+        <!-- Tipo tabs -->
+        <div class="tipo-tabs">
+          <button type="button" class="tipo-tab active" id="tabFisica" onclick="setTipo('persona_fisica')">{{ icon_user(14,14) }} Persona Física</button>
+          <button type="button" class="tipo-tab" id="tabMoral" onclick="setTipo('persona_moral')">{{ icon_building(14,14) }} Persona Moral</button>
+        </div>
+        <input type="hidden" name="tipo" id="tipoInput" value="persona_fisica">
+
+        <!-- Persona Física -->
+        <div class="tipo-panel active" id="panelFisica">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nombre <span class="req">*</span></label>
+              <input type="text" name="nombre" id="nombreFisica" placeholder="Nombre(s)" required>
+            </div>
+            <div class="form-group">
+              <label>Apellidos</label>
+              <input type="text" name="apellidos" placeholder="Apellido Paterno Materno">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>RFC</label>
+              <input type="text" name="rfc" placeholder="ABCD891231AB1" maxlength="13" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="form-group">
+              <label>CURP</label>
+              <input type="text" name="curp" placeholder="ABCD891231HXXXXX01" maxlength="18" oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Fecha de nacimiento</label>
+              <input type="date" name="fecha_nacimiento">
+            </div>
+            <div class="form-group">
+              <label>Estatus</label>
+              <select name="estatus">
+                <option value="activo">Activo</option>
+                <option value="prospecto">Prospecto</option>
+                <option value="inactivo">Inactivo</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Persona Moral -->
+        <div class="tipo-panel" id="panelMoral">
+          <div class="form-row single">
+            <div class="form-group">
+              <label>Razón social <span class="req">*</span></label>
+              <input type="text" name="razon_social" id="razonSocial" placeholder="Empresa S.A. de C.V.">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>RFC</label>
+              <input type="text" name="rfc" placeholder="ABCD891231AB1" maxlength="12" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="form-group">
+              <label>Giro comercial</label>
+              <input type="text" name="giro_comercial" placeholder="Ej: Construcción, Servicios…">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Representante legal</label>
+              <input type="text" name="representante_legal" placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+              <label>Contacto principal</label>
+              <input type="text" name="contacto_principal" placeholder="Nombre del contacto">
+            </div>
+          </div>
+          <div class="form-row single">
+            <div class="form-group">
+              <label>Estatus</label>
+              <select name="estatus">
+                <option value="activo">Activo</option>
+                <option value="prospecto">Prospecto</option>
+                <option value="inactivo">Inactivo</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contacto (común) -->
+        <div class="form-section-title">{{ icon_mail(14, 14) }} Contacto</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Correo electrónico</label>
+            <input type="email" name="email" placeholder="correo@ejemplo.com">
+          </div>
+          <div class="form-group">
+            <label>Celular</label>
+            <input type="tel" name="celular" placeholder="5512345678">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Teléfono fijo</label>
+            <input type="tel" name="telefono" placeholder="5512345678">
+          </div>
+          <div class="form-group">
+            <label>Origen del cliente</label>
+            <select name="origen_cliente">
+              <option value="">— Seleccionar —</option>
+              {% for o in origenes %}<option value="{{ o }}">{{ o }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Dirección -->
+        <div class="form-section-title">{{ icon_map_pin(14, 14) }} Dirección</div>
+        <div class="form-row triple">
+          <div class="form-group" style="grid-column:1/3;">
+            <label>Calle</label>
+            <input type="text" name="direccion" placeholder="Nombre de la calle">
+          </div>
+          <div class="form-group">
+            <label>No. ext.</label>
+            <input type="text" name="num_ext" placeholder="123">
+          </div>
+        </div>
+        <div class="form-row triple">
+          <div class="form-group">
+            <label>Colonia</label>
+            <input type="text" name="colonia" placeholder="Colonia">
+          </div>
+          <div class="form-group">
+            <label>Municipio / Alcaldía</label>
+            <input type="text" name="municipio" placeholder="Municipio">
+          </div>
+          <div class="form-group">
+            <label>CP</label>
+            <input type="text" name="cp" placeholder="00000" maxlength="5">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Ciudad</label>
+            <input type="text" name="ciudad" placeholder="Ciudad">
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select name="estado">
+              <option value="">— Seleccionar —</option>
+              {% for e in estados_mx %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- CRM -->
+        <div class="form-section-title">{{ icon_settings(14,14) }} CRM</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Abogado asignado</label>
+            <select name="abogado_id">
+              <option value="">Sin asignar</option>
+              {% for a in abogados %}
+              <option value="{{ a.id }}">{{ a.nombre }} {{ a.apellidos }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Potencial de facturación (MXN)</label>
+            <input type="number" name="potencial_facturacion" placeholder="0" min="0" step="1000">
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-group">
+            <label>Etiquetas</label>
+            <div class="tag-input-wrap" id="tagInputWrap" onclick="document.getElementById('tagBare').focus()">
+              <input type="text" class="tag-input-bare" id="tagBare" placeholder="Escribe y presiona Enter…">
+            </div>
+            <input type="hidden" name="etiquetas" id="etiquetasHidden" value="[]">
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-group">
+            <label>Notas internas</label>
+            <textarea name="notas" placeholder="Notas privadas del equipo…" rows="2"></textarea>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:.84rem;cursor:pointer;">
+            <input type="checkbox" name="invitar_portal" style="width:16px;height:16px;">
+            Invitar al portal de clientes (se enviará acceso por correo)
+          </label>
+        </div>
+
+        <div id="crearError" style="color:var(--danger);font-size:.82rem;margin-top:10px;display:none;"></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCrearModal()">Cancelar</button>
+      <button class="btn btn-primary" id="crearSubmitBtn" onclick="submitCrear()">
+        <span id="crearBtnText">Crear cliente</span>
+        <span id="crearBtnSpin" style="display:none;">…</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL — IMPORTACIÓN MASIVA
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-box" style="max-width:720px;">
+    <div class="modal-header">
+      <span class="modal-title">Importar clientes desde Excel</span>
+      <button class="modal-close" onclick="closeImportModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.84rem;color:var(--text-2);margin-bottom:14px;">
+        Sube un archivo .xlsx usando la plantilla oficial. Las filas con errores se omitirán y podrás revisarlas.
+      </p>
+      <a href="{{ url_for('clientes.plantilla_importar') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">
+        ⬇ Descargar plantilla Excel
+      </a>
+
+      <!-- Drop zone -->
+      <div class="import-drop-zone" id="importDropZone" onclick="document.getElementById('importFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleImportDrop(event)">
+        <div class="import-drop-icon">{{ icon_folder(32, 32) }}</div>
+        <div class="import-drop-text" id="importDropText">Arrastra el archivo aquí o haz clic para seleccionar</div>
+        <div class="import-drop-sub">.xlsx — hasta 5 MB</div>
+      </div>
+      <input type="file" id="importFileInput" class="import-file-input" accept=".xlsx"
+             onchange="handleImportFile(this.files[0])">
+
+      <!-- Preview -->
+      <div class="import-preview-wrap" id="importPreviewWrap">
+        <div class="import-stats">
+          <div class="import-stat ok">
+            <div class="stat-count" id="importOkCount">0</div>
+            <div>Filas válidas</div>
+          </div>
+          <div class="import-stat err">
+            <div class="stat-count" id="importErrCount">0</div>
+            <div>Filas con errores</div>
+          </div>
+        </div>
+
+        <div class="import-preview-table" id="importPreviewTable"></div>
+
+        <div id="importPreviewErr" style="display:none;margin-top:10px;">
+          <div style="font-size:.8rem;font-weight:700;color:var(--danger);margin-bottom:6px;">Filas con errores (no se importarán):</div>
+          <div class="import-preview-table" id="importErrTable"></div>
+        </div>
+      </div>
+
+      <div id="importFeedback" style="margin-top:12px;font-size:.84rem;display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeImportModal()">Cancelar</button>
+      <button class="btn btn-primary" id="importConfirmBtn" disabled onclick="confirmarImport()">
+        <span id="importBtnText">Importar</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     CONFIRM DELETE overlay
+────────────────────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:var(--danger);">Eliminar cliente</span>
+      <button class="modal-close" onclick="document.getElementById('deleteModal').classList.remove('open')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.88rem;color:var(--text-2);">
+        ¿Seguro que deseas eliminar a <strong id="deleteClienteName"></strong>?<br>
+        Esta acción no se puede deshacer.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('deleteModal').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-danger" id="deleteConfirmBtn">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── View toggle ─────────────────────────────────────────────────────────────
+const ABOGADOS_DATA = {{ abogados | tojson }};
+let currentView = localStorage.getItem("lexos_clientes_view") || "table";
+
+function setView(v) {
+  currentView = v;
+  localStorage.setItem("lexos_clientes_view", v);
+  document.getElementById("viewTable").style.display = v === "table" ? "block" : "none";
+  document.getElementById("viewCards").style.display = v === "cards" ? "block" : "none";
+  document.getElementById("btnTable").classList.toggle("active", v === "table");
+  document.getElementById("btnCards").classList.toggle("active", v === "cards");
+}
+setView(currentView);
+
+// ── Filters ──────────────────────────────────────────────────────────────────
+const filtersPanel = document.getElementById("filtersPanel");
+{% if estatus or tipo or abogado or desde or hasta %}
+filtersPanel.classList.add("open");
+{% endif %}
+
+function toggleFilters() {
+  filtersPanel.classList.toggle("open");
+}
+function applyFilters() {
+  document.getElementById("hEstatus").value = document.getElementById("fEstatus").value;
+  document.getElementById("hTipo").value    = document.getElementById("fTipo").value;
+  document.getElementById("hAbogado").value = document.getElementById("fAbogado").value;
+  document.getElementById("hDesde").value   = document.getElementById("fDesde").value;
+  document.getElementById("hHasta").value   = document.getElementById("fHasta").value;
+  document.getElementById("searchForm").submit();
+}
+function clearFilters() {
+  ["fEstatus","fTipo","fAbogado","fDesde","fHasta"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  applyFilters();
+}
+
+// Debounce search
+let searchTimer;
+document.getElementById("searchInput").addEventListener("input", function() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => document.getElementById("searchForm").submit(), 300);
+});
+
+// ── Tipo tabs ────────────────────────────────────────────────────────────────
+function setTipo(tipo) {
+  document.getElementById("tipoInput").value = tipo;
+  document.getElementById("panelFisica").classList.toggle("active", tipo === "persona_fisica");
+  document.getElementById("panelMoral").classList.toggle("active",  tipo === "persona_moral");
+  document.getElementById("tabFisica").classList.toggle("active",   tipo === "persona_fisica");
+  document.getElementById("tabMoral").classList.toggle("active",    tipo === "persona_moral");
+  // Swap required fields
+  document.getElementById("nombreFisica").required = tipo === "persona_fisica";
+  document.getElementById("razonSocial").required  = tipo === "persona_moral";
+}
+
+// ── Tag input ────────────────────────────────────────────────────────────────
+let tags = [];
+const tagBare = document.getElementById("tagBare");
+const tagWrap = document.getElementById("tagInputWrap");
+const etiquetasHidden = document.getElementById("etiquetasHidden");
+
+function renderTags() {
+  tagWrap.querySelectorAll(".tag").forEach(el => el.remove());
+  tags.forEach((t, i) => {
+    const span = document.createElement("span");
+    span.className = "tag";
+    span.textContent = t;
+    span.onclick = () => { tags.splice(i, 1); renderTags(); };
+    tagWrap.insertBefore(span, tagBare);
+  });
+  etiquetasHidden.value = JSON.stringify(tags);
+}
+
+tagBare.addEventListener("keydown", function(e) {
+  if (e.key === "Enter" || e.key === ",") {
+    e.preventDefault();
+    const val = this.value.trim().replace(/,/g, "");
+    if (val && !tags.includes(val)) { tags.push(val); renderTags(); }
+    this.value = "";
+  } else if (e.key === "Backspace" && !this.value && tags.length) {
+    tags.pop();
+    renderTags();
+  }
+});
+
+// ── Create modal ─────────────────────────────────────────────────────────────
+function openCrearModal() {
+  document.getElementById("crearModal").classList.add("open");
+  setTipo("persona_fisica");
+  document.getElementById("crearForm").reset();
+  tags = [];
+  renderTags();
+  document.getElementById("crearError").style.display = "none";
+}
+function closeCrearModal() {
+  document.getElementById("crearModal").classList.remove("open");
+}
+
+async function submitCrear() {
+  const form = document.getElementById("crearForm");
+  const btn  = document.getElementById("crearSubmitBtn");
+  const errorEl = document.getElementById("crearError");
+
+  // Validate required
+  const tipo = document.getElementById("tipoInput").value;
+  if (tipo === "persona_fisica" && !document.getElementById("nombreFisica").value.trim()) {
+    errorEl.textContent = "El nombre es requerido.";
+    errorEl.style.display = "block";
+    return;
+  }
+  if (tipo === "persona_moral" && !document.getElementById("razonSocial").value.trim()) {
+    errorEl.textContent = "La razón social es requerida.";
+    errorEl.style.display = "block";
+    return;
+  }
+
+  btn.disabled = true;
+  document.getElementById("crearBtnText").style.display = "none";
+  document.getElementById("crearBtnSpin").style.display = "inline";
+  errorEl.style.display = "none";
+
+  try {
+    const fd = new FormData(form);
+    const res = await fetch("{{ url_for('clientes.ajax_crear') }}", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      window.location.href = data.redirect;
+    } else {
+      errorEl.textContent = data.error || "Error al crear cliente.";
+      errorEl.style.display = "block";
+    }
+  } catch (e) {
+    errorEl.textContent = "Error de conexión.";
+    errorEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+    document.getElementById("crearBtnText").style.display = "inline";
+    document.getElementById("crearBtnSpin").style.display = "none";
+  }
+}
+
+// Close modal on backdrop click
+document.getElementById("crearModal").addEventListener("click", function(e) {
+  if (e.target === this) closeCrearModal();
+});
+
+// ── Delete modal ─────────────────────────────────────────────────────────────
+let deleteId = null;
+function confirmarEliminar(id, nombre) {
+  deleteId = id;
+  document.getElementById("deleteClienteName").textContent = nombre;
+  document.getElementById("deleteModal").classList.add("open");
+}
+document.getElementById("deleteConfirmBtn").addEventListener("click", async function() {
+  if (!deleteId) return;
+  this.disabled = true;
+  try {
+    const res = await fetch(`/clientes/${deleteId}/eliminar`, {
+      method: "POST",
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    });
+    const data = await res.json();
+    if (data.ok) window.location.reload();
+  } catch (e) {}
+  this.disabled = false;
+});
+document.getElementById("deleteModal").addEventListener("click", function(e) {
+  if (e.target === this) this.classList.remove("open");
+});
+
+// ── Import modal ──────────────────────────────────────────────────────────────
+let importRowsOk = [];
+
+function openImportModal() {
+  document.getElementById("importModal").classList.add("open");
+  resetImport();
+}
+function closeImportModal() {
+  document.getElementById("importModal").classList.remove("open");
+}
+function resetImport() {
+  importRowsOk = [];
+  document.getElementById("importPreviewWrap").classList.remove("open");
+  document.getElementById("importDropText").textContent = "Arrastra el archivo aquí o haz clic para seleccionar";
+  document.getElementById("importConfirmBtn").disabled = true;
+  document.getElementById("importFeedback").style.display = "none";
+  document.getElementById("importFileInput").value = "";
+}
+function handleImportDrop(e) {
+  e.preventDefault();
+  document.getElementById("importDropZone").classList.remove("drag-over");
+  const file = e.dataTransfer.files[0];
+  if (file) handleImportFile(file);
+}
+async function handleImportFile(file) {
+  if (!file) return;
+  if (!file.name.endsWith(".xlsx")) {
+    alert("Solo se aceptan archivos .xlsx");
+    return;
+  }
+  document.getElementById("importDropText").innerHTML = `{{ icon_file_text(14,14) }} ${file.name}`;
+
+  const fd = new FormData();
+  fd.append("archivo", file);
+  const res  = await fetch("{{ url_for('clientes.importar_preview') }}", { method: "POST", body: fd });
+  const data = await res.json();
+
+  if (!data.ok) {
+    alert("Error: " + data.error);
+    return;
+  }
+
+  importRowsOk = data.rows_ok;
+  document.getElementById("importOkCount").textContent  = data.total_ok;
+  document.getElementById("importErrCount").textContent = data.total_err;
+  document.getElementById("importPreviewWrap").classList.add("open");
+  document.getElementById("importConfirmBtn").disabled = data.total_ok === 0;
+
+  // Preview table (ok rows)
+  const cols = ["fila","tipo","nombre","apellidos","razon_social","rfc","email","celular","estatus"];
+  let html = `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>`;
+  data.rows_ok.slice(0, 15).forEach(r => {
+    html += `<tr>${cols.map(c => `<td>${r[c]||''}</td>`).join("")}</tr>`;
+  });
+  if (data.rows_ok.length > 15) html += `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--text-3);">… y ${data.rows_ok.length - 15} más</td></tr>`;
+  html += "</tbody></table>";
+  document.getElementById("importPreviewTable").innerHTML = html;
+
+  // Error rows
+  if (data.total_err > 0) {
+    document.getElementById("importPreviewErr").style.display = "block";
+    let ehtml = `<table><thead><tr><th>Fila</th><th>Nombre</th><th>Error</th></tr></thead><tbody>`;
+    data.rows_err.forEach(r => {
+      ehtml += `<tr class="err-row"><td>${r.fila}</td><td>${r.nombre||'—'}</td><td class="import-err-msg">${(r.errores||[]).join(', ')}</td></tr>`;
+    });
+    ehtml += "</tbody></table>";
+    document.getElementById("importErrTable").innerHTML = ehtml;
+  } else {
+    document.getElementById("importPreviewErr").style.display = "none";
+  }
+}
+async function confirmarImport() {
+  const btn = document.getElementById("importConfirmBtn");
+  btn.disabled = true;
+  document.getElementById("importBtnText").textContent = "Importando…";
+  try {
+    const res = await fetch("{{ url_for('clientes.importar_confirmar') }}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: importRowsOk }),
+    });
+    const data = await res.json();
+    const fb = document.getElementById("importFeedback");
+    if (data.ok) {
+      fb.innerHTML = `<span style="color:var(--success)">✓ Se importaron ${data.insertados} clientes correctamente.</span>`;
+      fb.style.display = "block";
+      setTimeout(() => { closeImportModal(); window.location.reload(); }, 1500);
+    } else {
+      fb.innerHTML = `<span style="color:var(--danger)">Error: ${data.error}</span>`;
+      fb.style.display = "block";
+    }
+  } catch (e) {
+    alert("Error de conexión.");
+  }
+  btn.disabled = false;
+  document.getElementById("importBtnText").textContent = "Importar";
+}
+document.getElementById("importModal").addEventListener("click", function(e) {
+  if (e.target === this) closeImportModal();
+});
+
+// Close import dropdown when clicking elsewhere
+document.addEventListener("click", function(e) {
+  if (!e.target.closest("#importMenuBtn") && !e.target.closest("#importMenu")) {
+    const m = document.getElementById("importMenu");
+    if (m) m.classList.remove("open");
+  }
+});
+
+// Open via anchor
+if (window.location.hash === "#nuevo") {
+  openCrearModal();
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+}
+
+function closeAllTbDropdowns() {
+  document.querySelectorAll(".tb-dropdown.open,.tb-dropdown").forEach(el => el.classList.remove("open"));
+}
+</script>
+{% endblock %}

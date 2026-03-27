@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Cliente — LexOS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-icon">Lx</div>
+      <div class="logo-text">
+        <h1>Portal Clientes</h1>
+        <p>{{ tenant.nombre_despacho if tenant else 'LexOS' }}</p>
+      </div>
+    </div>
+
+    <h2 class="auth-title">Acceso para clientes</h2>
+    <p class="auth-subtitle">Ingresa el token de acceso que te proporcionó el despacho.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}" style="margin-bottom:16px;">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('portal.cliente_acceso') }}">
+      <div class="form-group">
+        <label class="form-label">Token de acceso</label>
+        <input class="form-control" type="text" name="token"
+               placeholder="Pega aquí tu token…" required autofocus
+               style="font-family:monospace; letter-spacing:.5px;">
+      </div>
+      <button type="submit" class="btn btn-primary w-full" style="margin-top:8px; padding:11px;">
+        Ingresar al portal
+      </button>
+    </form>
+
+    <p style="text-align:center; margin-top:24px; font-size:.75rem; color:var(--text-3);">
+      ¿Eres del despacho? <a href="{{ url_for('auth.login') }}">Iniciar sesión</a>
+    </p>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

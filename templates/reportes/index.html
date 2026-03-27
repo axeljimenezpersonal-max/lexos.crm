@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+{% block title %}Reportes{% endblock %}
+{% block page_title %}Reportes{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/reportes.css') }}">
+<style>
+.rpt-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:20px; gap:0; overflow-x:auto; scrollbar-width:none; }
+.rpt-tab { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.15em; text-transform:uppercase; padding:10px 18px; color:var(--ash); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; background:none; border-top:none; border-left:none; border-right:none; white-space:nowrap; display:flex; align-items:center; gap:6px; text-decoration:none; }
+.rpt-tab:hover { color:var(--fog); }
+.rpt-tab.active { color:var(--e); border-bottom-color:var(--e); }
+.rpt-card { background:var(--c); border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:16px; transition:border-color .2s; }
+.rpt-card:hover { border-color:var(--border-m); }
+.rpt-card-title { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:300; color:var(--fog); margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+.rpt-table { width:100%; border-collapse:collapse; }
+.rpt-table th { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash); padding:10px 14px; border-bottom:1px solid var(--border); font-weight:400; text-align:left; }
+.rpt-table td { padding:11px 14px; border-bottom:1px solid var(--border); font-family:'Libre Baskerville',serif; font-size:12px; color:var(--fog); vertical-align:middle; }
+.rpt-table tr:hover td { background:rgba(0,223,162,.025); }
+.rpt-table tr:last-child td { border-bottom:none; }
+.rpt-export-btn { display:inline-flex; align-items:center; gap:6px; font-family:'DM Mono',monospace; font-size:9px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; padding:7px 14px; border-radius:6px; border:1px solid var(--border-m); background:transparent; color:var(--e); cursor:pointer; transition:all .15s; text-decoration:none; }
+.rpt-export-btn:hover { background:var(--edim); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <div class="page-eyebrow">Gestión · LexOS</div>
+  <h1 class="page-title">Reportes</h1>
+  <div class="page-meta-row">
+    <span></span>
+    <div class="page-actions"></div>
+  </div>
+</div>
+<div class="page-divider"></div>
+
+<div class="rpt-layout">
+  <!-- ══════════════════════════════════════════════
+       SIDEBAR — Carpetas y reportes guardados
+       ══════════════════════════════════════════════ -->
+  <div class="rpt-sidebar">
+    <div class="rpt-sidebar-header">
+      <span>Mis reportes</span>
+      <button onclick="modalCarpeta()" title="Nueva carpeta">+ Carpeta</button>
+    </div>
+    <div class="rpt-sidebar-body">
+      <!-- Sin carpeta -->
+      <div class="rpt-folder active" onclick="filterFolder(null)" data-fid="">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        <span class="rpt-folder-name">Todos</span>
+      </div>
+
+      {% for c in carpetas %}
+      <div class="rpt-folder" onclick="filterFolder({{ c.id }})" data-fid="{{ c.id }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span class="rpt-folder-name">{{ c.nombre }}</span>
+        <button class="rpt-folder-del" onclick="event.stopPropagation();delCarpeta({{ c.id }})" title="Eliminar">&times;</button>
+      </div>
+      {% endfor %}
+
+      <div class="rpt-sep"></div>
+
+      <!-- Reportes guardados -->
+      {% for r in guardados %}
+      <div class="rpt-saved-item" data-fid="{{ r.carpeta_id or '' }}" data-rid="{{ r.id }}" onclick="loadSaved({{ r.id }}, '{{ r.tipo }}', '{{ r.filtros_json|e }}', '{{ r.nombre|e }}')">
+        <span class="rpt-saved-badge">{{ r.tipo[:3] }}</span>
+        <span>{{ r.nombre }}</span>
+        <button class="rpt-saved-del" onclick="event.stopPropagation();delSaved({{ r.id }})" title="Eliminar">&times;</button>
+      </div>
+      {% endfor %}
+
+      {% if not guardados %}
+      <div style="padding:16px;text-align:center;color:var(--ash);font-family:'DM Mono',monospace;font-size:.7rem;">
+        Sin reportes guardados
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       MAIN
+       ══════════════════════════════════════════════ -->
+  <div class="rpt-main">
+    <!-- Tipo de reporte -->
+    <div class="rpt-types-grid">
+      {% for t in tipos_reporte %}
+      <div class="rpt-type-card" data-tipo="{{ t.id }}" onclick="selectType('{{ t.id }}')">
+        <div class="rpt-type-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            {% if t.icon == 'file-text' %}
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            {% elif t.icon == 'users' %}
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            {% elif t.icon == 'credit-card' %}
+            <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+            {% elif t.icon == 'dollar-sign' %}
+            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            {% elif t.icon == 'activity' %}
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            {% elif t.icon == 'alert-triangle' %}
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            {% endif %}
+          </svg>
+        </div>
+        <div class="rpt-type-label">{{ t.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Filtros -->
+    <div class="rpt-card" id="filtersPanel" style="display:none;">
+      <div class="rpt-card-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46"/></svg>
+        Filtros del reporte
+      </div>
+
+      <!-- Asuntos filters -->
+      <div class="rpt-filters-grid" id="filt-asuntos" style="display:none;">
+        <div class="rpt-fg">
+          <label class="lex-label">Estado</label>
+          <select class="lex-input" id="f-asuntos-estado"><option value="">Todos</option>
+            <option value="activo">Activo</option><option value="completado">Completado</option>
+            <option value="archivado">Archivado</option></select>
+        </div>
+        <div class="rpt-fg">
+          <label class="lex-label">Tipo</label>
+          <select class="lex-input" id="f-asuntos-tipo"><option value="">Todos</option>
+            {% for t in tipos_asunto %}<option value="{{ t }}">{{ t|capitalize }}</option>{% endfor %}</select>
+        </div>
+        <div class="rpt-fg">
+          <label class="lex-label">Abogado</label>
+          <select class="lex-input" id="f-asuntos-abogado"><option value="">Todos</option>
+            {% for a in abogados %}<option value="{{ a.id }}">{{ a.nombre }} {{ a.apellidos }}</option>{% endfor %}</select>
+        </div>
+        <div class="rpt-fg"><label class="lex-label">Desde</label><input type="date" class="lex-input" id="f-asuntos-desde"></div>
+        <div class="rpt-fg"><label class="lex-label">Hasta</label><input type="date" class="lex-input" id="f-asuntos-hasta"></div>
+      </div>
+
+      <!-- Clientes filters -->
+      <div class="rpt-filters-grid" id="filt-clientes" style="display:none;">
+        <div class="rpt-fg">
+          <label class="lex-label">Tipo</label>
+          <select class="lex-input" id="f-clientes-tipo"><option value="">Todos</option>
+            <option value="persona_fisica">Persona Física</option>
+            <option value="persona_moral">Persona Moral</option></select>
+        </div>
+        <div class="rpt-fg">
+          <label class="lex-label">Estatus</label>
+          <select class="lex-input" id="f-clientes-estatus"><option value="">Todos</option>
+            <option value="activo">Activo</option><option value="prospecto">Prospecto</option>
+            <option value="inactivo">Inactivo</option></select>
+        </div>
+        <div class="rpt-fg"><label class="lex-label">Desde</label><input type="date" class="lex-input" id="f-clientes-desde"></div>
+        <div class="rpt-fg"><label class="lex-label">Hasta</label><input type="date" class="lex-input" id="f-clientes-hasta"></div>
+      </div>
+
+      <!-- Estado de cuenta filters -->
+      <div class="rpt-filters-grid" id="filt-estado_cuenta" style="display:none;">
+        <div class="rpt-fg">
+          <label class="lex-label">Estado</label>
+          <select class="lex-input" id="f-estado_cuenta-estado"><option value="">Todos</option>
+            <option value="pendiente">Pendiente</option><option value="pagado">Pagado</option>
+            <option value="vencido">Vencido</option><option value="abono">Abono</option></select>
+        </div>
+        <div class="rpt-fg"><label class="lex-label">Cliente ID</label><input type="number" class="lex-input" id="f-estado_cuenta-cliente_id" placeholder="Opcional"></div>
+        <div class="rpt-fg"><label class="lex-label">Desde</label><input type="date" class="lex-input" id="f-estado_cuenta-desde"></div>
+        <div class="rpt-fg"><label class="lex-label">Hasta</label><input type="date" class="lex-input" id="f-estado_cuenta-hasta"></div>
+      </div>
+
+      <!-- Facturación filters -->
+      <div class="rpt-filters-grid" id="filt-facturacion" style="display:none;">
+        <div class="rpt-fg">
+          <label class="lex-label">Moneda</label>
+          <select class="lex-input" id="f-facturacion-moneda"><option value="">Todas</option>
+            <option value="MXN">MXN</option><option value="USD">USD</option></select>
+        </div>
+        <div class="rpt-fg"><label class="lex-label">Desde</label><input type="date" class="lex-input" id="f-facturacion-desde"></div>
+        <div class="rpt-fg"><label class="lex-label">Hasta</label><input type="date" class="lex-input" id="f-facturacion-hasta"></div>
+      </div>
+
+      <!-- Actividad filters -->
+      <div class="rpt-filters-grid" id="filt-actividad" style="display:none;">
+        <div class="rpt-fg">
+          <label class="lex-label">Abogado</label>
+          <select class="lex-input" id="f-actividad-abogado"><option value="">Todos</option>
+            {% for a in abogados %}<option value="{{ a.id }}">{{ a.nombre }} {{ a.apellidos }}</option>{% endfor %}</select>
+        </div>
+        <div class="rpt-fg">
+          <label class="lex-label">Acción</label>
+          <select class="lex-input" id="f-actividad-accion"><option value="">Todas</option>
+            <option value="crear">Crear</option><option value="editar">Editar</option>
+            <option value="eliminar">Eliminar</option></select>
+        </div>
+        <div class="rpt-fg"><label class="lex-label">Desde</label><input type="date" class="lex-input" id="f-actividad-desde"></div>
+        <div class="rpt-fg"><label class="lex-label">Hasta</label><input type="date" class="lex-input" id="f-actividad-hasta"></div>
+      </div>
+
+      <!-- Vencimientos filters -->
+      <div class="rpt-filters-grid" id="filt-vencimientos" style="display:none;">
+        <div class="rpt-fg">
+          <label class="lex-label">Rango</label>
+          <select class="lex-input" id="f-vencimientos-rango">
+            <option value="30">Próximos 30 días</option>
+            <option value="7">Próximos 7 días</option>
+            <option value="90">Próximos 90 días</option>
+            <option value="vencidos">Ya vencidos</option></select>
+        </div>
+        <div class="rpt-fg">
+          <label class="lex-label">Abogado</label>
+          <select class="lex-input" id="f-vencimientos-abogado"><option value="">Todos</option>
+            {% for a in abogados %}<option value="{{ a.id }}">{{ a.nombre }} {{ a.apellidos }}</option>{% endfor %}</select>
+        </div>
+      </div>
+
+      <div class="rpt-filters-actions" style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-primary btn-sm" onclick="generarReporte()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Generar
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="modalGuardar()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Guardar
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="rpt-loading" id="loadingMsg">Generando reporte...</div>
+
+    <!-- Results -->
+    <div class="rpt-card" id="resultsPanel" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="rpt-card-title" id="resultsTitle" style="margin-bottom:0;">Resultados</span>
+          <span id="resultsCount" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--ash);text-transform:uppercase;"></span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="rpt-export-btn" onclick="exportar('excel')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Excel
+          </button>
+          <button class="rpt-export-btn" onclick="exportar('pdf')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            PDF
+          </button>
+        </div>
+      </div>
+      <div class="rpt-table-wrap" style="overflow-x:auto;">
+        <table class="rpt-table" id="resultsTable">
+          <thead id="resultsThead"></thead>
+          <tbody id="resultsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="rpt-empty" id="emptyState" style="text-align:center;padding:48px 20px;color:var(--ash);">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.35;margin-bottom:12px;">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <p style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;">Selecciona un tipo de reporte para comenzar</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODALES
+     ══════════════════════════════════════════════ -->
+
+<!-- Modal: Nueva carpeta -->
+<div class="rpt-modal-bg" id="modalCarpetaBg">
+  <div class="rpt-modal">
+    <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;color:var(--fog);margin-bottom:16px;">Nueva carpeta</h3>
+    <div class="rpt-fg" style="margin-bottom:16px;">
+      <label class="lex-label">Nombre</label>
+      <input type="text" class="lex-input" id="carpetaNombre" placeholder="Nombre de la carpeta">
+    </div>
+    <div class="rpt-modal-actions" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalCarpetaBg')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="crearCarpeta()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Guardar reporte -->
+<div class="rpt-modal-bg" id="modalGuardarBg">
+  <div class="rpt-modal">
+    <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;color:var(--fog);margin-bottom:16px;">Guardar reporte</h3>
+    <div class="rpt-fg" style="margin-bottom:12px;">
+      <label class="lex-label">Nombre</label>
+      <input type="text" class="lex-input" id="guardarNombre" placeholder="Nombre del reporte">
+    </div>
+    <div class="rpt-fg" style="margin-bottom:16px;">
+      <label class="lex-label">Carpeta</label>
+      <select class="lex-input" id="guardarCarpeta">
+        <option value="">Sin carpeta</option>
+        {% for c in carpetas %}
+        <option value="{{ c.id }}">{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="rpt-modal-actions" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modalGuardarBg')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarReporte()">Guardar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  let currentType = '';
+  let currentFilters = {};
+  let currentSavedId = null;
+  const PREFIX = '{{ url_for("reportes.index") }}'.replace(/\/$/,'');
+
+  // ── Type selection ──
+  window.selectType = function(tipo) {
+    currentType = tipo;
+    currentSavedId = null;
+    document.querySelectorAll('.rpt-type-card').forEach(c => c.classList.toggle('active', c.dataset.tipo === tipo));
+    document.querySelectorAll('[id^="filt-"]').forEach(f => f.style.display = 'none');
+    const fp = document.getElementById('filt-' + tipo);
+    if (fp) fp.style.display = '';
+    document.getElementById('filtersPanel').classList.add('open');
+    document.getElementById('filtersPanel').style.display = '';
+    document.getElementById('resultsPanel').classList.remove('open');
+    document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'none';
+  };
+
+  // ── Collect filters ──
+  function collectFilters() {
+    const filtDiv = document.getElementById('filt-' + currentType);
+    if (!filtDiv) return {};
+    const f = {};
+    filtDiv.querySelectorAll('select, input').forEach(el => {
+      const key = el.id.replace('f-' + currentType + '-', '');
+      if (el.value) f[key] = el.value;
+    });
+    return f;
+  }
+
+  // ── Set filters ──
+  function setFilters(tipo, filtros) {
+    if (typeof filtros === 'string') {
+      try { filtros = JSON.parse(filtros); } catch(e) { filtros = {}; }
+    }
+    const filtDiv = document.getElementById('filt-' + tipo);
+    if (!filtDiv) return;
+    filtDiv.querySelectorAll('select, input').forEach(el => {
+      const key = el.id.replace('f-' + tipo + '-', '');
+      el.value = filtros[key] || '';
+    });
+  }
+
+  // ── Generate report ──
+  window.generarReporte = function() {
+    if (!currentType) return;
+    currentFilters = collectFilters();
+    const loading = document.getElementById('loadingMsg');
+    const results = document.getElementById('resultsPanel');
+    loading.classList.add('show');
+    results.classList.remove('open');
+    results.style.display = 'none';
+
+    fetch(PREFIX + '/generar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tipo: currentType, filtros: currentFilters})
+    })
+    .then(r => r.json())
+    .then(data => {
+      loading.classList.remove('show');
+      if (!data.ok) { alert(data.error || 'Error'); return; }
+      renderTable(data.headers, data.columns, data.rows);
+      document.getElementById('resultsTitle').textContent =
+        (document.querySelector('.rpt-type-card.active .rpt-type-label') || {}).textContent || 'Resultados';
+      document.getElementById('resultsCount').textContent = data.total + ' registros';
+      results.classList.add('open');
+      results.style.display = '';
+      document.getElementById('emptyState').style.display = 'none';
+    })
+    .catch(err => { loading.classList.remove('show'); alert('Error de conexión'); });
+  };
+
+  function renderTable(headers, columns, rows) {
+    let thead = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+    let tbody = '';
+    if (rows.length === 0) {
+      tbody = `<tr><td colspan="${headers.length}" style="text-align:center;padding:32px;color:var(--ash);font-family:'DM Mono',monospace;font-size:11px;">Sin resultados</td></tr>`;
+    } else {
+      rows.forEach(r => {
+        tbody += '<tr>' + columns.map(c => `<td>${r[c] != null ? r[c] : '—'}</td>`).join('') + '</tr>';
+      });
+    }
+    document.getElementById('resultsThead').innerHTML = thead;
+    document.getElementById('resultsTbody').innerHTML = tbody;
+  }
+
+  // ── Export ──
+  window.exportar = function(fmt) {
+    if (!currentType) return;
+    const filtros = collectFilters();
+    const nombre = document.getElementById('resultsTitle').textContent || 'reporte';
+    fetch(PREFIX + '/exportar/' + fmt, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tipo: currentType, filtros: filtros, nombre: nombre})
+    })
+    .then(r => r.blob())
+    .then(blob => {
+      const ext = fmt === 'excel' ? 'xlsx' : 'pdf';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombre + '.' + ext;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  };
+
+  // ── Folder filter ──
+  window.filterFolder = function(fid) {
+    document.querySelectorAll('.rpt-folder').forEach(f => f.classList.toggle('active', f.dataset.fid == (fid || '')));
+    document.querySelectorAll('.rpt-saved-item').forEach(s => {
+      s.style.display = (fid === null || s.dataset.fid == fid || s.dataset.fid === '') ? '' : 'none';
+    });
+  };
+
+  // ── Load saved report ──
+  window.loadSaved = function(id, tipo, filtrosStr, nombre) {
+    currentSavedId = id;
+    selectType(tipo);
+    let f;
+    try { f = JSON.parse(filtrosStr); } catch(e) { f = {}; }
+    setFilters(tipo, f);
+    generarReporte();
+  };
+
+  // ── Carpeta CRUD ──
+  window.modalCarpeta = function() { document.getElementById('modalCarpetaBg').classList.add('open'); };
+  window.crearCarpeta = function() {
+    const n = document.getElementById('carpetaNombre').value.trim();
+    if (!n) return;
+    fetch(PREFIX + '/carpeta/crear', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'nombre=' + encodeURIComponent(n)})
+    .then(r => r.json()).then(() => location.reload());
+  };
+  window.delCarpeta = function(id) {
+    if (!confirm('¿Eliminar carpeta?')) return;
+    fetch(PREFIX + '/carpeta/' + id + '/eliminar', {method:'POST'}).then(() => location.reload());
+  };
+
+  // ── Save report ──
+  window.modalGuardar = function() {
+    if (!currentType) { alert('Selecciona un tipo de reporte primero'); return; }
+    document.getElementById('modalGuardarBg').classList.add('open');
+  };
+  window.guardarReporte = function() {
+    const nombre = document.getElementById('guardarNombre').value.trim();
+    if (!nombre) return;
+    const carpeta_id = document.getElementById('guardarCarpeta').value || null;
+    const filtros = collectFilters();
+    fetch(PREFIX + '/guardar', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({nombre, tipo: currentType, filtros, carpeta_id, id: currentSavedId})
+    }).then(r => r.json()).then(d => { if(d.ok) location.reload(); else alert(d.error||'Error'); });
+  };
+  window.delSaved = function(id) {
+    if (!confirm('¿Eliminar reporte guardado?')) return;
+    fetch(PREFIX + '/guardado/' + id + '/eliminar', {method:'POST'}).then(() => location.reload());
+  };
+
+  // ── Modal helpers ──
+  window.closeModal = function(id) { document.getElementById(id).classList.remove('open'); };
+  document.querySelectorAll('.rpt-modal-bg').forEach(bg => {
+    bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
+  });
+})();
+</script>
+{% endblock %}

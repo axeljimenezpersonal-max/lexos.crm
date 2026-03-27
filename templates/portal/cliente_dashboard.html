@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Portal — LexOS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+<!-- Portal header -->
+<header style="background:var(--bg-2); border-bottom:1px solid var(--border); padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between;">
+  <div class="d-flex align-center gap-3">
+    <div class="logo-icon" style="width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:.8rem;">Lx</div>
+    <div>
+      <div style="font-size:.85rem; font-weight:700; color:var(--text);">Portal Clientes</div>
+      <div style="font-size:.65rem; color:var(--text-3);">{{ tenant.nombre_despacho if tenant else 'LexOS' }}</div>
+    </div>
+  </div>
+  <div class="d-flex align-center gap-3">
+    <span class="text-sm text-muted">{{ session.get('portal_cliente_nombre','') }}</span>
+    <a href="{{ url_for('portal.cliente_logout') }}" class="btn btn-ghost btn-sm">Salir</a>
+  </div>
+</header>
+
+<div style="max-width:900px; margin:0 auto; padding:32px 24px;">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }}" data-auto-dismiss="4000">{{ msg }}</div>
+    {% endfor %}{% endif %}
+  {% endwith %}
+
+  <h1 style="font-size:1.3rem; font-weight:700; margin-bottom:6px;">Bienvenido, {{ session.get('portal_cliente_nombre','') }}</h1>
+  <p class="text-muted text-sm" style="margin-bottom:28px;">Aquí puedes consultar el estado de tus asuntos y comunicarte con el despacho.</p>
+
+  <!-- Mis asuntos -->
+  <div class="card mb-4">
+    <div class="card-header"><span class="card-title">Mis asuntos</span></div>
+    {% if asuntos %}
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table>
+        <thead><tr><th>Expediente</th><th>Asunto</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <tbody>
+        {% for a in asuntos %}
+        <tr>
+          <td><span class="text-xs text-muted">{{ a.numero_expediente or '—' }}</span></td>
+          <td><strong>{{ a.titulo }}</strong></td>
+          <td><span class="text-xs text-muted">{{ a.tipo_asunto or '—' }}</span></td>
+          <td><span class="badge badge-{{ a.estado }}">{{ a.estado }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted text-sm" style="padding:16px 0;">No tienes asuntos registrados aún.</p>
+    {% endif %}
+  </div>
+
+  <!-- Cobros -->
+  <div class="card mb-4">
+    <div class="card-header"><span class="card-title">Estado de cuenta</span></div>
+    {% if cobros %}
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table>
+        <thead><tr><th>Concepto</th><th>Monto</th><th>Estado</th><th>Vencimiento</th></tr></thead>
+        <tbody>
+        {% for c in cobros %}
+        <tr>
+          <td>{{ c.concepto }}</td>
+          <td class="fw-600">${{ "{:,.2f}".format(c.monto) }} {{ c.moneda }}</td>
+          <td><span class="badge badge-{{ c.estado }}">{{ c.estado }}</span></td>
+          <td><span class="text-xs text-muted">{{ c.fecha_vencimiento or '—' }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted text-sm" style="padding:16px 0;">Sin cobros registrados.</p>
+    {% endif %}
+  </div>
+
+  <!-- Mensajes -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start;">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Mensajes con el despacho</span></div>
+      {% if mensajes %}
+      <div style="max-height:320px; overflow-y:auto;">
+        {% for m in mensajes %}
+        <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+          <div class="d-flex justify-between align-center mb-1">
+            <span class="badge badge-{{ 'activo' if m.remitente=='despacho' else 'pendiente' }}">{{ m.remitente }}</span>
+            <span class="text-xs text-muted">{{ m.fecha[:16] if m.fecha else '' }}</span>
+          </div>
+          <p class="text-sm" style="color:var(--text-2); line-height:1.5;">{{ m.mensaje }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted text-sm" style="padding:8px 0;">Sin mensajes todavía.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Enviar mensaje</span></div>
+      <form method="POST" action="{{ url_for('portal.cliente_mensaje') }}">
+        <div class="form-group">
+          <label class="form-label">Asunto relacionado (opcional)</label>
+          <select class="form-control" name="asunto_id">
+            <option value="">— General —</option>
+            {% for a in asuntos %}
+            <option value="{{ a.id }}">{{ a.titulo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mensaje</label>
+          <textarea class="form-control" name="mensaje" rows="4"
+                    placeholder="Escribe tu consulta o comentario…" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Enviar mensaje</button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

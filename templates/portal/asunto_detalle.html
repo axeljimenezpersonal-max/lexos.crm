@@ -1,0 +1,102 @@
+{% extends "portal/base_portal.html" %}
+{% block title %}{{ asunto.titulo }}{% endblock %}
+
+{% block content %}
+<div class="ptl-page-header">
+  <a href="{{ url_for('portal.cliente_asuntos') }}" class="ptl-back">← Mis Asuntos</a>
+  <h1>{{ asunto.titulo }}</h1>
+</div>
+
+<!-- Info card -->
+<div class="ptl-detail-card">
+  <div class="ptl-detail-grid">
+    <div class="ptl-dg-item">
+      <div class="ptl-dg-label">Estado</div>
+      <span class="ptl-status ptl-status-{{ asunto.estado }}">{{ asunto.estado }}</span>
+    </div>
+    <div class="ptl-dg-item">
+      <div class="ptl-dg-label">Tipo</div>
+      <div>{{ asunto.tipo_asunto|capitalize if asunto.tipo_asunto else '—' }}</div>
+    </div>
+    <div class="ptl-dg-item">
+      <div class="ptl-dg-label">Expediente</div>
+      <div>{{ asunto.numero_expediente or '—' }}</div>
+    </div>
+    <div class="ptl-dg-item">
+      <div class="ptl-dg-label">Abogado</div>
+      <div>{{ abogado_nombre }}</div>
+    </div>
+    {% if asunto.fecha_limite %}
+    <div class="ptl-dg-item">
+      <div class="ptl-dg-label">Fecha límite</div>
+      <div>{{ asunto.fecha_limite }}</div>
+    </div>
+    {% endif %}
+    <div class="ptl-dg-item">
+      <div class="ptl-dg-label">Abierto</div>
+      <div>{{ asunto.fecha_alta[:10] if asunto.fecha_alta else '—' }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Últimas actividades -->
+<div class="ptl-section">
+  <h2>Últimas actividades</h2>
+  {% if actividades %}
+  <div class="ptl-timeline">
+    {% for a in actividades %}
+    <div class="ptl-tl-item">
+      <div class="ptl-tl-dot {{ 'done' if a.realizado else '' }}"></div>
+      <div class="ptl-tl-content">
+        <div class="ptl-tl-title">{{ a.titulo }}</div>
+        <div class="ptl-tl-meta">{{ a.tipo|capitalize if a.tipo else '' }} · {{ a.fecha[:16] if a.fecha else '' }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="ptl-text-muted">Sin actividades registradas.</p>
+  {% endif %}
+</div>
+
+<!-- Notas / preguntas al abogado -->
+<div class="ptl-section">
+  <h2>Preguntas al abogado</h2>
+
+  {% if notas_cliente %}
+  <div class="ptl-notes-list">
+    {% for n in notas_cliente %}
+    <div class="ptl-note {{ 'ptl-note-despacho' if n.remitente == 'despacho' else 'ptl-note-cliente' }}">
+      <div class="ptl-note-meta">
+        {{ 'Despacho' if n.remitente == 'despacho' else 'Tú' }} · {{ n.fecha[:16] if n.fecha else '' }}
+      </div>
+      <div class="ptl-note-text">{{ n.mensaje }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <form class="ptl-note-form" onsubmit="enviarNota(event)">
+    <textarea id="notaTexto" placeholder="Escribe tu pregunta o comentario..." rows="3"></textarea>
+    <button type="submit" class="ptl-btn ptl-btn-primary">Enviar</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function enviarNota(e) {
+  e.preventDefault();
+  const msg = document.getElementById('notaTexto').value.trim();
+  if (!msg) return;
+  fetch('{{ url_for("portal.cliente_asunto_nota", asunto_id=asunto.id) }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'mensaje=' + encodeURIComponent(msg)
+  }).then(r => r.json()).then(d => {
+    if (d.ok) location.reload();
+    else alert(d.error || 'Error');
+  });
+}
+</script>
+{% endblock %}

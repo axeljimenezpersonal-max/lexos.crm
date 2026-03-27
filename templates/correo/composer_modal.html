@@ -1,0 +1,811 @@
+{% from "components/icons.html" import icon_link, icon_file_text, icon_edit, icon_chart, icon_image, icon_alert_triangle, icon_paperclip %}
+{# ═══════════════════════════════════════════════════════════════════════════
+   EMAIL COMPOSER MODAL — Reusable include
+   Usage: {% include "correo/composer_modal.html" %}
+   Then call openEmailComposer({para, asunto, asunto_id}) from JS
+   ═══════════════════════════════════════════════════════════════════════════ #}
+
+<!-- Composer Overlay -->
+<div class="emc-overlay" id="emcOverlay">
+  <div class="emc-modal" id="emcModal">
+
+    <!-- Header -->
+    <div class="emc-header">
+      <div class="emc-header-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span class="emc-header-title">Nuevo correo</span>
+      </div>
+      <button class="emc-close" onclick="closeEmailComposer()">&times;</button>
+    </div>
+
+    <!-- Gmail status banner -->
+    <div class="emc-gmail-banner" id="emcGmailBanner">
+      <div class="emc-gmail-connected" id="emcGmailConnected" style="display:none">
+        <span class="emc-gmail-dot"></span>
+        Enviando como: <strong id="emcGmailEmail"></strong>
+      </div>
+      <div class="emc-gmail-disconnected" id="emcGmailDisconnected" style="display:none">
+        <span class="emc-warn-icon">{{ icon_alert_triangle(14, 14) }}</span>
+        Conecta tu cuenta Gmail para enviar correos desde LexOS
+        <a href="{{ url_for('correo.gmail_connect') }}" class="emc-gmail-connect-btn" target="_blank">Conectar Gmail →</a>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="emc-body">
+
+      <!-- FROM (readonly) -->
+      <div class="emc-field emc-field-from" id="emcFromField">
+        <label>De</label>
+        <div class="emc-from-display" id="emcFromDisplay">
+          <span class="emc-from-avatar" id="emcFromAvatar">AJ</span>
+          <span id="emcFromName">Cargando...</span>
+        </div>
+      </div>
+
+      <!-- TO -->
+      <div class="emc-field">
+        <div class="emc-field-header">
+          <label>Para</label>
+          <div class="emc-cc-toggles">
+            <button class="emc-cc-toggle" id="emcCCToggle" onclick="toggleEMCField('cc')">+ CC</button>
+            <button class="emc-cc-toggle" id="emcCCOToggle" onclick="toggleEMCField('cco')">+ CCO</button>
+          </div>
+        </div>
+        <div class="emc-chips-wrap" id="emcToWrap">
+          <div class="emc-chips" id="emcToChips"></div>
+          <input type="text" class="emc-chip-input" id="emcToInput"
+                 placeholder="Buscar contacto o escribir correo..."
+                 oninput="emcSearchContacts(this, 'to')"
+                 onkeydown="emcInputKeydown(event, 'to')">
+          <div class="emc-autocomplete" id="emcToAutocomplete"></div>
+        </div>
+      </div>
+
+      <!-- CC (hidden) -->
+      <div class="emc-field emc-field-cc" id="emcCCField" style="display:none">
+        <label>CC</label>
+        <div class="emc-chips-wrap" id="emcCCWrap">
+          <div class="emc-chips" id="emcCCChips"></div>
+          <input type="text" class="emc-chip-input" id="emcCCInput"
+                 placeholder="CC..."
+                 oninput="emcSearchContacts(this, 'cc')"
+                 onkeydown="emcInputKeydown(event, 'cc')">
+          <div class="emc-autocomplete" id="emcCCAutocomplete"></div>
+        </div>
+      </div>
+
+      <!-- CCO (hidden) -->
+      <div class="emc-field emc-field-cc" id="emcCCOField" style="display:none">
+        <label>CCO</label>
+        <div class="emc-chips-wrap" id="emcCCOWrap">
+          <div class="emc-chips" id="emcCCOChips"></div>
+          <input type="text" class="emc-chip-input" id="emcCCOInput"
+                 placeholder="CCO..."
+                 oninput="emcSearchContacts(this, 'cco')"
+                 onkeydown="emcInputKeydown(event, 'cco')">
+          <div class="emc-autocomplete" id="emcCCOAutocomplete"></div>
+        </div>
+      </div>
+
+      <!-- SUBJECT -->
+      <div class="emc-field">
+        <label>Asunto</label>
+        <div class="emc-subject-wrap">
+          <input type="text" class="emc-subject" id="emcSubject" placeholder="Asunto del correo" maxlength="120">
+          <span class="emc-char-count" id="emcCharCount">0/120</span>
+        </div>
+      </div>
+
+      <!-- EDITOR -->
+      <div class="emc-editor-wrap">
+        <div class="emc-toolbar">
+          <button type="button" onclick="emcExec('bold')" title="Negrita"><b>B</b></button>
+          <button type="button" onclick="emcExec('italic')" title="Cursiva"><i>I</i></button>
+          <button type="button" onclick="emcExec('underline')" title="Subrayar"><u>U</u></button>
+          <span class="emc-toolbar-sep"></span>
+          <button type="button" onclick="emcExec('insertUnorderedList')" title="Lista">&#8226;</button>
+          <button type="button" onclick="emcExec('insertOrderedList')" title="Lista numerada">1.</button>
+          <span class="emc-toolbar-sep"></span>
+          <button type="button" onclick="emcInsertLink()" title="Link">{{ icon_link(14,14) }}</button>
+          <button type="button" onclick="emcExec('removeFormat')" title="Limpiar formato">✕</button>
+        </div>
+        <div class="emc-editor" id="emcEditor" contenteditable="true"></div>
+        <div class="emc-firma-separator" id="emcFirmaSep" style="display:none">
+          <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 8px">
+        </div>
+        <div class="emc-firma" id="emcFirma"></div>
+      </div>
+
+      <!-- ATTACHMENTS -->
+      <div class="emc-attachments" id="emcAttachments" style="display:none">
+        <div class="emc-att-chips" id="emcAttChips"></div>
+        <div class="emc-att-bar">
+          <div class="emc-att-usage" id="emcAttUsage">0 KB / 25 MB</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="emc-footer">
+      <div class="emc-footer-left">
+        <button class="emc-btn-discard" onclick="closeEmailComposer()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+          Descartar
+        </button>
+        <label class="emc-btn-attach" for="emcFileInput">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+          Adjuntar
+          <input type="file" id="emcFileInput" multiple style="display:none" onchange="emcAddFiles(this.files)">
+        </label>
+      </div>
+      <div class="emc-footer-right">
+        <button class="emc-btn-send" id="emcSendBtn" onclick="emcSend()" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+          <span id="emcSendText">Enviar</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="emc-toast" id="emcToast"></div>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   EMAIL COMPOSER MODAL STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+.emc-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s;
+  padding: 20px;
+}
+.emc-overlay.show { opacity: 1; pointer-events: auto; }
+
+.emc-modal {
+  width: 720px; max-width: 100%; max-height: calc(100vh - 40px);
+  background: #1E2130; border: 1px solid #2A2D3E;
+  border-radius: 16px; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 30px 100px rgba(0,0,0,.6);
+  transform: translateY(20px) scale(.97);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+.emc-overlay.show .emc-modal { transform: translateY(0) scale(1); }
+
+/* Header */
+.emc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid #2A2D3E;
+  background: #171923;
+}
+.emc-header-left { display: flex; align-items: center; gap: 10px; color: #E2E8F0; font-weight: 700; font-size: .92rem; }
+.emc-close { background: none; border: none; color: #64748B; font-size: 1.5rem; cursor: pointer; padding: 0 4px; transition: color .15s; }
+.emc-close:hover { color: #E2E8F0; }
+
+/* Gmail banner */
+.emc-gmail-banner { padding: 0 20px; }
+.emc-gmail-connected {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  background: #10B98110; border: 1px solid #10B98130; border-radius: 8px;
+  font-size: .78rem; color: #6EE7B7; margin-top: 12px;
+}
+.emc-gmail-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
+.emc-gmail-disconnected {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  background: #F59E0B10; border: 1px solid #F59E0B30; border-radius: 8px;
+  font-size: .78rem; color: #FCD34D; margin-top: 12px; flex-wrap: wrap;
+}
+.emc-warn-icon { font-size: 1rem; }
+.emc-gmail-connect-btn {
+  margin-left: auto; padding: 4px 12px; border-radius: 6px;
+  background: #F59E0B; color: #000; font-weight: 700; font-size: .72rem;
+  text-decoration: none; transition: opacity .15s;
+}
+.emc-gmail-connect-btn:hover { opacity: .85; }
+
+/* Body */
+.emc-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+
+/* Fields */
+.emc-field { margin-bottom: 12px; }
+.emc-field label {
+  display: block; font-size: .68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .7px;
+  color: #64748B; margin-bottom: 5px;
+}
+.emc-field-header { display: flex; align-items: center; justify-content: space-between; }
+.emc-cc-toggles { display: flex; gap: 6px; }
+.emc-cc-toggle {
+  background: none; border: none; color: var(--e);
+  font-size: .72rem; font-weight: 600; cursor: pointer;
+}
+.emc-cc-toggle:hover { text-decoration: underline; }
+
+/* FROM field */
+.emc-from-display {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: #2A2D3E; border-radius: 8px;
+  font-size: .82rem; color: #94A3B8;
+}
+.emc-from-avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--e); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .55rem; font-weight: 800; flex-shrink: 0;
+}
+
+/* Chip input */
+.emc-chips-wrap {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 6px 10px; background: #171923; border: 1px solid #2A2D3E;
+  border-radius: 8px; min-height: 38px; position: relative;
+  transition: border-color .15s;
+}
+.emc-chips-wrap:focus-within { border-color: var(--e); box-shadow: 0 0 0 2px rgba(0,223,162,.15); }
+.emc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Chips by type */
+.emc-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px 3px 6px; border-radius: 14px;
+  font-size: .75rem; font-weight: 600; max-width: 220px;
+}
+.emc-chip-cliente  { background: rgba(29,78,216,.2); border: 1px solid #3b82f6; color: #93c5fd; }
+.emc-chip-equipo   { background: rgba(109,40,217,.2); border: 1px solid #8b5cf6; color: #c4b5fd; }
+.emc-chip-contraparte { background: rgba(146,64,14,.2); border: 1px solid #f59e0b; color: #fcd34d; }
+.emc-chip-manual   { background: #374151; border: 1px solid #6b7280; color: #d1d5db; }
+.emc-chip-x {
+  background: none; border: none; color: inherit; cursor: pointer;
+  font-size: .85rem; padding: 0 2px; opacity: .6; transition: opacity .1s;
+}
+.emc-chip-x:hover { opacity: 1; }
+
+.emc-chip-input {
+  flex: 1; min-width: 120px; border: none; background: transparent;
+  color: #E2E8F0; font-size: .82rem; outline: none; padding: 4px 0;
+}
+.emc-chip-input::placeholder { color: #475569; }
+
+/* Autocomplete dropdown */
+.emc-autocomplete {
+  position: absolute; left: 0; right: 0; top: 100%;
+  background: #1E2130; border: 1px solid #2A2D3E;
+  border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  max-height: 280px; overflow-y: auto; z-index: 50;
+  display: none; margin-top: 4px;
+}
+.emc-ac-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; cursor: pointer; transition: background .1s;
+}
+.emc-ac-item:hover, .emc-ac-item.active { background: #2A2D3E; }
+.emc-ac-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .6rem; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.emc-ac-info { flex: 1; min-width: 0; }
+.emc-ac-name { font-size: .82rem; font-weight: 600; color: #E2E8F0; }
+.emc-ac-email { font-size: .72rem; color: #64748B; }
+.emc-ac-badge {
+  padding: 2px 8px; border-radius: 10px;
+  font-size: .6rem; font-weight: 700; text-transform: uppercase;
+}
+.emc-ac-badge-cliente { background: #1d4ed820; color: #93c5fd; }
+.emc-ac-badge-equipo { background: #6d28d920; color: #c4b5fd; }
+.emc-ac-badge-contraparte { background: #92400e20; color: #fcd34d; }
+.emc-ac-manual {
+  padding: 10px 14px; font-size: .82rem; color: #94A3B8; cursor: pointer;
+}
+.emc-ac-manual:hover { background: #2A2D3E; color: #E2E8F0; }
+.emc-ac-manual strong { color: var(--e); }
+
+/* Subject */
+.emc-subject-wrap { position: relative; }
+.emc-subject {
+  width: 100%; padding: 9px 50px 9px 12px;
+  background: #171923; border: 1px solid #2A2D3E;
+  border-radius: 8px; color: #E2E8F0; font-size: .88rem;
+  transition: border-color .15s;
+}
+.emc-subject:focus { outline: none; border-color: var(--e); box-shadow: 0 0 0 2px rgba(0,223,162,.15); }
+.emc-char-count {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-size: .65rem; color: #475569;
+}
+
+/* Editor */
+.emc-editor-wrap {
+  background: #171923; border: 1px solid #2A2D3E;
+  border-radius: 8px; overflow: hidden;
+}
+.emc-toolbar {
+  display: flex; gap: 2px; padding: 6px 10px;
+  border-bottom: 1px solid #2A2D3E; flex-wrap: wrap;
+}
+.emc-toolbar button {
+  width: 30px; height: 28px; border-radius: 4px;
+  background: transparent; border: none; color: #94A3B8;
+  cursor: pointer; font-size: .8rem; transition: all .1s;
+  display: flex; align-items: center; justify-content: center;
+}
+.emc-toolbar button:hover { background: #2A2D3E; color: #E2E8F0; }
+.emc-toolbar-sep { width: 1px; height: 20px; background: #2A2D3E; margin: 4px 4px; }
+
+.emc-editor {
+  min-height: 200px; max-height: 400px; overflow-y: auto;
+  padding: 14px; color: #E2E8F0; font-size: .88rem;
+  line-height: 1.6; outline: none;
+}
+.emc-editor:empty::before {
+  content: 'Escribe tu mensaje...'; color: #475569;
+}
+.emc-editor a { color: var(--e); }
+.emc-firma { padding: 0 14px 14px; font-size: .8rem; color: #64748B; }
+
+/* Attachments */
+.emc-attachments { padding: 10px 20px; border-top: 1px solid #2A2D3E; }
+.emc-att-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.emc-att-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 8px;
+  background: #2A2D3E; font-size: .75rem; color: #E2E8F0;
+}
+.emc-att-chip-icon { font-size: .9rem; }
+.emc-att-chip-size { color: #64748B; font-size: .65rem; }
+.emc-att-chip-x { background: none; border: none; color: #64748B; cursor: pointer; font-size: .8rem; }
+.emc-att-chip-x:hover { color: #EF4444; }
+.emc-att-bar { display: flex; align-items: center; gap: 8px; }
+.emc-att-usage { font-size: .65rem; color: #64748B; }
+
+/* Footer */
+.emc-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-top: 1px solid #2A2D3E;
+  background: #171923;
+}
+.emc-footer-left { display: flex; align-items: center; gap: 8px; }
+.emc-footer-right { display: flex; align-items: center; gap: 8px; }
+.emc-btn-discard {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 8px; border: 1px solid #374151;
+  background: transparent; color: #94A3B8; font-size: .78rem;
+  font-weight: 600; cursor: pointer; transition: all .15s;
+}
+.emc-btn-discard:hover { border-color: #EF4444; color: #EF4444; }
+.emc-btn-attach {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 8px; border: 1px solid #374151;
+  background: transparent; color: #94A3B8; font-size: .78rem;
+  font-weight: 600; cursor: pointer; transition: all .15s;
+}
+.emc-btn-attach:hover { border-color: var(--e); color: var(--e); }
+.emc-btn-send {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 24px; border-radius: 8px; border: none;
+  background: var(--e); color: var(--n); font-size: .85rem;
+  font-weight: 700; cursor: pointer; transition: all .15s;
+  box-shadow: 0 4px 16px rgba(0,223,162,.3);
+}
+.emc-btn-send:hover:not(:disabled) { filter: brightness(1.15); transform: translateY(-1px); }
+.emc-btn-send:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* Toast */
+.emc-toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: #10B981; color: #fff; padding: 12px 24px; border-radius: 10px;
+  font-size: .88rem; font-weight: 700; z-index: 3000;
+  box-shadow: 0 8px 32px rgba(16,185,129,.3);
+  transition: transform .3s cubic-bezier(.4,0,.2,1), opacity .3s;
+  opacity: 0; pointer-events: none;
+}
+.emc-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.emc-toast.error { background: #EF4444; box-shadow: 0 8px 32px rgba(239,68,68,.3); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .emc-modal { width: 100%; max-height: 100vh; border-radius: 0; }
+  .emc-overlay { padding: 0; }
+}
+
+/* Spin animation */
+@keyframes emcSpin { to { transform: rotate(360deg); } }
+.emc-spinner { animation: emcSpin .8s linear infinite; }
+</style>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   EMAIL COMPOSER — JavaScript
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const EMC = {
+  toEmails: [],
+  ccEmails: [],
+  ccoEmails: [],
+  attachments: [],   // {file, id}
+  totalAttSize: 0,
+  asuntoId: null,
+  gmailConnected: false,
+  gmailEmail: '',
+  searchController: null,
+  acActiveIndex: -1,
+};
+
+/* ── Open / Close ────────────────────────────── */
+function openEmailComposer(opts = {}) {
+  const overlay = document.getElementById('emcOverlay');
+  overlay.classList.add('show');
+
+  // Reset state
+  EMC.toEmails = []; EMC.ccEmails = []; EMC.ccoEmails = [];
+  EMC.attachments = []; EMC.totalAttSize = 0;
+  EMC.asuntoId = opts.asunto_id || null;
+  EMC.acActiveIndex = -1;
+
+  // Clear UI
+  ['emcToChips','emcCCChips','emcCCOChips','emcAttChips'].forEach(id => {
+    document.getElementById(id).innerHTML = '';
+  });
+  ['emcToInput','emcCCInput','emcCCOInput'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('emcSubject').value = opts.asunto || '';
+  document.getElementById('emcEditor').innerHTML = '';
+  document.getElementById('emcAttachments').style.display = 'none';
+  document.getElementById('emcCCField').style.display = 'none';
+  document.getElementById('emcCCOField').style.display = 'none';
+  emcUpdateCharCount();
+  emcValidateSend();
+
+  // Pre-fill TO
+  if (opts.para) {
+    const emails = Array.isArray(opts.para) ? opts.para : [opts.para];
+    emails.forEach(e => {
+      if (e && e.includes('@')) {
+        emcAddChip('to', e, opts.para_nombre || e.split('@')[0], opts.para_tipo || 'manual');
+      }
+    });
+  }
+
+  // Check Gmail status
+  emcCheckGmail();
+
+  // Focus subject
+  setTimeout(() => {
+    if (opts.para) document.getElementById('emcSubject').focus();
+    else document.getElementById('emcToInput').focus();
+  }, 350);
+}
+
+function closeEmailComposer() {
+  const editor = document.getElementById('emcEditor');
+  const subject = document.getElementById('emcSubject').value;
+  if ((editor.textContent.trim() || subject.trim() || EMC.toEmails.length) &&
+      !confirm('¿Descartar este correo?')) return;
+  document.getElementById('emcOverlay').classList.remove('show');
+}
+
+/* ── Gmail status ────────────────────────────── */
+async function emcCheckGmail() {
+  try {
+    const r = await fetch('/correo/gmail/status');
+    const d = await r.json();
+    EMC.gmailConnected = d.connected;
+    EMC.gmailEmail = d.email || '';
+
+    document.getElementById('emcGmailConnected').style.display = d.connected ? 'flex' : 'none';
+    document.getElementById('emcGmailDisconnected').style.display = d.connected ? 'none' : 'flex';
+    document.getElementById('emcGmailEmail').textContent = d.email || '';
+
+    if (d.connected) {
+      document.getElementById('emcFromDisplay').innerHTML = `
+        <span class="emc-from-avatar" style="background:#10B981">${(d.nombre||'G')[0]}</span>
+        <span>${d.nombre || ''} &lt;${d.email}&gt;</span>`;
+    } else {
+      document.getElementById('emcFromDisplay').innerHTML = `
+        <span class="emc-from-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+        <span style="color:#F59E0B">Gmail no conectado — se enviará via servidor</span>`;
+    }
+  } catch(e) {
+    document.getElementById('emcGmailDisconnected').style.display = 'flex';
+  }
+}
+
+/* ── Autocomplete ────────────────────────────── */
+let emcDebounceTimer = null;
+
+function emcSearchContacts(input, field) {
+  clearTimeout(emcDebounceTimer);
+  const q = input.value.trim();
+  const acEl = document.getElementById(`emc${field.charAt(0).toUpperCase()+field.slice(1)}Autocomplete`);
+
+  if (q.length < 1) { acEl.style.display = 'none'; return; }
+
+  emcDebounceTimer = setTimeout(async () => {
+    if (EMC.searchController) EMC.searchController.abort();
+    EMC.searchController = new AbortController();
+
+    try {
+      const r = await fetch(`/correo/contactos/buscar?q=${encodeURIComponent(q)}`, {
+        signal: EMC.searchController.signal
+      });
+      const results = await r.json();
+      EMC.acActiveIndex = -1;
+
+      let html = '';
+      results.forEach((c, i) => {
+        if (c.email && !EMC[`${field}Emails`]?.includes(c.email)) {
+          html += `<div class="emc-ac-item" data-idx="${i}"
+                        onmousedown="emcSelectContact('${field}', '${c.email}', '${c.nombre}', '${c.tipo}')">
+            <div class="emc-ac-avatar" style="background:${c.color}">${c.avatar_iniciales}</div>
+            <div class="emc-ac-info">
+              <div class="emc-ac-name">${c.nombre}</div>
+              <div class="emc-ac-email">${c.email}</div>
+            </div>
+            <span class="emc-ac-badge emc-ac-badge-${c.tipo}">${c.tipo}</span>
+          </div>`;
+        }
+      });
+
+      // Manual email option
+      if (q.includes('@') || results.length === 0) {
+        const emailVal = q.includes('@') ? q : '';
+        if (emailVal) {
+          html += `<div class="emc-ac-manual" onmousedown="emcSelectContact('${field}', '${emailVal}', '${emailVal.split('@')[0]}', 'manual')">
+            Usar <strong>${emailVal}</strong> ↵
+          </div>`;
+        }
+      }
+
+      acEl.innerHTML = html;
+      acEl.style.display = html ? 'block' : 'none';
+    } catch(e) {
+      if (e.name !== 'AbortError') console.error(e);
+    }
+  }, 250);
+}
+
+function emcSelectContact(field, email, nombre, tipo) {
+  emcAddChip(field, email, nombre, tipo);
+  const input = document.getElementById(`emc${field === 'to' ? 'To' : field.toUpperCase()}Input`);
+  input.value = '';
+  const acEl = input.closest('.emc-chips-wrap').querySelector('.emc-autocomplete');
+  acEl.style.display = 'none';
+  input.focus();
+}
+
+function emcInputKeydown(e, field) {
+  const input = e.target;
+  const acEl = input.closest('.emc-chips-wrap').querySelector('.emc-autocomplete');
+  const items = acEl.querySelectorAll('.emc-ac-item, .emc-ac-manual');
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    EMC.acActiveIndex = Math.min(EMC.acActiveIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === EMC.acActiveIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    EMC.acActiveIndex = Math.max(EMC.acActiveIndex - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('active', i === EMC.acActiveIndex));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (EMC.acActiveIndex >= 0 && items[EMC.acActiveIndex]) {
+      items[EMC.acActiveIndex].dispatchEvent(new Event('mousedown'));
+    } else {
+      const val = input.value.trim();
+      if (val && val.includes('@')) {
+        emcAddChip(field, val, val.split('@')[0], 'manual');
+        input.value = '';
+        acEl.style.display = 'none';
+      }
+    }
+  } else if (e.key === 'Backspace' && !input.value) {
+    // Remove last chip
+    const arr = field === 'to' ? EMC.toEmails : field === 'cc' ? EMC.ccEmails : EMC.ccoEmails;
+    if (arr.length > 0) {
+      arr.pop();
+      emcRenderChips(field);
+      emcValidateSend();
+    }
+  } else if (e.key === 'Escape') {
+    acEl.style.display = 'none';
+  }
+}
+
+/* ── Chips ────────────────────────────────────── */
+function emcAddChip(field, email, nombre, tipo) {
+  const mapField = { to: 'toEmails', cc: 'ccEmails', cco: 'ccoEmails' };
+  const arr = EMC[mapField[field]];
+  if (arr.includes(email)) return;
+  arr.push(email);
+  EMC[`_chipMeta_${email}`] = { nombre, tipo };
+  emcRenderChips(field);
+  emcValidateSend();
+}
+
+function emcRemoveChip(field, email) {
+  const mapField = { to: 'toEmails', cc: 'ccEmails', cco: 'ccoEmails' };
+  const arr = EMC[mapField[field]];
+  const idx = arr.indexOf(email);
+  if (idx > -1) arr.splice(idx, 1);
+  emcRenderChips(field);
+  emcValidateSend();
+}
+
+function emcRenderChips(field) {
+  const mapField = { to: 'toEmails', cc: 'ccEmails', cco: 'ccoEmails' };
+  const mapEl = { to: 'emcToChips', cc: 'emcCCChips', cco: 'emcCCOChips' };
+  const arr = EMC[mapField[field]];
+  const el = document.getElementById(mapEl[field]);
+  el.innerHTML = arr.map(email => {
+    const meta = EMC[`_chipMeta_${email}`] || { nombre: email, tipo: 'manual' };
+    return `<span class="emc-chip emc-chip-${meta.tipo}">
+      ${meta.nombre || email}
+      <button class="emc-chip-x" onmousedown="emcRemoveChip('${field}','${email}')">&times;</button>
+    </span>`;
+  }).join('');
+}
+
+/* ── CC/CCO toggle ───────────────────────────── */
+function toggleEMCField(field) {
+  const el = document.getElementById(`emc${field.toUpperCase()}Field`);
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+/* ── Subject char count ──────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  const subj = document.getElementById('emcSubject');
+  if (subj) subj.addEventListener('input', emcUpdateCharCount);
+});
+
+function emcUpdateCharCount() {
+  const subj = document.getElementById('emcSubject');
+  const count = document.getElementById('emcCharCount');
+  if (subj && count) {
+    const len = subj.value.length;
+    count.textContent = `${len}/120`;
+    count.style.color = len > 60 ? '#F59E0B' : '#475569';
+  }
+}
+
+/* ── Toolbar commands ────────────────────────── */
+function emcExec(cmd) {
+  document.execCommand(cmd, false, null);
+  document.getElementById('emcEditor').focus();
+}
+function emcInsertLink() {
+  const url = prompt('URL del enlace:');
+  if (url) document.execCommand('createLink', false, url);
+}
+
+/* ── Attachments ─────────────────────────────── */
+function emcAddFiles(files) {
+  const MAX = 25 * 1024 * 1024;
+  for (const file of files) {
+    if (EMC.totalAttSize + file.size > MAX) {
+      emcShowToast('Límite de 25MB excedido', true);
+      break;
+    }
+    const id = Math.random().toString(36).substr(2, 9);
+    EMC.attachments.push({ file, id });
+    EMC.totalAttSize += file.size;
+  }
+  emcRenderAttachments();
+}
+
+function emcRemoveFile(id) {
+  const idx = EMC.attachments.findIndex(a => a.id === id);
+  if (idx > -1) {
+    EMC.totalAttSize -= EMC.attachments[idx].file.size;
+    EMC.attachments.splice(idx, 1);
+  }
+  emcRenderAttachments();
+}
+
+function emcRenderAttachments() {
+  const el = document.getElementById('emcAttChips');
+  const wrap = document.getElementById('emcAttachments');
+  if (EMC.attachments.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const icons = {pdf:'{{ icon_file_text(14,14) }}', doc:'{{ icon_edit(14,14) }}', docx:'{{ icon_edit(14,14) }}', xls:'{{ icon_chart(14,14) }}', xlsx:'{{ icon_chart(14,14) }}', png:'{{ icon_image(14,14) }}', jpg:'{{ icon_image(14,14) }}', jpeg:'{{ icon_image(14,14) }}'};
+  el.innerHTML = EMC.attachments.map(a => {
+    const ext = a.file.name.split('.').pop().toLowerCase();
+    const icon = icons[ext] || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>';
+    const size = a.file.size < 1024 ? `${a.file.size} B`
+               : a.file.size < 1048576 ? `${(a.file.size/1024).toFixed(1)} KB`
+               : `${(a.file.size/1048576).toFixed(1)} MB`;
+    return `<span class="emc-att-chip">
+      <span class="emc-att-chip-icon">${icon}</span>
+      ${a.file.name}
+      <span class="emc-att-chip-size">${size}</span>
+      <button class="emc-att-chip-x" onclick="emcRemoveFile('${a.id}')">&times;</button>
+    </span>`;
+  }).join('');
+
+  const totalStr = EMC.totalAttSize < 1048576
+    ? `${(EMC.totalAttSize/1024).toFixed(0)} KB`
+    : `${(EMC.totalAttSize/1048576).toFixed(1)} MB`;
+  document.getElementById('emcAttUsage').textContent = `${totalStr} / 25 MB`;
+}
+
+/* ── Validate ────────────────────────────────── */
+function emcValidateSend() {
+  const btn = document.getElementById('emcSendBtn');
+  const hasTo = EMC.toEmails.length > 0;
+  const hasSubject = document.getElementById('emcSubject').value.trim().length > 0;
+  btn.disabled = !(hasTo && hasSubject);
+}
+
+// Listen for subject changes
+document.addEventListener('input', e => {
+  if (e.target.id === 'emcSubject') emcValidateSend();
+});
+
+/* ── Send ────────────────────────────────────── */
+async function emcSend() {
+  const btn = document.getElementById('emcSendBtn');
+  const sendText = document.getElementById('emcSendText');
+  btn.disabled = true;
+  sendText.innerHTML = '<svg class="emc-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Enviando...';
+
+  const body = {
+    para: EMC.toEmails,
+    cc: EMC.ccEmails,
+    cco: EMC.ccoEmails,
+    asunto: document.getElementById('emcSubject').value.trim(),
+    cuerpo_html: document.getElementById('emcEditor').innerHTML,
+    asunto_id: EMC.asuntoId,
+  };
+
+  try {
+    const r = await fetch('/correo/enviar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+
+    if (d.ok) {
+      document.getElementById('emcOverlay').classList.remove('show');
+      emcShowToast('Correo enviado correctamente');
+
+      // Add to timeline if on asunto page
+      if (typeof addToTimeline === 'function' && EMC.asuntoId) {
+        addToTimeline('correo_enviado', '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>', 'Correo enviado',
+          body.asunto, 'Tú', `Para: ${EMC.toEmails.join(', ')}`);
+      }
+    } else {
+      emcShowToast(d.error || 'Error al enviar', true);
+      btn.disabled = false;
+    }
+  } catch(e) {
+    emcShowToast('Error de conexión', true);
+    btn.disabled = false;
+  }
+
+  sendText.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg> Enviar';
+}
+
+/* ── Toast ────────────────────────────────────── */
+function emcShowToast(msg, isError = false) {
+  const el = document.getElementById('emcToast');
+  el.textContent = isError ? msg : `✓ ${msg}`;
+  el.className = `emc-toast show ${isError ? 'error' : ''}`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+/* ── Keyboard ────────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('emcOverlay').classList.contains('show')) {
+    closeEmailComposer();
+  }
+});
+</script>

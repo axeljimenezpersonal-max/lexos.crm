@@ -1,0 +1,728 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   LexOS — biblioteca.css
+───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Section tabs ───────────────────────────────────────────────────────── */
+.bib-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+  gap: 0;
+  align-items: center;
+}
+.bib-tab {
+  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: .84rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color .15s;
+  text-decoration: none;
+}
+.bib-tab:hover { color: var(--text); }
+.bib-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.bib-tab-editor {
+  margin-left: auto;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: rgba(0,223,162,.1);
+  color: var(--accent);
+  font-size: .82rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background .15s;
+}
+.bib-tab-editor:hover { background: rgba(0,223,162,.2); }
+
+/* ── Metrics bar ────────────────────────────────────────────────────────── */
+.bib-metrics {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.bib-metric {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  flex: 1;
+  min-width: 100px;
+}
+.bib-metric-val {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.bib-metric-label { font-size: .72rem; color: var(--text-3); margin-top: 3px; }
+.bib-usage-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 100px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.bib-usage-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--ed));
+  border-radius: 100px;
+  transition: width .4s;
+}
+
+/* ── Estudio grid layout ────────────────────────────────────────────────── */
+.bib-estudio-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+}
+
+/* ── Sidebar (carpetas) ─────────────────────────────────────────────────── */
+.bib-sidebar {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 0;
+  align-self: start;
+  position: sticky;
+  top: 80px;
+}
+.bib-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.bib-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  color: var(--text-2);
+  font-size: .84rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .1s;
+  border-left: 3px solid transparent;
+}
+.bib-folder:hover { background: rgba(0,223,162,.05); }
+.bib-folder.active {
+  background: rgba(0,223,162,.08);
+  color: var(--accent);
+  font-weight: 600;
+  border-left-color: var(--accent);
+}
+.bib-folder-row {
+  display: flex;
+  align-items: center;
+}
+.bib-folder-row .bib-folder { flex: 1; }
+.bib-folder-actions {
+  display: none;
+  gap: 2px;
+  padding-right: 8px;
+}
+.bib-folder-row:hover .bib-folder-actions { display: flex; }
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .78rem;
+  padding: 3px 5px;
+  border-radius: 5px;
+  color: var(--text-3);
+  transition: background .1s;
+}
+.btn-icon:hover { background: var(--border); color: var(--text); }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+.bib-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.bib-search-form {
+  display: contents;
+}
+.bib-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 300px;
+}
+.bib-search-wrap svg {
+  position: absolute;
+  left: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.bib-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: .83rem;
+}
+.bib-search-input:focus { outline: none; border-color: var(--accent); }
+.bib-toolbar select {
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: .83rem;
+}
+
+/* ── Drop zone ──────────────────────────────────────────────────────────── */
+.bib-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-3);
+  margin-bottom: 16px;
+  transition: border-color .15s, background .15s;
+}
+.bib-dropzone.active { border-color: var(--accent); background: rgba(0,223,162,.04); }
+.bib-dz-icon { font-size: 1.8rem; margin-bottom: 4px; }
+.bib-dz-text { font-size: .86rem; font-weight: 600; }
+.bib-dz-sub { font-size: .74rem; color: var(--text-3); margin-top: 3px; }
+
+/* ── Upload zone (inside modal) ─────────────────────────────────────────── */
+.bib-upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: .84rem;
+  transition: border-color .15s, background .15s;
+}
+.bib-upload-zone.active { border-color: var(--accent); background: rgba(0,223,162,.04); }
+.bib-upload-names { margin-top: 8px; font-size: .78rem; color: var(--accent); font-weight: 600; }
+
+/* ── Files grid ─────────────────────────────────────────────────────────── */
+.bib-files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.bib-file-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: border-color .15s;
+}
+.bib-file-card:hover { border-color: var(--accent); }
+.bib-file-icon { font-size: 1.5rem; flex-shrink: 0; }
+.bib-file-info { flex: 1; min-width: 0; }
+.bib-file-name {
+  font-size: .84rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bib-file-meta { font-size: .72rem; color: var(--text-3); margin-top: 2px; }
+.bib-file-actions {
+  display: none;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.bib-file-card:hover .bib-file-actions { display: flex; }
+
+/* ── Plantillas grid ────────────────────────────────────────────────────── */
+.bib-plantillas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+.bib-plantilla-card {
+  display: flex;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color .15s;
+}
+.bib-plantilla-card:hover { border-color: var(--accent); }
+.bib-pl-icon { font-size: 1.8rem; flex-shrink: 0; }
+.bib-pl-body { flex: 1; min-width: 0; }
+.bib-pl-name { font-weight: 700; font-size: .9rem; color: var(--text); margin-bottom: 4px; }
+.bib-pl-cat { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.bib-pl-badge {
+  font-size: .66rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: rgba(0,223,162,.12);
+  color: var(--accent);
+}
+.bib-pl-badge-tipo { background: rgba(16,185,129,.12); color: #065F46; }
+.bib-pl-badge-custom { background: rgba(245,158,11,.12); color: #B45309; }
+.bib-pl-desc { font-size: .8rem; color: var(--text-3); margin-bottom: 4px; }
+.bib-pl-meta { font-size: .72rem; color: var(--text-3); }
+.bib-pl-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ── Acuerdos ───────────────────────────────────────────────────────────── */
+.bib-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(0,223,162,.06);
+  border: 1px solid rgba(0,223,162,.2);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+.bib-info-icon { font-size: 1.3rem; flex-shrink: 0; }
+.bib-info-badge {
+  font-size: .68rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: rgba(245,158,11,.15);
+  color: #B45309;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bib-ac-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+  align-items: center;
+}
+.bib-ac-tab {
+  padding: 9px 16px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-3);
+  font-size: .84rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color .15s;
+}
+.bib-ac-tab:hover { color: var(--text); }
+.bib-ac-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.bib-ac-linked {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(0,223,162,.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.mono { font-family: monospace; font-size: .82rem; }
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+.bib-table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.bib-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .83rem;
+}
+.bib-table th {
+  background: var(--sidebar);
+  color: var(--text-3);
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.bib-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.bib-table tr:last-child td { border-bottom: none; }
+.bib-table tr:hover td { background: rgba(0,223,162,.03); }
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.bib-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-3);
+  font-size: .86rem;
+}
+.bib-empty-icon { font-size: 2.4rem; margin-bottom: 10px; }
+
+/* ── Modals ─────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-header {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.modal-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+.modal-close {
+  background: none; border: none; color: var(--text-3);
+  font-size: 1.3rem; cursor: pointer; line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
+.modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Form ───────────────────────────────────────────────────────────────── */
+.bib-form-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.bib-fg { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+.bib-fg label {
+  font-size: .74rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.bib-fg label .req { color: var(--accent); }
+.bib-fg input,
+.bib-fg select,
+.bib-fg textarea {
+  padding: 8px 10px;
+  background: var(--sidebar);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: .83rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s;
+}
+.bib-fg input:focus,
+.bib-fg select:focus,
+.bib-fg textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,223,162,.1); }
+.bib-fg textarea { resize: vertical; min-height: 60px; }
+
+/* Share link field */
+.bib-share-link { display: flex; gap: 8px; }
+.bib-share-link input {
+  flex: 1;
+  padding: 8px 10px;
+  background: var(--sidebar);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--accent);
+  font-size: .82rem;
+  font-family: monospace;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EDITOR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+  min-height: calc(100vh - 140px);
+}
+
+/* ── Editor sidebar ─────────────────────────────────────────────────────── */
+.editor-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.ed-sidebar-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.ed-sidebar-title {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-3);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ed-fg { margin-bottom: 10px; }
+.ed-fg:last-child { margin-bottom: 0; }
+.ed-fg label {
+  display: block;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.ed-fg input,
+.ed-fg select {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--sidebar);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: .82rem;
+  font-family: inherit;
+  outline: none;
+}
+.ed-fg input:focus,
+.ed-fg select:focus { border-color: var(--accent); }
+
+/* ── Variables list ─────────────────────────────────────────────────────── */
+.ed-vars-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+.ed-var-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .1s;
+  border-bottom: 1px solid var(--border);
+}
+.ed-var-item:last-child { border-bottom: none; }
+.ed-var-item:hover { background: rgba(0,223,162,.08); }
+.ed-var-item code {
+  font-size: .72rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+.ed-var-item span {
+  font-size: .68rem;
+  color: var(--text-3);
+}
+
+/* ── Actions grid ───────────────────────────────────────────────────────── */
+.ed-actions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ed-firma-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: .82rem;
+  color: var(--text-3);
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  cursor: help;
+}
+
+/* ── Versions list ──────────────────────────────────────────────────────── */
+.ed-versions-list { max-height: 180px; overflow-y: auto; }
+.ed-version-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .1s;
+  border-bottom: 1px solid var(--border);
+}
+.ed-version-item:last-child { border-bottom: none; }
+.ed-version-item:hover { background: rgba(0,223,162,.08); }
+.ed-version-item.active { background: rgba(0,223,162,.1); }
+.ed-ver-num { font-size: .78rem; font-weight: 700; color: var(--accent); }
+.ed-ver-date { font-size: .7rem; color: var(--text-3); }
+
+/* ── Recent list ────────────────────────────────────────────────────────── */
+.ed-recent-list { max-height: 200px; overflow-y: auto; }
+.ed-recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .1s;
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+.ed-recent-item:last-child { border-bottom: none; }
+.ed-recent-item:hover { background: rgba(0,223,162,.08); }
+.ed-recent-item.active { background: rgba(0,223,162,.1); }
+.ed-rec-title { font-size: .8rem; color: var(--text); font-weight: 500; }
+.ed-rec-estado {
+  font-size: .65rem;
+  padding: 2px 6px;
+  border-radius: 100px;
+  background: rgba(0,223,162,.1);
+  color: var(--accent);
+  font-weight: 700;
+}
+.ed-new-doc {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+  font-size: .82rem !important;
+}
+
+/* ── Editor main ────────────────────────────────────────────────────────── */
+.editor-main {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ed-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+}
+.ed-status { font-size: .78rem; color: var(--text-3); font-weight: 600; }
+.ed-autosave { font-size: .74rem; color: var(--success); font-weight: 600; }
+.ed-shared-badge {
+  font-size: .68rem;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: rgba(16,185,129,.12);
+  color: #065F46;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+/* ── Quill overrides ────────────────────────────────────────────────────── */
+#quillEditor {
+  flex: 1;
+  min-height: 500px;
+}
+.ql-toolbar.ql-snow {
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: var(--sidebar);
+}
+.ql-container.ql-snow {
+  border: none !important;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 13pt;
+  line-height: 1.7;
+  color: var(--text);
+}
+.ql-editor {
+  padding: 32px 40px;
+  min-height: 500px;
+}
+.ql-editor h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 12px; }
+.ql-editor h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 10px; }
+.ql-editor h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+.ql-editor h4 { font-size: 1rem;  font-weight: 700; margin-bottom: 6px; }
+.ql-editor p { margin-bottom: 10px; }
+.ql-editor blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  color: var(--text-2);
+}
+.ql-snow .ql-stroke { stroke: var(--text-2); }
+.ql-snow .ql-fill { fill: var(--text-2); }
+.ql-snow .ql-picker-label { color: var(--text-2); }
+.ql-snow .ql-picker-options {
+  background: var(--card);
+  border-color: var(--border);
+}
+
+/* ── Diff content ───────────────────────────────────────────────────────── */
+.ed-diff-content {
+  padding: 20px;
+  font-family: 'Georgia', serif;
+  font-size: 12pt;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1000px) {
+  .bib-estudio-grid { grid-template-columns: 1fr; }
+  .bib-sidebar { position: static; }
+  .editor-layout { grid-template-columns: 1fr; }
+  .editor-sidebar {
+    position: static;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .ed-sidebar-section { min-width: 200px; flex: 1; }
+}
+@media (max-width: 700px) {
+  .bib-files-grid { grid-template-columns: 1fr; }
+  .bib-plantillas-grid { grid-template-columns: 1fr; }
+  .bib-file-card .bib-file-actions { display: flex; }
+  .ql-editor { padding: 20px 16px; }
+}

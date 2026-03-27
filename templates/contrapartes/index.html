@@ -1,0 +1,453 @@
+{% extends 'base.html' %}
+{% block page_title %}Contrapartes{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/contrapartes.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="page-eyebrow">Gestión · LexOS</div>
+  <h1 class="page-title">Contrapartes</h1>
+  <div class="page-meta-row">
+    <span class="page-count">{{ total }} contraparte{{ 's' if total != 1 else '' }}</span>
+    <div class="page-actions">
+      <button class="btn btn-primary btn-sm" onclick="abrirModalNueva()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nueva contraparte
+      </button>
+    </div>
+  </div>
+</div>
+<div class="page-divider"></div>
+
+<!-- Tabs Stakeholders -->
+<div class="sh-tabs">
+  <a class="sh-tab" href="{{ url_for('clientes.index') }}">Clientes</a>
+  <a class="sh-tab active" href="{{ url_for('contrapartes.index') }}">Contrapartes</a>
+</div>
+
+<!-- Layout split: tabla + panel -->
+<div class="cp-split {{ 'has-selected' if seleccionada }}">
+
+  <!-- COLUMNA IZQUIERDA: tabla -->
+  <div class="cp-main">
+    <form id="cpSearchForm" method="GET" action="" style="display:contents;">
+      <div class="cl-toolbar">
+        <div class="search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" name="q" class="search-input" autocomplete="off"
+                 placeholder="Buscar por nombre, despacho, abogado..."
+                 value="{{ q }}" id="cpSearchInput">
+        </div>
+        <input type="hidden" name="cp" value="{{ cp_id }}">
+
+        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleFiltrosCP()" id="cpFiltersBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+          </svg>
+          Filtros
+        </button>
+
+        <div class="view-toggle">
+          <button type="button" id="cpBtnTabla" onclick="cpSetView('tabla')" title="Vista tabla">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/>
+            </svg>
+            Tabla
+          </button>
+          <button type="button" id="cpBtnTarjetas" onclick="cpSetView('tarjetas')" title="Vista tarjetas">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+            </svg>
+            Tarjetas
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <!-- Panel de filtros -->
+    <div class="filters-panel" id="cpFiltersPanel">
+      <div class="filter-group">
+        <label>Tipo</label>
+        <select onchange="document.getElementById('cpSearchForm').submit()">
+          <option value="">Todos</option>
+          <option value="persona_fisica">Persona Física</option>
+          <option value="persona_moral">Persona Moral</option>
+        </select>
+      </div>
+    </div>
+
+    <table class="lex-table cp-table">
+      <thead>
+        <tr>
+          <th>Contraparte</th>
+          <th>Abogado / Despacho</th>
+          <th>Tipo</th>
+          <th>Casos</th>
+          <th>Tasa favorable</th>
+          <th>Activos</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cp in contrapartes %}
+        {% set tasa = ((cp.favorables / cp.total_casos * 100) | round | int) if cp.total_casos > 0 else none %}
+        <tr class="cp-row {{ 'selected' if cp_id == cp.id | string }}"
+            onclick="selectCP({{ cp.id }})">
+          <td>
+            <div class="name-cell" style="display:flex;align-items:center;gap:10px;">
+              <div class="cp-avatar">{{ cp.nombre[:2].upper() }}</div>
+              <div>
+                <div class="name-main">{{ cp.nombre }}</div>
+                <div class="name-sub" style="font-size:9px;color:#8A9BA8;">
+                  {{ 'Persona Física' if cp.tipo == 'persona_fisica' else 'Persona Moral' }}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div style="font-size:12px;">{{ cp.abogado_nombre or '—' }}</div>
+            <div style="font-size:10px;color:#8A9BA8;">{{ cp.despacho or '—' }}</div>
+          </td>
+          <td>
+            <span class="badge" style="font-family:'DM Mono',monospace;font-size:7px;
+                  letter-spacing:0.08em;text-transform:uppercase;
+                  background:rgba(0,223,162,0.06);color:#8A9BA8;
+                  border:0.5px solid rgba(0,223,162,0.1);padding:2px 7px;border-radius:4px;">
+              {{ 'PF' if cp.tipo == 'persona_fisica' else 'PM' }}
+            </span>
+          </td>
+          <td>
+            <span style="font-family:'Merriweather',serif;font-size:15px;color:#EAF0EC;">
+              {{ cp.total_casos }}
+            </span>
+          </td>
+          <td>
+            {% if tasa is not none %}
+            <span style="font-family:'DM Mono',monospace;font-size:11px;
+                         color:{{ '#00DFA2' if tasa >= 60 else '#F59E0B' if tasa >= 40 else '#EF4444' }};">
+              {{ tasa }}%
+            </span>
+            {% else %}
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:#8A9BA8;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <span style="font-family:'Merriweather',serif;font-size:15px;color:#EAF0EC;">
+              {{ cp.en_proceso }}
+            </span>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center;padding:48px;
+              color:#8A9BA8;font-family:'DM Mono',monospace;
+              font-size:10px;letter-spacing:0.1em;">
+            Sin contrapartes registradas
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- COLUMNA DERECHA: panel de inteligencia -->
+  <div class="cp-panel" id="cpPanel">
+    {% if seleccionada %}
+
+    <div class="cp-panel-header">
+      <div style="font-family:'DM Mono',monospace;font-size:7px;
+                  letter-spacing:0.2em;text-transform:uppercase;
+                  color:rgba(0,223,162,0.4);margin-bottom:6px;
+                  display:flex;align-items:center;gap:6px;">
+        <div style="width:5px;height:5px;border-radius:50%;background:#00DFA2;"></div>
+        Perfil de adversario
+      </div>
+      <div style="font-family:'Merriweather',serif;font-size:16px;
+                  color:#EAF0EC;font-weight:400;">
+        {{ seleccionada.nombre }}
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;
+                  color:#8A9BA8;margin-top:2px;">
+        {{ seleccionada.abogado_nombre or 'Sin abogado registrado' }}
+        {% if seleccionada.despacho %} · {{ seleccionada.despacho }}{% endif %}
+      </div>
+    </div>
+
+    <div class="cp-panel-divider"></div>
+
+    <!-- Stats rápidos -->
+    {% set total_cp = asuntos_cp | length %}
+    {% set fav  = asuntos_cp | selectattr('resultado', 'eq', 'favorable')    | list | length %}
+    {% set desf = asuntos_cp | selectattr('resultado', 'eq', 'desfavorable') | list | length %}
+    <div class="cp-panel-stats">
+      <div class="cps-item">
+        <span class="cps-v">{{ total_cp }}</span>
+        <span class="cps-l">Total casos</span>
+      </div>
+      <div class="cps-item">
+        <span class="cps-v" style="color:#00DFA2;">{{ fav }}</span>
+        <span class="cps-l">A favor</span>
+      </div>
+      <div class="cps-item">
+        <span class="cps-v" style="color:#EF4444;">{{ desf }}</span>
+        <span class="cps-l">En contra</span>
+      </div>
+    </div>
+
+    <div class="cp-panel-divider"></div>
+
+    <!-- Insights generados -->
+    <div class="cp-panel-section-label">Inteligencia estratégica</div>
+
+    {% if total_cp >= 2 %}
+      {% if fav / total_cp >= 0.6 %}
+      <div class="cp-insight-item">
+        <div class="cp-insight-title">Tasa favorable alta</div>
+        <div class="cp-insight-body">
+          {{ fav }} de {{ total_cp }} casos resueltos a favor.
+          Adversario con historial desfavorable ante este despacho.
+        </div>
+        <span class="cp-insight-tag"
+              style="background:rgba(0,223,162,0.08);color:#00DFA2;border-color:rgba(0,223,162,0.2);">
+          Ventaja estratégica
+        </span>
+      </div>
+      {% elif fav / total_cp <= 0.4 %}
+      <div class="cp-insight-item">
+        <div class="cp-insight-title">Adversario difícil</div>
+        <div class="cp-insight-body">
+          Solo {{ fav }} de {{ total_cp }} casos favorables.
+          Revisar estrategia y argumentos previos.
+        </div>
+        <span class="cp-insight-tag"
+              style="background:rgba(239,68,68,0.08);color:#EF4444;border-color:rgba(239,68,68,0.2);">
+          Requiere análisis
+        </span>
+      </div>
+      {% else %}
+      <div class="cp-insight-item">
+        <div class="cp-insight-title">Historial equilibrado</div>
+        <div class="cp-insight-body">
+          {{ fav }} de {{ total_cp }} casos favorables. Adversario con tasa mixta.
+        </div>
+        <span class="cp-insight-tag"
+              style="background:rgba(245,158,11,0.08);color:#F59E0B;border-color:rgba(245,158,11,0.2);">
+          Monitorear
+        </span>
+      </div>
+      {% endif %}
+    {% else %}
+      <div class="cp-insight-item">
+        <div class="cp-insight-title">Historial insuficiente</div>
+        <div class="cp-insight-body">
+          Se necesitan al menos 2 casos para generar insights estadísticos.
+        </div>
+        <span class="cp-insight-tag"
+              style="background:rgba(245,158,11,0.08);color:#F59E0B;border-color:rgba(245,158,11,0.2);">
+          Sin datos suficientes
+        </span>
+      </div>
+    {% endif %}
+
+    {% if seleccionada.notas %}
+    <div class="cp-insight-item">
+      <div class="cp-insight-title">Notas del despacho</div>
+      <div class="cp-insight-body">{{ seleccionada.notas }}</div>
+    </div>
+    {% endif %}
+
+    <div class="cp-panel-divider"></div>
+
+    <!-- Historial de asuntos -->
+    <div class="cp-panel-section-label">Historial de casos</div>
+    {% for asunto in asuntos_cp %}
+    <div class="cp-hist-item">
+      <div style="flex:1;">
+        <a href="{{ url_for('asuntos.detalle', id=asunto.asunto_id) }}"
+           style="font-family:'Merriweather',serif;font-size:12px;
+                  color:#EAF0EC;text-decoration:none;">
+          {{ asunto.nombre }}
+        </a>
+        <div style="font-family:'DM Mono',monospace;font-size:8px;
+                    color:#8A9BA8;margin-top:2px;">
+          {{ asunto.tipo_asunto | capitalize }} ·
+          {{ asunto.fecha_inicio[:10] if asunto.fecha_inicio else '—' }}
+        </div>
+      </div>
+      <span class="badge-resultado-{{ asunto.resultado }}">
+        {{ asunto.resultado | replace('_', ' ') | upper }}
+      </span>
+    </div>
+    {% else %}
+    <div style="font-family:'DM Mono',monospace;font-size:9px;
+                color:#8A9BA8;padding:12px 0;letter-spacing:0.08em;">
+      Sin asuntos vinculados
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div style="padding:32px;text-align:center;font-family:'DM Mono',monospace;
+                font-size:9px;color:#8A9BA8;letter-spacing:0.1em;">
+      Selecciona una contraparte<br>para ver su perfil
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Modal Nueva Contraparte -->
+<div class="modal-overlay" id="modalNuevaCP">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 class="modal-title">Nueva contraparte</h2>
+      <button class="modal-close" onclick="cerrarModalNueva()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-label">Nombre *</label>
+        <input type="text" id="cpNombre" class="modal-input"
+               placeholder="Ej. Constructora del Bajío S.A. de C.V.">
+      </div>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">Tipo</label>
+          <select id="cpTipo" class="modal-input">
+            <option value="persona_fisica">Persona Física</option>
+            <option value="persona_moral">Persona Moral</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">RFC</label>
+          <input type="text" id="cpRFC" class="modal-input"
+                 placeholder="XXXX000000XXX" style="text-transform:uppercase;">
+        </div>
+      </div>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">Abogado contraparte</label>
+          <input type="text" id="cpAbogado" class="modal-input"
+                 placeholder="Lic. Fernando Aguilar">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Despacho</label>
+          <input type="text" id="cpDespacho" class="modal-input"
+                 placeholder="Aguilar & Asociados">
+        </div>
+      </div>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">Teléfono</label>
+          <input type="text" id="cpTel" class="modal-input"
+                 placeholder="443 000 0000">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Ciudad</label>
+          <input type="text" id="cpCiudad" class="modal-input"
+                 placeholder="Morelia, Mich.">
+        </div>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Notas estratégicas</label>
+        <textarea id="cpNotas" class="modal-input" rows="3"
+                  placeholder="Estilo de litigación, patrones observados..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn-cancel" onclick="cerrarModalNueva()">Cancelar</button>
+      <button class="modal-btn-primary" onclick="guardarCP()">Guardar contraparte</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Vista tabla / tarjetas
+function cpSetView(v) {
+  localStorage.setItem('cp_view', v);
+  document.getElementById('cpBtnTabla').classList.toggle('active', v === 'tabla');
+  document.getElementById('cpBtnTarjetas').classList.toggle('active', v === 'tarjetas');
+  const tabla = document.querySelector('.cp-table');
+  if (tabla) tabla.style.display = v === 'tabla' ? '' : 'none';
+}
+(function() {
+  const v = localStorage.getItem('cp_view') || 'tabla';
+  cpSetView(v);
+})();
+
+// Filtros
+function toggleFiltrosCP() {
+  document.getElementById('cpFiltersPanel').classList.toggle('open');
+}
+
+// Búsqueda con debounce
+let cpSearchTimer;
+document.getElementById('cpSearchInput').addEventListener('input', function() {
+  clearTimeout(cpSearchTimer);
+  cpSearchTimer = setTimeout(() => document.getElementById('cpSearchForm').submit(), 350);
+});
+
+function selectCP(id) {
+  const url = new URL(window.location);
+  url.searchParams.set('cp', id);
+  window.location = url.toString();
+}
+
+function abrirModalNueva() {
+  document.getElementById('modalNuevaCP').classList.add('open');
+  setTimeout(() => document.getElementById('cpNombre').focus(), 100);
+}
+function cerrarModalNueva() {
+  document.getElementById('modalNuevaCP').classList.remove('open');
+}
+
+document.getElementById('modalNuevaCP').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalNueva();
+});
+
+async function guardarCP() {
+  const nombreInput = document.getElementById('cpNombre');
+  const nombre = nombreInput.value.trim();
+  if (!nombre) {
+    nombreInput.style.borderColor = '#EF4444';
+    nombreInput.focus();
+    return;
+  }
+  nombreInput.style.borderColor = '';
+
+  const btn = document.querySelector('#modalNuevaCP .modal-btn-primary');
+  btn.textContent = 'Guardando...';
+  btn.disabled = true;
+
+  const resp = await fetch('/contrapartes/crear', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nombre,
+      tipo:            document.getElementById('cpTipo').value,
+      rfc:             document.getElementById('cpRFC').value.toUpperCase(),
+      abogado_nombre:  document.getElementById('cpAbogado').value,
+      despacho:        document.getElementById('cpDespacho').value,
+      telefono:        document.getElementById('cpTel').value,
+      ciudad:          document.getElementById('cpCiudad').value,
+      notas:           document.getElementById('cpNotas').value,
+    })
+  });
+
+  const data = await resp.json();
+  if (data.ok) {
+    window.location.reload();
+  } else {
+    btn.textContent = 'Guardar contraparte';
+    btn.disabled = false;
+    alert(data.error || 'Error al guardar');
+  }
+}
+</script>
+{% endblock %}

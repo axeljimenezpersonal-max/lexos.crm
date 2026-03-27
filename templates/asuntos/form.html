@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if accion == 'editar' else 'Nuevo' }} Asunto{% endblock %}
+{% block page_title %}{{ 'Editar' if accion == 'editar' else 'Nuevo' }} Asunto{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ 'Editar asunto' if accion == 'editar' else 'Nuevo asunto' }}</h1>
+    <p class="page-subtitle">Complete los datos del expediente.</p>
+  </div>
+  <a href="{{ url_for('asuntos.index') }}" class="btn btn-ghost">← Cancelar</a>
+</div>
+
+<div style="max-width: 780px;">
+  <form method="POST">
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Datos generales</span></div>
+      <div class="card-body">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">No. de expediente</label>
+            <input class="form-control" type="text" name="numero_expediente"
+                   value="{{ asunto.get('numero_expediente','') }}" placeholder="EXP-2025-001">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo de asunto</label>
+            <select class="form-control" name="tipo_asunto">
+              {% for t in tipos_asunto %}
+              <option value="{{ t }}" {{ 'selected' if asunto.get('tipo_asunto') == t else '' }}>{{ t|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Título del asunto <span class="text-danger">*</span></label>
+          <input class="form-control" type="text" name="titulo"
+                 value="{{ asunto.get('titulo','') }}" placeholder="Describe brevemente el asunto" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <textarea class="form-control" name="descripcion" rows="3"
+                    placeholder="Antecedentes y descripción del caso…">{{ asunto.get('descripcion','') }}</textarea>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Estado</label>
+            <select class="form-control" name="estado">
+              {% for e in ['activo','suspendido','cerrado','archivado'] %}
+              <option value="{{ e }}" {{ 'selected' if asunto.get('estado','activo') == e else '' }}>{{ e|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prioridad</label>
+            <select class="form-control" name="prioridad">
+              {% for p in ['alta','media','baja'] %}
+              <option value="{{ p }}" {{ 'selected' if asunto.get('prioridad','media') == p else '' }}>{{ p|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Partes involucradas</span></div>
+      <div class="card-body">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Cliente</label>
+            <select class="form-control" name="cliente_id">
+              <option value="">— Seleccionar cliente —</option>
+              {% for c in clientes %}
+              <option value="{{ c.id }}" {{ 'selected' if asunto.get('cliente_id')|string == c.id|string else '' }}>
+                {{ c.nombre }} {{ c.apellidos or '' }} {{ c.razon_social or '' }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Abogado responsable</label>
+            <select class="form-control" name="abogado_responsable">
+              <option value="">— Seleccionar abogado —</option>
+              {% for a in abogados %}
+              <option value="{{ a.id }}" {{ 'selected' if asunto.get('abogado_responsable')|string == a.id|string else '' }}>
+                {{ a.nombre }} {{ a.apellidos }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Datos judiciales y financieros</span></div>
+      <div class="card-body">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Juzgado / Tribunal</label>
+            <input class="form-control" type="text" name="juzgado"
+                   value="{{ asunto.get('juzgado','') }}" placeholder="Juzgado 5° Civil CDMX">
+          </div>
+          <div class="form-group">
+            <label class="form-label">No. de juicio</label>
+            <input class="form-control" type="text" name="numero_juicio"
+                   value="{{ asunto.get('numero_juicio','') }}" placeholder="123/2025">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha de inicio</label>
+            <input class="form-control" type="date" name="fecha_inicio"
+                   value="{{ asunto.get('fecha_inicio','') }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha de cierre</label>
+            <input class="form-control" type="date" name="fecha_cierre"
+                   value="{{ asunto.get('fecha_cierre','') }}">
+          </div>
+          <div class="form-group col-span-2">
+            <label class="form-label">Honorarios pactados (MXN)</label>
+            <input class="form-control" type="number" name="honorarios_pactados" step="0.01"
+                   value="{{ asunto.get('honorarios_pactados','') }}" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas internas</label>
+          <textarea class="form-control" name="notas" rows="2"
+                    placeholder="Notas privadas del equipo…">{{ asunto.get('notas','') }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        {{ 'Guardar cambios' if accion == 'editar' else 'Crear asunto' }}
+      </button>
+      <a href="{{ url_for('asuntos.index') }}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

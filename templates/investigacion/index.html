@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% block title %}Investigación Legal{% endblock %}
+{% block page_title %}Investigación Legal{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/investigacion.css') }}">{% endblock %}
+
+{% block content %}
+<div class="tb-breadcrumb"><span>Investigación Legal</span></div>
+
+<!-- Search bar -->
+<form class="inv-search-bar" id="searchForm" method="GET" action="{{ url_for('investigacion.index') }}">
+  <input class="inv-search-input" type="text" name="q" id="searchQ" value="{{ q }}" placeholder="Buscar asuntos, documentos, notas, formatos…">
+  <button class="inv-search-btn" type="submit">Buscar</button>
+</form>
+
+<!-- Tabs -->
+<div class="inv-tabs">
+  <button class="inv-tab active" data-inv-tab="busqueda">Búsqueda<span class="inv-tab-badge" id="badgeResultados">{{ resultados|length }}</span></button>
+  <button class="inv-tab" data-inv-tab="recursos">Recursos Externos</button>
+  <button class="inv-tab" data-inv-tab="colecciones">Colecciones<span class="inv-tab-badge">{{ colecciones|length }}</span></button>
+  <button class="inv-tab" data-inv-tab="historial">Historial</button>
+  <button class="inv-tab" data-inv-tab="organos">Órganos Jurisdiccionales<span class="inv-tab-badge">{{ organos|length }}</span></button>
+</div>
+
+<!-- ═══ TAB: Búsqueda ═══ -->
+<div class="inv-tab-panel" id="panel-busqueda">
+  <div class="inv-layout">
+    <!-- Filters sidebar -->
+    <aside class="inv-filters">
+      <div class="inv-filters-title">Filtros</div>
+      <div class="inv-fg">
+        <label>Tipo</label>
+        <select id="filtTipo">
+          <option value="">Todos</option>
+          <option value="asunto">Asuntos</option>
+          <option value="documento">Documentos</option>
+          <option value="archivo">Archivos</option>
+          <option value="formato">Formatos</option>
+          <option value="nota">Notas</option>
+          <option value="investigacion">Investigaciones</option>
+        </select>
+      </div>
+      <div class="inv-fg">
+        <label>Desde</label>
+        <input type="date" id="filtDesde">
+      </div>
+      <div class="inv-fg">
+        <label>Hasta</label>
+        <input type="date" id="filtHasta">
+      </div>
+      <button class="inv-apply-btn" onclick="aplicarFiltros()">Aplicar filtros</button>
+    </aside>
+
+    <!-- Results -->
+    <div class="inv-content">
+      <div class="inv-results-header">
+        <span class="inv-results-count" id="resultsCount">{{ resultados|length }} resultado{{ 's' if resultados|length != 1 }}</span>
+      </div>
+
+      {% if resultados %}
+      <div class="inv-result-list" id="resultList">
+        {% for r in resultados %}
+        <a class="inv-result" href="{{ r.url }}" data-tipo="{{ r.tipo }}" data-fecha="{{ r.fecha or '' }}">
+          <div class="inv-result-icon {{ r.tipo }}">
+            {% if r.tipo == 'asunto' %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {% elif r.tipo in ('documento','archivo') %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            {% elif r.tipo == 'formato' %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            {% elif r.tipo == 'nota' %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            {% else %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            {% endif %}
+          </div>
+          <div class="inv-result-body">
+            <div class="inv-result-title">{{ r.titulo }}</div>
+            <div class="inv-result-sub">{{ r.subtitulo }}</div>
+            {% if r.fecha %}<div class="inv-result-date">{{ r.fecha[:10] }}</div>{% endif %}
+          </div>
+          <button class="inv-result-save" onclick="event.preventDefault();event.stopPropagation();abrirGuardar('{{ r.tipo }}','{{ r.id }}','{{ r.titulo|e }}')" title="Guardar en colección">★</button>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="inv-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <p>{{ 'Sin resultados para "' + q + '".' if q else 'Escribe un término para buscar en todo el sistema.' }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB: Recursos Externos ═══ -->
+<div class="inv-tab-panel" id="panel-recursos" style="display:none;">
+  <!-- External search -->
+  <div class="inv-ext-search">
+    <input type="text" id="extQuery" placeholder="Buscar en fuentes externas…">
+    <select id="extFuente">
+      <option value="">Todas las fuentes</option>
+      {% for r in recursos %}
+      <option value="{{ r.id }}">{{ r.nombre }}</option>
+      {% endfor %}
+    </select>
+    <button onclick="buscarExterno()">Buscar</button>
+  </div>
+
+  <!-- Resource cards -->
+  <div class="inv-recursos-grid">
+    {% for r in recursos %}
+    <div class="inv-recurso">
+      <div class="inv-recurso-header">
+        <div class="inv-recurso-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </div>
+        <div class="inv-recurso-name">{{ r.nombre }}</div>
+      </div>
+      <div class="inv-recurso-desc">{{ r.descripcion }}</div>
+      <div class="inv-recurso-links">
+        <a href="{{ r.url }}" target="_blank" class="inv-recurso-link inv-recurso-link-primary">Visitar</a>
+        <a href="#" onclick="buscarEnFuente('{{ r.id }}');return false;" class="inv-recurso-link inv-recurso-link-secondary">Buscar</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ═══ TAB: Colecciones ═══ -->
+<div class="inv-tab-panel" id="panel-colecciones" style="display:none;">
+  <div class="inv-results-header">
+    <span class="inv-results-count">{{ colecciones|length }} colección{{ 'es' if colecciones|length != 1 }}</span>
+    <button class="inv-search-btn" onclick="document.getElementById('modalNuevaCol').classList.add('open')" style="padding:6px 14px; font-size:.78rem;">+ Nueva colección</button>
+  </div>
+
+  {% if colecciones %}
+  <div class="inv-col-grid">
+    {% for c in colecciones %}
+    <div class="inv-col-card">
+      <div class="inv-col-header" onclick="this.parentElement.querySelector('.inv-col-body').classList.toggle('open')">
+        <div>
+          <div class="inv-col-name">{{ c.nombre }}</div>
+          <div class="inv-col-meta">{{ c.items|length }} elemento{{ 's' if c.items|length != 1 }} · {{ c.fecha_creacion[:10] if c.fecha_creacion else '' }}</div>
+        </div>
+        <div class="d-flex align-center gap-2">
+          <button class="inv-col-del" onclick="event.stopPropagation();eliminarCol({{ c.id }})" title="Eliminar colección">✕</button>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+      <div class="inv-col-body">
+        {% if c.items %}
+        {% for it in c.items %}
+        <div class="inv-col-item">
+          <span class="inv-col-item-type">{{ it.tipo }}</span>
+          {% if it.url %}<a href="{{ it.url }}">{{ it.titulo }}</a>{% else %}<span>{{ it.titulo }}</span>{% endif %}
+          <button class="inv-col-item-del" onclick="eliminarColItem({{ it.id }})" title="Quitar">✕</button>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-sm text-muted" style="padding:8px 0;">Colección vacía</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="inv-empty">
+    <p>Crea una colección para agrupar resultados relevantes.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══ TAB: Historial ═══ -->
+<div class="inv-tab-panel" id="panel-historial" style="display:none;">
+  {% if historial %}
+  <div class="inv-hist-list">
+    {% for h in historial %}
+    <a class="inv-hist-item" href="{{ url_for('investigacion.index', q=h.termino) }}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span class="inv-hist-term">{{ h.termino }}</span>
+      <span class="inv-hist-count">{{ h.resultados }} resultados</span>
+      <span class="inv-hist-date">{{ h.fecha[:16] if h.fecha else '' }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="inv-empty">
+    <p>Tu historial de búsquedas aparecerá aquí.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══ TAB: Órganos Jurisdiccionales ═══ -->
+<div class="inv-tab-panel" id="panel-organos" style="display:none;">
+  <div class="inv-organos-card">
+    <div class="inv-organos-header">
+      <div class="inv-organos-filters">
+        <a href="#" class="active" data-materia="">Todos</a>
+        <a href="#" data-materia="Civil">Civil</a>
+        <a href="#" data-materia="Penal">Penal</a>
+        <a href="#" data-materia="Familiar">Familiar</a>
+        <a href="#" data-materia="Laboral">Laboral</a>
+        <a href="#" data-materia="Mercantil">Mercantil</a>
+        <a href="#" data-materia="Amparo">Amparo</a>
+        <a href="#" data-materia="Administrativo">Administrativo</a>
+      </div>
+      <button class="inv-search-btn" onclick="document.getElementById('modalNuevoOrg').classList.add('open')" style="padding:6px 14px; font-size:.78rem;">+ Nuevo órgano</button>
+    </div>
+    <table class="inv-table">
+      <thead><tr><th>Nombre</th><th>Materia</th><th>Ubicación</th><th>Teléfono</th><th></th></tr></thead>
+      <tbody id="organosBody">
+        {% for o in organos %}
+        <tr data-materia="{{ o.materia }}">
+          <td><strong>{{ o.nombre }}</strong>{% if o.es_custom %} <span class="inv-badge-custom">Custom</span>{% endif %}</td>
+          <td>{{ o.materia }}</td>
+          <td class="text-sm">{{ o.ubicacion or '—' }}</td>
+          <td class="text-sm">{{ o.telefono or '—' }}</td>
+          <td>
+            <div class="inv-table-actions">
+              <button class="inv-table-btn" onclick="abrirVincular({{ o.id }},'{{ o.nombre|e }}')" title="Vincular a asunto">Vincular</button>
+              {% if o.es_custom %}
+              <button class="inv-table-btn inv-table-btn-danger" onclick="eliminarOrgano({{ o.id }})" title="Eliminar">✕</button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- Modal: Nueva colección -->
+<div class="inv-modal-bg" id="modalNuevaCol">
+  <div class="inv-modal">
+    <h3>Nueva colección</h3>
+    <div class="inv-fg">
+      <label>Nombre</label>
+      <input type="text" id="colNombre" placeholder="Ej: Jurisprudencia laboral">
+    </div>
+    <div class="inv-fg">
+      <label>Vincular a asunto (opcional)</label>
+      <select id="colAsunto">
+        <option value="">— Ninguno —</option>
+        {% for a in asuntos %}
+        <option value="{{ a.id }}">{{ a.titulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="inv-modal-actions">
+      <button class="inv-search-btn" style="background:var(--border,#374151);" onclick="document.getElementById('modalNuevaCol').classList.remove('open')">Cancelar</button>
+      <button class="inv-search-btn" onclick="crearColeccion()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nuevo órgano -->
+<div class="inv-modal-bg" id="modalNuevoOrg">
+  <div class="inv-modal">
+    <h3>Nuevo órgano jurisdiccional</h3>
+    <div class="inv-fg"><label>Nombre</label><input type="text" id="orgNombre"></div>
+    <div class="inv-fg">
+      <label>Materia</label>
+      <select id="orgMateria">
+        <option value="Civil">Civil</option><option value="Penal">Penal</option>
+        <option value="Familiar">Familiar</option><option value="Laboral">Laboral</option>
+        <option value="Mercantil">Mercantil</option><option value="Amparo">Amparo</option>
+        <option value="Administrativo">Administrativo</option>
+      </select>
+    </div>
+    <div class="inv-fg"><label>Ubicación</label><input type="text" id="orgUbicacion"></div>
+    <div class="inv-fg"><label>Teléfono</label><input type="text" id="orgTelefono"></div>
+    <div class="inv-fg"><label>Horario</label><input type="text" id="orgHorario" placeholder="L-V 9:00-15:00"></div>
+    <div class="inv-fg"><label>Notas</label><input type="text" id="orgNotas"></div>
+    <div class="inv-modal-actions">
+      <button class="inv-search-btn" style="background:var(--border,#374151);" onclick="document.getElementById('modalNuevoOrg').classList.remove('open')">Cancelar</button>
+      <button class="inv-search-btn" onclick="crearOrgano()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Guardar resultado en colección -->
+<div class="inv-modal-bg" id="modalGuardar">
+  <div class="inv-modal">
+    <h3>Guardar en colección</h3>
+    <input type="hidden" id="guardarTipo">
+    <input type="hidden" id="guardarEntidadId">
+    <input type="hidden" id="guardarTitulo">
+    <div class="inv-fg">
+      <label>Colección</label>
+      <select id="guardarCol">
+        {% for c in colecciones %}
+        <option value="{{ c.id }}">{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="inv-modal-actions">
+      <button class="inv-search-btn" style="background:var(--border,#374151);" onclick="document.getElementById('modalGuardar').classList.remove('open')">Cancelar</button>
+      <button class="inv-search-btn" onclick="guardarResultado()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Vincular órgano a asunto -->
+<div class="inv-modal-bg" id="modalVincular">
+  <div class="inv-modal">
+    <h3>Vincular órgano a asunto</h3>
+    <input type="hidden" id="vincularOrgId">
+    <p class="text-sm text-muted" id="vincularOrgNombre" style="margin-bottom:12px;"></p>
+    <div class="inv-fg">
+      <label>Asunto</label>
+      <select id="vincularAsunto">
+        {% for a in asuntos %}
+        <option value="{{ a.id }}">{{ a.titulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="inv-modal-actions">
+      <button class="inv-search-btn" style="background:var(--border,#374151);" onclick="document.getElementById('modalVincular').classList.remove('open')">Cancelar</button>
+      <button class="inv-search-btn" onclick="vincularOrgano()">Vincular</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PREFIX = '{{ url_for("investigacion.index") }}'.replace(/\/$/,'');
+
+/* ── Tabs ── */
+document.querySelectorAll('.inv-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.inv-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.inv-tab-panel').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.invTab).style.display = '';
+  });
+});
+
+/* ── Client-side filters ── */
+function aplicarFiltros() {
+  const tipo = document.getElementById('filtTipo').value;
+  const desde = document.getElementById('filtDesde').value;
+  const hasta = document.getElementById('filtHasta').value;
+  document.querySelectorAll('.inv-result').forEach(el => {
+    let show = true;
+    if (tipo && el.dataset.tipo !== tipo) show = false;
+    if (desde && el.dataset.fecha < desde) show = false;
+    if (hasta && el.dataset.fecha > hasta) show = false;
+    el.style.display = show ? '' : 'none';
+  });
+  const visible = document.querySelectorAll('.inv-result:not([style*="display: none"])').length;
+  document.getElementById('resultsCount').textContent = visible + ' resultado' + (visible !== 1 ? 's' : '');
+}
+
+/* ── External search ── */
+function buscarExterno() {
+  const q = document.getElementById('extQuery').value.trim();
+  if (!q) return;
+  const fuente = document.getElementById('extFuente').value;
+  const recursos = {{ recursos|tojson }};
+  if (fuente) {
+    const r = recursos.find(x => x.id === fuente);
+    if (r && r.busqueda) window.open(r.busqueda.replace('{q}', encodeURIComponent(q)), '_blank');
+    else if (r) window.open(r.url, '_blank');
+  } else {
+    /* Google site search across all */
+    const sites = recursos.map(r => 'site:' + new URL(r.url).hostname).join(' OR ');
+    window.open('https://www.google.com/search?q=' + encodeURIComponent(q + ' ' + sites), '_blank');
+  }
+}
+function buscarEnFuente(id) {
+  const q = document.getElementById('extQuery')?.value?.trim() || '';
+  const recursos = {{ recursos|tojson }};
+  const r = recursos.find(x => x.id === id);
+  if (!r) return;
+  if (q && r.busqueda) window.open(r.busqueda.replace('{q}', encodeURIComponent(q)), '_blank');
+  else window.open(r.url, '_blank');
+}
+
+/* ── Colecciones ── */
+function crearColeccion() {
+  const nombre = document.getElementById('colNombre').value.trim();
+  if (!nombre) return;
+  const asunto_id = document.getElementById('colAsunto').value;
+  fetch(PREFIX + '/coleccion/crear', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({nombre, asunto_id: asunto_id || null})
+  }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else alert(d.error||'Error'); });
+}
+function eliminarCol(id) {
+  if (!confirm('¿Eliminar esta colección?')) return;
+  fetch(PREFIX + '/coleccion/' + id + '/eliminar', {method:'POST'})
+  .then(r => r.json()).then(d => { if (d.ok) location.reload(); });
+}
+function eliminarColItem(id) {
+  fetch(PREFIX + '/coleccion/item/' + id + '/eliminar', {method:'POST'})
+  .then(r => r.json()).then(d => { if (d.ok) location.reload(); });
+}
+
+/* ── Guardar resultado ── */
+function abrirGuardar(tipo, id, titulo) {
+  document.getElementById('guardarTipo').value = tipo;
+  document.getElementById('guardarEntidadId').value = id;
+  document.getElementById('guardarTitulo').value = titulo;
+  document.getElementById('modalGuardar').classList.add('open');
+}
+function guardarResultado() {
+  const col_id = document.getElementById('guardarCol').value;
+  if (!col_id) { alert('Selecciona una colección'); return; }
+  fetch(PREFIX + '/guardar-resultado', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      coleccion_id: col_id,
+      tipo: document.getElementById('guardarTipo').value,
+      entidad_id: document.getElementById('guardarEntidadId').value,
+      titulo: document.getElementById('guardarTitulo').value
+    })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { document.getElementById('modalGuardar').classList.remove('open'); alert('Guardado'); }
+    else alert(d.error||'Error');
+  });
+}
+
+/* ── Órganos ── */
+document.querySelectorAll('.inv-organos-filters a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('.inv-organos-filters a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    const mat = a.dataset.materia;
+    document.querySelectorAll('#organosBody tr').forEach(tr => {
+      tr.style.display = (!mat || tr.dataset.materia === mat) ? '' : 'none';
+    });
+  });
+});
+
+function crearOrgano() {
+  const data = {
+    nombre: document.getElementById('orgNombre').value.trim(),
+    materia: document.getElementById('orgMateria').value,
+    ubicacion: document.getElementById('orgUbicacion').value.trim(),
+    telefono: document.getElementById('orgTelefono').value.trim(),
+    horario: document.getElementById('orgHorario').value.trim(),
+    notas: document.getElementById('orgNotas').value.trim()
+  };
+  if (!data.nombre) return;
+  fetch(PREFIX + '/organo/crear', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+  }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else alert(d.error||'Error'); });
+}
+function eliminarOrgano(id) {
+  if (!confirm('¿Eliminar este órgano?')) return;
+  fetch(PREFIX + '/organo/' + id + '/eliminar', {method:'POST'})
+  .then(r => r.json()).then(d => { if (d.ok) location.reload(); });
+}
+function abrirVincular(id, nombre) {
+  document.getElementById('vincularOrgId').value = id;
+  document.getElementById('vincularOrgNombre').textContent = nombre;
+  document.getElementById('modalVincular').classList.add('open');
+}
+function vincularOrgano() {
+  const organo_id = document.getElementById('vincularOrgId').value;
+  const asunto_id = document.getElementById('vincularAsunto').value;
+  if (!asunto_id) return;
+  fetch(PREFIX + '/organo/' + organo_id + '/vincular', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({asunto_id})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { document.getElementById('modalVincular').classList.remove('open'); alert('Vinculado'); }
+    else alert(d.error||'Error');
+  });
+}
+
+/* ── Close modals on bg click ── */
+document.querySelectorAll('.inv-modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,777 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon_folder, icon_clipboard, icon_edit, icon_book, icon_file_text, icon_trash, icon_link, icon_file, icon_scale, icon_eye, icon_paperclip, icon_image %}
+{% block title %}Biblioteca{% endblock %}
+{% block page_title %}Biblioteca{% endblock %}{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/biblioteca.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="tb-breadcrumb"><span>Biblioteca</span></div>
+
+<!-- ══════════════════════════════════════════════
+     SECTION TABS
+     ══════════════════════════════════════════════ -->
+<div class="bib-tabs">
+  <a class="bib-tab {{ 'active' if seccion == 'estudio' }}"
+     href="{{ url_for('biblioteca.index', seccion='estudio') }}">
+    {{ icon_folder(14, 14) }} Estudio
+  </a>
+  <a class="bib-tab {{ 'active' if seccion == 'formatos' }}"
+     href="{{ url_for('biblioteca.index', seccion='formatos') }}">
+    {{ icon_clipboard(14, 14) }} Formatos
+  </a>
+  <a class="bib-tab {{ 'active' if seccion == 'acuerdos' }}"
+     href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">
+    {{ icon_scale(14, 14) }} Acuerdos y Audiencias
+  </a>
+  <a class="bib-tab-editor" href="{{ url_for('biblioteca.editor') }}">
+    {{ icon_edit(14, 14) }} Editor de documentos
+  </a>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 1 — ESTUDIO
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if seccion == 'estudio' %}
+<div class="bib-estudio">
+
+  <!-- Metrics bar -->
+  <div class="bib-metrics">
+    <div class="bib-metric">
+      <div class="bib-metric-val">{{ total_archivos }}</div>
+      <div class="bib-metric-label">Archivos</div>
+    </div>
+    <div class="bib-metric">
+      <div class="bib-metric-val">{{ '%.1f' | format(espacio_usado / (1024*1024)) }} MB</div>
+      <div class="bib-metric-label">Espacio usado</div>
+    </div>
+    <div class="bib-metric">
+      <div class="bib-metric-val">{{ '%.0f' | format(espacio_limite / (1024*1024)) }} MB</div>
+      <div class="bib-metric-label">Límite del plan</div>
+    </div>
+    <div class="bib-metric" style="flex:2">
+      <div class="bib-usage-bar">
+        <div class="bib-usage-fill" style="width:{{ [(espacio_usado / espacio_limite * 100)|round(1), 100]|min }}%"></div>
+      </div>
+      <div class="bib-metric-label">{{ '%.1f' | format(espacio_usado / espacio_limite * 100) }}% utilizado</div>
+    </div>
+  </div>
+
+  <div class="bib-estudio-grid">
+    <!-- Left: Carpetas -->
+    <div class="bib-sidebar">
+      <div class="bib-sidebar-header">
+        <span style="font-weight:700; font-size:.84rem">Carpetas</span>
+        <button class="btn btn-ghost btn-sm" onclick="abrirCrearCarpeta()">+ Nueva</button>
+      </div>
+      <a class="bib-folder {{ 'active' if not carpeta_id }}"
+         href="{{ url_for('biblioteca.index', seccion='estudio') }}">
+        {{ icon_folder(14, 14) }} Todos los archivos
+      </a>
+      {% for c in carpetas %}
+      <div class="bib-folder-row">
+        <a class="bib-folder {{ 'active' if carpeta_id == c.id }}"
+           href="{{ url_for('biblioteca.index', seccion='estudio', carpeta=c.id) }}">
+          {{ icon_folder(13, 13) }} {{ c.nombre }}
+        </a>
+        <div class="bib-folder-actions">
+          <button class="btn-icon" onclick="renombrarCarpeta({{ c.id }}, '{{ c.nombre | replace("'","\\'") }}')" title="Renombrar">{{ icon_edit(13, 13) }}</button>
+          <button class="btn-icon" onclick="eliminarCarpeta({{ c.id }})" title="Eliminar">{{ icon_trash(13, 13) }}</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Right: Files -->
+    <div class="bib-main">
+      <!-- Toolbar -->
+      <div class="bib-toolbar">
+        <form method="GET" class="bib-search-form">
+          <input type="hidden" name="seccion" value="estudio">
+          {% if carpeta_id %}<input type="hidden" name="carpeta" value="{{ carpeta_id }}">{% endif %}
+          <div class="bib-search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" name="q" value="{{ q }}" placeholder="Buscar archivos…" class="bib-search-input">
+          </div>
+          <select name="tipo" onchange="this.form.submit()">
+            <option value="">Todos los tipos</option>
+            {% for ext in ['pdf','docx','xlsx','png','jpg'] %}
+            <option value="{{ ext }}" {{ 'selected' if tipo_f == ext }}>.{{ ext }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        <button class="btn btn-primary btn-sm" onclick="abrirUpload()">⬆ Subir archivos</button>
+      </div>
+
+      <!-- Drop zone -->
+      <div class="bib-dropzone" id="mainDropzone"
+           ondragover="event.preventDefault(); this.classList.add('active')"
+           ondragleave="this.classList.remove('active')"
+           ondrop="handleMainDrop(event)">
+        <div class="bib-dz-icon">{{ icon_folder(32, 32) }}</div>
+        <div class="bib-dz-text">Arrastra archivos aquí o haz clic en "Subir archivos"</div>
+        <div class="bib-dz-sub">PDF, DOCX, XLSX, imágenes — Máx. 16 MB cada uno</div>
+      </div>
+
+      <!-- Files grid -->
+      {% if archivos %}
+      <div class="bib-files-grid">
+        {% for a in archivos %}
+        <div class="bib-file-card" id="file-{{ a.id }}">
+          <div class="bib-file-icon">
+            {% if a.extension in ('pdf',) %}{{ icon_file_text(28, 28) }}
+            {% elif a.extension in ('doc','docx') %}{{ icon_file_text(28, 28) }}
+            {% elif a.extension in ('xls','xlsx') %}{{ icon_file(28, 28) }}
+            {% elif a.extension in ('png','jpg','jpeg','gif','webp') %}{{ icon_image(28, 28) }}
+            {% elif a.extension in ('ppt','pptx') %}{{ icon_file(28, 28) }}
+            {% else %}{{ icon_file(28, 28) }}{% endif %}
+          </div>
+          <div class="bib-file-info">
+            <div class="bib-file-name" title="{{ a.nombre_original or a.nombre }}">
+              {{ (a.nombre_original or a.nombre) | truncate(28, true, '…') }}
+            </div>
+            <div class="bib-file-meta">
+              .{{ a.extension }} · {{ '%.1f' | format((a.tamanio or 0) / 1024) }} KB
+              {% if a.carpeta_nombre %} · {{ a.carpeta_nombre }}{% endif %}
+            </div>
+          </div>
+          <div class="bib-file-actions">
+            {% if a.extension == 'pdf' %}
+            <button class="btn-icon" onclick="previewPdf('{{ a.archivo_url }}')" title="Vista previa">{{ icon_eye(13, 13) }}</button>
+            {% endif %}
+            <a href="{{ a.archivo_url }}" download class="btn-icon" title="Descargar">⬇</a>
+            <button class="btn-icon" onclick="compartirArchivo({{ a.id }})" title="Compartir">{{ icon_link(13, 13) }}</button>
+            <button class="btn-icon" onclick="vincularArchivo({{ a.id }})" title="Vincular a asunto/cliente">{{ icon_paperclip(13, 13) }}</button>
+            <button class="btn-icon" onclick="eliminarArchivo({{ a.id }})" title="Eliminar">{{ icon_trash(13, 13) }}</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="bib-empty">
+        <div class="bib-empty-icon">{{ icon_folder(36, 36) }}</div>
+        <p>No hay archivos{% if carpeta_id %} en esta carpeta{% endif %}.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 2 — FORMATOS (Plantillas)
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if seccion == 'formatos' %}
+<div class="bib-formatos">
+  <!-- Toolbar -->
+  <div class="bib-toolbar">
+    <form method="GET" class="bib-search-form">
+      <input type="hidden" name="seccion" value="formatos">
+      <div class="bib-search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" name="q_pl" value="{{ q_pl }}" placeholder="Buscar plantillas…" class="bib-search-input">
+      </div>
+      <select name="categoria" onchange="this.form.submit()">
+        <option value="">Todas las categorías</option>
+        {% for cat in categorias %}
+        <option value="{{ cat }}" {{ 'selected' if cat_f == cat }}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+      <select name="derecho" onchange="this.form.submit()">
+        <option value="">Tipo de derecho</option>
+        {% for td in tipos_derecho %}
+        <option value="{{ td }}" {{ 'selected' if derecho_f == td }}>{{ td }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <button class="btn btn-primary btn-sm" onclick="abrirSubirPlantilla()">⬆ Subir plantilla</button>
+  </div>
+
+  {% if plantillas %}
+  <div class="bib-plantillas-grid">
+    {% for p in plantillas %}
+    <div class="bib-plantilla-card">
+      <div class="bib-pl-icon">
+        {% if p.extension == 'pdf' %}{{ icon_file_text(28, 28) }}{% elif p.extension in ('doc','docx') %}{{ icon_file_text(28, 28) }}{% else %}{{ icon_file(28, 28) }}{% endif %}
+      </div>
+      <div class="bib-pl-body">
+        <div class="bib-pl-name">{{ p.nombre }}</div>
+        <div class="bib-pl-cat">
+          <span class="bib-pl-badge">{{ p.categoria or 'Otro' }}</span>
+          {% if p.tipo_derecho %}<span class="bib-pl-badge bib-pl-badge-tipo">{{ p.tipo_derecho }}</span>{% endif %}
+          {% if p.es_custom %}<span class="bib-pl-badge bib-pl-badge-custom">Personalizada</span>{% endif %}
+        </div>
+        {% if p.descripcion %}
+        <div class="bib-pl-desc">{{ p.descripcion | truncate(60, true, '…') }}</div>
+        {% endif %}
+        <div class="bib-pl-meta">{{ '%.0f' | format((p.tamanio or 0) / 1024) }} KB</div>
+      </div>
+      <div class="bib-pl-actions">
+        <a href="{{ url_for('biblioteca.plantilla_descargar', id=p.id) }}" class="btn btn-secondary btn-sm">⬇ Descargar</a>
+        <a href="{{ url_for('biblioteca.editor', plantilla=p.id) }}" class="btn btn-primary btn-sm">{{ icon_edit(12, 12) }} Usar en editor</a>
+        <button class="btn btn-ghost btn-sm" onclick="eliminarPlantilla({{ p.id }})">{{ icon_trash(12, 12) }}</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bib-empty">
+    <div class="bib-empty-icon">{{ icon_clipboard(36, 36) }}</div>
+    <p>No hay plantillas{{ ' con esos filtros' if cat_f or derecho_f or q_pl else '' }}.</p>
+    <button class="btn btn-primary btn-sm" onclick="abrirSubirPlantilla()" style="margin-top:8px">⬆ Subir primera plantilla</button>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 3 — ACUERDOS Y AUDIENCIAS
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if seccion == 'acuerdos' %}
+<div class="bib-acuerdos">
+  <!-- Info banner -->
+  <div class="bib-info-banner">
+    <div class="bib-info-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+    <div>
+      <strong>Consulta de acuerdos y audiencias del CJF</strong><br>
+      <span style="font-size:.82rem; color:var(--text-3)">
+        La consulta automática del Consejo de la Judicatura Federal se encuentra en desarrollo.
+        Por ahora puedes registrar manualmente tus acuerdos y audiencias para vincularlos a asuntos de LexOS.
+      </span>
+    </div>
+    <span class="bib-info-badge">Próximamente — API CJF</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bib-ac-tabs">
+    <a class="bib-ac-tab {{ 'active' if tab_ac == 'audiencias' }}"
+       href="{{ url_for('biblioteca.index', seccion='acuerdos', tab_ac='audiencias') }}">Audiencias</a>
+    <a class="bib-ac-tab {{ 'active' if tab_ac == 'acuerdos' }}"
+       href="{{ url_for('biblioteca.index', seccion='acuerdos', tab_ac='acuerdos') }}">Acuerdos</a>
+    <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="abrirCrearAcuerdo()">+ Registrar {{ 'audiencia' if tab_ac == 'audiencias' else 'acuerdo' }}</button>
+  </div>
+
+  {% if acuerdos %}
+  <div class="bib-table-wrap">
+    <table class="bib-table">
+      <thead>
+        <tr>
+          <th>NEUN</th>
+          <th>No. Asunto</th>
+          <th>Órgano</th>
+          <th>Circuito</th>
+          <th>Autoridad</th>
+          <th>Fecha</th>
+          <th>Asunto vinculado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in acuerdos %}
+        <tr id="ac-row-{{ a.id }}">
+          <td><span class="mono">{{ a.neun or '—' }}</span></td>
+          <td>{{ a.numero_asunto or '—' }}</td>
+          <td>{{ a.organo or '—' }}</td>
+          <td>{{ a.circuito or '—' }}</td>
+          <td>{{ a.autoridad or '—' }}</td>
+          <td>{{ (a.fecha or '—')[:10] }}</td>
+          <td>
+            {% if a.asunto_titulo %}
+              <span class="bib-ac-linked">{{ a.asunto_titulo | truncate(20, true, '…') }}</span>
+            {% else %}
+              <button class="btn btn-ghost btn-sm" onclick="vincularAcuerdo({{ a.id }})">{{ icon_paperclip(12, 12) }} Vincular</button>
+            {% endif %}
+          </td>
+          <td>
+            <button class="btn-icon" onclick="eliminarAcuerdo({{ a.id }})" title="Eliminar">{{ icon_trash(13, 13) }}</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bib-empty">
+    <div class="bib-empty-icon">{{ icon_scale(36, 36) }}</div>
+    <p>No hay {{ 'audiencias' if tab_ac == 'audiencias' else 'acuerdos' }} registrados.</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODALS
+     ══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Upload modal -->
+<div class="modal-overlay" id="uploadModal" onclick="if(event.target===this)cerrarModal('uploadModal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">⬆ Subir archivos al Estudio</span>
+      <button class="modal-close" onclick="cerrarModal('uploadModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="uploadForm" enctype="multipart/form-data">
+        <div class="bib-form-row">
+          <div class="bib-fg" style="flex:2">
+            <label>Carpeta destino</label>
+            <select name="carpeta_id">
+              <option value="">Raíz (sin carpeta)</option>
+              {% for c in carpetas %}
+              <option value="{{ c.id }}" {{ 'selected' if carpeta_id == c.id }}>{{ c.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="bib-form-row">
+          <div class="bib-fg">
+            <label>Vincular a asunto (opcional)</label>
+            <select name="asunto_id">
+              <option value="">— Ninguno —</option>
+              {% for a in asuntos %}
+              <option value="{{ a.id }}">{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="bib-fg">
+            <label>Vincular a cliente (opcional)</label>
+            <select name="cliente_id">
+              <option value="">— Ninguno —</option>
+              {% for c in clientes %}
+              <option value="{{ c.id }}">{{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="bib-form-row">
+          <div class="bib-fg">
+            <label>Archivos</label>
+            <div class="bib-upload-zone" id="uploadZone"
+                 ondragover="event.preventDefault(); this.classList.add('active')"
+                 ondragleave="this.classList.remove('active')"
+                 ondrop="handleUploadDrop(event)"
+                 onclick="document.getElementById('uploadInput').click()">
+              <div style="color:var(--text-3)">{{ icon_folder(32, 32) }}</div>
+              <div>Arrastra archivos aquí o haz clic</div>
+              <div id="uploadFileNames" class="bib-upload-names"></div>
+            </div>
+            <input type="file" id="uploadInput" name="archivos" multiple style="display:none"
+                   onchange="showUploadNames(this)">
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('uploadModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitUpload()">Subir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create folder modal -->
+<div class="modal-overlay" id="carpetaModal" onclick="if(event.target===this)cerrarModal('carpetaModal')">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_folder(14, 14) }} Nueva carpeta</span>
+      <button class="modal-close" onclick="cerrarModal('carpetaModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="carpetaForm">
+        <div class="bib-fg">
+          <label>Nombre de la carpeta</label>
+          <input type="text" name="nombre" id="carpetaNombre" placeholder="Ej. Contratos 2026" required autofocus>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('carpetaModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitCarpeta()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload plantilla modal -->
+<div class="modal-overlay" id="plantillaModal" onclick="if(event.target===this)cerrarModal('plantillaModal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_clipboard(14, 14) }} Subir plantilla</span>
+      <button class="modal-close" onclick="cerrarModal('plantillaModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="plantillaForm" enctype="multipart/form-data">
+        <div class="bib-form-row">
+          <div class="bib-fg" style="flex:2">
+            <label>Nombre <span class="req">*</span></label>
+            <input type="text" name="nombre" required placeholder="Ej. Contrato de arrendamiento">
+          </div>
+          <div class="bib-fg">
+            <label>Categoría</label>
+            <select name="categoria">
+              {% for cat in categorias %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="bib-form-row">
+          <div class="bib-fg">
+            <label>Tipo de derecho</label>
+            <select name="tipo_derecho">
+              {% for td in tipos_derecho %}
+              <option value="{{ td }}">{{ td }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="bib-fg" style="flex:2">
+            <label>Descripción</label>
+            <input type="text" name="descripcion" placeholder="Breve descripción…">
+          </div>
+        </div>
+        <div class="bib-form-row">
+          <div class="bib-fg">
+            <label>Archivo (DOCX, PDF) <span class="req">*</span></label>
+            <input type="file" name="archivo" accept=".docx,.doc,.pdf,.xlsx" required>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('plantillaModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitPlantilla()">Subir plantilla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create acuerdo modal -->
+<div class="modal-overlay" id="acuerdoModal" onclick="if(event.target===this)cerrarModal('acuerdoModal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_scale(16, 16) }} Registrar {{ 'audiencia' if tab_ac == 'audiencias' else 'acuerdo' }}</span>
+      <button class="modal-close" onclick="cerrarModal('acuerdoModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="acuerdoForm">
+        <input type="hidden" name="tipo" value="{{ 'audiencia' if tab_ac == 'audiencias' else 'acuerdo' }}">
+        <div class="bib-form-row">
+          <div class="bib-fg">
+            <label>NEUN</label>
+            <input type="text" name="neun" placeholder="Ej. 123456789">
+          </div>
+          <div class="bib-fg">
+            <label>Número de asunto</label>
+            <input type="text" name="numero_asunto" placeholder="Ej. 1234/2026">
+          </div>
+        </div>
+        <div class="bib-form-row">
+          <div class="bib-fg">
+            <label>Órgano</label>
+            <input type="text" name="organo" placeholder="Ej. Juzgado Primero de Distrito">
+          </div>
+          <div class="bib-fg">
+            <label>Circuito</label>
+            <input type="text" name="circuito" placeholder="Ej. Primer Circuito">
+          </div>
+        </div>
+        <div class="bib-form-row">
+          <div class="bib-fg" style="flex:2">
+            <label>Autoridad</label>
+            <input type="text" name="autoridad" placeholder="Nombre de la autoridad">
+          </div>
+          <div class="bib-fg">
+            <label>Fecha</label>
+            <input type="date" name="fecha" value="{{ today_str }}">
+          </div>
+        </div>
+        <div class="bib-form-row">
+          <div class="bib-fg" style="flex:2">
+            <label>Descripción</label>
+            <textarea name="descripcion" rows="2" placeholder="Notas…"></textarea>
+          </div>
+          <div class="bib-fg">
+            <label>Vincular a asunto</label>
+            <select name="asunto_id">
+              <option value="">— Ninguno —</option>
+              {% for a in asuntos %}
+              <option value="{{ a.id }}">{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('acuerdoModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitAcuerdo()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF Preview modal -->
+<div class="modal-overlay" id="pdfModal" onclick="if(event.target===this)cerrarModal('pdfModal')">
+  <div class="modal-box" style="max-width:900px; height:85vh">
+    <div class="modal-header">
+      <span class="modal-title">Vista previa</span>
+      <button class="modal-close" onclick="cerrarModal('pdfModal')">×</button>
+    </div>
+    <div class="modal-body" style="padding:0; flex:1; overflow:hidden">
+      <iframe id="pdfFrame" style="width:100%; height:100%; border:none"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- Compartir modal -->
+<div class="modal-overlay" id="compartirModal" onclick="if(event.target===this)cerrarModal('compartirModal')">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_link(14, 14) }} Compartir archivo</span>
+      <button class="modal-close" onclick="cerrarModal('compartirModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="bib-fg" style="margin-bottom:12px">
+        <label>Duración del enlace</label>
+        <select id="compartirHoras">
+          <option value="24">24 horas</option>
+          <option value="48">48 horas</option>
+          <option value="72" selected>72 horas</option>
+        </select>
+      </div>
+      <div id="compartirResult" style="display:none">
+        <div class="bib-share-link">
+          <input type="text" id="compartirLink" readonly onclick="this.select()">
+          <button class="btn btn-primary btn-sm" onclick="copiarLink()">Copiar</button>
+        </div>
+        <p style="font-size:.78rem; color:var(--text-3); margin-top:6px" id="compartirExpires"></p>
+      </div>
+    </div>
+    <div class="modal-footer" id="compartirFooter">
+      <button class="btn btn-ghost" onclick="cerrarModal('compartirModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitCompartir()">Generar enlace</button>
+    </div>
+  </div>
+</div>
+
+<!-- Vincular modal -->
+<div class="modal-overlay" id="vincularModal" onclick="if(event.target===this)cerrarModal('vincularModal')">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_paperclip(16, 16) }} Vincular archivo</span>
+      <button class="modal-close" onclick="cerrarModal('vincularModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="vincularArchivoId">
+      <div class="bib-fg" style="margin-bottom:12px">
+        <label>Asunto</label>
+        <select id="vincularAsunto">
+          <option value="">— Ninguno —</option>
+          {% for a in asuntos %}
+          <option value="{{ a.id }}">{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bib-fg">
+        <label>Cliente</label>
+        <select id="vincularCliente">
+          <option value="">— Ninguno —</option>
+          {% for c in clientes %}
+          <option value="{{ c.id }}">{{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('vincularModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitVincular()">Vincular</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════════ -->
+<script>
+/* ── Modals ─────────────────────────────────── */
+function cerrarModal(id) { document.getElementById(id).classList.remove("open"); }
+
+/* ── Estudio: carpetas ──────────────────────── */
+function abrirCrearCarpeta() {
+  document.getElementById("carpetaNombre").value = "";
+  document.getElementById("carpetaModal").classList.add("open");
+  setTimeout(() => document.getElementById("carpetaNombre").focus(), 100);
+}
+async function submitCarpeta() {
+  const nombre = document.getElementById("carpetaNombre").value.trim();
+  if (!nombre) { alert("Nombre requerido"); return; }
+  const fd = new FormData();
+  fd.append("nombre", nombre);
+  const r = await fetch("/biblioteca/carpeta/crear", {
+    method: "POST", body: fd,
+    headers: {"X-Requested-With": "XMLHttpRequest"},
+  });
+  const j = await r.json();
+  if (j.ok) { cerrarModal("carpetaModal"); location.reload(); }
+  else alert(j.error);
+}
+async function renombrarCarpeta(id, actual) {
+  const nuevo = prompt("Nuevo nombre:", actual);
+  if (!nuevo || nuevo.trim() === actual) return;
+  await fetch(`/biblioteca/carpeta/${id}/renombrar`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({nombre: nuevo.trim()}),
+  });
+  location.reload();
+}
+async function eliminarCarpeta(id) {
+  if (!confirm("¿Eliminar carpeta? Los archivos no se borrarán.")) return;
+  await fetch(`/biblioteca/carpeta/${id}/eliminar`, {
+    method: "POST", headers: {"X-Requested-With": "XMLHttpRequest"},
+  });
+  location.reload();
+}
+
+/* ── Estudio: upload ────────────────────────── */
+function abrirUpload() { document.getElementById("uploadModal").classList.add("open"); }
+function handleUploadDrop(e) {
+  e.preventDefault();
+  document.getElementById("uploadZone").classList.remove("active");
+  const dt = new DataTransfer();
+  for (const f of e.dataTransfer.files) dt.items.add(f);
+  document.getElementById("uploadInput").files = dt.files;
+  showUploadNames(document.getElementById("uploadInput"));
+}
+function handleMainDrop(e) {
+  e.preventDefault();
+  document.getElementById("mainDropzone").classList.remove("active");
+  const dt = new DataTransfer();
+  for (const f of e.dataTransfer.files) dt.items.add(f);
+  document.getElementById("uploadInput").files = dt.files;
+  abrirUpload();
+  showUploadNames(document.getElementById("uploadInput"));
+}
+function showUploadNames(inp) {
+  const el = document.getElementById("uploadFileNames");
+  el.innerHTML = Array.from(inp.files).map(f =>
+    `<div>${f.name} (${(f.size/1024).toFixed(0)} KB)</div>`
+  ).join("");
+}
+async function submitUpload() {
+  const inp = document.getElementById("uploadInput");
+  if (!inp.files.length) { alert("Selecciona al menos un archivo"); return; }
+  const fd = new FormData(document.getElementById("uploadForm"));
+  const r = await fetch("/biblioteca/upload", {
+    method: "POST", body: fd,
+    headers: {"X-Requested-With": "XMLHttpRequest"},
+  });
+  const j = await r.json();
+  if (j.ok) { cerrarModal("uploadModal"); location.reload(); }
+  else alert(j.error || "Error al subir");
+}
+
+/* ── Estudio: file actions ──────────────────── */
+async function eliminarArchivo(id) {
+  if (!confirm("¿Eliminar este archivo?")) return;
+  await fetch(`/biblioteca/archivo/${id}/eliminar`, {method: "POST"});
+  document.getElementById("file-" + id)?.remove();
+}
+function previewPdf(url) {
+  document.getElementById("pdfFrame").src = url;
+  document.getElementById("pdfModal").classList.add("open");
+}
+
+let compartirCurrentId = null;
+function compartirArchivo(id) {
+  compartirCurrentId = id;
+  document.getElementById("compartirResult").style.display = "none";
+  document.getElementById("compartirFooter").style.display = "flex";
+  document.getElementById("compartirModal").classList.add("open");
+}
+async function submitCompartir() {
+  const horas = document.getElementById("compartirHoras").value;
+  const r = await fetch(`/biblioteca/archivo/${compartirCurrentId}/compartir`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({horas: parseInt(horas)}),
+  });
+  const j = await r.json();
+  if (j.ok) {
+    document.getElementById("compartirLink").value = j.link;
+    document.getElementById("compartirExpires").textContent =
+      `Expira: ${new Date(j.expires).toLocaleString("es-MX")}`;
+    document.getElementById("compartirResult").style.display = "block";
+    document.getElementById("compartirFooter").style.display = "none";
+  }
+}
+function copiarLink() {
+  const inp = document.getElementById("compartirLink");
+  inp.select();
+  navigator.clipboard.writeText(inp.value);
+  inp.style.borderColor = "var(--success)";
+  setTimeout(() => inp.style.borderColor = "", 1000);
+}
+
+function vincularArchivo(id) {
+  document.getElementById("vincularArchivoId").value = id;
+  document.getElementById("vincularModal").classList.add("open");
+}
+async function submitVincular() {
+  const id = document.getElementById("vincularArchivoId").value;
+  const r = await fetch(`/biblioteca/archivo/${id}/vincular`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      asunto_id: document.getElementById("vincularAsunto").value || null,
+      cliente_id: document.getElementById("vincularCliente").value || null,
+    }),
+  });
+  const j = await r.json();
+  if (j.ok) { cerrarModal("vincularModal"); location.reload(); }
+}
+
+/* ── Formatos ───────────────────────────────── */
+function abrirSubirPlantilla() { document.getElementById("plantillaModal").classList.add("open"); }
+async function submitPlantilla() {
+  const fd = new FormData(document.getElementById("plantillaForm"));
+  const r = await fetch("/biblioteca/plantilla/subir", {
+    method: "POST", body: fd,
+    headers: {"X-Requested-With": "XMLHttpRequest"},
+  });
+  const j = await r.json();
+  if (j.ok) { cerrarModal("plantillaModal"); location.reload(); }
+  else alert(j.error || "Error");
+}
+async function eliminarPlantilla(id) {
+  if (!confirm("¿Eliminar esta plantilla?")) return;
+  await fetch(`/biblioteca/plantilla/${id}/eliminar`, {method: "POST"});
+  location.reload();
+}
+
+/* ── Acuerdos ───────────────────────────────── */
+function abrirCrearAcuerdo() { document.getElementById("acuerdoModal").classList.add("open"); }
+async function submitAcuerdo() {
+  const fd = new FormData(document.getElementById("acuerdoForm"));
+  const data = Object.fromEntries(fd.entries());
+  const r = await fetch("/biblioteca/acuerdo/crear", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(data),
+  });
+  const j = await r.json();
+  if (j.ok) { cerrarModal("acuerdoModal"); location.reload(); }
+  else alert(j.error || "Error");
+}
+async function vincularAcuerdo(id) {
+  const asuntoId = prompt("ID del asunto a vincular:");
+  if (!asuntoId) return;
+  await fetch(`/biblioteca/acuerdo/${id}/vincular`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({asunto_id: parseInt(asuntoId)}),
+  });
+  location.reload();
+}
+async function eliminarAcuerdo(id) {
+  if (!confirm("¿Eliminar?")) return;
+  await fetch(`/biblioteca/acuerdo/${id}/eliminar`, {method: "POST"});
+  document.getElementById("ac-row-" + id)?.remove();
+}
+</script>
+{% endblock %}

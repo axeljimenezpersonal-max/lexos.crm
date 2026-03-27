@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Mi Perfil{% endblock %}
+{% block page_title %}Mi Perfil{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Mi Perfil</h1>
+    <p class="page-subtitle">Gestiona tu información personal y contraseña.</p>
+  </div>
+</div>
+
+<div style="max-width: 560px;">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Información personal</span>
+    </div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Nombre</label>
+            <input class="form-control" type="text" name="nombre"
+                   value="{{ user.nombre }}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Apellidos</label>
+            <input class="form-control" type="text" name="apellidos"
+                   value="{{ user.apellidos or '' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo electrónico</label>
+          <input class="form-control" type="email" value="{{ user.email }}" disabled>
+          <small class="text-muted text-xs mt-1">El correo no puede cambiarse.</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input class="form-control" type="tel" name="telefono"
+                 value="{{ user.telefono or '' }}" placeholder="55 1234 5678">
+        </div>
+        <hr style="border-color: var(--border); margin: 20px 0;">
+        <p class="text-sm fw-600" style="margin-bottom: 14px;">Cambiar contraseña <span class="text-muted">(opcional)</span></p>
+        <div class="form-group">
+          <label class="form-label">Nueva contraseña</label>
+          <input class="form-control" type="password" name="new_password"
+                 placeholder="Dejar vacío para no cambiar">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar contraseña</label>
+          <input class="form-control" type="password" name="confirm_password">
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          <a href="{{ url_for('dashboard.index') }}" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

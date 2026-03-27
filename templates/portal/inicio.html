@@ -1,0 +1,116 @@
+{% extends "portal/base_portal.html" %}
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+<div class="ptl-page-header">
+  <h1>Bienvenido, {{ session.get('portal_cliente_nombre', 'Cliente') }}</h1>
+  <p>Aquí puedes consultar el estado de tus asuntos legales.</p>
+</div>
+
+<!-- Summary cards -->
+<div class="ptl-summary-grid">
+  <div class="ptl-summary-card">
+    <div class="ptl-sc-icon" style="background:rgba(0,223,162,.1);color:var(--e);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </div>
+    <div class="ptl-sc-body">
+      <div class="ptl-sc-val">{{ asuntos|length }}</div>
+      <div class="ptl-sc-label">Asuntos activos</div>
+    </div>
+  </div>
+
+  <div class="ptl-summary-card">
+    <div class="ptl-sc-icon" style="background:rgba(245,158,11,.1);color:#F59E0B;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    </div>
+    <div class="ptl-sc-body">
+      {% if prox_evento %}
+      <div class="ptl-sc-val ptl-sc-val-sm">{{ prox_evento.titulo[:30] }}</div>
+      <div class="ptl-sc-label">{{ prox_evento.fecha_inicio[:16] if prox_evento.fecha_inicio else '' }}</div>
+      {% else %}
+      <div class="ptl-sc-val">—</div>
+      <div class="ptl-sc-label">Sin eventos próximos</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="ptl-summary-card">
+    <div class="ptl-sc-icon" style="background:rgba(239,68,68,.1);color:#EF4444;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </div>
+    <div class="ptl-sc-body">
+      {% if ultima_factura %}
+      <div class="ptl-sc-val">${{ '{:,.0f}'.format(ultima_factura.total or ultima_factura.monto) }}</div>
+      <div class="ptl-sc-label">Factura pendiente · {{ ultima_factura.estado }}</div>
+      {% else %}
+      <div class="ptl-sc-val">$0</div>
+      <div class="ptl-sc-label">Sin facturas pendientes</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="ptl-summary-card">
+    <div class="ptl-sc-icon" style="background:rgba(16,185,129,.1);color:#10B981;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <div class="ptl-sc-body">
+      <div class="ptl-sc-val">{{ msgs_no_leidos }}</div>
+      <div class="ptl-sc-label">Mensajes nuevos</div>
+    </div>
+  </div>
+</div>
+
+<!-- Asuntos activos -->
+{% if asuntos %}
+<div class="ptl-section">
+  <h2>Asuntos activos</h2>
+  <div class="ptl-card-list">
+    {% for a in asuntos %}
+    <a href="{{ url_for('portal.cliente_asunto_detalle', asunto_id=a.id) }}" class="ptl-card-link">
+      <div class="ptl-case-card">
+        <div class="ptl-case-title">{{ a.titulo }}</div>
+        <div class="ptl-case-meta">
+          <span class="ptl-status ptl-status-{{ a.estado }}">{{ a.estado }}</span>
+          {% if a.tipo_asunto %}<span>{{ a.tipo_asunto|capitalize }}</span>{% endif %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <a href="{{ url_for('portal.cliente_asuntos') }}" class="ptl-link">Ver todos los asuntos →</a>
+</div>
+{% endif %}
+
+<!-- Próximo evento con acciones -->
+{% if prox_evento %}
+<div class="ptl-section">
+  <h2>Próximo evento</h2>
+  <div class="ptl-event-card">
+    <div>
+      <strong>{{ prox_evento.titulo }}</strong>
+      <div class="ptl-text-muted">{{ prox_evento.fecha_inicio }} · {{ prox_evento.tipo|capitalize if prox_evento.tipo else '' }}</div>
+    </div>
+    <div class="ptl-event-actions">
+      <button class="ptl-btn ptl-btn-sm ptl-btn-success" onclick="confirmarEvento({{ prox_evento.id if prox_evento.id else 0 }}, 'confirmar')">Confirmar</button>
+      <button class="ptl-btn ptl-btn-sm ptl-btn-outline" onclick="confirmarEvento({{ prox_evento.id if prox_evento.id else 0 }}, 'rechazar')">Rechazar</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmarEvento(id, accion) {
+  if (!id) return;
+  fetch('{{ url_for("portal.cliente_evento_confirmar", evento_id=0) }}'.replace('/0/', '/' + id + '/'), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'accion=' + accion
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { alert(d.message); location.reload(); }
+    else alert(d.error || 'Error');
+  });
+}
+</script>
+{% endblock %}

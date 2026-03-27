@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ item.titulo }}{% endblock %}
+{% block page_title %}Biblioteca{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ item.titulo }}</h1>
+    <p class="page-subtitle">
+      <span class="badge badge-media">{{ item.tipo }}</span>
+      {% if item.publico %}<span class="badge" style="background:var(--info-soft);color:var(--info);margin-left:6px;">público</span>{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <form method="POST" action="{{ url_for('biblioteca.eliminar', id=item.id) }}"
+          data-confirm="¿Eliminar este elemento?">
+      <button class="btn btn-danger btn-sm">Eliminar</button>
+    </form>
+    <a href="{{ url_for('biblioteca.index') }}" class="btn btn-ghost">← Volver</a>
+  </div>
+</div>
+
+<div style="max-width: 800px;">
+  <div class="card">
+    <div class="card-body">
+      {% if item.descripcion %}
+      <p class="text-sm" style="color:var(--text-2); margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+        {{ item.descripcion }}
+      </p>
+      {% endif %}
+      <div class="detail-meta" style="margin-bottom:16px;">
+        <div class="meta-item">
+          <div class="meta-label">Tipo</div>
+          <div class="meta-value">{{ item.tipo|capitalize }}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Fecha de alta</div>
+          <div class="meta-value">{{ item.fecha_alta[:10] if item.fecha_alta else '—' }}</div>
+        </div>
+      </div>
+      {% if item.contenido %}
+      <div style="border-top:1px solid var(--border); padding-top:20px;">
+        <div class="meta-label" style="margin-bottom:12px;">Contenido</div>
+        <div style="color:var(--text-2); line-height:1.9; font-size:.88rem; white-space:pre-wrap;
+                    background:var(--bg-4); padding:16px; border-radius:var(--radius-sm);
+                    border:1px solid var(--border); font-family:monospace;">{{ item.contenido }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

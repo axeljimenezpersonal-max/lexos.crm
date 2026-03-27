@@ -1,0 +1,35 @@
+{% from "components/icons.html" import icon_lock %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enlace expirado — LexOS</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: #080C10; color: #EAF0EC;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; text-align: center; padding: 20px;
+  }
+  .card {
+    background: #1C2630; border: 1px solid rgba(0,223,162,.1);
+    border-radius: 16px; padding: 48px 40px; max-width: 420px;
+  }
+  .icon { font-size: 3rem; margin-bottom: 16px; }
+  h1 { font-size: 1.3rem; margin-bottom: 8px; }
+  p { color: #9CA3AF; font-size: .9rem; line-height: 1.5; }
+  .brand { margin-top: 24px; font-size: .74rem; color: #00DFA2; font-weight: 700; font-family: 'DM Mono', monospace; letter-spacing: 2px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">{{ icon_lock(20,20) }}</div>
+    <h1>Enlace expirado</h1>
+    <p>Este enlace compartido ya no está disponible. Solicita al despacho un nuevo enlace de acceso.</p>
+    <div class="brand">LexOS</div>
+  </div>
+</body>
+</html>

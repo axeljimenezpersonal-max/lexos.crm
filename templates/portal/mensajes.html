@@ -1,0 +1,78 @@
+{% extends "portal/base_portal.html" %}
+{% block title %}Mensajes{% endblock %}
+
+{% block content %}
+<div class="ptl-page-header">
+  <h1>Mensajes</h1>
+  <p>Comunicación directa con tu abogado.</p>
+</div>
+
+<div class="ptl-chat-container">
+  <div class="ptl-chat-messages" id="chatMessages">
+    {% if mensajes %}
+      {% for m in mensajes %}
+      <div class="ptl-msg {{ 'ptl-msg-out' if m.remitente == 'cliente' else 'ptl-msg-in' }}">
+        <div class="ptl-msg-sender">{{ 'Tú' if m.remitente == 'cliente' else 'Despacho' }}</div>
+        <div class="ptl-msg-bubble">{{ m.mensaje }}</div>
+        <div class="ptl-msg-time">{{ m.fecha[:16] if m.fecha else '' }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="ptl-chat-empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <p>Sin mensajes. Envía el primero.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <form class="ptl-chat-input" onsubmit="enviarMensaje(event)">
+    <textarea id="msgTexto" placeholder="Escribe un mensaje..." rows="2"></textarea>
+    <button type="submit" class="ptl-btn ptl-btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Enviar
+    </button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Scroll to bottom
+const chatBox = document.getElementById('chatMessages');
+chatBox.scrollTop = chatBox.scrollHeight;
+
+function enviarMensaje(e) {
+  e.preventDefault();
+  const txt = document.getElementById('msgTexto').value.trim();
+  if (!txt) return;
+  fetch('{{ url_for("portal.cliente_mensaje_enviar") }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'mensaje=' + encodeURIComponent(txt)
+  }).then(r => r.json()).then(d => {
+    if (d.ok) location.reload();
+    else alert(d.error || 'Error');
+  });
+}
+
+// Auto-refresh every 15 seconds
+let lastDate = '{{ mensajes[-1].fecha if mensajes else "2000-01-01" }}';
+setInterval(function() {
+  fetch('{{ url_for("portal.cliente_mensajes_ajax") }}?after=' + encodeURIComponent(lastDate))
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok || !d.mensajes.length) return;
+    d.mensajes.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'ptl-msg ' + (m.remitente === 'cliente' ? 'ptl-msg-out' : 'ptl-msg-in');
+      div.innerHTML = `<div class="ptl-msg-sender">${m.remitente === 'cliente' ? 'Tú' : 'Despacho'}</div>
+        <div class="ptl-msg-bubble">${m.mensaje}</div>
+        <div class="ptl-msg-time">${(m.fecha||'').substring(0,16)}</div>`;
+      chatBox.appendChild(div);
+      lastDate = m.fecha;
+    });
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}, 15000);
+</script>
+{% endblock %}

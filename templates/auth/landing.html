@@ -1,0 +1,182 @@
+{% from "components/icons.html" import icon_scale, icon_users, icon_dollar, icon_calendar, icon_book, icon_chart %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LexOS — Plataforma Legal para Despachos en México</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body>
+<div class="landing-page">
+
+  <!-- Nav -->
+  <nav class="landing-nav">
+    <div class="nav-brand">
+      <div class="logo-icon">Lx</div>
+      <span class="brand-text">LexOS</span>
+    </div>
+    <div class="nav-actions">
+      <span class="text-sm text-muted d-none d-sm-inline">¿Ya tienes cuenta?</span>
+      <a href="{{ url_for('auth.login') }}" class="btn btn-ghost btn-sm">Iniciar sesión</a>
+      <a href="{{ url_for('auth.register_tenant') }}" class="btn btn-primary btn-sm">Registrar despacho</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="landing-hero">
+    <div class="hero-badge">MX · Hecho para despachos en México</div>
+
+    <h1>El CRM legal que<br><span class="accent">tu despacho necesita</span></h1>
+    <p class="sub">
+      Gestiona asuntos, clientes, cobranzas y agenda en un solo lugar.
+      Multi-tenant, seguro y sin complicaciones.
+    </p>
+
+    <!-- Discovery form -->
+    <form class="discover-form" id="discoverForm"
+          action="{{ url_for('auth.discover') }}" method="POST">
+      <input type="email" name="email" id="emailInput"
+             placeholder="correo@tu-despacho.com"
+             autocomplete="email" required>
+      <button type="submit" id="discoverBtn">Acceder →</button>
+    </form>
+    <p class="discover-hint">
+      Ingresa tu correo y te llevaremos al acceso de tu despacho.
+    </p>
+
+    <!-- Discovery result (AJAX) -->
+    <div class="discover-result" id="discoverResult" style="display:none;"></div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div style="margin-top:16px; max-width:460px; width:100%;">
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Separador -->
+    <div style="display:flex;align-items:center;gap:12px;margin:28px 0;max-width:460px;width:100%;">
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <span class="text-xs text-muted">¿Eres nuevo en LexOS?</span>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+
+    <a href="{{ url_for('auth.register_tenant') }}" class="btn btn-secondary" style="padding:11px 28px;">
+      Registrar mi despacho gratis →
+    </a>
+  </section>
+
+  <!-- Features -->
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="feature-icon">{{ icon_scale(28, 28) }}</div>
+      <div class="feature-title">Gestión de asuntos</div>
+      <div class="feature-desc">Expedientes digitales con historial completo, documentos, notas y tareas vinculadas.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">{{ icon_users(28, 28) }}</div>
+      <div class="feature-title">CRM de clientes</div>
+      <div class="feature-desc">Perfil completo de cada cliente con portal de acceso externo.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">{{ icon_dollar(28, 28) }}</div>
+      <div class="feature-title">Control de cobranza</div>
+      <div class="feature-desc">Honorarios, anticipos y estado de cuenta en tiempo real.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">{{ icon_calendar(28, 28) }}</div>
+      <div class="feature-title">Calendario legal</div>
+      <div class="feature-desc">Audiencias, plazos y reuniones con recordatorios automáticos.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">{{ icon_book(28, 28) }}</div>
+      <div class="feature-title">Biblioteca legal</div>
+      <div class="feature-desc">Guarda leyes, tesis y templates reutilizables.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">{{ icon_chart(28, 28) }}</div>
+      <div class="feature-title">Estadísticas</div>
+      <div class="feature-desc">Métricas de productividad y rentabilidad del despacho.</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center; padding:32px; margin-top:40px; border-top:1px solid var(--border);">
+    <p class="text-xs text-muted">
+      © 2025 LexOS — Todos los derechos reservados ·
+      <a href="#" class="text-muted">Privacidad</a> ·
+      <a href="#" class="text-muted">Términos</a>
+    </p>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+(function () {
+  const form = document.getElementById('discoverForm');
+  const result = document.getElementById('discoverResult');
+  const btn = document.getElementById('discoverBtn');
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const email = document.getElementById('emailInput').value.trim();
+    if (!email) return;
+
+    btn.textContent = '...';
+    btn.disabled = true;
+    result.style.display = 'none';
+    result.innerHTML = '';
+
+    try {
+      const res = await fetch('{{ url_for("auth.discover") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (data.found && data.count === 1) {
+        result.style.display = 'block';
+        result.innerHTML = `
+          <div class="tenant-card" onclick="window.location='${data.redirect}'">
+            <div class="tc-icon">${data.tenant_name[0]}</div>
+            <div>
+              <div class="tc-name">${data.tenant_name}</div>
+              <div class="tc-sub">Haz clic para ingresar</div>
+            </div>
+            <div class="tc-arrow">→</div>
+          </div>`;
+        setTimeout(() => window.location = data.redirect, 1200);
+      } else if (data.found && data.count > 1) {
+        const cards = data.tenants.map(t => `
+          <div class="tenant-card" onclick="window.location='/auth/login?tenant_slug=${t.slug}&prefill_email=${encodeURIComponent(email)}'">
+            <div class="tc-icon">${t.nombre_despacho[0]}</div>
+            <div>
+              <div class="tc-name">${t.nombre_despacho}</div>
+              <div class="tc-sub">${t.slug}</div>
+            </div>
+            <div class="tc-arrow">→</div>
+          </div>`).join('');
+        result.style.display = 'block';
+        result.innerHTML = `<p class="text-sm text-muted" style="margin-bottom:10px;">Encontramos ${data.count} despachos con ese correo:</p>` + cards;
+      } else {
+        result.style.display = 'block';
+        result.innerHTML = `<div class="alert alert-danger">${data.message || 'No encontramos una cuenta con ese correo.'}</div>`;
+      }
+    } catch (err) {
+      result.style.display = 'block';
+      result.innerHTML = '<div class="alert alert-danger">Error de conexión. Intenta de nuevo.</div>';
+    } finally {
+      btn.textContent = 'Acceder →';
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

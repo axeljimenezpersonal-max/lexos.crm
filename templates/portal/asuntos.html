@@ -1,0 +1,37 @@
+{% extends "portal/base_portal.html" %}
+{% block title %}Mis Asuntos{% endblock %}
+
+{% block content %}
+<div class="ptl-page-header">
+  <h1>Mis Asuntos</h1>
+  <p>Expedientes legales en los que participas.</p>
+</div>
+
+{% if asuntos %}
+<div class="ptl-card-list">
+  {% for a in asuntos %}
+  <a href="{{ url_for('portal.cliente_asunto_detalle', asunto_id=a.id) }}" class="ptl-card-link">
+    <div class="ptl-case-card ptl-case-card-full">
+      <div class="ptl-case-top">
+        <div class="ptl-case-title">{{ a.titulo }}</div>
+        <span class="ptl-status ptl-status-{{ a.estado }}">{{ a.estado }}</span>
+      </div>
+      <div class="ptl-case-details">
+        {% if a.numero_expediente %}<span>Exp: {{ a.numero_expediente }}</span>{% endif %}
+        {% if a.tipo_asunto %}<span>{{ a.tipo_asunto|capitalize }}</span>{% endif %}
+        <span>Abogado: {{ a.abogado_nombre }}</span>
+      </div>
+      {% if a.fecha_alta %}
+      <div class="ptl-text-muted ptl-text-sm">Abierto: {{ a.fecha_alta[:10] }}</div>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="ptl-empty">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+  <p>No tienes asuntos registrados.</p>
+</div>
+{% endif %}
+{% endblock %}

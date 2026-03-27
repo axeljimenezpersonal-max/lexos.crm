@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas{% endblock %}
+{% block page_title %}Estadísticas{% endblock %}{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/estadisticas.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="tb-breadcrumb"><span>Estadísticas</span></div>
+
+<!-- ══════════════════════════════════════════════
+     FILTROS GLOBALES
+     ══════════════════════════════════════════════ -->
+<form class="est-filters" id="filtersForm" method="get">
+  <div class="est-filt-group">
+    <label>Período</label>
+    <select name="periodo" id="selPeriodo" onchange="toggleCustom()">
+      <option value="semana" {{ 'selected' if periodo=='semana' }}>Esta semana</option>
+      <option value="mes" {{ 'selected' if periodo=='mes' }}>Este mes</option>
+      <option value="trimestre" {{ 'selected' if periodo=='trimestre' }}>Trimestre</option>
+      <option value="anio" {{ 'selected' if periodo=='anio' }}>Este año</option>
+      <option value="custom" {{ 'selected' if periodo=='custom' }}>Personalizado</option>
+    </select>
+  </div>
+  <div class="est-filt-group est-custom-dates" id="customDates" style="{{ '' if periodo=='custom' else 'display:none' }}">
+    <label>Desde</label>
+    <input type="date" name="desde" value="{{ desde_c }}">
+  </div>
+  <div class="est-filt-group est-custom-dates" id="customDates2" style="{{ '' if periodo=='custom' else 'display:none' }}">
+    <label>Hasta</label>
+    <input type="date" name="hasta" value="{{ hasta_c }}">
+  </div>
+  <div class="est-filt-group">
+    <label>Abogado</label>
+    <select name="abogado">
+      <option value="">Todos</option>
+      {% for ab in abogados %}
+      <option value="{{ ab.id }}" {{ 'selected' if abogado_f == ab.id }}>{{ ab.nombre }} {{ ab.apellidos }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="est-filt-group">
+    <label>Tipo de derecho</label>
+    <select name="tipo_derecho">
+      <option value="">Todos</option>
+      {% for t in tipos_asunto %}
+      <option value="{{ t }}" {{ 'selected' if tipo_f == t }}>{{ t|capitalize }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="est-btn-filter">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46"/></svg>
+    Aplicar
+  </button>
+  <div class="est-filt-range">{{ start }} → {{ end }}</div>
+</form>
+
+<!-- ══════════════════════════════════════════════
+     KPI CARDS
+     ══════════════════════════════════════════════ -->
+<div class="est-kpi-grid">
+  <div class="est-kpi">
+    <div class="est-kpi-icon" style="background:rgba(0,223,162,.12);color:var(--e);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </div>
+    <div class="est-kpi-body">
+      <div class="est-kpi-val">{{ kpi.asuntos_total }}</div>
+      <div class="est-kpi-label">Asuntos</div>
+      <div class="est-kpi-sub">{{ kpi.asuntos_activos }} activos · {{ kpi.asuntos_completados }} completados</div>
+    </div>
+  </div>
+
+  <div class="est-kpi">
+    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#10B981;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="est-kpi-body">
+      <div class="est-kpi-val">{{ kpi.clientes_activos }}</div>
+      <div class="est-kpi-label">Clientes activos</div>
+      <div class="est-kpi-sub">{{ kpi.clientes_prospectos }} prospectos</div>
+    </div>
+  </div>
+
+  <div class="est-kpi">
+    <div class="est-kpi-icon" style="background:rgba(245,158,11,.12);color:#F59E0B;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </div>
+    <div class="est-kpi-body">
+      <div class="est-kpi-val">${{ '{:,.0f}'.format(kpi.facturado) }}</div>
+      <div class="est-kpi-label">Facturado</div>
+      <div class="est-kpi-sub">
+        {% if kpi.fac_delta > 0 %}
+        <span class="est-delta up">+{{ kpi.fac_delta }}%</span>
+        {% elif kpi.fac_delta < 0 %}
+        <span class="est-delta down">{{ kpi.fac_delta }}%</span>
+        {% else %}
+        <span class="est-delta">0%</span>
+        {% endif %}
+        vs período anterior
+      </div>
+    </div>
+  </div>
+
+  <div class="est-kpi">
+    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#10B981;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
+    </div>
+    <div class="est-kpi-body">
+      <div class="est-kpi-val">${{ '{:,.0f}'.format(kpi.cobrado) }}</div>
+      <div class="est-kpi-label">Cobrado ({{ kpi.cobrado_pct }}%)</div>
+      <div class="est-kpi-sub">${{ '{:,.0f}'.format(kpi.pendiente) }} pendiente</div>
+    </div>
+  </div>
+
+  <div class="est-kpi">
+    <div class="est-kpi-icon" style="background:rgba(0,223,162,.12);color:var(--e);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </div>
+    <div class="est-kpi-body">
+      <div class="est-kpi-val">{{ '{:,.1f}'.format(kpi.horas) }}h</div>
+      <div class="est-kpi-label">Horas registradas</div>
+      <div class="est-kpi-sub">en el período</div>
+    </div>
+  </div>
+
+  <div class="est-kpi {{ 'est-kpi-alert' if kpi.vencidos > 0 }}">
+    <div class="est-kpi-icon" style="background:rgba(239,68,68,.12);color:#EF4444;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div class="est-kpi-body">
+      <div class="est-kpi-val">{{ kpi.vencidos }}</div>
+      <div class="est-kpi-label">Asuntos vencidos</div>
+      <div class="est-kpi-sub">con fecha límite pasada</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     GRÁFICAS — FILA 1
+     ══════════════════════════════════════════════ -->
+<div class="est-charts-row est-charts-2col">
+  <!-- Asuntos por estado (dona) -->
+  <div class="est-chart-card">
+    <div class="est-chart-header">
+      <span>Asuntos por estado</span>
+      <button class="est-chart-export" onclick="exportChart('chartEstado')" title="Exportar PNG">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+    <div class="est-chart-body"><canvas id="chartEstado"></canvas></div>
+  </div>
+
+  <!-- Asuntos por tipo (barras) -->
+  <div class="est-chart-card">
+    <div class="est-chart-header">
+      <span>Asuntos por tipo de derecho</span>
+      <button class="est-chart-export" onclick="exportChart('chartTipo')" title="Exportar PNG">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+    <div class="est-chart-body"><canvas id="chartTipo"></canvas></div>
+  </div>
+</div>
+
+<!-- FILA 2 — Facturación mensual (ancho completo) -->
+<div class="est-charts-row">
+  <div class="est-chart-card est-chart-wide">
+    <div class="est-chart-header">
+      <span>Facturación vs Cobro — últimos 12 meses</span>
+      <button class="est-chart-export" onclick="exportChart('chartFact')" title="Exportar PNG">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+    <div class="est-chart-body est-chart-tall"><canvas id="chartFact"></canvas></div>
+  </div>
+</div>
+
+<!-- FILA 3 — Clientes nuevos + Carga abogado -->
+<div class="est-charts-row est-charts-2col">
+  <div class="est-chart-card">
+    <div class="est-chart-header">
+      <span>Clientes nuevos por mes</span>
+      <button class="est-chart-export" onclick="exportChart('chartClientes')" title="Exportar PNG">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+    <div class="est-chart-body"><canvas id="chartClientes"></canvas></div>
+  </div>
+
+  <div class="est-chart-card">
+    <div class="est-chart-header">
+      <span>Carga por abogado</span>
+      <button class="est-chart-export" onclick="exportChart('chartCarga')" title="Exportar PNG">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+    <div class="est-chart-body"><canvas id="chartCarga"></canvas></div>
+  </div>
+</div>
+
+<!-- FILA 4 — Heatmap + Top clientes -->
+<div class="est-charts-row est-charts-2col">
+  <div class="est-chart-card">
+    <div class="est-chart-header">
+      <span>Actividad — Heatmap (30 días)</span>
+      <button class="est-chart-export" onclick="exportHeatmap()" title="Exportar PNG">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+    <div class="est-chart-body">
+      <div class="est-heatmap" id="heatmapGrid"></div>
+    </div>
+  </div>
+
+  <div class="est-chart-card">
+    <div class="est-chart-header">
+      <span>Top 5 clientes por facturación</span>
+      <button class="est-chart-export" onclick="exportChart('chartTop')" title="Exportar PNG">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+    <div class="est-chart-body"><canvas id="chartTop"></canvas></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TABLAS DE DATOS
+     ══════════════════════════════════════════════ -->
+<div class="est-tables-section">
+  <div class="est-tab-bar">
+    <a href="?{{ request.query_string.decode().replace('&tab='+tab,'') }}&tab=asuntos" class="est-tab {{ 'active' if tab=='asuntos' }}">Asuntos</a>
+    <a href="?{{ request.query_string.decode().replace('&tab='+tab,'') }}&tab=desglose" class="est-tab {{ 'active' if tab=='desglose' }}">Desglose por tipo</a>
+    <a href="?{{ request.query_string.decode().replace('&tab='+tab,'') }}&tab=clientes" class="est-tab {{ 'active' if tab=='clientes' }}">Clientes</a>
+    <a href="?{{ request.query_string.decode().replace('&tab='+tab,'') }}&tab=facturacion" class="est-tab {{ 'active' if tab=='facturacion' }}">Facturación</a>
+  </div>
+
+  {% if tab == 'asuntos' %}
+  <div class="est-table-wrap">
+    <table class="est-table">
+      <thead>
+        <tr><th>Expediente</th><th>Título</th><th>Cliente</th><th>Estado</th><th>Tipo</th><th>Fecha alta</th></tr>
+      </thead>
+      <tbody>
+        {% for a in tab_asuntos %}
+        <tr>
+          <td class="est-mono">{{ a.numero_expediente or '—' }}</td>
+          <td><a href="{{ url_for('asuntos.detalle', id=a.id) }}">{{ a.titulo }}</a></td>
+          <td>{{ a.cliente_nombre or '—' }}</td>
+          <td><span class="est-badge est-badge-{{ a.estado }}">{{ a.estado }}</span></td>
+          <td>{{ a.tipo_asunto|capitalize if a.tipo_asunto else '—' }}</td>
+          <td>{{ a.fecha_alta[:10] if a.fecha_alta else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="est-empty">Sin datos en el período seleccionado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif tab == 'desglose' %}
+  <div class="est-table-wrap">
+    <table class="est-table">
+      <thead>
+        <tr><th>Tipo</th><th>Total</th><th>Activos</th><th>Completados</th><th>Honorarios</th></tr>
+      </thead>
+      <tbody>
+        {% for d in tab_desglose %}
+        <tr>
+          <td>{{ d.tipo_asunto|capitalize if d.tipo_asunto else 'Sin tipo' }}</td>
+          <td class="est-num">{{ d.total }}</td>
+          <td class="est-num">{{ d.activos }}</td>
+          <td class="est-num">{{ d.completados }}</td>
+          <td class="est-num">${{ '{:,.0f}'.format(d.honorarios) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="est-empty">Sin datos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif tab == 'clientes' %}
+  <div class="est-table-wrap">
+    <table class="est-table">
+      <thead>
+        <tr><th>Cliente</th><th>Tipo</th><th>Asuntos activos</th><th>Total cobrado</th></tr>
+      </thead>
+      <tbody>
+        {% for c in tab_clientes %}
+        <tr>
+          <td><a href="{{ url_for('clientes.ver_cliente', cliente_id=c.id) }}">{{ c.nombre }} {{ c.apellidos or '' }}</a></td>
+          <td>{{ c.tipo|capitalize if c.tipo else '—' }}</td>
+          <td class="est-num">{{ c.asuntos_activos }}</td>
+          <td class="est-num">${{ '{:,.0f}'.format(c.total_cobrado) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="est-empty">Sin datos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif tab == 'facturacion' %}
+  <div class="est-table-wrap">
+    <table class="est-table">
+      <thead>
+        <tr><th>Folio</th><th>Cliente</th><th>Asunto</th><th>Monto</th><th>Estado</th><th>Emisión</th></tr>
+      </thead>
+      <tbody>
+        {% for f in tab_facturacion %}
+        <tr>
+          <td class="est-mono">{{ f.folio or f.id }}</td>
+          <td>{{ f.cliente_nombre or '—' }}</td>
+          <td>{{ f.asunto_titulo or '—' }}</td>
+          <td class="est-num">${{ '{:,.0f}'.format(f.total or f.monto) }}</td>
+          <td><span class="est-badge est-badge-{{ f.estado }}">{{ f.estado }}</span></td>
+          <td>{{ f.fecha_emision or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="est-empty">Sin datos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ALERTAS DE INACTIVIDAD
+     ══════════════════════════════════════════════ -->
+{% if alerta_inactivos %}
+<div class="est-alerts-section">
+  <div class="est-alerts-header">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Asuntos sin actividad (más de {{ dias_inactivos }} días)</span>
+    <span class="est-alert-count">{{ alerta_inactivos|length }}</span>
+  </div>
+  <div class="est-alerts-body">
+    {% for a in alerta_inactivos %}
+    <div class="est-alert-item">
+      <div class="est-alert-title">
+        <a href="{{ url_for('asuntos.detalle', id=a.id) }}">{{ a.titulo }}</a>
+        <span class="est-mono">{{ a.numero_expediente or '' }}</span>
+      </div>
+      <div class="est-alert-meta">
+        {% if a.ultima_actividad %}
+          Última actividad: {{ a.ultima_actividad[:10] }} · {{ a.dias_sin|int }} días sin movimiento
+        {% else %}
+          Sin actividad registrada
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  // ── Chart defaults ──
+  Chart.defaults.color = '#9CA3AF';
+  Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
+
+  const COLORS = ['#00DFA2','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316','#06B6D4','#84CC16'];
+
+  // ── 1. Asuntos por estado (dona) ──
+  const estadoData = {{ ch_asuntos_estado | tojson }};
+  new Chart(document.getElementById('chartEstado'), {
+    type: 'doughnut',
+    data: {
+      labels: estadoData.map(d => d.estado),
+      datasets: [{
+        data: estadoData.map(d => d.total),
+        backgroundColor: COLORS.slice(0, estadoData.length),
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+
+  // ── 2. Asuntos por tipo (barras) ──
+  const tipoData = {{ ch_asuntos_tipo | tojson }};
+  new Chart(document.getElementById('chartTipo'), {
+    type: 'bar',
+    data: {
+      labels: tipoData.map(d => d.tipo_asunto || 'Sin tipo'),
+      datasets: [{
+        label: 'Asuntos',
+        data: tipoData.map(d => d.total),
+        backgroundColor: '#00DFA2',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' } },
+                y: { grid: { display: false } } }
+    }
+  });
+
+  // ── 3. Facturación vs Cobro (línea) ──
+  const factData = {{ ch_facturacion | tojson }};
+  new Chart(document.getElementById('chartFact'), {
+    type: 'line',
+    data: {
+      labels: factData.map(d => d.label),
+      datasets: [
+        {
+          label: 'Facturado',
+          data: factData.map(d => d.facturado),
+          borderColor: '#00DFA2',
+          backgroundColor: 'rgba(0,223,162,.1)',
+          fill: true, tension: .3, pointRadius: 3,
+        },
+        {
+          label: 'Cobrado',
+          data: factData.map(d => d.cobrado),
+          borderColor: '#10B981',
+          backgroundColor: 'rgba(16,185,129,.1)',
+          fill: true, tension: .3, pointRadius: 3,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.05)' } },
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' },
+             ticks: { callback: v => '$' + v.toLocaleString() } }
+      }
+    }
+  });
+
+  // ── 4. Clientes nuevos (barras) ──
+  const cliData = {{ ch_clientes_mes | tojson }};
+  new Chart(document.getElementById('chartClientes'), {
+    type: 'bar',
+    data: {
+      labels: cliData.map(d => d.label),
+      datasets: [{
+        label: 'Nuevos',
+        data: cliData.map(d => d.total),
+        backgroundColor: '#10B981',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } },
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' } } }
+    }
+  });
+
+  // ── 5. Carga por abogado (agrupadas) ──
+  const cargaData = {{ ch_carga_abogado | tojson }};
+  new Chart(document.getElementById('chartCarga'), {
+    type: 'bar',
+    data: {
+      labels: cargaData.map(d => d.nombre),
+      datasets: [
+        { label: 'Activos', data: cargaData.map(d => d.activos), backgroundColor: '#00DFA2', borderRadius: 4 },
+        { label: 'Completados', data: cargaData.map(d => d.completados), backgroundColor: '#10B981', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: { x: { grid: { display: false } },
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' } } }
+    }
+  });
+
+  // ── 6. Heatmap (custom canvas) ──
+  const hmData = {{ ch_heatmap | tojson }};
+  buildHeatmap(hmData);
+
+  // ── 7. Top clientes (barras horizontales) ──
+  const topData = {{ ch_top_clientes | tojson }};
+  new Chart(document.getElementById('chartTop'), {
+    type: 'bar',
+    data: {
+      labels: topData.map(d => d.nombre),
+      datasets: [{
+        label: 'Facturado',
+        data: topData.map(d => d.total),
+        backgroundColor: '#F59E0B',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' },
+                      ticks: { callback: v => '$' + v.toLocaleString() } },
+                y: { grid: { display: false } } }
+    }
+  });
+});
+
+// ── Heatmap builder ──
+function buildHeatmap(data) {
+  const grid = document.getElementById('heatmapGrid');
+  if (!grid) return;
+  const days = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const hours = Array.from({length:24}, (_,i) => i);
+  const maxCount = Math.max(1, ...data.map(d => d.count));
+
+  // header row
+  let html = '<div class="hm-corner"></div>';
+  hours.forEach(h => { html += `<div class="hm-hlabel">${h}</div>`; });
+
+  days.forEach((day, di) => {
+    html += `<div class="hm-dlabel">${day}</div>`;
+    hours.forEach(h => {
+      const cell = data.find(d => d.day === di && d.hour === h);
+      const count = cell ? cell.count : 0;
+      const intensity = count / maxCount;
+      const bg = intensity === 0 ? 'rgba(255,255,255,.03)' :
+                 `rgba(99,102,241,${0.15 + intensity * 0.85})`;
+      html += `<div class="hm-cell" style="background:${bg}" title="${day} ${h}:00 — ${count} acciones"></div>`;
+    });
+  });
+  grid.innerHTML = html;
+}
+
+// ── Export chart to PNG ──
+function exportChart(id) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const link = document.createElement('a');
+  link.download = id + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function exportHeatmap() {
+  const el = document.getElementById('heatmapGrid');
+  if (!el) return;
+  // Simple fallback: screenshot not possible via JS alone, so open print
+  window.print();
+}
+
+// ── Toggle custom dates ──
+function toggleCustom() {
+  const show = document.getElementById('selPeriodo').value === 'custom';
+  document.getElementById('customDates').style.display = show ? '' : 'none';
+  document.getElementById('customDates2').style.display = show ? '' : 'none';
+}
+</script>
+{% endblock %}

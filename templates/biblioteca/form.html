@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if accion=='editar' else 'Nuevo' }} elemento{% endblock %}
+{% block page_title %}Biblioteca{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ 'Editar elemento' if accion=='editar' else 'Agregar a biblioteca' }}</h1>
+    <p class="page-subtitle">Leyes, jurisprudencia, templates y artículos.</p>
+  </div>
+  <a href="{{ url_for('biblioteca.index') }}" class="btn btn-ghost">← Cancelar</a>
+</div>
+
+<div style="max-width: 720px;">
+  <form method="POST">
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Datos</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Título <span class="text-danger">*</span></label>
+          <input class="form-control" type="text" name="titulo"
+                 value="{{ item.get('titulo','') }}" required
+                 placeholder="Ej: Código Civil Federal — Art. 1910">
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select class="form-control" name="tipo">
+              {% for t in ['ley','jurisprudencia','template','articulo','otro'] %}
+              <option value="{{ t }}" {{ 'selected' if item.get('tipo','ley')==t }}>{{ t|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="display:flex; align-items:flex-end; padding-bottom:18px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="checkbox" name="publico" {{ 'checked' if item.get('publico') }}>
+              <span class="form-label" style="margin:0;">Visible para todo el despacho</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción breve</label>
+          <input class="form-control" type="text" name="descripcion"
+                 value="{{ item.get('descripcion','') }}"
+                 placeholder="Resumen en una línea…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Etiquetas <span class="text-muted text-xs">(separadas por coma)</span></label>
+          <input class="form-control" type="text" name="tags"
+                 value="{{ item.get('tags','') }}"
+                 placeholder="civil, responsabilidad, 2025">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contenido / Texto completo</label>
+          <textarea class="form-control" name="contenido" rows="10"
+                    placeholder="Pega el texto completo del artículo, tesis o template…">{{ item.get('contenido','') }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if accion=='editar' else 'Agregar a biblioteca' }}</button>
+      <a href="{{ url_for('biblioteca.index') }}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

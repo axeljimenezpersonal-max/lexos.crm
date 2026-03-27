@@ -1,0 +1,1213 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ asunto.titulo }}{% endblock %}
+{% block page_title %}{{ asunto.titulo | truncate(40) }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/asunto_detalle.css') }}">
+{% endblock %}
+{% block content %}
+<script>document.querySelector('.page').classList.add('page-fullbleed');</script>
+{% set ti = asunto.tipo_info %}
+{% set hon_pactados = asunto.honorarios_pactados or 0 %}
+{% set hon_cobrado  = cobros_resumen.pagado or 0 %}
+{% set hon_pend     = (hon_pactados - hon_cobrado) if hon_pactados > 0 else (cobros_resumen.pendiente or 0) %}
+{% set hon_pct      = ((hon_cobrado / hon_pactados * 100) | int) if hon_pactados > 0 else 0 %}
+{% set is_admin     = user_role in ('super_admin', 'admin', 'socio') %}
+{% set st           = col_a_stats %}
+
+<div class="ad-layout">
+
+  <!-- ══ COLUMNA IZQUIERDA — CONTENIDO PRINCIPAL ══ -->
+  <div class="ad-main">
+
+    <!-- HEADER -->
+    <div class="ad-header">
+      <!-- Banda de color por estado -->
+      <div class="ad-band ad-band-{{ asunto.estado }}"></div>
+
+      <div class="ad-header-inner">
+        <!-- Fila superior -->
+        <div class="ad-top">
+          <div class="ad-top-left">
+            <div class="ad-exp">
+              {{ asunto.numero_expediente }}{% if asunto.tipo_asunto %} · {{ asunto.tipo_asunto }}{% endif %}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo }}{% endif %}
+            </div>
+            <h1 class="ad-title" id="adTitle" onclick="startEditTitle()" title="Click para editar">{{ asunto.titulo }}</h1>
+            <!-- Etiquetas -->
+            <div class="ad-tags" id="tagsRow">
+              {% for et in etiquetas %}
+              <span class="ad-tag-chip" style="--tc:{{ et.color }}">
+                {{ et.nombre }}<button class="ad-tag-remove" onclick="removeTag('{{ et.id }}',this.parentElement)">×</button>
+              </span>
+              {% endfor %}
+              <button class="ad-tag-add" id="tagAddBtn" onclick="toggleTagDropdown(event)">+ etiqueta</button>
+              <div class="tag-dropdown" id="tagDropdown">
+                <input type="text" placeholder="Nueva etiqueta…" id="tagInput" class="tag-input" maxlength="30">
+                <div class="tag-colors">
+                  <span class="tc selected" style="background:#00DFA2" onclick="selectColor('#00DFA2',this)"></span>
+                  <span class="tc" style="background:#3B8BD4" onclick="selectColor('#3B8BD4',this)"></span>
+                  <span class="tc" style="background:#F59E0B" onclick="selectColor('#F59E0B',this)"></span>
+                  <span class="tc" style="background:#EF4444" onclick="selectColor('#EF4444',this)"></span>
+                  <span class="tc" style="background:#8B5CF6" onclick="selectColor('#8B5CF6',this)"></span>
+                  <span class="tc" style="background:#EC4899" onclick="selectColor('#EC4899',this)"></span>
+                </div>
+                <button class="tag-create-btn" onclick="createTag()">Crear</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ad-top-right">
+            <!-- Estado -->
+            <div class="ad-estado-badge ad-estado-{{ asunto.estado }}" onclick="toggleStatusMenu()">
+              {{ asunto.estado | replace('_',' ') | upper }}
+            </div>
+            <!-- Vencimiento -->
+            {% if asunto.semaforo %}
+            <div class="ad-vence">
+              <span class="ad-vdot ad-vdot-{{ asunto.semaforo.clase }}"></span>
+              {% if asunto.semaforo.dias %}Vence en {{ asunto.semaforo.dias }}d{% else %}{{ asunto.semaforo.label }}{% endif %}
+            </div>
+            {% endif %}
+            <!-- Acciones -->
+            <div class="ad-acciones">
+              <a href="{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}" class="ad-btn" target="_blank">PDF</a>
+              <div class="ad-mas-wrap">
+                <button class="ad-btn" onclick="toggleMasOpciones(event)">⋯</button>
+                <div class="ad-mas-menu" id="adMasMenu">
+                  <div class="ad-mas-title">Acciones del expediente</div>
+                  {% if es_responsable %}
+                  <button class="ad-mas-opt" onclick="abrirEditarAsunto()">
+                    <div class="ad-mas-dot" style="background:#00DFA2"></div>
+                    <span class="ad-mas-label">Editar datos del asunto</span>
+                  </button>
+                  {% endif %}
+                  <button class="ad-mas-opt"
+                          onclick="window.location.href='{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}'">
+                    <div class="ad-mas-dot" style="background:#3B8BD4"></div>
+                    <span class="ad-mas-label">Exportar PDF</span>
+                  </button>
+                  <button class="ad-mas-opt" onclick="copiarEnlace()">
+                    <div class="ad-mas-dot" style="background:#8A9BA8"></div>
+                    <span class="ad-mas-label">Copiar enlace</span>
+                  </button>
+                  <div class="ad-mas-sep"></div>
+                  {% if es_responsable %}
+                  <button class="ad-mas-opt ad-mas-danger" onclick="confirmarEliminar()">
+                    <div class="ad-mas-dot" style="background:#EF4444"></div>
+                    <span class="ad-mas-label">Eliminar asunto</span>
+                  </button>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fila de stats -->
+        <div class="ad-stats">
+          <div class="ad-stat">
+            <span class="ad-stat-v">{{ st.dias_activo if st.dias_activo is not none else '—' }}</span>
+            <span class="ad-stat-l">Días activo</span>
+          </div>
+          <div class="ad-stat">
+            <span class="ad-stat-v ad-stat-pendiente">${{ hon_pend | int }}</span>
+            <span class="ad-stat-l">Pendiente</span>
+            {% if hon_pactados > 0 %}
+            <span class="ad-stat-sub">{{ hon_pct }}% cobrado</span>
+            {% endif %}
+          </div>
+          <div class="ad-stat">
+            <span class="ad-stat-v">{{ tareas_pend | length }}</span>
+            <span class="ad-stat-l">Próx. actividades</span>
+          </div>
+          <div class="ad-stat ad-stat-editable" style="text-align:left;" onclick="editarJuzgado()" title="Click para editar">
+            <span class="ad-stat-v ad-stat-v-sm" id="adStatJuzgado" data-val="{{ asunto.juzgado or '' }}">{{ asunto.juzgado or '—' }}</span>
+            <span class="ad-stat-l">Juzgado <span class="ad-stat-edit-hint">✎</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="ad-tabs">
+        <a class="ad-tab active" href="#" onclick="filterTimeline('all',this);return false;">
+          Todos <span class="tab-counter" id="tc-all">{{ tl_counts.all }}</span>
+        </a>
+        <a class="ad-tab" href="#" onclick="filterTimeline('nota',this);return false;">
+          Notas <span class="tab-counter {% if not tl_counts.nota %}tc-zero{% endif %}" id="tc-nota">{{ tl_counts.nota }}</span>
+        </a>
+        <a class="ad-tab" href="#" onclick="filterTimeline('documento',this);return false;">
+          Docs <span class="tab-counter {% if not tl_counts.documento %}tc-zero{% endif %}" id="tc-documento">{{ tl_counts.documento }}</span>
+        </a>
+        <a class="ad-tab" href="#" onclick="filterTimeline('actividad',this);return false;">
+          Actividades <span class="tab-counter {% if not tl_counts.actividad %}tc-zero{% endif %}" id="tc-actividad">{{ tl_counts.actividad }}</span>
+        </a>
+        <a class="ad-tab" href="#" onclick="filterTimeline('sentencia',this);return false;">
+          Sentencias <span class="tab-counter {% if not tl_counts.sentencia %}tc-zero{% endif %}" id="tc-sentencia">{{ tl_counts.sentencia }}</span>
+        </a>
+        <a class="ad-tab" href="#" onclick="filterTimeline('llamada',this);return false;">
+          Llamadas <span class="tab-counter {% if not tl_counts.llamada %}tc-zero{% endif %}" id="tc-llamada">{{ tl_counts.llamada }}</span>
+        </a>
+        <a class="ad-tab" href="#" onclick="filterTimeline('cambio_estatus',this);return false;">
+          Cambios <span class="tab-counter {% if not tl_counts.cambio_estatus %}tc-zero{% endif %}" id="tc-cambio_estatus">{{ tl_counts.cambio_estatus }}</span>
+        </a>
+      </div>{# /ad-tabs #}
+    </div>{# /ad-header #}
+
+    <!-- TIMELINE -->
+    <div class="ad-content" id="tlFeed">
+      {% if grupos %}
+        {% for grupo in grupos %}
+        <div class="tl-date-sep"><span>{{ grupo.label }}</span></div>
+        {% for item in grupo.registros %}
+        <div class="tl-item" data-tipo="{{ item.tipo }}" data-id="{{ item.id }}">
+          <div class="tl-left">
+            <div class="tl-avatar" style="background:{{ item.tl_av_bg }};color:{{ item.tl_color }}">
+              {{ item.iniciales }}
+            </div>
+            {% if not loop.last %}<div class="tl-line" style="background:{{ item.tl_color }}"></div>{% endif %}
+          </div>
+          <div class="tl-card {{ item.tl_cls }}">
+            <div class="tl-header">
+              <div class="tl-meta">
+                <span class="tl-who">{{ item.autor_nombre or 'Sistema' }}</span>
+                <span class="tl-dot">·</span>
+                <span class="tl-time">{{ item.tl_hora or '' }}</span>
+              </div>
+              <span class="tl-badge" style="background:{{ item.tl_badge_bg }};color:{{ item.tl_color }}">{{ item.tl_badge }}</span>
+            </div>
+            {% if item.titulo %}<div class="tl-title">{{ item.titulo }}</div>{% endif %}
+            {% if item.contenido %}
+            <div class="tl-body{% if item.contenido|length > 200 %} truncated{% endif %}">{{ item.contenido }}</div>
+            {% if item.contenido|length > 200 %}
+            <button class="tl-expand" onclick="this.previousElementSibling.classList.toggle('truncated');this.textContent=this.textContent=='Ver más'?'Ver menos':'Ver más'">Ver más</button>
+            {% endif %}
+            {% endif %}
+            {% if item.tipo in ('documento','sentencia') and item.metadata %}
+            <div class="ad-tl-doc">
+              <span>📄</span>
+              <a href="{{ item.metadata.archivo_url or item.metadata.url or '#' }}" target="_blank" class="tl-doc-name">{{ item.metadata.archivo_nombre or item.titulo }}</a>
+              {% if item.metadata.tamanio %}<span class="tl-doc-size">{{ item.metadata.tamanio }}</span>{% endif %}
+            </div>
+            {% endif %}
+            {% if item.tipo == 'nota' and item.metadata and item.metadata.menciones %}
+            <div class="ad-tl-mentions">
+              {% for m in item.metadata.menciones %}<span class="ad-tl-mention">@{{ m }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            {% if item.tipo == 'actividad' %}
+            <div class="tl-actions">
+              {% if not item.realizado %}
+              <button class="ad-tl-action-btn tl-action" onclick="marcarRealizado('{{ item.id }}',true,this)">✓ Marcar realizado</button>
+              {% else %}
+              <span class="tl-action" style="color:#00DFA2;border-color:rgba(0,223,162,0.2);cursor:default">✓ Realizado</span>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if item.tipo == 'nota' %}
+            <div class="tl-actions">
+              <span class="tl-action" onclick="editarNota({{ item.id }})">Editar</span>
+              <span class="tl-action tl-action-danger" onclick="eliminarNota({{ item.id }})">Eliminar</span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% endfor %}
+      {% else %}
+      <div class="ad-tl-empty">
+        <div class="ad-tl-empty-icon">○</div>
+        <div class="ad-tl-empty-text">Sin actividad registrada</div>
+        <div class="ad-tl-empty-hint">Usa el botón + para agregar notas, documentos o actividades</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- FAB anclado al fondo de la columna de contenido -->
+    <div class="fab-wrap" id="fabContainer">
+      <div style="position:relative;">
+
+        <!-- Popup de formularios -->
+        <div class="fab-popup" id="fabPopup" style="display:none;width:320px;margin-bottom:8px;">
+          <div class="fab-popup-header">
+            <span id="fabPopupTitle" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#EAF0EC;"></span>
+            <button onclick="closeFab()" style="background:none;border:none;color:#8A9BA8;cursor:pointer;font-size:18px;line-height:1;padding:0;margin-left:auto;">×</button>
+          </div>
+          <div id="fabStep2">
+
+            <!-- NOTA -->
+            <div id="fabForm-nota" style="display:none">
+              <div class="fab-form-body">
+                <label class="fab-label">Escribe tu nota aquí:</label>
+                <textarea class="fab-textarea" id="fabNotaContenido" rows="6"
+                  placeholder="Escribe aquí el contenido de la nota. Puedes usar @nombre para mencionar a un colega del equipo."></textarea>
+                <div id="mentionDD" class="mention-dd" style="display:none"></div>
+              </div>
+              <div class="fab-form-footer">
+                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
+                <button class="fab-submit" onclick="fabGuardarNota()">Guardar nota</button>
+              </div>
+            </div>
+
+            <!-- ACTIVIDAD -->
+            <div id="fabForm-actividad" style="display:none">
+              <div class="fab-form-body">
+                <label class="fab-label">Tipo de actividad:</label>
+                <select class="fab-select" id="fabActTipo">
+                  {% for t in tipos_actividad %}<option value="{{ t.value }}">{{ t.label }}</option>{% endfor %}
+                </select>
+                <label class="fab-label" style="margin-top:8px;">Título o descripción breve:</label>
+                <input type="text" class="fab-input" id="fabActTitulo" placeholder="Ej: Audiencia inicial, Reunión con cliente…">
+                <div class="fab-row" style="margin-top:8px;">
+                  <div style="flex:1;">
+                    <label class="fab-label">Fecha y hora:</label>
+                    <input type="datetime-local" class="fab-input" id="fabActFecha" value="{{ today_str }}">
+                  </div>
+                  <div style="flex:1;">
+                    <label class="fab-label">Lugar (opcional):</label>
+                    <input type="text" class="fab-input" id="fabActLugar" placeholder="Ej: Juzgado 5, Oficina...">
+                  </div>
+                </div>
+                <label class="fab-label" style="margin-top:8px;">Notas adicionales:</label>
+                <textarea class="fab-textarea" id="fabActDesc" rows="2" placeholder="Detalles adicionales sobre la actividad (opcional)"></textarea>
+                <label class="fab-check" style="margin-top:8px;"><input type="checkbox" id="fabActEvento"> Agregar también al calendario</label>
+              </div>
+              <div class="fab-form-footer">
+                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
+                <button class="fab-submit" onclick="fabGuardarActividad()">Guardar actividad</button>
+              </div>
+            </div>
+
+            <!-- DOCUMENTO -->
+            <div id="fabForm-documento" style="display:none">
+              <div class="fab-form-body">
+                <label class="fab-label">Selecciona o arrastra el archivo:</label>
+                <div class="fab-dropzone" id="fabDropzone"
+                     ondragover="event.preventDefault();this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="fabHandleDrop(event)">
+                  <input type="file" id="fabFileInput" multiple style="display:none" onchange="fabHandleFiles(this.files)">
+                  <div onclick="document.getElementById('fabFileInput').click()" style="cursor:pointer;text-align:center;">
+                    <div style="font-size:28px;margin-bottom:8px;">⬆</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:9px;color:#8A9BA8;letter-spacing:0.1em;">Haz clic aquí o arrastra el archivo</div>
+                  </div>
+                  <div id="fabUploadProgress" style="display:none;margin-top:12px;width:100%;">
+                    <div style="height:2px;background:rgba(0,223,162,0.1);border-radius:1px;">
+                      <div id="fabProgressBar" style="height:100%;background:#00DFA2;width:0;transition:width 0.3s;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- LLAMADA -->
+            <div id="fabForm-llamada" style="display:none">
+              <div class="fab-form-body">
+                <label class="fab-label">¿Con quién fue la llamada?</label>
+                <input type="text" class="fab-input" id="fabLlamadaCon" placeholder="Nombre del cliente, contraparte u otro contacto">
+                <div class="fab-row" style="margin-top:8px;">
+                  <div style="flex:1;">
+                    <label class="fab-label">Duración aproximada:</label>
+                    <input type="text" class="fab-input" id="fabLlamadaDuracion" placeholder="Ej: 15 minutos, 1 hora">
+                  </div>
+                  <div style="flex:1;">
+                    <label class="fab-label">Resultado:</label>
+                    <select class="fab-select" id="fabLlamadaResultado">
+                      <option value="contactado">Se contactó</option>
+                      <option value="no_contesto">No contestó</option>
+                      <option value="mensaje">Dejó mensaje</option>
+                      <option value="buzon">Buzón de voz</option>
+                    </select>
+                  </div>
+                </div>
+                <label class="fab-label" style="margin-top:8px;">Resumen de la llamada:</label>
+                <textarea class="fab-textarea" id="fabLlamadaNotas" rows="4"
+                  placeholder="Escribe aquí el resumen de lo que se habló en la llamada…"></textarea>
+              </div>
+              <div class="fab-form-footer">
+                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
+                <button class="fab-submit" onclick="fabGuardarLlamada()">Guardar llamada</button>
+              </div>
+            </div>
+
+            <!-- CORREO -->
+            <div id="fabForm-correo" style="display:none">
+              <div class="fab-form-body">
+                <label class="fab-label">Asunto del correo:</label>
+                <input type="text" class="fab-input" id="fabCorreoAsunto" placeholder="Ej: Citación a audiencia, Envío de documentos...">
+                <label class="fab-label" style="margin-top:8px;">Remitente o destinatario:</label>
+                <input type="text" class="fab-input" id="fabCorreoContacto" placeholder="Nombre o correo electrónico de la otra parte">
+                <label class="fab-label" style="margin-top:8px;">Resumen o contenido del correo:</label>
+                <textarea class="fab-textarea" id="fabCorreoContenido" rows="5"
+                  placeholder="Escribe aquí un resumen del correo enviado o recibido, o pega el contenido principal…"></textarea>
+              </div>
+              <div class="fab-form-footer">
+                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
+                <button class="fab-submit" onclick="fabGuardarCorreo()">Guardar correo</button>
+              </div>
+            </div>
+
+          </div>{# /fabStep2 #}
+        </div>{# /fab-popup #}
+
+        <!-- Menú principal -->
+        <div class="fab-menu" id="fabMenu">
+          <div class="fab-menu-header">¿Qué quieres agregar?</div>
+          <button class="fab-opt" onclick="abrirNota()">
+            <span class="fab-opt-icon" style="background:rgba(0,223,162,0.1);color:#00DFA2">✎</span>
+            <div class="fab-opt-text"><span class="fab-opt-label">Nota</span><span class="fab-opt-desc">Agregar una nota al expediente</span></div>
+          </button>
+          <button class="fab-opt" onclick="abrirActividad()">
+            <span class="fab-opt-icon" style="background:rgba(249,115,22,0.1);color:#F97316">◷</span>
+            <div class="fab-opt-text"><span class="fab-opt-label">Actividad</span><span class="fab-opt-desc">Agendar audiencia, diligencia o tarea</span></div>
+          </button>
+          <button class="fab-opt" onclick="abrirDocumento()">
+            <span class="fab-opt-icon" style="background:rgba(59,139,212,0.1);color:#3B8BD4">⬆</span>
+            <div class="fab-opt-text"><span class="fab-opt-label">Documento</span><span class="fab-opt-desc">Subir archivo al expediente</span></div>
+          </button>
+          <button class="fab-opt" onclick="abrirLlamada()">
+            <span class="fab-opt-icon" style="background:rgba(139,92,246,0.1);color:#8B5CF6">☎</span>
+            <div class="fab-opt-text"><span class="fab-opt-label">Llamada</span><span class="fab-opt-desc">Registrar llamada o contacto</span></div>
+          </button>
+          <button class="fab-opt" onclick="abrirCorreo()">
+            <span class="fab-opt-icon" style="background:rgba(0,223,162,0.1);color:#00DFA2">✉</span>
+            <div class="fab-opt-text"><span class="fab-opt-label">Correo</span><span class="fab-opt-desc">Registrar correo o comunicación</span></div>
+          </button>
+        </div>
+
+        <!-- Botón principal -->
+        <button class="fab-btn" id="fabBtn" onclick="toggleFabMenu()">
+          <span class="fab-icon">+</span>
+        </button>
+
+      </div>{# /relative wrapper #}
+    </div>{# /fab-wrap #}
+
+  </div>{# /ad-main #}
+
+  <!-- ══ COLUMNA DERECHA — SIDEBAR ══ -->
+  <aside class="ad-sidebar" id="adSidebar">
+
+    <!-- 1. Número de expediente -->
+    <div class="sb-sec">
+      <div class="sb-sec-label">Expediente</div>
+      <div style="font-family:'DM Mono',monospace;font-size:14px;color:#00DFA2;letter-spacing:0.08em;">
+        {{ asunto.numero_expediente }}
+      </div>
+      {% if asunto.numero_judicial %}
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:#8A9BA8;margin-top:4px;">
+        Judicial: {{ asunto.numero_judicial }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- 2. Semáforo -->
+    {% if asunto.semaforo %}
+    {% set sem_color = '#EF4444' if asunto.semaforo.clase == 'rojo' else ('#F59E0B' if asunto.semaforo.clase == 'amarillo' else '#00DFA2') %}
+    <div class="sem-indicator">
+      <div class="sem-dot {{ asunto.semaforo.clase }}" style="background:{{ sem_color }}"></div>
+      <span style="color:{{ sem_color }}">{{ asunto.semaforo.label }}</span>
+      {% if asunto.semaforo.dias %}<span style="color:#8A9BA8">· {{ asunto.semaforo.dias }}d</span>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 3. Estado -->
+    <div class="sb-sec">
+      <div class="sb-sec-label">Estado</div>
+      <div style="position:relative;">
+        <button class="ad-status-btn st-{{ asunto.estado }}" id="statusBtn" onclick="toggleStatusMenu()">
+          <span>{{ asunto.estado | replace('_',' ') | title }}</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+        </button>
+        <div class="ad-status-menu" id="statusMenu">
+          {% for col in kanban_cols %}
+          <button class="ad-status-opt" onclick="cambiarEstado('{{ col.key }}')">
+            <span class="so-dot" style="background:{{ col.color }}"></span>
+            {{ col.label }}
+            {% if asunto.estado == col.key %}<span class="so-check">✓</span>{% endif %}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Prioridad -->
+    <div class="sb-sec">
+      <div class="sb-sec-label">Prioridad</div>
+      <div class="prioridad-btns">
+        <button class="prio-btn {% if asunto.prioridad == 'baja' %}active{% endif %}"
+                data-valor="baja"
+                onclick="cambiarPrioridad('baja')"
+                style="--pcolor:#00DFA2">BAJA</button>
+        <button class="prio-btn {% if asunto.prioridad == 'media' %}active{% endif %}"
+                data-valor="media"
+                onclick="cambiarPrioridad('media')"
+                style="--pcolor:#F59E0B">MEDIA</button>
+        <button class="prio-btn {% if asunto.prioridad == 'alta' %}active{% endif %}"
+                data-valor="alta"
+                onclick="cambiarPrioridad('alta')"
+                style="--pcolor:#EF4444">ALTA</button>
+      </div>
+    </div>
+
+    <!-- 5. Descripción del caso -->
+    <div class="sb-sec">
+      <div class="sb-sec-label">Descripción del caso</div>
+      <textarea class="caso-desc-input"
+                id="casoDescripcion"
+                placeholder="Describe brevemente los hechos y el estado actual del caso…"
+                maxlength="1000"
+                oninput="onDescInput()"
+                onblur="guardarDescripcion()">{{ asunto.descripcion or '' }}</textarea>
+      <div class="desc-counter">
+        <span id="descCount">{{ (asunto.descripcion or '') | length }}</span>/1000
+      </div>
+    </div>
+
+    <!-- 6. Equipo a cargo -->
+    <div class="sb-sec">
+      <div class="sb-sec-label">Equipo a cargo</div>
+      {% if abogado_resp %}
+      <div class="equipo-item">
+        <div class="eq-avatar">{{ (abogado_resp.nombre or '?')[0] | upper }}</div>
+        <div class="eq-info">
+          <div class="eq-nombre">{{ abogado_resp.nombre }} {{ abogado_resp.apellidos or '' }}</div>
+          <div class="eq-rol">Responsable</div>
+        </div>
+        {% if is_admin %}
+        <div class="ctx-tm-menu-wrap">
+          <button class="ctx-tm-dots" onclick="toggleTeamMenu(this)">⋮</button>
+          <div class="ctx-tm-menu">
+            {% for a in abogados %}{% if a.id != abogado_resp.id %}
+            <button class="ctx-tm-opt" onclick="cambiarResponsable('{{ a.id }}','{{ a.nombre }} {{ a.apellidos or '' }}')">→ {{ a.nombre }} {{ a.apellidos or '' }}</button>
+            {% endif %}{% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% for c in colaboradores %}
+      <div class="equipo-item">
+        <div class="eq-avatar">{{ (c.nombre or '?')[0] | upper }}</div>
+        <div class="eq-info">
+          <div class="eq-nombre">{{ c.nombre }} {{ c.apellidos or '' }}</div>
+          <div class="eq-rol">Colaborador</div>
+        </div>
+        {% if is_admin %}
+        <button class="eq-remove" onclick="quitarMiembro('{{ c.id }}','{{ c.nombre }} {{ c.apellidos or '' }}')" title="Remover">×</button>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if is_admin %}
+      <button class="eq-agregar-btn" onclick="toggleAddColaborador()">
+        <span>+</span> Agregar colaborador
+      </button>
+      <div id="addColabWrap" style="display:none;margin-top:8px;">
+        <select class="eq-search-input" id="addColabSelect">
+          <option value="">Seleccionar abogado…</option>
+          {% for a in abogados %}
+          <option value="{{ a.id }}">{{ a.nombre }} {{ a.apellidos or '' }}</option>
+          {% endfor %}
+        </select>
+        <button class="ctx-add-confirm" onclick="addColaborador()" style="margin-top:6px;">Agregar</button>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- 7. Cliente -->
+    {% if asunto.cid %}
+    <div class="sb-sec">
+      <div class="sb-sec-label">Cliente</div>
+      <div class="ctx-client">
+        <div class="ctx-client-top">
+          <div class="ctx-client-avatar" style="background:hsl({{ (asunto.cid | string | length * 47) % 360 }},35%,20%)">
+            {{ (asunto.cliente_razon or asunto.cliente_nombre or '?')[0] | upper }}
+          </div>
+          <div style="min-width:0;flex:1;">
+            <a href="{{ url_for('clientes.detalle', id=asunto.cid) }}" class="ctx-client-name-link">{{ asunto.cliente_razon or asunto.cliente_nombre }}</a>
+            {% if asunto.cliente_tipo %}<div class="ctx-client-tipo">{{ asunto.cliente_tipo }}</div>{% endif %}
+          </div>
+        </div>
+        {% if asunto.cliente_email %}
+        <div class="ctx-contact-row">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+          <span>{{ asunto.cliente_email }}</span>
+        </div>
+        {% endif %}
+        {% if asunto.cliente_celular %}
+        <div class="ctx-contact-row">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+          <span>{{ asunto.cliente_celular }}</span>
+        </div>
+        {% endif %}
+        <a href="{{ url_for('clientes.detalle', id=asunto.cid) }}" class="ver-ficha-btn">
+          Ver ficha completa →
+        </a>
+      </div>
+    </div>
+    {% else %}
+    <div class="sb-sec">
+      <div class="sb-sec-label">Cliente</div>
+      <span style="font-family:'DM Mono',monospace;font-size:9px;color:#8A9BA8;">Sin cliente asignado</span>
+    </div>
+    {% endif %}
+
+    <!-- 8. Cobranzas -->
+    <div class="sb-sec">
+      <div class="sb-sec-label">Cobranzas</div>
+      <div class="sb-kpis">
+        <div class="sb-kpi">
+          <span class="sb-kpi-v">${{ (cobros_resumen.total or 0) | int }}</span>
+          <span class="sb-kpi-l">Total</span>
+        </div>
+        <div class="sb-kpi">
+          <span class="sb-kpi-v" style="color:#00DFA2">${{ (cobros_resumen.pagado or 0) | int }}</span>
+          <span class="sb-kpi-l">Pagado</span>
+        </div>
+        <div class="sb-kpi">
+          <span class="sb-kpi-v" style="color:{% if hon_pend > 0 %}#F59E0B{% else %}#8A9BA8{% endif %}">${{ hon_pend | int }}</span>
+          <span class="sb-kpi-l">Pendiente</span>
+        </div>
+      </div>
+      {% if hon_pactados > 0 %}
+      <div class="ctx-cobro-bar" style="margin-top:10px;">
+        <div class="ctx-cobro-fill" style="width:{{ hon_pct }}%"></div>
+      </div>
+      {% endif %}
+      {% for c in cobros[:3] %}
+      <div class="ctx-cobro-row">
+        <span class="ctx-cobro-folio">{{ c.folio }}</span>
+        <span class="ctx-cobro-monto">${{ c.monto | int }}</span>
+        <span class="badge-est est-{{ c.estado }}">{{ c.estado | upper }}</span>
+      </div>
+      {% endfor %}
+      <a href="{{ url_for('cobranzas.index') }}" class="ctx-add-btn" style="margin-top:8px;display:block;">+ Crear cobro</a>
+    </div>
+
+  </aside>{# /ad-sidebar #}
+</div>{# /ad-layout #}
+
+
+<!-- ══ MODALS ══ -->
+<div class="lex-overlay" id="archiveModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="lex-modal">
+    <div class="lex-modal-header">
+      <h3 class="lex-modal-title">Archivar asunto</h3>
+      <button class="lex-modal-close" onclick="document.getElementById('archiveModal').classList.remove('show')">×</button>
+    </div>
+    <div class="lex-modal-body">
+      <p>¿Archivar <strong>{{ asunto.titulo }}</strong>?</p>
+      <p style="font-size:12px;color:#8A9BA8;margin-top:8px;">El asunto se archivará y podrás recuperarlo después.</p>
+    </div>
+    <div class="lex-modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('archiveModal').classList.remove('show')">Cancelar</button>
+      <form method="POST" action="{{ url_for('asuntos.eliminar', id=asunto.id) }}" style="display:inline;">
+        <input type="hidden" name="accion" value="archivar">
+        <button type="submit" class="btn btn-primary btn-sm">Archivar</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="lex-overlay" id="deleteModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="lex-modal">
+    <div class="lex-modal-header">
+      <h3 class="lex-modal-title">Eliminar asunto</h3>
+      <button class="lex-modal-close" onclick="document.getElementById('deleteModal').classList.remove('show')">×</button>
+    </div>
+    <div class="lex-modal-body">
+      <p>Esta acción <strong>no se puede deshacer</strong>.</p>
+      <p style="font-size:12px;color:#8A9BA8;margin:10px 0 4px;">Escribe <strong style="color:#EF4444;">{{ asunto.numero_expediente or asunto.titulo[:20] }}</strong> para confirmar:</p>
+      <input type="text" class="lex-input" id="deleteConfirmInput" placeholder="Número de expediente"
+             oninput="document.getElementById('deleteConfirmBtn').disabled=this.value!=='{{ asunto.numero_expediente or asunto.titulo[:20] }}'">
+    </div>
+    <div class="lex-modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('deleteModal').classList.remove('show')">Cancelar</button>
+      <button id="deleteConfirmBtn" class="btn btn-danger btn-sm" disabled onclick="confirmarDeleteFinal()">Eliminar permanentemente</button>
+    </div>
+  </div>
+</div>
+
+<div class="lex-overlay" id="respModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="lex-modal">
+    <div class="lex-modal-header">
+      <h3 class="lex-modal-title">Cambiar responsable</h3>
+      <button class="lex-modal-close" onclick="document.getElementById('respModal').classList.remove('show')">×</button>
+    </div>
+    <div class="lex-modal-body">
+      <p>¿Cambiar el responsable a <strong id="respNewName"></strong>?</p>
+      <p style="font-size:12px;color:#8A9BA8;margin-top:8px;">El responsable actual pasará a ser colaborador.</p>
+    </div>
+    <div class="lex-modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('respModal').classList.remove('show')">Cancelar</button>
+      <button id="respConfirmBtn" class="btn btn-primary btn-sm" onclick="confirmarCambioResp()">Confirmar cambio</button>
+    </div>
+  </div>
+</div>
+
+<div class="lex-overlay" id="quitarModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="lex-modal">
+    <div class="lex-modal-header">
+      <h3 class="lex-modal-title">Quitar miembro</h3>
+      <button class="lex-modal-close" onclick="document.getElementById('quitarModal').classList.remove('show')">×</button>
+    </div>
+    <div class="lex-modal-body">
+      <p>¿Quitar a <strong id="quitarName"></strong> de este asunto?</p>
+    </div>
+    <div class="lex-modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('quitarModal').classList.remove('show')">Cancelar</button>
+      <button id="quitarConfirmBtn" class="btn btn-danger btn-sm" onclick="confirmarQuitar()">Sí, quitar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar datos del asunto -->
+<div class="lex-overlay" id="editAsuntoModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="lex-modal lex-modal-lg">
+    <div class="lex-modal-header">
+      <h3 class="lex-modal-title">Editar datos del asunto</h3>
+      <button class="lex-modal-close" onclick="document.getElementById('editAsuntoModal').classList.remove('show')">×</button>
+    </div>
+    <div class="lex-modal-body">
+      <div class="edit-grid">
+        <div class="edit-field edit-field-full">
+          <label class="edit-label">Título del asunto</label>
+          <input type="text" class="lex-input" id="editTitulo" value="{{ asunto.titulo }}">
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Tipo de asunto</label>
+          <input type="text" class="lex-input" id="editTipoAsunto" value="{{ asunto.tipo_asunto or '' }}" placeholder="Ej: Civil, Mercantil, Laboral…">
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Sub-tipo</label>
+          <input type="text" class="lex-input" id="editSubTipo" value="{{ asunto.sub_tipo or '' }}" placeholder="Ej: Divorcio, Cobro de pesos…">
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Fecha de inicio</label>
+          <input type="date" class="lex-input" id="editFechaInicio" value="{{ (asunto.fecha_inicio or '')[:10] }}">
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Fecha límite</label>
+          <input type="date" class="lex-input" id="editFechaLimite" value="{{ (asunto.fecha_limite or '')[:10] }}">
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Juzgado</label>
+          <input type="text" class="lex-input" id="editJuzgado" value="{{ asunto.juzgado or '' }}" placeholder="Ej: 5° Civil">
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Núm. de juicio</label>
+          <input type="text" class="lex-input" id="editNumeroJuicio" value="{{ asunto.numero_juicio or '' }}" placeholder="Número de expediente judicial">
+        </div>
+      </div>
+    </div>
+    <div class="lex-modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('editAsuntoModal').classList.remove('show')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarEdicionAsunto()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ASUNTO_ID    = '{{ asunto.id }}';
+const EXP_NUM      = '{{ asunto.numero_expediente or asunto.titulo[:20] }}';
+const ABOGADOS     = {{ abogados | tojson }};
+const CLIENT_EMAIL = '{{ asunto.cliente_email or "" }}';
+let TL_COUNTS      = {{ tl_counts | tojson }};
+let _tagColor      = '#00DFA2';
+let pendingTeamAction = null;
+
+/* ── Status ──────────────────────────────────── */
+function toggleStatusMenu() {
+  document.getElementById('statusMenu').classList.toggle('show');
+}
+async function cambiarEstado(estado) {
+  document.getElementById('statusMenu').classList.remove('show');
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/estado`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({estado})
+  });
+  if (r.ok) {
+    const btn = document.getElementById('statusBtn');
+    btn.className = `ad-status-btn st-${estado}`;
+    btn.querySelector('span').textContent = estado.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    showToast('Estado actualizado','success');
+  }
+}
+
+/* ── Priority ────────────────────────────────── */
+function cambiarPrioridad(prio) {
+  document.querySelectorAll('.prio-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.prio-btn[data-valor="${prio}"]`)?.classList.add('active');
+  editarCampo('prioridad', prio);
+}
+
+/* ── Title inline edit ───────────────────────── */
+function startEditTitle() {
+  const h1 = document.getElementById('adTitle');
+  if (h1.querySelector('input')) return;
+  const val = h1.textContent.trim();
+  const inp = document.createElement('input');
+  inp.type='text'; inp.value=val; inp.className='ad-title-input';
+  h1.textContent=''; h1.appendChild(inp); inp.focus(); inp.select();
+  inp.addEventListener('blur', () => {
+    const nv = inp.value.trim() || val;
+    h1.textContent = nv;
+    if (nv !== val) editarCampo('titulo', nv);
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key==='Enter') inp.blur();
+    if (e.key==='Escape') { inp.value=val; inp.blur(); }
+  });
+}
+
+/* ── Descripción del caso ────────────────────── */
+let _descTimer = null;
+function onDescInput() {
+  const ta = document.getElementById('casoDescripcion');
+  const cc = document.getElementById('descCount');
+  if (cc) cc.textContent = ta.value.length;
+  clearTimeout(_descTimer);
+  _descTimer = setTimeout(() => editarCampo('descripcion', ta.value), 1000);
+}
+function guardarDescripcion() {
+  const ta = document.getElementById('casoDescripcion');
+  if (ta) editarCampo('descripcion', ta.value);
+}
+
+/* ── Generic field edit ──────────────────────── */
+async function editarCampo(campo, valor) {
+  try {
+    const r = await fetch(`/asuntos/${ASUNTO_ID}/editar-campo`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({campo, valor})
+    });
+    if (!r.ok) showToast('Error al guardar','error');
+  } catch(e) { showToast('Error de conexión','error'); }
+}
+
+/* ── Timeline filter ─────────────────────────── */
+function filterTimeline(tipo, btn) {
+  document.querySelectorAll('.ad-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#tlFeed .tl-item').forEach(item => {
+    item.style.display = (tipo==='all' || item.dataset.tipo===tipo) ? '' : 'none';
+  });
+  // hide date separators with no visible items
+  document.querySelectorAll('#tlFeed .tl-date-sep').forEach(sep => {
+    let next = sep.nextElementSibling;
+    let hasVisible = false;
+    while (next && !next.classList.contains('tl-date-sep')) {
+      if (next.classList.contains('tl-item') && next.style.display !== 'none') hasVisible = true;
+      next = next.nextElementSibling;
+    }
+    sep.style.display = hasVisible ? '' : 'none';
+  });
+}
+function updateTabCounter(tipo, delta) {
+  TL_COUNTS[tipo] = (TL_COUNTS[tipo]||0) + delta;
+  TL_COUNTS.all   = (TL_COUNTS.all  ||0) + delta;
+  const el = document.getElementById(`tc-${tipo}`);
+  const elAll = document.getElementById('tc-all');
+  if (el) el.textContent = TL_COUNTS[tipo];
+  if (elAll) elAll.textContent = TL_COUNTS.all;
+}
+
+/* ── Tags ────────────────────────────────────── */
+function toggleTagDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('tagDropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) setTimeout(()=>document.getElementById('tagInput')?.focus(), 50);
+}
+function selectColor(color, el) {
+  _tagColor = color;
+  document.querySelectorAll('.tc').forEach(d=>d.classList.remove('selected'));
+  el.classList.add('selected');
+}
+async function createTag() {
+  const nombre = document.getElementById('tagInput').value.trim();
+  if (!nombre) return;
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/etiquetas`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({nombre, color:_tagColor})
+  });
+  if (r.ok) {
+    const data = await r.json();
+    const row = document.getElementById('tagsRow');
+    const addBtn = row.querySelector('.ad-tag-add');
+    const tag = document.createElement('span');
+    tag.className='ad-tag-chip'; tag.style.cssText=`--tc:${_tagColor}`;
+    tag.innerHTML=`${nombre}<button class="ad-tag-remove" onclick="removeTag('${data.id}',this.parentElement)">×</button>`;
+    row.insertBefore(tag, addBtn);
+    document.getElementById('tagInput').value='';
+    document.getElementById('tagDropdown').classList.remove('open');
+  }
+}
+async function removeTag(eid, el) {
+  if (!eid) return;
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/etiquetas/${eid}`, {method:'DELETE'});
+  if (r.ok) el.remove();
+}
+/* keep legacy aliases */
+const quitarEtiqueta = removeTag;
+
+/* ── FAB ─────────────────────────────────────── */
+function toggleFabMenu() {
+  const menu = document.getElementById('fabMenu');
+  const btn  = document.getElementById('fabBtn');
+  const isOpen = menu.classList.toggle('open');
+  btn.classList.toggle('fab-open', isOpen);
+  if (isOpen) document.getElementById('fabPopup').style.display = 'none';
+}
+function abrirNota()      { closeFabMenu(); openFabForm('nota');      }
+function abrirActividad() { closeFabMenu(); openFabForm('actividad'); }
+function abrirDocumento() { closeFabMenu(); openFabForm('documento'); }
+function abrirLlamada()   { closeFabMenu(); openFabForm('llamada');   }
+function abrirCorreo()    { closeFabMenu(); openFabForm('correo');    }
+function closeFabMenu() {
+  document.getElementById('fabMenu').classList.remove('open');
+  document.getElementById('fabBtn').classList.remove('fab-open');
+}
+function openFabForm(tipo) {
+  const titles = {
+    nota:'Nueva nota', actividad:'Nueva actividad',
+    documento:'Subir documento', llamada:'Registrar llamada', correo:'Registrar correo'
+  };
+  document.getElementById('fabPopupTitle').textContent = titles[tipo] || '';
+  document.querySelectorAll('[id^="fabForm-"]').forEach(f => f.style.display = 'none');
+  const form = document.getElementById(`fabForm-${tipo}`);
+  if (form) form.style.display = '';
+  document.getElementById('fabPopup').style.display = 'flex';
+}
+function openFab(directTipo) { openFabForm(directTipo); }
+function closeFab() {
+  document.getElementById('fabPopup').style.display = 'none';
+  document.querySelectorAll('[id^="fabForm-"]').forEach(f => f.style.display = 'none');
+  document.getElementById('fabBtn').classList.remove('fab-open');
+}
+function fabGoTo(tipo) { openFabForm(tipo); }
+async function fabGuardarNota() {
+  const contenido = document.getElementById('fabNotaContenido').value.trim();
+  if (!contenido) return showToast('Escribe algo primero','error');
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/notas`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({contenido})
+  });
+  if (r.ok) {
+    const data = await r.json();
+    addToTimeline('nota','✎','Nota', contenido, data.autor_nombre||'Tú', contenido);
+    document.getElementById('fabNotaContenido').value='';
+    closeFab(); showToast('Nota guardada','success'); updateTabCounter('nota',1);
+  } else showToast('Error al guardar nota','error');
+}
+async function fabGuardarActividad() {
+  const titulo = document.getElementById('fabActTitulo').value.trim();
+  const tipo   = document.getElementById('fabActTipo').value;
+  const fecha  = document.getElementById('fabActFecha').value;
+  const lugar  = document.getElementById('fabActLugar').value.trim();
+  const desc   = document.getElementById('fabActDesc').value.trim();
+  const evento = document.getElementById('fabActEvento').checked;
+  if (!titulo) return showToast('Agrega un título','error');
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({tipo, titulo, fecha, lugar, descripcion:desc, crear_evento:evento})
+  });
+  if (r.ok) {
+    const data = await r.json();
+    addToTimeline('actividad','◷','Actividad', titulo, data.autor_nombre||'Tú', desc);
+    ['fabActTitulo','fabActDesc','fabActLugar'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    closeFab(); showToast('Actividad guardada','success'); updateTabCounter('actividad',1);
+  } else showToast('Error al guardar actividad','error');
+}
+function fabHandleDrop(e) {
+  e.preventDefault();
+  document.getElementById('fabDropzone').classList.remove('drag-over');
+  fabHandleFiles(e.dataTransfer.files);
+}
+async function fabHandleFiles(files) {
+  if (!files.length) return;
+  const prog = document.getElementById('fabUploadProgress');
+  const bar  = document.getElementById('fabProgressBar');
+  prog.style.display='';
+  for (let i=0; i<files.length; i++) {
+    const fd = new FormData(); fd.append('archivo', files[i]);
+    bar.style.width=`${Math.round((i/files.length)*100)}%`;
+    const r = await fetch(`/asuntos/${ASUNTO_ID}/documentos`, {method:'POST', body:fd});
+    if (r.ok) { addToTimeline('documento','⬆','Documento', files[i].name,'Tú',''); updateTabCounter('documento',1); }
+  }
+  bar.style.width='100%';
+  setTimeout(()=>{prog.style.display='none';bar.style.width='0';closeFab();showToast('Documento(s) subido(s)','success');},500);
+}
+async function fabGuardarLlamada() {
+  const con       = document.getElementById('fabLlamadaCon').value.trim();
+  const duracion  = document.getElementById('fabLlamadaDuracion').value.trim();
+  const resultado = document.getElementById('fabLlamadaResultado').value;
+  const notas     = document.getElementById('fabLlamadaNotas').value.trim();
+  const contenido = [con&&`Con: ${con}`, duracion&&`Duración: ${duracion}`, `Resultado: ${resultado}`, notas].filter(Boolean).join(' · ');
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({tipo:'llamada', titulo:con||'Llamada', descripcion:contenido})
+  });
+  if (r.ok) {
+    addToTimeline('llamada','☎','Llamada', con||'Llamada','Tú', contenido);
+    closeFab(); showToast('Llamada registrada','success'); updateTabCounter('llamada',1);
+  } else showToast('Error','error');
+}
+
+/* ── FAB — guardar correo ────────────────────── */
+async function fabGuardarCorreo() {
+  const asunto_correo = document.getElementById('fabCorreoAsunto').value.trim();
+  const contacto      = document.getElementById('fabCorreoContacto').value.trim();
+  const contenido     = document.getElementById('fabCorreoContenido').value.trim();
+  if (!contenido) return showToast('Escribe el contenido del correo','error');
+  const descripcion = [asunto_correo && `Asunto: ${asunto_correo}`, contacto && `Contacto: ${contacto}`, contenido].filter(Boolean).join('\n');
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({tipo:'nota', titulo: asunto_correo || 'Correo registrado', descripcion})
+  });
+  if (r.ok) {
+    addToTimeline('nota','✉','Correo', asunto_correo||'Correo', 'Tú', descripcion);
+    ['fabCorreoAsunto','fabCorreoContacto','fabCorreoContenido'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    closeFab(); showToast('Correo guardado correctamente','success'); updateTabCounter('nota',1);
+  } else showToast('Error al guardar el correo','error');
+}
+
+/* ── Mention DD ──────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('fabNotaContenido');
+  const dd = document.getElementById('mentionDD');
+  if (!ta||!dd) return;
+  ta.addEventListener('input', () => {
+    const val=ta.value, pos=ta.selectionStart, at=val.lastIndexOf('@',pos-1);
+    if (at===-1||pos-at>20){dd.style.display='none';return;}
+    const query=val.slice(at+1,pos).toLowerCase();
+    const matches=ABOGADOS.filter(a=>`${a.nombre} ${a.apellidos||''}`.toLowerCase().includes(query));
+    if (!matches.length){dd.style.display='none';return;}
+    dd.innerHTML=matches.map(a=>`<button class="mention-opt" onclick="fabInsertMention('${a.nombre} ${a.apellidos||''}')">${a.nombre} ${a.apellidos||''}</button>`).join('');
+    dd.style.display='';
+  });
+});
+function fabInsertMention(name) {
+  const ta=document.getElementById('fabNotaContenido'), dd=document.getElementById('mentionDD');
+  const pos=ta.selectionStart, val=ta.value, at=val.lastIndexOf('@',pos-1);
+  ta.value=val.slice(0,at)+`@${name} `+val.slice(pos);
+  ta.focus(); ta.selectionStart=ta.selectionEnd=at+name.length+2; dd.style.display='none';
+}
+
+/* ── Mark realizado ──────────────────────────── */
+async function marcarRealizado(actId, realizado, el) {
+  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades/${actId}/realizado`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({realizado})
+  });
+  if (r.ok) {
+    const item = el.closest('.tl-item');
+    const badge = item?.querySelector('.ad-tl-status');
+    if (badge) { badge.className=`ad-tl-status ${realizado?'ad-tl-done':'ad-tl-pending'}`; badge.textContent=realizado?'✓ Realizado':'⏳ Pendiente'; }
+    el.style.display='none';
+    showToast(realizado?'Marcado como realizado':'Desmarcado','success');
+  }
+}
+
+/* ── Team ────────────────────────────────────── */
+function toggleTeamMenu(btn) {
+  const menu=btn.nextElementSibling;
+  const wasOpen=menu.classList.contains('show');
+  document.querySelectorAll('.ctx-tm-menu').forEach(m=>m.classList.remove('show'));
+  if (!wasOpen) menu.classList.add('show');
+}
+function toggleAddColaborador() {
+  const wrap=document.getElementById('addColabWrap');
+  wrap.style.display=wrap.style.display==='none'?'':'none';
+}
+async function addColaborador() {
+  const sel=document.getElementById('addColabSelect'); const uid=sel.value; if(!uid)return;
+  const r=await fetch(`/asuntos/${ASUNTO_ID}/editar-campo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campo:'colaborador_add',valor:uid})});
+  if(r.ok){showToast('Colaborador agregado','success');setTimeout(()=>location.reload(),800);}
+  else showToast('Error al agregar','error');
+}
+function cambiarResponsable(uid, nombre) {
+  pendingTeamAction={type:'cambiar_resp',uid};
+  document.getElementById('respNewName').textContent=nombre;
+  document.getElementById('respModal').classList.add('show');
+}
+async function confirmarCambioResp() {
+  if (!pendingTeamAction) return;
+  const r=await fetch(`/asuntos/${ASUNTO_ID}/equipo/${pendingTeamAction.uid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:'cambiar_responsable'})});
+  document.getElementById('respModal').classList.remove('show');
+  if(r.ok){showToast('Responsable actualizado','success');setTimeout(()=>location.reload(),800);}
+  else showToast('Error','error');
+  pendingTeamAction=null;
+}
+function quitarMiembro(uid, nombre) {
+  pendingTeamAction={type:'quitar',uid};
+  document.getElementById('quitarName').textContent=nombre;
+  document.getElementById('quitarModal').classList.add('show');
+}
+async function confirmarQuitar() {
+  if (!pendingTeamAction) return;
+  const r=await fetch(`/asuntos/${ASUNTO_ID}/equipo/${pendingTeamAction.uid}`,{method:'DELETE'});
+  document.getElementById('quitarModal').classList.remove('show');
+  if(r.ok){showToast('Miembro removido','success');setTimeout(()=>location.reload(),800);}
+  else showToast('Error','error');
+  pendingTeamAction=null;
+}
+
+/* ── Archive / Delete ────────────────────────── */
+function confirmarArchivar() { document.getElementById('archiveModal').classList.add('show'); }
+function confirmarEliminar() {
+  const input=document.getElementById('deleteConfirmInput');
+  const btn=document.getElementById('deleteConfirmBtn');
+  if(input) input.value=''; if(btn) btn.disabled=true;
+  document.getElementById('deleteModal').classList.add('show');
+}
+async function confirmarDeleteFinal() {
+  const r=await fetch(`/asuntos/${ASUNTO_ID}/eliminar`,{method:'POST'});
+  if(r.ok||r.redirected) window.location.href='/asuntos/';
+}
+
+/* ── Add to timeline (optimistic) ───────────── */
+function addToTimeline(tipo, icon, badge, titulo, autor, contenido) {
+  const cfg = {
+    nota:       {color:'#00DFA2', avBg:'rgba(0,223,162,0.12)',  badgeBg:'rgba(0,223,162,0.1)',  cls:'nota'},
+    documento:  {color:'#3B8BD4', avBg:'rgba(59,139,212,0.1)',  badgeBg:'rgba(59,139,212,0.1)', cls:'doc'},
+    actividad:  {color:'#F97316', avBg:'rgba(249,115,22,0.1)',  badgeBg:'rgba(249,115,22,0.1)', cls:'actividad'},
+    llamada:    {color:'#8B5CF6', avBg:'rgba(139,92,246,0.1)',  badgeBg:'rgba(139,92,246,0.1)', cls:'llamada'},
+  };
+  const c = cfg[tipo] || {color:'#8A9BA8', avBg:'rgba(138,155,168,0.08)', badgeBg:'rgba(138,155,168,0.08)', cls:'sistema'};
+  const feed = document.getElementById('tlFeed');
+  feed.querySelector('.ad-tl-empty')?.remove();
+
+  // Insert "Hoy" separator if not already first
+  const firstSep = feed.querySelector('.tl-date-sep');
+  const todayLabel = 'HOY';
+  if (!firstSep || !firstSep.textContent.toUpperCase().includes('HOY')) {
+    const sep = document.createElement('div');
+    sep.className = 'tl-date-sep';
+    const now = new Date();
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    sep.innerHTML = `<span>Hoy · ${now.getDate()} de ${meses[now.getMonth()]} ${now.getFullYear()}</span>`;
+    feed.prepend(sep);
+  }
+
+  const iniciales = autor.split(' ').filter(Boolean).map(p=>p[0]).slice(0,2).join('').toUpperCase() || 'YO';
+  const hora = new Date().toTimeString().slice(0,5);
+  const div = document.createElement('div');
+  div.className = 'tl-item'; div.dataset.tipo = tipo;
+  div.style.animation = 'tlHighlight 1.5s ease';
+  div.innerHTML = `
+    <div class="tl-left">
+      <div class="tl-avatar" style="background:${c.avBg};color:${c.color}">${iniciales}</div>
+    </div>
+    <div class="tl-card ${c.cls}">
+      <div class="tl-header">
+        <div class="tl-meta">
+          <span class="tl-who">${autor}</span>
+          <span class="tl-dot">·</span>
+          <span class="tl-time">${hora}</span>
+        </div>
+        <span class="tl-badge" style="background:${c.badgeBg};color:${c.color}">${badge}</span>
+      </div>
+      ${titulo?`<div class="tl-title">${titulo}</div>`:''}
+      ${contenido?`<div class="tl-body">${contenido}</div>`:''}
+    </div>`;
+  // Insert after the "Hoy" separator
+  const todaySep = feed.querySelector('.tl-date-sep');
+  todaySep ? todaySep.insertAdjacentElement('afterend', div) : feed.prepend(div);
+}
+
+/* ── Juzgado inline edit ─────────────────────── */
+function editarJuzgado() {
+  const span = document.getElementById('adStatJuzgado');
+  if (!span || span.querySelector('input')) return;
+  const val = span.dataset.val || '';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = val;
+  inp.placeholder = 'Ej: 5° Civil';
+  inp.style.cssText = 'width:100%;background:transparent;border:none;border-bottom:1px solid rgba(0,223,162,0.5);color:#EAF0EC;font-size:13px;font-family:\'DM Mono\',monospace;outline:none;padding:0;';
+  span.textContent = '';
+  span.appendChild(inp);
+  inp.focus();
+  inp.select();
+  inp.addEventListener('blur', () => {
+    const nv = inp.value.trim();
+    span.textContent = nv || '—';
+    span.dataset.val = nv;
+    if (nv !== val) editarCampo('juzgado', nv);
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') inp.blur();
+    if (e.key === 'Escape') { inp.value = val; inp.blur(); }
+  });
+}
+
+/* ── Más opciones ────────────────────────────── */
+function toggleMasOpciones(e) {
+  e.stopPropagation();
+  document.getElementById('adMasMenu').classList.toggle('open');
+}
+function closeMasMenu() {
+  document.getElementById('adMasMenu')?.classList.remove('open');
+}
+function copiarEnlace() {
+  navigator.clipboard.writeText(window.location.href);
+  const btn = event.currentTarget;
+  const label = btn.querySelector('.ad-mas-label');
+  const original = label.textContent;
+  label.textContent = 'Enlace copiado ✓';
+  label.style.color = '#00DFA2';
+  setTimeout(() => {
+    label.textContent = original;
+    label.style.color = '';
+    document.getElementById('adMasMenu').classList.remove('open');
+  }, 1500);
+}
+function abrirEditarAsunto() {
+  closeMasMenu();
+  document.getElementById('editAsuntoModal').classList.add('show');
+}
+async function guardarEdicionAsunto() {
+  try {
+    const campos = {
+      titulo:        document.getElementById('editTitulo').value.trim(),
+      tipo_asunto:   document.getElementById('editTipoAsunto').value.trim(),
+      sub_tipo:      document.getElementById('editSubTipo').value.trim(),
+      fecha_inicio:  document.getElementById('editFechaInicio').value,
+      fecha_limite:  document.getElementById('editFechaLimite').value,
+      juzgado:       document.getElementById('editJuzgado').value.trim(),
+      numero_juicio: document.getElementById('editNumeroJuicio').value.trim(),
+    };
+    if (!campos.titulo) return showToast('El título es obligatorio', 'error');
+    const r = await fetch(`/asuntos/${ASUNTO_ID}/editar-campo`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({campo: 'multi', valor: campos})
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    document.getElementById('editAsuntoModal').classList.remove('show');
+    showToast('Datos actualizados', 'success');
+    setTimeout(() => location.reload(), 800);
+  } catch(e) {
+    console.error('[guardarEdicionAsunto]', e);
+    showToast('Error al guardar — intenta de nuevo', 'error');
+  }
+}
+
+/* ── Close on outside click ──────────────────── */
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ad-mas-wrap'))
+    document.getElementById('adMasMenu')?.classList.remove('open');
+  if (!e.target.closest('#statusBtn') && !e.target.closest('#statusMenu'))
+    document.getElementById('statusMenu')?.classList.remove('show');
+  if (!e.target.closest('.tags-wrap'))
+    document.getElementById('tagDropdown')?.classList.remove('open');
+  if (!e.target.closest('.ctx-tm-menu-wrap'))
+    document.querySelectorAll('.ctx-tm-menu').forEach(m=>m.classList.remove('show'));
+  if (!e.target.closest('#fabContainer'))
+    document.getElementById('fabMenu')?.classList.remove('open');
+});
+</script>
+{% endblock %}

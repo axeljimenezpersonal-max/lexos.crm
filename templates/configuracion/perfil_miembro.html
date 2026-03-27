@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon_edit, icon_trash, icon_pin, icon_check_circle, icon_map_pin, icon_mail, icon_plus, icon_key %}
+{% block title %}{{ member.nombre }} {{ member.apellidos or '' }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/equipo.css') }}">
+<style>
+/* ── Profile Page ── */
+.prf-page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.prf-back { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--text-3); text-decoration: none; margin-bottom: 20px; transition: color .15s; }
+.prf-back:hover { color: var(--accent); }
+
+/* Header card */
+.prf-header { display: flex; gap: 24px; align-items: flex-start; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; margin-bottom: 24px; }
+.prf-avatar { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+.prf-info { flex: 1; }
+.prf-name { font-size: 1.5rem; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.prf-email { font-size: .85rem; color: var(--text-3); margin-bottom: 10px; }
+.prf-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.prf-badge { padding: 4px 12px; border-radius: 20px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.prf-chip { padding: 3px 10px; border-radius: 6px; font-size: .72rem; background: var(--surface-2); color: var(--text-2); }
+.prf-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px; }
+.prf-meta-item { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--text-3); }
+.prf-actions { display: flex; gap: 8px; flex-shrink: 0; align-self: flex-start; }
+
+/* Stats grid */
+.prf-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 24px; }
+.prf-stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; text-align: center; }
+.prf-stat-num { font-size: 1.6rem; font-weight: 800; color: var(--text); }
+.prf-stat-label { font-size: .72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+
+/* Carga bar */
+.prf-carga { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin-bottom: 24px; }
+.prf-carga-label { font-size: .82rem; color: var(--text-2); font-weight: 600; min-width: 120px; }
+.prf-carga-bar { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.prf-carga-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+.prf-carga-text { font-size: .78rem; font-weight: 700; min-width: 60px; text-align: right; }
+
+/* Tabs */
+.prf-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+.prf-tab { padding: 10px 20px; font-size: .85rem; font-weight: 600; color: var(--text-3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none; }
+.prf-tab:hover { color: var(--text-2); }
+.prf-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.prf-panel { display: none; }
+.prf-panel.active { display: block; }
+
+/* Table */
+.prf-table { width: 100%; border-collapse: collapse; }
+.prf-table th { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 600; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.prf-table td { padding: 10px 12px; font-size: .84rem; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.prf-table tr:hover td { background: var(--hover); }
+.prf-table a { color: var(--accent); text-decoration: none; }
+.prf-table a:hover { text-decoration: underline; }
+.prf-estado { padding: 3px 8px; border-radius: 4px; font-size: .7rem; font-weight: 600; text-transform: uppercase; }
+.prf-estado-activo { background: #10B98118; color: #10B981; }
+.prf-estado-completado { background: #3B82F618; color: #3B82F6; }
+.prf-estado-archivado { background: #6B728018; color: #6B7280; }
+.prf-prioridad-alta { color: #EF4444; font-weight: 700; }
+.prf-prioridad-media { color: #F59E0B; }
+.prf-prioridad-baja { color: #10B981; }
+
+/* Events */
+.prf-evt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.prf-evt:last-child { border-bottom: none; }
+.prf-evt-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.prf-evt-info { flex: 1; }
+.prf-evt-title { font-size: .85rem; font-weight: 600; color: var(--text); }
+.prf-evt-meta { font-size: .75rem; color: var(--text-3); }
+
+/* Activity */
+.prf-act { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.prf-act:last-child { border-bottom: none; }
+.prf-act-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; }
+.prf-act-body { flex: 1; }
+.prf-act-text { font-size: .82rem; color: var(--text-2); }
+.prf-act-date { font-size: .72rem; color: var(--text-3); }
+
+/* Empty */
+.prf-empty { text-align: center; padding: 40px 20px; color: var(--text-3); font-size: .88rem; }
+
+/* ── FAB — Floating Action Button ── */
+.prf-fab {
+  position: fixed; bottom: 32px; right: 32px; z-index: 900;
+  width: 60px; height: 60px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--e) 100%);
+  color: #fff; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 32px rgba(99,102,241,.45);
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+}
+.prf-fab:hover { transform: translateY(-3px) scale(1.05); box-shadow: 0 12px 40px rgba(99,102,241,.55); }
+.prf-fab:active { transform: translateY(0) scale(.97); }
+.prf-fab svg { transition: transform .2s; }
+.prf-fab:hover svg { transform: rotate(-8deg); }
+
+/* Tooltip on hover */
+.prf-fab-wrap { position: fixed; bottom: 32px; right: 32px; z-index: 900; }
+.prf-fab-tooltip {
+  position: absolute; right: 72px; top: 50%; transform: translateY(-50%);
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 14px; border-radius: 8px; font-size: .78rem; font-weight: 600;
+  white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+.prf-fab-wrap:hover .prf-fab-tooltip { opacity: 1; }
+
+/* ── Mail Modal ── */
+.mail-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(6px);
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 24px; opacity: 0; pointer-events: none;
+  transition: opacity .25s;
+}
+.mail-overlay.show { opacity: 1; pointer-events: auto; }
+.mail-box {
+  width: 520px; max-height: calc(100vh - 48px);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 25px 80px rgba(0,0,0,.5);
+  transform: translateY(40px) scale(.95);
+  transition: transform .35s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column;
+}
+.mail-overlay.show .mail-box { transform: translateY(0) scale(1); }
+
+.mail-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px; background: var(--card); border-bottom: 1px solid var(--border);
+}
+.mail-header h3 { font-size: 1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.mail-close { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 1.4rem; padding: 0 4px; transition: color .15s; }
+.mail-close:hover { color: var(--text); }
+
+.mail-body { padding: 22px; overflow-y: auto; flex: 1; }
+
+.mail-field { margin-bottom: 16px; }
+.mail-field label {
+  display: block; font-size: .7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-3); margin-bottom: 6px;
+}
+.mail-field input, .mail-field textarea {
+  width: 100%; padding: 10px 14px; font-size: .88rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text);
+  transition: border-color .15s, box-shadow .15s;
+  font-family: inherit;
+}
+.mail-field input:focus, .mail-field textarea:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,223,162,.15);
+}
+.mail-field textarea { min-height: 160px; resize: vertical; line-height: 1.6; }
+
+.mail-to-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent); color: #fff;
+  padding: 6px 14px; border-radius: 20px; font-size: .82rem; font-weight: 600;
+}
+.mail-to-chip .mail-to-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .6rem; font-weight: 800; background: rgba(255,255,255,.25);
+}
+
+.mail-cc-toggle {
+  display: inline-block; font-size: .75rem; color: var(--accent);
+  cursor: pointer; margin-left: 12px; font-weight: 600;
+}
+.mail-cc-toggle:hover { text-decoration: underline; }
+
+.mail-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 22px; background: var(--card); border-top: 1px solid var(--border);
+}
+.mail-footer-info { font-size: .72rem; color: var(--text-3); }
+.mail-send-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 24px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--e) 100%);
+  color: #fff; font-size: .88rem; font-weight: 700; cursor: pointer;
+  transition: all .2s; box-shadow: 0 4px 16px rgba(99,102,241,.3);
+}
+.mail-send-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(99,102,241,.4); }
+.mail-send-btn:active { transform: translateY(0); }
+.mail-send-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* Success animation */
+.mail-success {
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 20px; text-align: center;
+}
+.mail-success.show { display: flex; }
+.mail-success-icon { font-size: 3.5rem; margin-bottom: 16px; animation: mailPop .5s cubic-bezier(.4,0,.2,1); }
+.mail-success h4 { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.mail-success p { font-size: .85rem; color: var(--text-3); }
+
+@keyframes mailPop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  .mail-overlay { padding: 0; align-items: stretch; justify-content: stretch; }
+  .mail-box { width: 100%; max-height: 100vh; border-radius: 0; }
+  .prf-fab-wrap { bottom: 20px; right: 20px; }
+}
+
+@media (max-width: 900px) {
+  .prf-header { flex-direction: column; align-items: center; text-align: center; }
+  .prf-stats { grid-template-columns: repeat(3, 1fr); }
+  .prf-meta { justify-content: center; }
+  .prf-actions { justify-content: center; }
+}
+@media (max-width: 600px) {
+  .prf-stats { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="prf-page">
+
+  <!-- Back link -->
+  <a href="{{ url_for('equipo.index') }}" class="prf-back">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+    Volver al equipo
+  </a>
+
+  <!-- ═══ HEADER CARD ═══ -->
+  <div class="prf-header">
+    {% if member.avatar_url %}
+      <img src="{{ member.avatar_url }}" class="prf-avatar" style="object-fit:cover;">
+    {% else %}
+      <div class="prf-avatar" style="background:{{ member.color }}">
+        {{ member.nombre[0] }}{{ (member.apellidos or '')[0:1] }}
+      </div>
+    {% endif %}
+
+    <div class="prf-info">
+      <div class="prf-name">{{ member.nombre }} {{ member.apellidos or '' }}</div>
+      <div class="prf-email">{{ member.email }}</div>
+
+      <div class="prf-badges">
+        <span class="prf-badge" style="background:{{ member.cargo_color }}22; color:{{ member.cargo_color }}">
+          {{ member.cargo|upper }}
+        </span>
+        <span class="prf-badge" style="background:{{ '#10B981' if member.estatus == 'activo' else '#EF4444' }}18; color:{{ '#10B981' if member.estatus == 'activo' else '#EF4444' }}">
+          {{ member.estatus|upper }}
+        </span>
+        {% for esp in member.especialidades_list %}
+          <span class="prf-chip">{{ esp|capitalize }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="prf-meta">
+        {% if member.telefono %}
+        <div class="prf-meta-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          {{ member.telefono }}
+        </div>
+        {% endif %}
+        {% if member.fecha_ingreso %}
+        <div class="prf-meta-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Ingreso: {{ member.fecha_ingreso }}
+        </div>
+        {% endif %}
+        <div class="prf-meta-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Rol: {{ member.rol }}
+        </div>
+      </div>
+    </div>
+
+    {% if is_admin %}
+    <div class="prf-actions">
+      <a href="{{ url_for('equipo.index') }}" class="btn btn-ghost btn-sm">Editar</a>
+      {% if member.estatus == 'activo' %}
+      <form method="POST" action="{{ url_for('equipo.cambiar_estatus', uid=member.id) }}" style="margin:0">
+        <input type="hidden" name="accion" value="suspender">
+        <button class="btn btn-danger btn-sm" onclick="return confirm('Suspender a {{ member.nombre }}?')">Suspender</button>
+      </form>
+      {% else %}
+      <form method="POST" action="{{ url_for('equipo.cambiar_estatus', uid=member.id) }}" style="margin:0">
+        <input type="hidden" name="accion" value="reactivar">
+        <button class="btn btn-primary btn-sm">Reactivar</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══ STATS ═══ -->
+  <div class="prf-stats">
+    <div class="prf-stat">
+      <div class="prf-stat-num" style="color:#3B82F6">{{ stats.asuntos_activos }}</div>
+      <div class="prf-stat-label">Activos</div>
+    </div>
+    <div class="prf-stat">
+      <div class="prf-stat-num" style="color:#10B981">{{ stats.asuntos_completados }}</div>
+      <div class="prf-stat-label">Completados</div>
+    </div>
+    <div class="prf-stat">
+      <div class="prf-stat-num">{{ stats.asuntos_total }}</div>
+      <div class="prf-stat-label">Total asuntos</div>
+    </div>
+    <div class="prf-stat">
+      <div class="prf-stat-num" style="color:#8B5CF6">{{ stats.eventos_proximos }}</div>
+      <div class="prf-stat-label">Eventos prox.</div>
+    </div>
+    <div class="prf-stat">
+      <div class="prf-stat-num" style="color:#F59E0B">{{ stats.documentos }}</div>
+      <div class="prf-stat-label">Documentos</div>
+    </div>
+    <div class="prf-stat">
+      <div class="prf-stat-num" style="color:#EC4899">{{ stats.clientes_asignados }}</div>
+      <div class="prf-stat-label">Clientes</div>
+    </div>
+  </div>
+
+  <!-- ═══ CARGA ═══ -->
+  <div class="prf-carga">
+    <div class="prf-carga-label">Carga de trabajo</div>
+    <div class="prf-carga-bar">
+      <div class="prf-carga-fill" style="width:{{ carga.pct }}%; background:{{ carga.color }}"></div>
+    </div>
+    <div class="prf-carga-text" style="color:{{ carga.color }}">{{ carga.label }}</div>
+  </div>
+
+  <!-- ═══ TABS ═══ -->
+  <div class="prf-tabs">
+    <button class="prf-tab active" onclick="showPrfTab('asuntos')">Asuntos activos ({{ asuntos_activos|length }})</button>
+    <button class="prf-tab" onclick="showPrfTab('historial')">Historial ({{ asuntos_historial|length }})</button>
+    <button class="prf-tab" onclick="showPrfTab('eventos')">Eventos ({{ eventos|length }})</button>
+    <button class="prf-tab" onclick="showPrfTab('documentos')">Documentos ({{ documentos|length }})</button>
+    <button class="prf-tab" onclick="showPrfTab('actividad')">Actividad ({{ actividad|length }})</button>
+  </div>
+
+  <!-- ── Panel: Asuntos activos ── -->
+  <div class="prf-panel active" id="panel-asuntos">
+    {% if asuntos_activos %}
+    <table class="prf-table">
+      <thead>
+        <tr><th>Expediente</th><th>Asunto</th><th>Cliente</th><th>Tipo</th><th>Prioridad</th><th>Fecha límite</th></tr>
+      </thead>
+      <tbody>
+        {% for a in asuntos_activos %}
+        <tr>
+          <td style="font-family:monospace;font-size:.78rem">{{ a.numero_expediente or '—' }}</td>
+          <td><a href="{{ url_for('asuntos.detalle', id=a.id) }}">{{ a.titulo }}</a></td>
+          <td>{{ a.cliente_nombre or '—' }}</td>
+          <td><span class="prf-chip">{{ a.tipo_asunto or '—' }}</span></td>
+          <td><span class="prf-prioridad-{{ a.prioridad or 'media' }}">{{ (a.prioridad or 'media')|capitalize }}</span></td>
+          <td>{{ a.fecha_limite or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="prf-empty">Sin asuntos activos asignados</div>
+    {% endif %}
+  </div>
+
+  <!-- ── Panel: Historial ── -->
+  <div class="prf-panel" id="panel-historial">
+    {% if asuntos_historial %}
+    <table class="prf-table">
+      <thead>
+        <tr><th>Expediente</th><th>Asunto</th><th>Cliente</th><th>Estado</th><th>Fecha</th></tr>
+      </thead>
+      <tbody>
+        {% for a in asuntos_historial %}
+        <tr>
+          <td style="font-family:monospace;font-size:.78rem">{{ a.numero_expediente or '—' }}</td>
+          <td><a href="{{ url_for('asuntos.detalle', id=a.id) }}">{{ a.titulo }}</a></td>
+          <td>{{ a.cliente_nombre or '—' }}</td>
+          <td><span class="prf-estado prf-estado-{{ a.estado }}">{{ a.estado }}</span></td>
+          <td>{{ a.fecha_alta[:10] if a.fecha_alta else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="prf-empty">Sin asuntos completados o archivados</div>
+    {% endif %}
+  </div>
+
+  <!-- ── Panel: Eventos ── -->
+  <div class="prf-panel" id="panel-eventos">
+    {% if eventos %}
+      {% for e in eventos %}
+      <div class="prf-evt">
+        <div class="prf-evt-dot" style="background:{{ {'audiencia':'#3B82F6','reunion':'#8B5CF6','vencimiento':'#F59E0B','tarea':'#10B981'}.get(e.tipo, '#6B7280') }}"></div>
+        <div class="prf-evt-info">
+          <div class="prf-evt-title">{{ e.titulo }}</div>
+          <div class="prf-evt-meta">
+            {{ e.fecha_inicio[:16] if e.fecha_inicio else '' }}
+            {% if e.lugar %} · {{ icon_map_pin(12, 12) }} {{ e.lugar }}{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="prf-empty">Sin eventos próximos</div>
+    {% endif %}
+  </div>
+
+  <!-- ── Panel: Documentos ── -->
+  <div class="prf-panel" id="panel-documentos">
+    {% if documentos %}
+    <table class="prf-table">
+      <thead><tr><th>Documento</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <tbody>
+        {% for d in documentos %}
+        <tr>
+          <td><a href="{{ url_for('biblioteca.index') }}">{{ d.titulo }}</a></td>
+          <td><span class="prf-chip">{{ d.estado or 'borrador' }}</span></td>
+          <td>{{ d.fecha_alta[:10] if d.fecha_alta else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="prf-empty">Sin documentos creados</div>
+    {% endif %}
+  </div>
+
+  <!-- ── Panel: Actividad ── -->
+  <div class="prf-panel" id="panel-actividad">
+    {% if actividad %}
+      {% for act in actividad %}
+      <div class="prf-act">
+        <div class="prf-act-icon">
+          {% if 'crear' in act.accion %}{{ icon_plus(14,14) }}
+          {% elif 'editar' in act.accion %}{{ icon_edit(14,14) }}
+          {% elif 'eliminar' in act.accion %}{{ icon_trash(14,14) }}
+          {% elif 'login' in act.accion %}{{ icon_key(14,14) }}
+          {% elif 'correo' in act.accion %}{{ icon_mail(14,14) }}
+          {% else %}{{ icon_pin(14,14) }}{% endif %}
+        </div>
+        <div class="prf-act-body">
+          <div class="prf-act-text">
+            <strong>{{ act.accion|replace('_',' ')|capitalize }}</strong>
+            {% if act.entidad %} · {{ act.entidad }}{% endif %}
+          </div>
+          <div class="prf-act-date">{{ act.fecha[:16] if act.fecha else '' }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="prf-empty">Sin actividad registrada</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     FAB — Enviar correo
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="prf-fab-wrap">
+  <div class="prf-fab-tooltip">Enviar correo</div>
+  <button class="prf-fab" onclick="openMailModal()" aria-label="Enviar correo">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <polyline points="22,6 12,13 2,6"/>
+    </svg>
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL — Componer correo
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="mail-overlay" id="mailOverlay" onclick="if(event.target===this)closeMailModal()">
+  <div class="mail-box">
+    <!-- Header -->
+    <div class="mail-header">
+      <h3>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
+        Nuevo correo
+      </h3>
+      <button class="mail-close" onclick="closeMailModal()">&times;</button>
+    </div>
+
+    <!-- Compose form -->
+    <div class="mail-body" id="mailComposeBody">
+      <form id="mailForm" onsubmit="return sendMail(event)">
+        <!-- To -->
+        <div class="mail-field">
+          <label>Para</label>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="mail-to-chip">
+              <span class="mail-to-avatar" style="background:{{ member.color }}">{{ member.nombre[0] }}{{ (member.apellidos or '')[0:1] }}</span>
+              {{ member.nombre }} {{ member.apellidos or '' }} &lt;{{ member.email }}&gt;
+            </span>
+            <span class="mail-cc-toggle" id="ccToggle" onclick="toggleCC()">+ CC</span>
+          </div>
+        </div>
+
+        <!-- CC (hidden by default) -->
+        <div class="mail-field" id="ccField" style="display:none;">
+          <label>CC <span style="font-weight:400;text-transform:none;letter-spacing:0">(separar con comas)</span></label>
+          <input type="text" name="cc" id="mailCC" placeholder="correo1@ejemplo.com, correo2@ejemplo.com">
+        </div>
+
+        <!-- Subject -->
+        <div class="mail-field">
+          <label>Asunto</label>
+          <input type="text" name="asunto" id="mailAsunto" required placeholder="Ej: Actualización del caso García...">
+        </div>
+
+        <!-- Body -->
+        <div class="mail-field">
+          <label>Mensaje</label>
+          <textarea name="cuerpo" id="mailCuerpo" required placeholder="Escribe tu mensaje aquí..."></textarea>
+        </div>
+      </form>
+    </div>
+
+    <!-- Success state (hidden) -->
+    <div class="mail-success" id="mailSuccess">
+      <div class="mail-success-icon">{{ icon_check_circle(14,14) }}</div>
+      <h4>¡Correo enviado!</h4>
+      <p id="mailSuccessMsg">El correo fue enviado correctamente.</p>
+    </div>
+
+    <!-- Footer -->
+    <div class="mail-footer" id="mailFooter">
+      <div class="mail-footer-info">
+        Se enviará desde la configuración SMTP del despacho
+      </div>
+      <button type="submit" class="mail-send-btn" id="mailSendBtn" onclick="document.getElementById('mailForm').requestSubmit()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+        Enviar
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── Tab switching ── */
+function showPrfTab(tab) {
+  document.querySelectorAll('.prf-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.prf-panel').forEach(p => p.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+/* ── Mail modal ── */
+function openMailModal() {
+  document.getElementById('mailOverlay').classList.add('show');
+  // Reset to compose state
+  document.getElementById('mailComposeBody').style.display = '';
+  document.getElementById('mailSuccess').classList.remove('show');
+  document.getElementById('mailFooter').style.display = '';
+  document.getElementById('mailSendBtn').disabled = false;
+  document.getElementById('mailSendBtn').innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+    Enviar`;
+  // Focus subject after animation
+  setTimeout(() => document.getElementById('mailAsunto').focus(), 400);
+}
+
+function closeMailModal() {
+  document.getElementById('mailOverlay').classList.remove('show');
+  // Clear form after close animation
+  setTimeout(() => {
+    document.getElementById('mailForm').reset();
+    document.getElementById('ccField').style.display = 'none';
+    document.getElementById('ccToggle').style.display = '';
+  }, 350);
+}
+
+function toggleCC() {
+  const f = document.getElementById('ccField');
+  f.style.display = f.style.display === 'none' ? '' : 'none';
+  if (f.style.display !== 'none') {
+    document.getElementById('mailCC').focus();
+  }
+}
+
+function sendMail(e) {
+  e.preventDefault();
+  const btn = document.getElementById('mailSendBtn');
+  btn.disabled = true;
+  btn.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite">
+      <path d="M21 12a9 9 0 11-6.219-8.56"/>
+    </svg>
+    Enviando...`;
+
+  const fd = new FormData(document.getElementById('mailForm'));
+
+  fetch("{{ url_for('equipo.enviar_correo', uid=member.id) }}", {
+    method: 'POST',
+    body: fd,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      // Show success state
+      document.getElementById('mailComposeBody').style.display = 'none';
+      document.getElementById('mailFooter').style.display = 'none';
+      document.getElementById('mailSuccessMsg').textContent = data.msg || 'Correo enviado correctamente.';
+      document.getElementById('mailSuccess').classList.add('show');
+
+      // Auto-close after 2.5s
+      setTimeout(() => closeMailModal(), 2500);
+    } else {
+      alert(data.error || 'Error al enviar el correo');
+      btn.disabled = false;
+      btn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+        Enviar`;
+    }
+  })
+  .catch(err => {
+    alert('Error de conexión');
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+      Enviar`;
+  });
+
+  return false;
+}
+
+/* Keyboard shortcut: Escape to close */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('mailOverlay').classList.contains('show')) {
+    closeMailModal();
+  }
+});
+</script>
+
+<style>
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

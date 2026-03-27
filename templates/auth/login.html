@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión — {{ tenant.nombre_despacho if tenant else 'LexOS' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body>
+<div class="auth-split">
+
+  <!-- Left panel -->
+  <div class="auth-left">
+    <div class="al-logo">
+      <div class="logo-icon">Lx</div>
+      <div>
+        <div style="font-weight:800;font-size:1.2rem;color:var(--text);">LexOS</div>
+        <div style="font-size:.65rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.8px;">Plataforma Legal</div>
+      </div>
+    </div>
+
+    {% if tenant %}
+    <div style="margin-bottom:28px;text-align:center;">
+      <div style="width:64px;height:64px;background:var(--accent-soft);border:2px solid var(--accent-glow);
+                  border-radius:16px;display:flex;align-items:center;justify-content:center;
+                  margin:0 auto 12px;font-size:1.6rem;font-weight:800;color:var(--accent);">
+        {{ tenant.nombre_despacho[0] }}
+      </div>
+      <div style="font-weight:700;font-size:1rem;color:var(--text);margin-bottom:4px;">{{ tenant.nombre_despacho }}</div>
+      <div style="font-size:.72rem;color:var(--text-3);">Plan {{ tenant.plan|capitalize }}</div>
+    </div>
+    {% endif %}
+
+    <h2>Bienvenido de vuelta</h2>
+    <p>Tu despacho y tus clientes te esperan. Ingresa para continuar gestionando tu práctica legal.</p>
+
+    <div class="auth-testimonial" style="margin-top:32px;">
+      <div class="quote">"LexOS transformó la manera en que gestionamos nuestros expedientes. Ahora todo el equipo trabaja sincronizado."</div>
+      <div class="author">— Lic. R. Ramírez · Bufete Ramírez & Asociados</div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="auth-right">
+    <div class="ar-inner">
+      <div class="ar-header">
+        <h1>Iniciar sesión</h1>
+        <p>
+          Ingresa tus credenciales para acceder
+          {% if tenant %}a <strong>{{ tenant.nombre_despacho }}</strong>{% endif %}.
+        </p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }}" data-auto-dismiss="5000">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% if not tenant %}
+      <div class="alert alert-warning" style="margin-bottom:20px;">
+        No se detectó el despacho. <a href="{{ url_for('auth.landing') }}">Descubre tu acceso →</a>
+      </div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
+        <input type="hidden" name="next_url" value="{{ next_url or '' }}">
+
+        <!-- Email -->
+        <div class="form-group">
+          <label class="form-label" for="email">Correo electrónico</label>
+          <div class="input-group">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <input class="form-control {{ 'border-danger' if error else '' }}"
+                   type="email" id="email" name="email"
+                   value="{{ prefill_email or '' }}"
+                   placeholder="tu@despacho.mx"
+                   autocomplete="email" required autofocus>
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label" style="margin:0;" for="password">Contraseña</label>
+            <a href="{{ url_for('auth.forgot_password') }}" class="text-xs text-accent">¿Olvidaste tu contraseña?</a>
+          </div>
+          <div class="input-group">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0110 0v4"/>
+            </svg>
+            <input class="form-control {{ 'border-danger' if error else '' }}"
+                   type="password" id="password" name="password"
+                   placeholder="••••••••"
+                   autocomplete="current-password" required>
+            <button type="button" class="input-toggle" id="togglePwd" aria-label="Mostrar contraseña">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="eyeIcon">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Remember me -->
+        <div class="login-meta">
+          <label class="checkbox-label">
+            <input type="checkbox" name="remember_me" id="rememberMe">
+            Recordarme por 30 días
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full" style="padding:12px;">
+          Iniciar sesión
+        </button>
+      </form>
+
+      <div style="text-align:center;margin-top:24px;">
+        <p class="text-xs text-muted">
+          ¿Tu despacho no está en LexOS?
+          <a href="{{ url_for('auth.register_tenant') }}" class="text-accent">Regístralo gratis →</a>
+        </p>
+        <p class="text-xs text-muted" style="margin-top:8px;">
+          ¿Eres cliente del despacho?
+          <a href="{{ url_for('portal.cliente_login') }}" class="text-accent">Portal clientes</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+// Toggle contraseña
+document.getElementById('togglePwd').addEventListener('click', function () {
+  const input = document.getElementById('password');
+  const isText = input.type === 'text';
+  input.type = isText ? 'password' : 'text';
+  document.getElementById('eyeIcon').style.opacity = isText ? '1' : '.4';
+});
+
+// Descubrimiento de tenant al salir del campo email
+document.getElementById('email').addEventListener('blur', async function () {
+  const email = this.value.trim();
+  if (!email || '{{ tenant.slug if tenant else "" }}') return;
+
+  try {
+    const res = await fetch('{{ url_for("auth.discover") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (data.found && data.redirect) {
+      window.location = data.redirect;
+    }
+  } catch (_) {}
+});
+</script>
+</body>
+</html>

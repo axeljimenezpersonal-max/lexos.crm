@@ -1,0 +1,1764 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon_chart, icon_check_circle, icon_hourglass, icon_alert_triangle, icon_zap, icon_trending_up, icon_clock, icon_user, icon_calendar, icon_bell, icon_folder, icon_scale, icon_settings, icon_link, icon_archive, icon_mail, icon_users, icon_file_text, icon_file, icon_clipboard, icon_edit, icon_trash, icon_credit_card, icon_refresh, icon_download, icon_pin, icon_paperclip, icon_phone, icon_building %}
+{% block title %}Cobranzas{% endblock %}
+{% block page_title %}Cobranzas{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cobranzas.css') }}">
+<style>
+/* KPI stats rediseñados */
+.cbr-dash { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
+.cbr-stat { background:var(--c); border:1px solid var(--border); border-top:2px solid var(--e); border-radius:8px; padding:16px; cursor:pointer; transition:border-color .2s,box-shadow .2s; animation:fadeUp .35s ease both; animation-delay:calc(var(--i,0)*55ms); }
+.cbr-stat:hover { border-color:var(--border-m); box-shadow:0 4px 20px rgba(0,223,162,.06); }
+.cbr-stat-label { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.18em; text-transform:uppercase; color:var(--ash); margin-bottom:8px; display:block; }
+.cbr-stat-val { font-family:'Cormorant Garamond',serif; font-size:32px; font-weight:300; color:var(--fog); line-height:1; margin-bottom:5px; display:block; }
+.cbr-stat-sub { font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); display:block; }
+.val-cobrado { color:var(--e) !important; }
+.val-por-cobrar { color:#F59E0B !important; }
+.val-vencido { color:#EF4444 !important; }
+.val-proyeccion { color:#3B8BD4 !important; }
+.cbr-stat-icon { display:none; }
+
+/* Chart area */
+.cbr-dash-row { display:grid; grid-template-columns:1fr 320px; gap:16px; margin-bottom:20px; }
+@media(max-width:960px) { .cbr-dash-row { grid-template-columns:1fr; } }
+.cbr-chart-card { background:var(--c); border:1px solid var(--border); border-radius:8px; padding:18px; }
+.cbr-chart-title { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+
+/* Insights */
+.cbr-insights { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+.cbr-insight-chip { display:flex; align-items:center; gap:8px; background:var(--c); border:1px solid var(--border); border-radius:6px; padding:8px 14px; font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); transition:border-color .15s; }
+.cbr-insight-chip:hover { border-color:var(--border-m); }
+.cbr-insight-chip strong { color:var(--fog); font-weight:500; }
+.cbr-insight-icon { color:var(--e); flex-shrink:0; }
+
+/* Toolbar */
+.cbr-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.cbr-toolbar-right { margin-left:auto; display:flex; gap:8px; }
+.cbr-search-wrap { position:relative; flex:1; min-width:200px; max-width:380px; }
+.cbr-search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ash); pointer-events:none; }
+.cbr-search-input { background:var(--n); border:1px solid var(--border); border-radius:6px; color:var(--fog); font-family:'DM Mono',monospace; font-size:11px; padding:8px 10px 8px 34px; width:100%; outline:none; }
+.cbr-search-input:focus { border-color:var(--e); }
+.cbr-search-input::placeholder { color:var(--ash); opacity:.5; font-size:10px; letter-spacing:.06em; }
+
+/* Tab bar */
+.cbr-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; gap:0; overflow-x:auto; scrollbar-width:none; }
+.cbr-tabs::-webkit-scrollbar { display:none; }
+.cbr-tab { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.15em; text-transform:uppercase; padding:10px 18px; color:var(--ash); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; background:none; border-top:none; border-left:none; border-right:none; white-space:nowrap; display:flex; align-items:center; gap:6px; text-decoration:none; }
+.cbr-tab:hover { color:var(--fog); }
+.cbr-tab.active { color:var(--e); border-bottom-color:var(--e); }
+.cbr-tab-count { font-family:'DM Mono',monospace; font-size:8px; font-weight:500; background:var(--edim); color:var(--e); padding:1px 5px; border-radius:3px; }
+
+/* Table */
+.cbr-table-wrap { background:var(--c); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.cbr-table { width:100%; border-collapse:collapse; }
+.cbr-table th { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash); padding:10px 14px; border-bottom:1px solid var(--border); font-weight:400; text-align:left; white-space:nowrap; }
+.cbr-table td { padding:11px 14px; border-bottom:1px solid var(--border); font-family:'Libre Baskerville',serif; font-size:12px; color:var(--fog); vertical-align:middle; }
+.cbr-table tr:hover td { background:rgba(0,223,162,.025); }
+.cbr-table tr:last-child td { border-bottom:none; }
+.cbr-monto { font-family:'DM Mono',monospace; font-size:13px; color:var(--fog); font-weight:500; }
+.rec-badge { position:absolute; top:-4px; right:-4px; min-width:17px; height:17px; background:var(--danger); color:#fff; font-size:.5rem; font-weight:700; border-radius:2px; padding:0 3px; display:flex; align-items:center; justify-content:center; border:2px solid var(--c2); font-family:'DM Mono',monospace; }
+
+/* Pulse dot */
+.pulse-dot { width:7px; height:7px; border-radius:50%; background:var(--e); box-shadow:0 0 0 0 rgba(0,223,162,.4); animation:pulse-ring 2s ease-out infinite; flex-shrink:0; }
+@keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(0,223,162,.4)} 70%{box-shadow:0 0 0 6px rgba(0,223,162,0)} 100%{box-shadow:0 0 0 0 rgba(0,223,162,0)} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ── Page header ── -->
+<div class="page-header">
+  <div class="page-eyebrow">Gestión · LexOS</div>
+  <h1 class="page-title">Cobranza</h1>
+  <div class="page-meta-row">
+    <span class="page-count">{{ cobros|length }} registros</span>
+    <div class="page-actions"></div>
+  </div>
+</div>
+<div class="page-divider"></div>
+
+<!-- ══════════════════════════════════════════════
+     DASHBOARD — 6 KPI Cards + Chart
+     ══════════════════════════════════════════════ -->
+<div class="cbr-dash-row">
+  <!-- LEFT: 6 KPI cards -->
+  <div>
+    <div class="cbr-dash">
+      <!-- 1) Total facturado -->
+      <div class="cbr-stat" style="--i:0" onclick="filterByStatus('')" title="Ver todas">
+        <div class="cbr-stat-icon" style="background:rgba(0,223,162,.1); color:var(--e)">{{ icon_chart(18, 18) }}</div>
+        <span class="cbr-stat-label">Total facturado</span>
+        <span class="cbr-stat-val">${{ '{:,.0f}'.format(stats.total_facturado) }}</span>
+        <span class="cbr-stat-sub">Todos los periodos</span>
+      </div>
+      <!-- 2) Cobrado -->
+      <div class="cbr-stat" style="--i:1" onclick="filterByStatus('pagado')" title="Ver pagadas">
+        <div class="cbr-stat-icon" style="background:rgba(16,185,129,.1); color:#10B981">{{ icon_check_circle(18, 18) }}</div>
+        <span class="cbr-stat-label">Cobrado</span>
+        <span class="cbr-stat-val val-cobrado">${{ '{:,.0f}'.format(stats.cobrado) }}</span>
+        <span class="cbr-stat-sub">Facturas pagadas</span>
+      </div>
+      <!-- 3) Por cobrar -->
+      <div class="cbr-stat" style="--i:2" onclick="filterByStatus('pendiente')" title="Filtrar pendientes">
+        <div class="cbr-stat-icon" style="background:rgba(245,158,11,.1); color:#F59E0B">{{ icon_hourglass(18, 18) }}</div>
+        <span class="cbr-stat-label">Por cobrar</span>
+        <span class="cbr-stat-val val-por-cobrar">${{ '{:,.0f}'.format(stats.por_cobrar) }}</span>
+        <span class="cbr-stat-sub">Pendientes + abonos</span>
+      </div>
+      <!-- 4) Vencido -->
+      <div class="cbr-stat" style="--i:3" onclick="filterByStatus('vencido')" title="Filtrar vencidas">
+        <div class="cbr-stat-icon" style="background:rgba(239,68,68,.1); color:#EF4444">{{ icon_alert_triangle(18, 18) }}</div>
+        <span class="cbr-stat-label">Vencido</span>
+        <span class="cbr-stat-val val-vencido">${{ '{:,.0f}'.format(stats.vencido) }}</span>
+        <span class="cbr-stat-sub">Requiere atención</span>
+      </div>
+      <!-- 5) Por vencer esta semana -->
+      <div class="cbr-stat" style="--i:4" onclick="filterByStatus('pendiente')" title="Vencen pronto">
+        <div class="cbr-stat-icon" style="background:{% if stats.por_vencer_semana_cnt > 0 %}rgba(245,158,11,.1){% else %}rgba(16,185,129,.1){% endif %}; color:{% if stats.por_vencer_semana_cnt > 0 %}#F59E0B{% else %}#10B981{% endif %}">{{ icon_zap(18, 18) }}</div>
+        <span class="cbr-stat-label">Por vencer esta semana</span>
+        <span class="cbr-stat-val" style="color:{% if stats.por_vencer_semana_cnt > 0 %}#F59E0B{% else %}#10B981{% endif %}">{{ stats.por_vencer_semana_cnt }}</span>
+        <span class="cbr-stat-sub">${{ '{:,.0f}'.format(stats.por_vencer_semana_monto) }} en riesgo</span>
+      </div>
+      <!-- 6) Proyección 30 días -->
+      <div class="cbr-stat" style="--i:5">
+        <div class="cbr-stat-icon" style="background:rgba(0,223,162,.1); color:var(--e)">{{ icon_trending_up(18, 18) }}</div>
+        <span class="cbr-stat-label">Proyección 30 días</span>
+        <span class="cbr-stat-val val-proyeccion">${{ '{:,.0f}'.format(stats.proyeccion_30d) }}</span>
+        <span class="cbr-stat-sub">Estimado a cobrar</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Chart -->
+  <div class="cbr-chart-card">
+    <div class="cbr-chart-title">
+      <span class="pulse-dot"></span>
+      Facturado vs cobrado — últimos 6 meses
+    </div>
+    <div id="cbrChart" class="cbr-chart-wrap"></div>
+    <div class="cbr-bar-labels" id="cbrLabels"></div>
+    <div class="cbr-legend">
+      <div class="cbr-legend-item">
+        <div class="cbr-legend-dot" style="background:rgba(99,102,241,.4)"></div>Facturado
+      </div>
+      <div class="cbr-legend-item">
+        <div class="cbr-legend-dot" style="background:#10B981"></div>Cobrado
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     INSIGHTS ROW — 3 data chips
+     ══════════════════════════════════════════════ -->
+<div class="cbr-insights">
+  {% if stats.avg_dias_pago > 0 %}
+  <div class="cbr-insight-chip">
+    <span class="cbr-insight-icon">{{ icon_clock(14, 14) }}</span>
+    <span>Tiempo promedio de pago: <strong>{{ stats.avg_dias_pago }} días</strong></span>
+  </div>
+  {% endif %}
+  {% if stats.top_deudor_nombre %}
+  <div class="cbr-insight-chip" onclick="window.location='{{ url_for('cobranzas.index', tab='todas') }}&cliente={{ stats.top_deudor_id }}'" style="cursor:pointer">
+    <span class="cbr-insight-icon">{{ icon_user(14, 14) }}</span>
+    <span>Cliente que más debe: <strong>{{ stats.top_deudor_nombre }}</strong> — ${{ '{:,.0f}'.format(stats.top_deudor_monto) }}</span>
+  </div>
+  {% endif %}
+  {% if stats.prox_venc_folio %}
+  <div class="cbr-insight-chip" onclick="openPanel({{ stats.prox_venc_id }}, null)" style="cursor:pointer">
+    <span class="cbr-insight-icon">{{ icon_calendar(14, 14) }}</span>
+    <span>Próximo vencimiento: <strong>{{ stats.prox_venc_folio }}</strong> vence en {{ stats.prox_venc_dias }} días</span>
+  </div>
+  {% endif %}
+  {% if stats.vencido > 0 %}
+  <div class="cbr-insight-chip" onclick="filterByStatus('vencido')" style="cursor:pointer">
+    <span class="cbr-insight-icon">{{ icon_alert_triangle(14, 14) }}</span>
+    <span><strong>${{ '{:,.0f}'.format(stats.vencido) }}</strong> vencido — requiere seguimiento</span>
+  </div>
+  {% endif %}
+  {% if stats.cobrado > 0 and stats.total_facturado > 0 %}
+  <div class="cbr-insight-chip">
+    <span class="cbr-insight-icon">{{ icon_chart(14, 14) }}</span>
+    <span>Tasa de cobro: <strong>{{ '{:.0f}'.format((stats.cobrado / stats.total_facturado) * 100) }}%</strong></span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TOOLBAR — Búsqueda + Acciones
+     ══════════════════════════════════════════════ -->
+<div class="cbr-toolbar">
+  <form method="GET" id="filterForm" style="display:contents">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <div class="cbr-search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input class="cbr-search-input" type="text" name="q"
+             value="{{ q }}" placeholder="Buscar por cliente, folio, descripción…"
+             id="searchQ" autocomplete="off">
+    </div>
+
+    <!-- Filters toggle -->
+    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleFilters()">
+      {{ icon_settings(14, 14) }} Filtros{% if desde or hasta or cliente_f or asunto_f or estado_f or abogado_f or monto_min or monto_max %}
+      <span style="color:var(--accent)"> •</span>{% endif %}
+    </button>
+
+    <!-- Actions -->
+    <div class="cbr-toolbar-right">
+      <button type="button" class="btn btn-ghost btn-sm" id="btnRecordatorios"
+              onclick="toggleRecordatorios()" title="Recordatorios de vencimiento"
+              style="position:relative">
+        {{ icon_bell(14, 14) }} <span id="recordatorioBadge" class="rec-badge" style="display:none">0</span>
+      </button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="abrirFacturarHoras()">{{ icon_clock(14, 14) }} Facturar horas</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="abrirCrear()">+ Nueva factura</button>
+      <div class="dropdown-wrap" style="position:relative">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleExportMenu()">↓ Exportar ▾</button>
+        <div id="exportMenu" style="display:none; position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:9px; overflow:hidden; z-index:100; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,.2);">
+          <a href="{{ url_for('cobranzas.exportar_excel') }}" class="cbr-ac-item" style="display:block">{{ icon_chart(14, 14) }} Excel — Listado con filtros</a>
+          <div class="cbr-ac-item" onclick="bulkExportZip()" style="cursor:pointer">{{ icon_folder(14, 14) }} ZIP — Facturas seleccionadas</div>
+          <div class="cbr-ac-item" style="color:var(--text-3); cursor:default; border:none" title="Próximamente">{{ icon_link(14, 14) }} SAT <span style="font-size:.68rem">(próximamente)</span></div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Active filter chips -->
+{% if desde or hasta or cliente_f or asunto_f or estado_f or abogado_f or monto_min or monto_max %}
+<div class="cbr-active-filters">
+  {% if estado_f %}
+  <span class="cbr-filter-chip" onclick="removeFilter('estado')">
+    Estado: {{ estados_color[estado_f][1] if estado_f in estados_color else estado_f }} <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  {% if cliente_f %}
+  <span class="cbr-filter-chip" onclick="removeFilter('cliente')">
+    {{ icon_user(12, 12) }} Cliente filtrado <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  {% if asunto_f %}
+  <span class="cbr-filter-chip" onclick="removeFilter('asunto')">
+    {{ icon_folder(12, 12) }} Asunto filtrado <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  {% if desde %}
+  <span class="cbr-filter-chip" onclick="removeFilter('desde')">
+    {{ icon_calendar(12, 12) }} Desde: {{ desde }} <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  {% if hasta %}
+  <span class="cbr-filter-chip" onclick="removeFilter('hasta')">
+    {{ icon_calendar(12, 12) }} Hasta: {{ hasta }} <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  {% if abogado_f %}
+  <span class="cbr-filter-chip" onclick="removeFilter('abogado')">
+    {{ icon_scale(12, 12) }} Abogado filtrado <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  {% if monto_min %}
+  <span class="cbr-filter-chip" onclick="removeFilter('monto_min')">
+    Mín: ${{ monto_min }} <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  {% if monto_max %}
+  <span class="cbr-filter-chip" onclick="removeFilter('monto_max')">
+    Máx: ${{ monto_max }} <span class="cbr-filter-chip-x">✕</span>
+  </span>
+  {% endif %}
+  <a href="{{ url_for('cobranzas.index') }}" class="cbr-filter-chip" style="background:rgba(239,68,68,.1); color:#EF4444">
+    Limpiar todo <span class="cbr-filter-chip-x">✕</span>
+  </a>
+</div>
+{% endif %}
+
+<!-- Filters drawer -->
+<div class="cbr-filters" id="filtersPanel">
+  <div>
+    <label>Cliente</label>
+    <select name="cliente" form="filterForm" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Todos</option>
+      {% for c in clientes %}
+      <option value="{{ c.id }}" {{ 'selected' if cliente_f|string == c.id|string }}>
+        {{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Asunto</label>
+    <select name="asunto" form="filterForm" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Todos</option>
+      {% for a in asuntos_list %}
+      <option value="{{ a.id }}" {{ 'selected' if asunto_f|string == a.id|string }}>
+        {{ a.numero_expediente or a.titulo | truncate(30, true, '…') }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Estado</label>
+    <select name="estado" form="filterForm" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Todos</option>
+      {% for key, (cls, lbl) in estados_color.items() %}
+      <option value="{{ key }}" {{ 'selected' if estado_f == key }}>{{ lbl }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Abogado</label>
+    <select name="abogado" form="filterForm" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Todos</option>
+      {% for ab in abogados %}
+      <option value="{{ ab.id }}" {{ 'selected' if abogado_f|string == ab.id|string }}>
+        {{ ab.nombre }} {{ ab.apellidos }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Desde</label>
+    <input type="date" name="desde" form="filterForm" value="{{ desde }}"
+           onchange="document.getElementById('filterForm').submit()">
+  </div>
+  <div>
+    <label>Hasta</label>
+    <input type="date" name="hasta" form="filterForm" value="{{ hasta }}"
+           onchange="document.getElementById('filterForm').submit()">
+  </div>
+  <div>
+    <label>Monto mín.</label>
+    <input type="number" name="monto_min" form="filterForm" value="{{ monto_min }}"
+           placeholder="0" step="0.01" onchange="document.getElementById('filterForm').submit()">
+  </div>
+  <div>
+    <label>Monto máx.</label>
+    <input type="number" name="monto_max" form="filterForm" value="{{ monto_max }}"
+           placeholder="Sin límite" step="0.01" onchange="document.getElementById('filterForm').submit()">
+  </div>
+  <div style="align-self:flex-end">
+    <a href="{{ url_for('cobranzas.index') }}" class="btn btn-ghost btn-sm" style="width:100%">Limpiar filtros</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TABS — Pendientes | Pagadas | Vencidas | Todas
+     ══════════════════════════════════════════════ -->
+<div class="cbr-tabs">
+  <a class="cbr-tab {{ 'active' if tab == 'pendientes' }}"
+     href="{{ url_for('cobranzas.index', tab='pendientes', q=q) }}">
+    Pendientes y abonos
+    <span class="cbr-tab-count">{{ tab_counts.pendientes }}</span>
+  </a>
+  <a class="cbr-tab {{ 'active' if tab == 'pagadas' }}"
+     href="{{ url_for('cobranzas.index', tab='pagadas', q=q) }}">
+    Pagadas
+    <span class="cbr-tab-count">{{ tab_counts.pagadas }}</span>
+  </a>
+  <a class="cbr-tab {{ 'active' if tab == 'vencidas' }}"
+     href="{{ url_for('cobranzas.index', tab='vencidas', q=q) }}">
+    {{ icon_alert_triangle(12, 12) }} Vencidas
+    <span class="cbr-tab-count">{{ tab_counts.vencidas }}</span>
+  </a>
+  <a class="cbr-tab {{ 'active' if tab == 'todas' }}"
+     href="{{ url_for('cobranzas.index', tab='todas', q=q) }}">
+    Todas
+    <span class="cbr-tab-count">{{ tab_counts.todas }}</span>
+  </a>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     BULK ACTIONS BAR
+     ══════════════════════════════════════════════ -->
+<div class="cbr-bulk-bar" id="bulkBar">
+  <span class="cbr-bulk-count"><span id="bulkCount">0</span> facturas seleccionadas</span>
+  <div class="cbr-bulk-actions">
+    <button class="btn btn-secondary btn-sm" onclick="bulkExport()">{{ icon_chart(13, 13) }} Exportar Excel</button>
+    <button class="btn btn-secondary btn-sm" onclick="bulkExportZip()">{{ icon_archive(13, 13) }} Exportar ZIP</button>
+    <button class="btn btn-ghost btn-sm" onclick="bulkEmail()">{{ icon_mail(13, 13) }} Enviar por correo</button>
+    <button class="btn btn-ghost btn-sm" onclick="bulkClearSelection()">Deseleccionar</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TABLE + SLIDE PANEL LAYOUT
+     ══════════════════════════════════════════════ -->
+{% if cobros %}
+<div class="cbr-layout">
+  <div class="cbr-table-section" id="tableSection">
+    <div class="cbr-table-wrap">
+      <table class="cbr-table">
+        <thead>
+          <tr>
+            <th class="td-check">
+              <input type="checkbox" id="checkAll" onchange="toggleCheckAll(this)">
+            </th>
+            <th>Cliente</th>
+            <th>Asunto</th>
+            <th>Folio</th>
+            <th>Fecha / Vence</th>
+            <th>Monto</th>
+            <th>Total</th>
+            <th>Estatus</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cobros %}
+          <tr id="cobro-row-{{ c.id }}" onclick="openPanel({{ c.id }}, event)"
+              data-id="{{ c.id }}"
+              data-cliente="{{ (c.cliente_razon or c.cliente_nombre or '—') | e }}"
+              data-cliente-email="{{ c.cliente_email or '' }}"
+              data-cliente-id="{{ c.cliente_id }}"
+              data-concepto="{{ c.concepto | e }}"
+              data-folio="{{ c.numero_factura or '—' }}"
+              data-moneda="{{ c.moneda }}"
+              data-monto="{{ c.monto or 0 }}"
+              data-iva-pct="{{ c.iva_pct or 0 }}"
+              data-iva-monto="{{ c.iva_monto or 0 }}"
+              data-total="{{ c.total or c.monto or 0 }}"
+              data-abonado="{{ c.monto_abonado or 0 }}"
+              data-estado="{{ c.estado }}"
+              data-fecha-emision="{{ c.fecha_emision or '' }}"
+              data-fecha-vencimiento="{{ c.fecha_vencimiento or '' }}"
+              data-fecha-pago="{{ c.fecha_pago or '' }}"
+              data-notas="{{ c.notas or '' }}"
+              data-asunto-titulo="{{ c.asunto_titulo or '' }}"
+              data-asunto-id="{{ c.asunto_id or '' }}"
+              data-expediente="{{ c.numero_expediente or '' }}"
+              data-abogado-id="{{ c.abogado_id or '' }}"
+              data-factura-url="{{ c.archivo_factura_url or '' }}"
+              data-xml-url="{{ c.archivo_xml_url or '' }}">
+            <!-- Checkbox -->
+            <td class="td-check" onclick="event.stopPropagation()">
+              <input type="checkbox" class="row-check" value="{{ c.id }}" onchange="updateBulkBar()">
+            </td>
+            <!-- Cliente -->
+            <td>
+              <a href="{{ url_for('clientes.detalle', id=c.cliente_id) }}" class="client-link"
+                 onclick="event.stopPropagation()">
+                {{ (c.cliente_razon or c.cliente_nombre or '—').strip() | truncate(22, true, '…') }}
+              </a>
+              {% if c.cliente_email %}
+              <div class="td-sub">{{ c.cliente_email }}</div>
+              {% endif %}
+            </td>
+            <!-- Asunto -->
+            <td>
+              {% if c.asunto_titulo %}
+              <a href="{{ url_for('asuntos.detalle', id=c.asunto_id) }}" class="client-link"
+                 style="font-size:.78rem" onclick="event.stopPropagation()">
+                {{ c.numero_expediente or c.asunto_titulo | truncate(18, true, '…') }}
+              </a>
+              {% else %}
+              <span style="color:var(--text-3)">—</span>
+              {% endif %}
+            </td>
+            <!-- Folio -->
+            <td>
+              <span style="font-family:'SF Mono',monospace; font-size:.78rem; color:var(--accent)">{{ c.numero_factura or '—' }}</span>
+            </td>
+            <!-- Fecha / Vence -->
+            <td style="white-space:nowrap">
+              <div style="font-size:.78rem; color:var(--text-2)">{{ c.fecha_emision[:10] if c.fecha_emision else '—' }}</div>
+              {% if c.fecha_vencimiento %}
+              {% set venc = c.fecha_vencimiento[:10] %}
+              {% if c.estado not in ('pagado','cancelado') %}
+                {% if venc < today_str %}
+                <span class="date-badge date-badge-red">VENCIDA {{ venc }}</span>
+                {% elif venc <= (today_str[:8] + '07') %}
+                <span class="date-badge date-badge-yellow">Vence {{ venc }}</span>
+                {% else %}
+                <span class="date-badge date-badge-green">Vence {{ venc }}</span>
+                {% endif %}
+              {% else %}
+              <div class="td-sub">Vence {{ venc }}</div>
+              {% endif %}
+              {% endif %}
+            </td>
+            <!-- Monto base -->
+            <td class="td-monto">
+              {{ monedas[c.moneda].simbolo if c.moneda in monedas else '$' }}{{ '{:,.2f}'.format(c.monto or 0) }}
+              <div class="td-sub">{{ c.moneda }}</div>
+            </td>
+            <!-- Total -->
+            <td class="td-monto td-total">
+              {{ monedas[c.moneda].simbolo if c.moneda in monedas else '$' }}{{ '{:,.2f}'.format(c.total or c.monto or 0) }}
+              {% if c.estado == 'abono' and c.monto_abonado %}
+              <div class="abono-bar-wrap" title="Abonado {{ '{:,.2f}'.format(c.monto_abonado) }} / {{ '{:,.2f}'.format(c.total or c.monto or 1) }}">
+                <div class="abono-bar" style="width:{{ [((c.monto_abonado / (c.total or c.monto or 1)) * 100)|round(0)|int, 100]|min }}%"></div>
+              </div>
+              {% endif %}
+            </td>
+            <!-- Estatus -->
+            <td>
+              {% set estado_info = c.estado_info %}
+              <span class="badge badge-{{ c.estado }}">{{ estado_info[1] }}</span>
+              {% if c.archivo_factura_url %}
+              <a href="{{ c.archivo_factura_url }}" target="_blank" title="Ver factura PDF"
+                 style="color:var(--text-3); font-size:.78rem; margin-left:4px" onclick="event.stopPropagation()">{{ icon_paperclip(12, 12) }}</a>
+              {% endif %}
+            </td>
+            <!-- Hover actions -->
+            <td onclick="event.stopPropagation()">
+              <div class="row-actions">
+                {% if c.estado in ('pendiente','abono','vencido') %}
+                <button class="row-act-btn"
+                        onclick="abrirPago({{ c.id }}, {{ c.total or c.monto or 0 }}, {{ c.monto_abonado or 0 }}, '{{ (c.cliente_razon or c.cliente_nombre or '') | replace("'","\\'")|truncate(20,true) }}', '{{ (c.concepto or '')|replace("'","\\'")|truncate(25,true) }}', '{{ c.moneda }}')">
+                  {{ icon_credit_card(12, 12) }} Pagar
+                </button>
+                {% endif %}
+                {% if c.estado != 'cancelado' %}
+                <button class="row-act-btn"
+                        onclick="abrirNotaCredito({{ c.id }}, {{ c.total or c.monto or 0 }}, '{{ c.moneda }}')">{{ icon_refresh(12, 12) }} NC</button>
+                {% endif %}
+                <button class="row-act-btn"
+                        onclick="panelEmailFor({{ c.id }})">{{ icon_mail(12, 12) }}</button>
+                <a href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=c.cliente_id) }}"
+                   class="row-act-btn" title="Estado de cuenta PDF" target="_blank">{{ icon_clipboard(12, 12) }}</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      {% if total_pages > 1 %}
+      <div class="cbr-pag">
+        {% if page > 1 %}
+        <a href="{{ url_for('cobranzas.index', tab=tab, q=q, page=page-1) }}">← Anterior</a>
+        {% endif %}
+        {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+        {% if p == page %}
+        <span class="pag-active">{{ p }}</span>
+        {% else %}
+        <a href="{{ url_for('cobranzas.index', tab=tab, q=q, page=p) }}">{{ p }}</a>
+        {% endif %}
+        {% endfor %}
+        {% if page < total_pages %}
+        <a href="{{ url_for('cobranzas.index', tab=tab, q=q, page=page+1) }}">Siguiente →</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="cbr-table-wrap">
+  <div class="cbr-empty">
+    <div class="cbr-empty-icon">{{ icon_file_text(32, 32) }}</div>
+    <p>No hay cobros en esta vista.</p>
+    <button class="btn btn-primary btn-sm" onclick="abrirCrear()" style="margin-top:8px">+ Nueva factura</button>
+  </div>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════
+     SLIDE PANEL — Detalle de factura (40% derecha)
+     ══════════════════════════════════════════════ -->
+<div class="cbr-panel" id="detailPanel">
+  <div class="cbr-panel-header">
+    <span class="cbr-panel-folio" id="panelFolio">—</span>
+    <div style="display:flex; gap:6px; align-items:center">
+      <span id="panelBadge"></span>
+      <button class="cbr-panel-close" onclick="closePanel()">✕</button>
+    </div>
+  </div>
+  <div class="cbr-panel-body">
+    <!-- Client & Asunto -->
+    <div class="cbr-panel-section">
+      <div class="cbr-panel-section-title">Cliente y asunto</div>
+      <div class="cbr-panel-client">
+        <div class="cbr-panel-avatar" id="panelAvatar">—</div>
+        <div>
+          <div class="cbr-panel-client-name" id="panelClientName">—</div>
+          <div class="cbr-panel-client-email" id="panelClientEmail"></div>
+        </div>
+      </div>
+      <div id="panelAsuntoLink" style="margin-top:6px"></div>
+      <div id="panelAbogado" style="margin-top:4px; font-size:.78rem; color:var(--text-3)"></div>
+    </div>
+
+    <!-- Amounts -->
+    <div class="cbr-panel-section">
+      <div class="cbr-panel-section-title">Montos</div>
+      <div class="cbr-panel-amounts">
+        <div class="cbr-panel-amount-row">
+          <span>Descripción</span>
+          <span id="panelConcepto" style="font-weight:600; color:var(--text); max-width:240px; text-align:right">—</span>
+        </div>
+        <div class="cbr-panel-amount-row">
+          <span>Monto base</span>
+          <span class="cbr-panel-amount-val" id="panelMonto">—</span>
+        </div>
+        <div class="cbr-panel-amount-row">
+          <span>IVA</span>
+          <span class="cbr-panel-amount-val" id="panelIva">—</span>
+        </div>
+        <div class="cbr-panel-amount-row">
+          <span>Descuento</span>
+          <span class="cbr-panel-amount-val" id="panelDescuento" style="color:var(--text-3)">$0.00</span>
+        </div>
+        <div class="cbr-panel-amount-row total">
+          <span>Total final</span>
+          <span class="cbr-panel-amount-val" id="panelTotal">—</span>
+        </div>
+      </div>
+
+      <!-- Progress bar for abonos -->
+      <div id="panelProgressWrap" style="display:none; margin-top:12px">
+        <div class="cbr-panel-progress">
+          <div class="cbr-panel-progress-fill" id="panelProgressBar" style="width:0%"></div>
+        </div>
+        <div class="cbr-panel-progress-text">
+          <span id="panelAbonado">$0</span>
+          <span id="panelSaldo">Saldo: $0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dates -->
+    <div class="cbr-panel-section">
+      <div class="cbr-panel-section-title">Fechas</div>
+      <div class="cbr-panel-dates">
+        <div class="cbr-panel-date-row">
+          <span class="cbr-panel-date-label">Fecha de factura</span>
+          <span class="cbr-panel-date-val" id="panelFechaEmision">—</span>
+        </div>
+        <div class="cbr-panel-date-row">
+          <span class="cbr-panel-date-label">Fecha límite pago</span>
+          <span id="panelFechaVencWrap">
+            <span class="cbr-panel-date-val" id="panelFechaVenc">—</span>
+            <span id="panelFechaVencBadge" style="margin-left:6px"></span>
+          </span>
+        </div>
+        <div class="cbr-panel-date-row" id="panelFechaPagoRow" style="display:none">
+          <span class="cbr-panel-date-label">Fecha de pago real</span>
+          <span class="cbr-panel-date-val" id="panelFechaPago" style="color:#10B981">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment history timeline -->
+    <div class="cbr-panel-section" id="panelPaymentsSection" style="display:none">
+      <div class="cbr-panel-section-title">Historial de pagos</div>
+      <div class="cbr-panel-payments" id="panelPayments"></div>
+    </div>
+
+    <!-- Attachments -->
+    <div class="cbr-panel-section" id="panelFilesSection" style="display:none">
+      <div class="cbr-panel-section-title">Archivos adjuntos</div>
+      <div id="panelFiles"></div>
+    </div>
+
+    <!-- Notes -->
+    <div class="cbr-panel-section">
+      <div class="cbr-panel-section-title">Notas internas</div>
+      <textarea class="cbr-panel-notes" id="panelNotas" placeholder="Agregar notas…" rows="3"></textarea>
+      <button class="btn btn-ghost btn-sm" onclick="saveNotes()" style="margin-top:6px">Guardar notas</button>
+    </div>
+  </div>
+
+  <!-- Panel actions -->
+  <div class="cbr-panel-actions" id="panelActions">
+    <button class="cbr-panel-act primary" id="panelPayBtn" onclick="panelPay()">{{ icon_credit_card(14, 14) }} Registrar pago</button>
+    <button class="cbr-panel-act" onclick="panelEmail()">{{ icon_mail(14, 14) }} Enviar al cliente</button>
+    <a class="cbr-panel-act" id="panelEstadoCuenta" href="#" target="_blank">{{ icon_download(14, 14) }} Estado de cuenta</a>
+    <button class="cbr-panel-act" onclick="panelNC()">{{ icon_refresh(14, 14) }} Crear NC</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: CREAR FACTURA
+     ══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="crearModal" onclick="if(event.target===this)cerrarModal('crearModal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_file_text(14, 14) }} Nueva factura</span>
+      <button class="modal-close" onclick="cerrarModal('crearModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="crearForm" enctype="multipart/form-data">
+
+        <!-- Cliente + Asunto -->
+        <div class="cbr-section-divider">{{ icon_users(13, 13) }} Partes</div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg" style="flex:2">
+            <label>Cliente <span class="req">*</span></label>
+            <div class="cbr-ac-wrap">
+              <input type="text" id="crearClienteSearch" placeholder="Buscar cliente…"
+                     oninput="buscarClienteCrear(this.value)" autocomplete="off">
+              <div class="cbr-ac-results" id="crearClienteResults"></div>
+            </div>
+            <input type="hidden" name="cliente_id" id="crearClienteId">
+          </div>
+          <div class="cbr-fg" style="flex:2">
+            <label>Asunto vinculado (opcional)</label>
+            <select name="asunto_id" id="crearAsuntoSel">
+              <option value="">— Selecciona un cliente primero —</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Factura -->
+        <div class="cbr-section-divider">{{ icon_file_text(13, 13) }} Factura</div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg" style="flex:3">
+            <label>Descripción <span class="req">*</span></label>
+            <input type="text" name="concepto" placeholder="Concepto del cobro" required>
+          </div>
+          <div class="cbr-fg cbr-fg-md">
+            <label>
+              No. de factura
+              <button type="button" class="iva-exento-btn" onclick="autoFolio()">⟳ Auto</button>
+            </label>
+            <input type="text" name="numero_factura" id="crearFolio" placeholder="FAC-2026-0001">
+          </div>
+        </div>
+
+        <!-- Montos -->
+        <div class="cbr-section-divider">{{ icon_credit_card(13, 13) }} Montos</div>
+        <div class="cbr-form-row">
+          <input type="hidden" name="moneda" value="MXN">
+          <div class="cbr-fg">
+            <label>Monto base <span class="req">*</span></label>
+            <input type="number" name="monto" id="crearMonto" placeholder="0.00" step="0.01" min="0" oninput="recalcular()" required>
+          </div>
+          <div class="cbr-fg cbr-fg-sm">
+            <label>
+              IVA %
+              <button type="button" class="iva-exento-btn" onclick="toggleIvaExento()">Exento</button>
+            </label>
+            <input type="number" name="iva_pct" id="crearIvaPct" value="16" step="0.01" min="0" max="100" oninput="recalcular()">
+          </div>
+          <div class="cbr-fg cbr-fg-sm">
+            <label>IVA calculado</label>
+            <input type="text" id="crearIvaCalc" readonly placeholder="0.00">
+          </div>
+          <div class="cbr-fg cbr-fg-sm">
+            <label>Total con IVA</label>
+            <input type="text" id="crearTotal" readonly placeholder="0.00" style="font-weight:800">
+          </div>
+        </div>
+
+        <div class="cbr-form-row">
+          <div class="cbr-fg cbr-fg-sm">
+            <label>Descuento</label>
+            <select name="descuento_tipo" id="crearDctoTipo" onchange="recalcular()">
+              <option value="fijo">$ Monto fijo</option>
+              <option value="pct">% Porcentaje</option>
+            </select>
+          </div>
+          <div class="cbr-fg cbr-fg-sm">
+            <label>&nbsp;</label>
+            <input type="number" name="descuento_valor" id="crearDctoVal" value="0" min="0" step="0.01" oninput="recalcular()">
+          </div>
+          <div class="cbr-fg"></div>
+        </div>
+
+        <!-- Fechas + Estado -->
+        <div class="cbr-section-divider">{{ icon_calendar(13, 13) }} Fechas y estado</div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg">
+            <label>Fecha de factura <span class="req">*</span></label>
+            <input type="date" name="fecha_emision" id="crearFechaEmision" value="{{ today_str }}" required>
+          </div>
+          <div class="cbr-fg">
+            <label>Fecha límite de pago</label>
+            <input type="date" name="fecha_vencimiento">
+          </div>
+          <div class="cbr-fg">
+            <label>Estado <span class="req">*</span></label>
+            <select name="estado" id="crearEstado" onchange="toggleAbonoFields()">
+              <option value="pendiente">Pendiente</option>
+              <option value="abono">Abono</option>
+              <option value="pagado">Pagada</option>
+              <option value="cancelado">Cancelada</option>
+            </select>
+          </div>
+          <div class="cbr-fg" id="abonoFields" style="display:none">
+            <label>Monto abonado</label>
+            <input type="number" name="monto_abonado" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="cbr-fg" id="abonoFechaField" style="display:none">
+            <label>Fecha del abono</label>
+            <input type="date" name="fecha_abono" value="{{ today_str }}">
+          </div>
+          <div class="cbr-fg" id="fechaPagoField" style="display:none">
+            <label>Fecha de pago</label>
+            <input type="date" name="fecha_pago" value="{{ today_str }}">
+          </div>
+        </div>
+
+        <!-- Abogado -->
+        <div class="cbr-form-row">
+          <div class="cbr-fg">
+            <label>Abogado responsable</label>
+            <select name="abogado_id">
+              <option value="">— Sin asignar —</option>
+              {% for ab in abogados %}
+              <option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Archivos -->
+        <div class="cbr-section-divider">{{ icon_paperclip(13, 13) }} Documentos</div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg">
+            <label>Factura PDF</label>
+            <div class="cbr-drop-zone" id="dzFactura"
+                 ondragover="event.preventDefault(); this.classList.add('dz-over')"
+                 ondragleave="this.classList.remove('dz-over')"
+                 ondrop="handleDzDrop(event, 'archivo_factura', 'dzFactura')"
+                 onclick="document.getElementById('inputFactura').click()">
+              <div class="dz-icon">{{ icon_file_text(24, 24) }}</div>
+              <div>Arrastra o haz clic</div>
+              <div class="dz-name" id="dzFacturaName"></div>
+            </div>
+            <input type="file" id="inputFactura" name="archivo_factura" accept=".pdf" style="display:none"
+                   onchange="showDzName('dzFacturaName', this)">
+          </div>
+          <div class="cbr-fg">
+            <label>XML del SAT</label>
+            <div class="cbr-drop-zone" id="dzXml"
+                 ondragover="event.preventDefault(); this.classList.add('dz-over')"
+                 ondragleave="this.classList.remove('dz-over')"
+                 ondrop="handleDzDrop(event, 'archivo_xml', 'dzXml')"
+                 onclick="document.getElementById('inputXml').click()">
+              <div class="dz-icon">{{ icon_file(24, 24) }}</div>
+              <div>Arrastra o haz clic</div>
+              <div class="dz-name" id="dzXmlName"></div>
+            </div>
+            <input type="file" id="inputXml" name="archivo_xml" accept=".xml" style="display:none"
+                   onchange="showDzName('dzXmlName', this)">
+          </div>
+        </div>
+
+        <!-- Extra -->
+        <div class="cbr-section-divider">{{ icon_edit(13, 13) }} Extra</div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg">
+            <label>Notas internas</label>
+            <textarea name="notas" rows="2" placeholder="Solo visible para el equipo…"></textarea>
+          </div>
+        </div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg" style="flex-direction:row; align-items:center; gap:8px">
+            <input type="checkbox" name="enviar_correo" id="crearEnviarCorreo" style="width:16px; height:16px; accent-color:var(--accent)">
+            <label for="crearEnviarCorreo" style="font-size:.84rem; color:var(--text-2); text-transform:none; letter-spacing:0; font-weight:500">
+              {{ icon_mail(13, 13) }} Enviar factura por correo al cliente
+            </label>
+            <span title="Próximamente: integración SAT y CFDI" style="cursor:help; color:var(--text-3); font-size:.78rem">
+              {{ icon_link(12, 12) }} SAT (próximamente)
+            </span>
+          </div>
+        </div>
+
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('crearModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitCrear()">Crear factura</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: REGISTRAR PAGO
+     ══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="pagoModal" onclick="if(event.target===this)cerrarModal('pagoModal')">
+  <div class="modal-box modal-box-lg">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_credit_card(14, 14) }} Registrar pago</span>
+      <button class="modal-close" onclick="cerrarModal('pagoModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="pago-header">
+        <div class="pago-concepto" id="pagoConcepto">—</div>
+        <div class="pago-monto" id="pagoTotal">$0.00</div>
+        <div class="pago-saldo" id="pagoSaldo"></div>
+      </div>
+
+      <form id="pagoForm" enctype="multipart/form-data">
+        <input type="hidden" name="cobro_id" id="pagoCobId">
+        <div class="cbr-form-row">
+          <div class="cbr-fg">
+            <label>Monto a abonar <span class="req">*</span></label>
+            <input type="number" name="monto_pagado" id="pagoMonto" placeholder="0.00" step="0.01" min="0.01" required>
+            <div id="pagoSaldoHint" style="font-size:.72rem; color:var(--text-3); margin-top:2px"></div>
+          </div>
+          <div class="cbr-fg">
+            <label>Fecha de pago <span class="req">*</span></label>
+            <input type="date" name="fecha_pago" value="{{ today_str }}" required>
+          </div>
+          <div class="cbr-fg">
+            <label>Método</label>
+            <select name="metodo">
+              {% for m in metodos_pago %}
+              <option value="{{ m }}">{{ m }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg">
+            <label>Referencia / No. operación</label>
+            <input type="text" name="referencia" placeholder="Ej. SPEI-123456">
+          </div>
+          <div class="cbr-fg">
+            <label>Comprobante (imagen/PDF)</label>
+            <input type="file" name="comprobante" accept=".pdf,.jpg,.png,.jpeg">
+          </div>
+        </div>
+        <div class="cbr-form-row">
+          <div class="cbr-fg">
+            <label>Notas</label>
+            <input type="text" name="notas" placeholder="Observaciones del pago…">
+          </div>
+        </div>
+      </form>
+
+      <!-- Historial de pagos previos -->
+      <div class="pago-historial" id="pagoHistorial" style="display:none">
+        <div class="pago-hist-title">Historial de pagos anteriores</div>
+        <div id="pagoHistItems"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('pagoModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitPago()">Registrar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PANEL: RECORDATORIOS
+     ══════════════════════════════════════════════ -->
+<div class="rec-panel" id="recPanel" style="display:none">
+  <div class="rec-panel-header">
+    <span style="font-weight:700; font-size:.9rem">{{ icon_bell(14, 14) }} Recordatorios de vencimiento</span>
+    <button class="modal-close" onclick="document.getElementById('recPanel').style.display='none'">×</button>
+  </div>
+  <div class="rec-panel-body" id="recPanelBody">
+    <div style="text-align:center; color:var(--text-3); padding:20px">Cargando...</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: FACTURAR HORAS
+     ══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="horasModal" onclick="if(event.target===this)cerrarModal('horasModal')">
+  <div class="modal-box modal-box-lg">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_clock(14, 14) }} Facturar horas trabajadas</span>
+      <button class="modal-close" onclick="cerrarModal('horasModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.84rem; color:var(--text-2); margin-bottom:14px">
+        Genera una factura automática a partir de las horas registradas en un asunto.
+      </p>
+      <div class="cbr-form-row">
+        <div class="cbr-fg" style="flex:2">
+          <label>Asunto <span class="req">*</span></label>
+          <select id="horasAsunto">
+            <option value="">— Seleccionar asunto —</option>
+            {% for a in asuntos_list %}
+            <option value="{{ a.id }}">{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cbr-fg">
+          <label>Tarifa / hora <span class="req">*</span></label>
+          <input type="number" id="horasTarifa" placeholder="1,500.00" step="0.01" min="0.01">
+        </div>
+      </div>
+      <div class="cbr-form-row">
+        <div class="cbr-fg cbr-fg-sm">
+          <label>IVA %</label>
+          <input type="number" id="horasIva" value="16" step="0.01" min="0" max="100">
+        </div>
+        <input type="hidden" id="horasMoneda" value="MXN">
+      </div>
+      <div id="horasPreview" style="display:none; background:var(--sidebar); border:1px solid var(--border); border-radius:9px; padding:12px 14px; margin-top:8px;">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('horasModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitFacturarHoras()">Generar factura</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: NOTA DE CRÉDITO
+     ══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="ncModal" onclick="if(event.target===this)cerrarModal('ncModal')">
+  <div class="modal-box modal-box-lg">
+    <div class="modal-header">
+      <span class="modal-title">{{ icon_refresh(14, 14) }} Nueva nota de crédito</span>
+      <button class="modal-close" onclick="cerrarModal('ncModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--sidebar); border:1px solid var(--border); border-radius:9px; padding:10px 14px; margin-bottom:14px; font-size:.84rem">
+        <span style="color:var(--text-3)">Factura original:</span>
+        <strong id="ncFolioRef" style="color:var(--accent); font-family:monospace">—</strong>
+      </div>
+
+      <div class="nc-tipo-row">
+        <button class="nc-tipo-btn active" id="ncTotal" onclick="setNcTipo('total')">
+          <div style="margin-bottom:4px">{{ icon_trash(18, 18) }}</div>
+          Cancelación total
+        </button>
+        <button class="nc-tipo-btn" id="ncParcial" onclick="setNcTipo('parcial')">
+          <div style="margin-bottom:4px">{{ icon_edit(18, 18) }}</div>
+          Ajuste parcial
+        </button>
+      </div>
+
+      <div class="cbr-form-row">
+        <div class="cbr-fg" id="ncMontoRow" style="display:none">
+          <label>Monto a descontar <span class="req">*</span></label>
+          <input type="number" id="ncMonto" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="cbr-fg">
+          <label>Motivo <span class="req">*</span></label>
+          <select id="ncMotivoSel" onchange="document.getElementById('ncMotivo').value = this.value === 'otro' ? '' : this.value; document.getElementById('ncMotivoCustom').style.display = this.value === 'otro' ? 'flex' : 'none'">
+            <option value="Error en monto">Error en monto</option>
+            <option value="Descuento acordado">Descuento acordado</option>
+            <option value="Servicio no prestado">Servicio no prestado</option>
+            <option value="Devolución">Devolución</option>
+            <option value="otro">Otro (especificar)</option>
+          </select>
+          <input type="hidden" id="ncMotivo" value="Error en monto">
+        </div>
+      </div>
+      <div class="cbr-form-row" id="ncMotivoCustom" style="display:none">
+        <div class="cbr-fg">
+          <label>Descripción adicional</label>
+          <textarea id="ncDescripcion" rows="2" placeholder="Describe el motivo de la nota de crédito…"
+                    oninput="document.getElementById('ncMotivo').value = this.value"></textarea>
+        </div>
+      </div>
+
+      <p style="font-size:.78rem; color:var(--text-3); margin-top:8px; padding:10px; background:var(--sidebar); border-radius:8px">
+        La <strong>cancelación total</strong> marcará la factura como Cancelada y registrará un folio NC-xxxx.<br>
+        El <strong>ajuste parcial</strong> reducirá el total de la factura original.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModal('ncModal')">Cancelar</button>
+      <button class="btn btn-danger" onclick="submitNc()">Aplicar nota de crédito</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TOAST
+     ══════════════════════════════════════════════ -->
+<div class="cbr-toast" id="cbrToast"></div>
+
+<!-- ══════════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════════ -->
+<script>
+/* ── Data ───────────────────────────────────────── */
+const CLIENTES   = {{ clientes | tojson }};
+const MONTHLY    = {{ monthly | tojson }};
+const MONEDA_SYM = {{ monedas | tojson }};
+const ESTADOS_COLOR = {{ estados_color | tojson }};
+const ABOGADOS   = {{ abogados | tojson }};
+const TODAY      = "{{ today_str }}";
+
+/* ── Toast system ──────────────────────────────── */
+function showToast(msg, type = "success", duration = 3500) {
+  const el = document.getElementById("cbrToast");
+  el.textContent = (type === "success" ? "✓ " : type === "error" ? "✗ " : "⚠ ") + msg;
+  el.className = "cbr-toast " + type;
+  requestAnimationFrame(() => el.classList.add("show"));
+  clearTimeout(el._tid);
+  el._tid = setTimeout(() => el.classList.remove("show"), duration);
+}
+
+/* ── Custom confirm ──────────────────────────────── */
+function cbrConfirm(msg) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay open";
+    overlay.style.zIndex = "2000";
+    overlay.innerHTML = `
+      <div class="modal-box" style="max-width:420px">
+        <div class="modal-header">
+          <span class="modal-title">Confirmar acción</span>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:.9rem; color:var(--text); line-height:1.5">${msg}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="cbrConfirmNo">Cancelar</button>
+          <button class="btn btn-primary" id="cbrConfirmYes">Confirmar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#cbrConfirmYes").onclick = () => { overlay.remove(); resolve(true); };
+    overlay.querySelector("#cbrConfirmNo").onclick  = () => { overlay.remove(); resolve(false); };
+    overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
+  });
+}
+
+/* ── Bar chart ──────────────────────────────────── */
+(function renderChart() {
+  const wrap = document.getElementById("cbrChart");
+  const lbls = document.getElementById("cbrLabels");
+  if (!wrap || !MONTHLY.length) return;
+  const maxVal = Math.max(...MONTHLY.map(d => Math.max(d.facturado, d.cobrado)), 1);
+  wrap.innerHTML = '<div class="cbr-bar-group" id="cbrBarGroup"></div>';
+  const grp = document.getElementById("cbrBarGroup");
+  MONTHLY.forEach(d => {
+    const pairEl = document.createElement("div");
+    pairEl.className = "cbr-bar-pair";
+    const hFac = Math.max(3, Math.round((d.facturado / maxVal) * 110));
+    const hCob = Math.max(3, Math.round((d.cobrado   / maxVal) * 110));
+    pairEl.innerHTML = `
+      <div class="cbr-bar cbr-bar-facturado" style="height:${hFac}px"
+           title="${d.label}: $${d.facturado.toLocaleString()} facturado"></div>
+      <div class="cbr-bar cbr-bar-cobrado"   style="height:${hCob}px"
+           title="${d.label}: $${d.cobrado.toLocaleString()} cobrado"></div>`;
+    grp.appendChild(pairEl);
+  });
+  lbls.innerHTML = MONTHLY.map(d => `<span class="cbr-bar-lbl">${d.label}</span>`).join("");
+})();
+
+/* ── Filters ────────────────────────────────────── */
+function toggleFilters() {
+  document.getElementById("filtersPanel").classList.toggle("open");
+}
+{% if desde or hasta or cliente_f or asunto_f or estado_f or abogado_f or monto_min or monto_max %}
+document.getElementById("filtersPanel").classList.add("open");
+{% endif %}
+
+function filterByStatus(status) {
+  const base = location.pathname;
+  if (status) {
+    window.location = `${base}?estado=${status}&tab=todas`;
+  } else {
+    window.location = `${base}?tab=todas`;
+  }
+}
+
+function removeFilter(name) {
+  const url = new URL(window.location);
+  url.searchParams.delete(name);
+  window.location = url.toString();
+}
+
+/* ── Export menu ────────────────────────────────── */
+function toggleExportMenu() {
+  const m = document.getElementById("exportMenu");
+  m.style.display = m.style.display === "none" ? "block" : "none";
+}
+document.addEventListener("click", e => {
+  if (!e.target.closest(".dropdown-wrap")) {
+    const m = document.getElementById("exportMenu");
+    if (m) m.style.display = "none";
+  }
+});
+
+/* ── Modals ─────────────────────────────────────── */
+function abrirCrear() {
+  document.getElementById("crearModal").classList.add("open");
+  autoFolio();
+}
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove("open");
+}
+
+/* ── Checkbox / Bulk actions ───────────────────── */
+function toggleCheckAll(master) {
+  document.querySelectorAll(".row-check").forEach(cb => cb.checked = master.checked);
+  updateBulkBar();
+}
+function updateBulkBar() {
+  const checked = document.querySelectorAll(".row-check:checked");
+  const bar = document.getElementById("bulkBar");
+  document.getElementById("bulkCount").textContent = checked.length;
+  bar.classList.toggle("show", checked.length > 0);
+}
+function bulkClearSelection() {
+  document.querySelectorAll(".row-check").forEach(cb => cb.checked = false);
+  document.getElementById("checkAll").checked = false;
+  updateBulkBar();
+}
+function bulkExport() {
+  const ids = Array.from(document.querySelectorAll(".row-check:checked")).map(cb => cb.value);
+  if (!ids.length) { showToast("Selecciona al menos una factura", "warning"); return; }
+  showToast(`Exportando ${ids.length} registros…`);
+  window.open("{{ url_for('cobranzas.exportar_excel') }}?ids=" + ids.join(","), "_blank");
+}
+function bulkExportZip() {
+  const ids = Array.from(document.querySelectorAll(".row-check:checked")).map(cb => cb.value);
+  if (!ids.length) { showToast("Selecciona al menos una factura", "warning"); return; }
+  showToast(`Generando ZIP con ${ids.length} facturas…`);
+  // ZIP export placeholder — server needs to support it
+  window.open("{{ url_for('cobranzas.exportar_excel') }}?format=zip&ids=" + ids.join(","), "_blank");
+}
+function bulkEmail() {
+  const ids = Array.from(document.querySelectorAll(".row-check:checked")).map(cb => cb.value);
+  if (!ids.length) { showToast("Selecciona al menos una factura", "warning"); return; }
+  showToast(`Preparando envío de ${ids.length} facturas…`);
+  if (typeof openEmailComposer === "function") {
+    openEmailComposer({ subject: `Facturas seleccionadas (${ids.length})` });
+  }
+}
+
+/* ── Slide-in Panel ────────────────────────────── */
+let currentPanelId = null;
+function openPanel(id, event) {
+  if (event && (event.target.tagName === "A" || event.target.tagName === "BUTTON" || event.target.tagName === "INPUT")) return;
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  if (!row) return;
+
+  currentPanelId = id;
+
+  // Highlight active row
+  document.querySelectorAll(".cbr-table tr.row-active").forEach(r => r.classList.remove("row-active"));
+  row.classList.add("row-active");
+
+  const d = row.dataset;
+  const sym = (MONEDA_SYM[d.moneda] || {simbolo: "$"}).simbolo;
+  const monto = parseFloat(d.monto) || 0;
+  const ivaMonto = parseFloat(d.ivaMonto) || 0;
+  const ivaPct = parseFloat(d.ivaPct) || 0;
+  const total = parseFloat(d.total) || 0;
+  const abonado = parseFloat(d.abonado) || 0;
+  const saldo = total - abonado;
+
+  // Header
+  document.getElementById("panelFolio").textContent = d.folio;
+  const estadoInfo = ESTADOS_COLOR[d.estado] || ["cbr-gris","—"];
+  document.getElementById("panelBadge").innerHTML = `<span class="cbr-badge ${estadoInfo[0]}">${estadoInfo[1]}</span>`;
+
+  // Client
+  const initials = (d.cliente || "—").substring(0, 2).toUpperCase();
+  document.getElementById("panelAvatar").textContent = initials;
+  document.getElementById("panelClientName").textContent = d.cliente;
+  document.getElementById("panelClientEmail").textContent = d.clienteEmail || "";
+
+  // Asunto link
+  const asuntoLink = document.getElementById("panelAsuntoLink");
+  if (d.asuntoTitulo) {
+    asuntoLink.innerHTML = `<span style="font-size:.78rem; color:var(--text-3)">Asunto:</span> <a href="/asuntos/${d.asuntoId}" style="font-size:.78rem; color:var(--accent); text-decoration:none; font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> ${d.expediente || d.asuntoTitulo}</a>`;
+  } else {
+    asuntoLink.innerHTML = "";
+  }
+
+  // Abogado
+  const abogadoEl = document.getElementById("panelAbogado");
+  if (d.abogadoId) {
+    const ab = ABOGADOS.find(a => String(a.id) === d.abogadoId);
+    abogadoEl.innerHTML = ab ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 8 5 12 9 8"/><polyline points="15 8 19 12 23 8"/><line x1="1" y1="8" x2="23" y2="8"/></svg> Abogado: <strong>${ab.nombre} ${ab.apellidos || ""}</strong>` : "";
+  } else {
+    abogadoEl.innerHTML = "";
+  }
+
+  // Amounts
+  document.getElementById("panelConcepto").textContent = d.concepto;
+  document.getElementById("panelMonto").textContent = `${sym}${monto.toLocaleString("es-MX",{minimumFractionDigits:2})} ${d.moneda}`;
+  document.getElementById("panelIva").textContent = ivaPct > 0 ? `${ivaPct}% → ${sym}${ivaMonto.toLocaleString("es-MX",{minimumFractionDigits:2})}` : "Exento";
+  document.getElementById("panelDescuento").textContent = "$0.00";
+  document.getElementById("panelTotal").textContent = `${sym}${total.toLocaleString("es-MX",{minimumFractionDigits:2})} ${d.moneda}`;
+
+  // Progress bar
+  const progWrap = document.getElementById("panelProgressWrap");
+  if (abonado > 0 && d.estado !== "pagado") {
+    progWrap.style.display = "block";
+    const pct = Math.min(100, Math.round((abonado / total) * 100));
+    document.getElementById("panelProgressBar").style.width = pct + "%";
+    document.getElementById("panelAbonado").textContent = `Abonado: ${sym}${abonado.toLocaleString("es-MX",{minimumFractionDigits:2})} (${pct}%)`;
+    document.getElementById("panelSaldo").textContent = `Saldo: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
+  } else if (d.estado === "pagado") {
+    progWrap.style.display = "block";
+    document.getElementById("panelProgressBar").style.width = "100%";
+    document.getElementById("panelAbonado").textContent = `Pagado completo`;
+    document.getElementById("panelSaldo").textContent = `${sym}${total.toLocaleString("es-MX",{minimumFractionDigits:2})} / ${sym}${total.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
+  } else {
+    progWrap.style.display = "none";
+  }
+
+  // Dates
+  document.getElementById("panelFechaEmision").textContent = d.fechaEmision ? d.fechaEmision.substring(0, 10) : "—";
+  const vencStr = d.fechaVencimiento ? d.fechaVencimiento.substring(0, 10) : "—";
+  document.getElementById("panelFechaVenc").textContent = vencStr;
+
+  // Vencimiento badge
+  const vencBadge = document.getElementById("panelFechaVencBadge");
+  if (d.fechaVencimiento && !["pagado","cancelado"].includes(d.estado)) {
+    const diffDays = Math.round((new Date(d.fechaVencimiento) - new Date()) / 86400000);
+    if (diffDays < 0) {
+      vencBadge.innerHTML = `<span class="date-badge date-badge-red">VENCIDA hace ${Math.abs(diffDays)}d</span>`;
+    } else if (diffDays <= 7) {
+      vencBadge.innerHTML = `<span class="date-badge date-badge-yellow">${diffDays}d</span>`;
+    } else {
+      vencBadge.innerHTML = `<span class="date-badge date-badge-green">${diffDays} días</span>`;
+    }
+  } else {
+    vencBadge.innerHTML = "";
+  }
+
+  const fechaPagoRow = document.getElementById("panelFechaPagoRow");
+  if (d.fechaPago) {
+    fechaPagoRow.style.display = "flex";
+    document.getElementById("panelFechaPago").textContent = d.fechaPago.substring(0, 10);
+  } else {
+    fechaPagoRow.style.display = "none";
+  }
+
+  // Notes
+  document.getElementById("panelNotas").value = d.notas || "";
+
+  // Files
+  const filesSection = document.getElementById("panelFilesSection");
+  const filesEl = document.getElementById("panelFiles");
+  filesEl.innerHTML = "";
+  let hasFiles = false;
+  if (d.facturaUrl) {
+    hasFiles = true;
+    filesEl.innerHTML += `<div class="cbr-panel-file"><span class="cbr-panel-file-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="cbr-panel-file-name">Factura PDF</span><a href="${d.facturaUrl}" target="_blank" class="cbr-panel-file-dl">Descargar</a></div>`;
+  }
+  if (d.xmlUrl) {
+    hasFiles = true;
+    filesEl.innerHTML += `<div class="cbr-panel-file"><span class="cbr-panel-file-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="cbr-panel-file-name">XML SAT</span><a href="${d.xmlUrl}" target="_blank" class="cbr-panel-file-dl">Descargar</a></div>`;
+  }
+  filesSection.style.display = hasFiles ? "block" : "none";
+
+  // Panel action buttons
+  const payBtn = document.getElementById("panelPayBtn");
+  payBtn.style.display = ["pendiente","abono","vencido"].includes(d.estado) ? "flex" : "none";
+
+  // Estado de cuenta link
+  document.getElementById("panelEstadoCuenta").href = `/cobranzas/estado-cuenta/${d.clienteId}/pdf`;
+
+  // Load payment history
+  loadPanelPayments(id, sym);
+
+  // Open panel
+  document.getElementById("detailPanel").classList.add("open");
+  document.getElementById("tableSection")?.classList.add("with-panel");
+}
+
+async function loadPanelPayments(id, sym) {
+  const section = document.getElementById("panelPaymentsSection");
+  const container = document.getElementById("panelPayments");
+  try {
+    const r = await fetch(`/cobranzas/${id}/pagos`);
+    const payments = await r.json();
+    if (payments.length) {
+      container.innerHTML = payments.map((p, i) => {
+        const isLast = i === payments.length - 1;
+        return `<div class="cbr-panel-payment">
+          <div class="cbr-panel-payment-dot" style="${isLast ? 'background:#10B981' : ''}"></div>
+          <span class="cbr-panel-payment-date">${(p.fecha||"—").substring(0,10)}</span>
+          <span class="cbr-panel-payment-monto">${sym}${parseFloat(p.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
+          <span class="cbr-panel-payment-metodo">${p.metodo||""}</span>
+        </div>`;
+      }).join("");
+      section.style.display = "block";
+    } else {
+      section.style.display = "none";
+    }
+  } catch (e) {
+    section.style.display = "none";
+  }
+}
+
+function closePanel() {
+  document.getElementById("detailPanel").classList.remove("open");
+  document.getElementById("tableSection")?.classList.remove("with-panel");
+  document.querySelectorAll(".cbr-table tr.row-active").forEach(r => r.classList.remove("row-active"));
+  currentPanelId = null;
+}
+
+function panelPay() {
+  if (!currentPanelId) return;
+  const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
+  if (!row) return;
+  const d = row.dataset;
+  abrirPago(currentPanelId, parseFloat(d.total)||0, parseFloat(d.abonado)||0, d.cliente, d.concepto, d.moneda);
+}
+
+function panelNC() {
+  if (!currentPanelId) return;
+  const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
+  if (!row) return;
+  abrirNotaCredito(currentPanelId, parseFloat(row.dataset.total)||0, row.dataset.moneda);
+}
+
+function panelEmail() {
+  if (!currentPanelId) return;
+  const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
+  if (!row) return;
+  if (typeof openEmailComposer === "function") {
+    openEmailComposer({
+      to: row.dataset.clienteEmail || "",
+      subject: `Factura ${row.dataset.folio} — ${row.dataset.concepto}`
+    });
+  } else {
+    showToast("Módulo de correo no disponible", "warning");
+  }
+}
+
+function panelEmailFor(id) {
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  if (!row) return;
+  if (typeof openEmailComposer === "function") {
+    openEmailComposer({
+      to: row.dataset.clienteEmail || "",
+      subject: `Factura ${row.dataset.folio} — ${row.dataset.concepto}`
+    });
+  } else {
+    showToast("Módulo de correo no disponible", "warning");
+  }
+}
+
+async function saveNotes() {
+  if (!currentPanelId) return;
+  const notas = document.getElementById("panelNotas").value;
+  try {
+    const r = await fetch(`/cobranzas/${currentPanelId}/notas`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({notas})
+    });
+    const j = await r.json();
+    if (j.ok) {
+      showToast("Notas guardadas");
+      // Update the data attribute on the row too
+      const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
+      if (row) row.dataset.notas = notas;
+    }
+    else showToast(j.error || "Error al guardar", "error");
+  } catch (e) {
+    showToast("Error de conexión", "error");
+  }
+}
+
+// Close panel on ESC
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if (document.querySelector(".modal-overlay.open")) return;
+    closePanel();
+  }
+});
+
+/* ── Crear form: autocomplete cliente ───────────── */
+function buscarClienteCrear(q) {
+  const box = document.getElementById("crearClienteResults");
+  if (!q || q.length < 2) { box.classList.remove("open"); return; }
+  const ql = q.toLowerCase();
+  const hits = CLIENTES.filter(c => {
+    const n = ((c.nombre||"")+" "+(c.apellidos||"")+" "+(c.razon_social||"")).toLowerCase();
+    return n.includes(ql);
+  }).slice(0, 8);
+  if (!hits.length) { box.classList.remove("open"); return; }
+  box.innerHTML = hits.map(c => {
+    const lbl = c.tipo === "moral"
+      ? c.razon_social
+      : ((c.nombre||"")+" "+(c.apellidos||"")).trim();
+    return `<div class="cbr-ac-item" onmousedown="pickClienteCrear(${c.id}, '${lbl.replace(/'/g,"\\'")}')">
+      ${c.tipo === "moral" ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><path d="M9 22v-4h6v4"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'} ${lbl}</div>`;
+  }).join("");
+  box.classList.add("open");
+}
+function pickClienteCrear(id, name) {
+  document.getElementById("crearClienteId").value = id;
+  document.getElementById("crearClienteSearch").value = name;
+  document.getElementById("crearClienteResults").classList.remove("open");
+  fetch(`/cobranzas/ajax/asuntos-cliente/${id}`)
+    .then(r => r.json())
+    .then(list => {
+      const sel = document.getElementById("crearAsuntoSel");
+      sel.innerHTML = '<option value="">— Sin asunto —</option>' +
+        list.map(a => `<option value="${a.id}">${a.numero_expediente||""} ${a.titulo}</option>`).join("");
+    });
+}
+document.addEventListener("click", e => {
+  if (!e.target.closest("#crearClienteSearch") && !e.target.closest("#crearClienteResults")) {
+    document.getElementById("crearClienteResults").classList.remove("open");
+  }
+});
+
+/* ── Crear form: cálculos ───────────────────────── */
+function recalcular() {
+  const monto   = parseFloat(document.getElementById("crearMonto").value) || 0;
+  const ivaPct  = parseFloat(document.getElementById("crearIvaPct").value) || 0;
+  const dTipo   = document.getElementById("crearDctoTipo").value;
+  const dVal    = parseFloat(document.getElementById("crearDctoVal").value) || 0;
+  const ivaMon  = monto * ivaPct / 100;
+  const subtotal= monto + ivaMon;
+  const dcto    = dTipo === "pct" ? subtotal * dVal / 100 : dVal;
+  const total   = subtotal - dcto;
+  document.getElementById("crearIvaCalc").value = ivaMon.toFixed(2);
+  document.getElementById("crearTotal").value   = total.toFixed(2);
+}
+
+function toggleIvaExento() {
+  const inp = document.getElementById("crearIvaPct");
+  inp.value = inp.value == "0" ? "16" : "0";
+  recalcular();
+}
+
+async function autoFolio() {
+  const r = await fetch("/cobranzas/ajax/auto-folio");
+  const j = await r.json();
+  document.getElementById("crearFolio").value = j.folio;
+}
+
+function toggleAbonoFields() {
+  const est = document.getElementById("crearEstado").value;
+  document.getElementById("abonoFields").style.display   = est === "abono" ? "flex" : "none";
+  document.getElementById("abonoFechaField").style.display= est === "abono" ? "flex" : "none";
+  document.getElementById("fechaPagoField").style.display = est === "pagado"? "flex" : "none";
+}
+
+/* ── Drag-drop zones ────────────────────────────── */
+function handleDzDrop(e, inputName, zoneId) {
+  e.preventDefault();
+  document.getElementById(zoneId).classList.remove("dz-over");
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  const inp = document.querySelector(`input[name="${inputName}"]`);
+  if (inp) {
+    inp.files = dt.files;
+    document.getElementById(zoneId + "Name").textContent = file.name;
+  }
+}
+function showDzName(nameElId, inp) {
+  document.getElementById(nameElId).textContent = inp.files[0]?.name || "";
+}
+
+/* ── Submit crear ───────────────────────────────── */
+async function submitCrear() {
+  const form = document.getElementById("crearForm");
+  const cid  = document.getElementById("crearClienteId").value;
+  if (!cid) { showToast("Selecciona un cliente", "warning"); return; }
+  if (!form.querySelector('[name="concepto"]').value.trim()) {
+    showToast("La descripción es requerida", "warning"); return;
+  }
+  const fd = new FormData(form);
+  const r  = await fetch("/cobranzas/ajax/crear", {method: "POST", body: fd});
+  const j  = await r.json();
+  if (!j.ok) { showToast(j.error || "Error al crear", "error"); return; }
+  cerrarModal("crearModal");
+  showToast("Factura creada exitosamente");
+  setTimeout(() => location.reload(), 800);
+}
+
+/* ── Pago modal ─────────────────────────────────── */
+let pagoCurrentId = null;
+let pagoSaldoPendiente = 0;
+async function abrirPago(id, total, abonado, cliente, concepto, moneda) {
+  pagoCurrentId = id;
+  const sym   = (MONEDA_SYM[moneda] || {simbolo: "$"}).simbolo;
+  const saldo = total - abonado;
+  pagoSaldoPendiente = saldo;
+
+  document.getElementById("pagoCobId").value  = id;
+  document.getElementById("pagoConcepto").textContent = `${cliente} — ${concepto}`;
+  document.getElementById("pagoTotal").textContent    = `${sym}${total.toLocaleString("es-MX", {minimumFractionDigits:2})} ${moneda}`;
+  document.getElementById("pagoSaldo").textContent    = abonado > 0
+    ? `Abonado: ${sym}${abonado.toLocaleString("es-MX",{minimumFractionDigits:2})} · Saldo pendiente: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`
+    : `Saldo pendiente: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
+  document.getElementById("pagoMonto").value = saldo.toFixed(2);
+  document.getElementById("pagoSaldoHint").textContent = `Saldo pendiente: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
+
+  // Historial
+  const hist = await fetch(`/cobranzas/${id}/pagos`).then(r => r.json());
+  const histEl = document.getElementById("pagoHistorial");
+  if (hist.length) {
+    document.getElementById("pagoHistItems").innerHTML = hist.map(p =>
+      `<div class="pago-hist-item">
+        <span class="pago-hist-fecha">${(p.fecha||"—").substring(0,10)}</span>
+        <span class="pago-hist-monto">${sym}${parseFloat(p.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
+        <span class="pago-hist-metodo">${p.metodo||""}</span>
+        <span style="color:var(--text-3);font-size:.72rem">${p.referencia||""}</span>
+      </div>`
+    ).join("");
+    histEl.style.display = "block";
+  } else {
+    histEl.style.display = "none";
+  }
+
+  document.getElementById("pagoModal").classList.add("open");
+}
+
+async function submitPago() {
+  const id = pagoCurrentId;
+  if (!id) return;
+  const form = document.getElementById("pagoForm");
+  const monto = parseFloat(document.getElementById("pagoMonto").value);
+  if (!monto || monto <= 0) { showToast("Ingresa un monto válido", "warning"); return; }
+  if (monto > pagoSaldoPendiente * 1.01) {
+    showToast("El monto excede el saldo pendiente", "warning"); return;
+  }
+  const fd = new FormData(form);
+  const r  = await fetch(`/cobranzas/${id}/pago`, {method:"POST", body:fd});
+  const j  = await r.json();
+  if (!j.ok) { showToast(j.error || "Error al registrar pago", "error"); return; }
+  cerrarModal("pagoModal");
+  showToast("Pago registrado exitosamente");
+  setTimeout(() => location.reload(), 800);
+}
+
+/* ── Nota de crédito ────────────────────────────── */
+let ncCurrentId = null, ncMoneda = "MXN", ncTotal = 0;
+function abrirNotaCredito(id, total, moneda) {
+  ncCurrentId = id; ncMoneda = moneda; ncTotal = total;
+  // Pre-fill folio reference
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  const folio = row ? row.dataset.folio : `#${id}`;
+  document.getElementById("ncFolioRef").textContent = folio;
+  document.getElementById("ncModal").classList.add("open");
+  setNcTipo("total");
+  // Reset fields
+  document.getElementById("ncMonto").value = "";
+  document.getElementById("ncMotivoSel").value = "Error en monto";
+  document.getElementById("ncMotivo").value = "Error en monto";
+  document.getElementById("ncMotivoCustom").style.display = "none";
+}
+function setNcTipo(tipo) {
+  const isTotal = tipo === "total";
+  document.getElementById("ncTotal").classList.toggle("active", isTotal);
+  document.getElementById("ncParcial").classList.toggle("active", !isTotal);
+  document.getElementById("ncMontoRow").style.display = isTotal ? "none" : "flex";
+  document.getElementById("ncModal").dataset.ncTipo = tipo;
+}
+async function submitNc() {
+  const id    = ncCurrentId;
+  const tipo  = document.getElementById("ncModal").dataset.ncTipo || "total";
+  const monto = parseFloat(document.getElementById("ncMonto").value) || null;
+  const motivo= document.getElementById("ncMotivo").value.trim();
+  if (!motivo) { showToast("Ingresa un motivo", "warning"); return; }
+  if (tipo === "parcial" && (!monto || monto <= 0)) { showToast("Ingresa el monto a descontar", "warning"); return; }
+  if (tipo === "parcial" && monto > ncTotal) { showToast("El monto excede el total de la factura", "warning"); return; }
+
+  const ok = await cbrConfirm(tipo === "total"
+    ? `¿Cancelar completamente la factura? Se marcará como cancelada.`
+    : `¿Aplicar nota de crédito por $${monto.toLocaleString("es-MX",{minimumFractionDigits:2})} ${ncMoneda}?`
+  );
+  if (!ok) return;
+
+  const r = await fetch(`/cobranzas/${id}/nota-credito`, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({tipo, monto, motivo}),
+  });
+  const j = await r.json();
+  if (!j.ok) { showToast(j.error || "Error", "error"); return; }
+  cerrarModal("ncModal");
+  showToast("Nota de crédito aplicada");
+  setTimeout(() => location.reload(), 800);
+}
+
+/* ── Search debounce ────────────────────────────── */
+let _st;
+document.getElementById("searchQ")?.addEventListener("input", () => {
+  clearTimeout(_st);
+  _st = setTimeout(() => document.getElementById("filterForm").submit(), 350);
+});
+
+/* ── Recordatorios ─────────────────────────────── */
+let recLoaded = false;
+async function toggleRecordatorios() {
+  const panel = document.getElementById("recPanel");
+  if (panel.style.display === "block") { panel.style.display = "none"; return; }
+  panel.style.display = "block";
+  if (recLoaded) return;
+  try {
+    const r = await fetch("/cobranzas/ajax/recordatorios");
+    const j = await r.json();
+    recLoaded = true;
+    const body = document.getElementById("recPanelBody");
+    if (!j.alertas || !j.alertas.length) {
+      body.innerHTML = '<div style="text-align:center; color:var(--text-3); padding:20px">✓ Sin alertas pendientes</div>';
+      return;
+    }
+    body.innerHTML = j.alertas.map(a => {
+      const cls = a.tipo === "urgente" ? "rec-urgente" : a.tipo === "seguimiento" ? "rec-seguimiento" : "rec-preventivo";
+      return `<div class="rec-item ${cls}">
+        <div class="rec-msg">${a.mensaje}</div>
+        <div class="rec-actions">
+          <span class="rec-monto">${a.moneda} $${a.monto.toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
+          ${a.email ? `<button class="btn btn-ghost btn-sm" onclick="enviarRecordatorio(${a.cobro_id})" title="Enviar correo al cliente">✉ Enviar</button>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    document.getElementById("recPanelBody").innerHTML = '<div style="color:var(--danger);padding:12px">Error al cargar recordatorios</div>';
+  }
+}
+async function enviarRecordatorio(cobroId) {
+  const ok = await cbrConfirm("¿Enviar recordatorio de pago por correo al cliente?");
+  if (!ok) return;
+  const r = await fetch("/cobranzas/ajax/enviar-recordatorio", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({cobro_id: cobroId}),
+  });
+  const j = await r.json();
+  if (j.ok) showToast(`Recordatorio enviado a ${j.email}`);
+  else showToast(j.error || "Error al enviar", "error");
+}
+// Load recordatorios count on page load
+(async function loadRecCount() {
+  try {
+    const r = await fetch("/cobranzas/ajax/recordatorios");
+    const j = await r.json();
+    if (j.total > 0) {
+      const badge = document.getElementById("recordatorioBadge");
+      badge.textContent = j.total;
+      badge.style.display = "inline-flex";
+    }
+  } catch(e) {}
+})();
+
+/* ── Facturar horas ────────────────────────────── */
+function abrirFacturarHoras() {
+  document.getElementById("horasModal").classList.add("open");
+  document.getElementById("horasPreview").style.display = "none";
+}
+
+async function submitFacturarHoras() {
+  const asuntoId = document.getElementById("horasAsunto").value;
+  const tarifa   = parseFloat(document.getElementById("horasTarifa").value);
+  const ivaPct   = parseFloat(document.getElementById("horasIva").value) || 16;
+  const moneda   = document.getElementById("horasMoneda").value;
+
+  if (!asuntoId) { showToast("Selecciona un asunto", "warning"); return; }
+  if (!tarifa || tarifa <= 0) { showToast("Ingresa una tarifa por hora válida", "warning"); return; }
+
+  const r = await fetch("/cobranzas/ajax/facturar-horas", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({asunto_id: asuntoId, tarifa_hora: tarifa, iva_pct: ivaPct, moneda}),
+  });
+  const j = await r.json();
+  if (!j.ok) { showToast(j.error || "Error", "error"); return; }
+
+  const prev = document.getElementById("horasPreview");
+  prev.style.display = "block";
+  prev.innerHTML = `
+    <div style="font-weight:700;color:var(--success);margin-bottom:6px">✓ Factura generada exitosamente</div>
+    <div style="font-size:.84rem">Folio: <strong>${j.folio}</strong></div>
+    <div style="font-size:.84rem">Horas: ${j.horas.toFixed(1)}h × $${tarifa.toLocaleString("es-MX",{minimumFractionDigits:2})}/h</div>
+    <div style="font-size:.84rem">Monto base: $${j.monto.toLocaleString("es-MX",{minimumFractionDigits:2})}</div>
+    <div style="font-size:.84rem;font-weight:700">Total con IVA: $${j.total.toLocaleString("es-MX",{minimumFractionDigits:2})} ${moneda}</div>
+  `;
+  showToast("Factura generada exitosamente");
+  setTimeout(() => { cerrarModal("horasModal"); location.reload(); }, 2500);
+}
+</script>
+{% endblock %}

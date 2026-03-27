@@ -1,0 +1,702 @@
+{% from "components/icons.html" import icon, icon_lightbulb, icon_check_circle %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuración inicial — LexOS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+  <style>
+    /* ── Layout principal del tour ────────────────────────────────────────── */
+    .tour-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      background: var(--bg);
+    }
+    @media (max-width: 768px) {
+      .tour-shell { grid-template-columns: 1fr; }
+      .tour-sidebar { display: none; }
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────────────────────── */
+    .tour-sidebar {
+      background: var(--bg-2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 32px 24px;
+    }
+    .ts-brand {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 40px;
+    }
+    .ts-brand .logo-icon {
+      width: 36px; height: 36px;
+      background: var(--accent); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: .9rem; color: #fff;
+    }
+    .ts-brand-name { font-weight: 800; font-size: 1.1rem; color: var(--text); }
+
+    .ts-progress {
+      margin-bottom: 32px;
+    }
+    .ts-progress-label {
+      display: flex; justify-content: space-between;
+      font-size: .75rem; color: var(--text-3); margin-bottom: 8px;
+    }
+    .ts-progress-label span:last-child { color: var(--accent); font-weight: 600; }
+
+    .ts-phases { display: flex; flex-direction: column; gap: 4px; }
+
+    .ts-phase {
+      border-radius: var(--radius); padding: 12px 14px;
+      cursor: pointer;
+      transition: background var(--transition);
+      position: relative;
+    }
+    .ts-phase:hover { background: var(--bg-3); }
+    .ts-phase.active { background: var(--accent-soft); }
+
+    .ts-phase-header {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .ts-phase-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+      background: var(--bg-4); border: 1px solid var(--border);
+      transition: all var(--transition);
+    }
+    .ts-phase.active   .ts-phase-icon { background: var(--accent); border-color: var(--accent); }
+    .ts-phase.done     .ts-phase-icon { background: var(--success-soft, rgba(16,185,129,.15)); border-color: var(--success); }
+    .ts-phase.locked   .ts-phase-icon { opacity: .4; }
+
+    .ts-phase-info { flex: 1; min-width: 0; }
+    .ts-phase-title {
+      font-size: .82rem; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .ts-phase.active .ts-phase-title { color: var(--accent); }
+    .ts-phase.done   .ts-phase-title { color: var(--text-2); }
+
+    .ts-phase-steps {
+      font-size: .7rem; color: var(--text-3); margin-top: 2px;
+    }
+
+    .ts-phase-check {
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .ts-phase.done .ts-phase-check {
+      background: var(--success); color: #fff;
+      font-size: .65rem; font-weight: 700;
+    }
+
+    /* Step dots inside phase */
+    .ts-phase-dots {
+      display: flex; gap: 4px; margin-top: 8px; padding-left: 42px;
+    }
+    .ts-phase-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--border);
+      transition: background var(--transition);
+    }
+    .ts-phase-dot.done    { background: var(--success); }
+    .ts-phase-dot.current { background: var(--accent); }
+
+    /* Skip button */
+    .ts-skip {
+      margin-top: auto; padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Main content ─────────────────────────────────────────────────────── */
+    .tour-main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .tour-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tour-topbar-left { display: flex; align-items: center; gap: 12px; }
+    .tour-phase-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent-soft); border: 1px solid var(--accent-glow);
+      color: var(--accent); font-size: .72rem; font-weight: 600;
+      padding: 4px 12px; border-radius: 20px;
+    }
+    .tour-step-counter { font-size: .8rem; color: var(--text-3); }
+
+    .tour-body {
+      flex: 1; display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0; overflow: hidden;
+    }
+    @media (max-width: 960px) {
+      .tour-body { grid-template-columns: 1fr; }
+      .tour-ilustration { display: none; }
+    }
+
+    /* Left: step content */
+    .tour-step-content {
+      padding: 48px 48px 48px 40px;
+      display: flex; flex-direction: column;
+      overflow-y: auto;
+    }
+    .tour-step-eyebrow {
+      font-size: .72rem; color: var(--accent); font-weight: 600;
+      text-transform: uppercase; letter-spacing: .8px;
+      margin-bottom: 14px;
+    }
+    .tour-step-title {
+      font-size: 1.8rem; font-weight: 800;
+      color: var(--text); letter-spacing: -.5px;
+      line-height: 1.2; margin-bottom: 8px;
+    }
+    .tour-step-sub {
+      font-size: .9rem; color: var(--accent); font-weight: 500;
+      margin-bottom: 20px;
+    }
+    .tour-step-desc {
+      font-size: .9rem; color: var(--text-2); line-height: 1.75;
+      margin-bottom: 28px; max-width: 420px;
+    }
+    .tour-step-tip {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: var(--bg-3); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius); padding: 14px 16px;
+      margin-bottom: 32px;
+      font-size: .82rem; color: var(--text-2); line-height: 1.6;
+    }
+    .tour-step-tip .tip-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+    .tour-actions {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      margin-top: auto;
+    }
+
+    /* Right: ilustración -->
+    .tour-ilustration {
+      background: var(--bg-2);
+      border-left: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px;
+      position: relative; overflow: hidden;
+    }
+    .tour-ilustration::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at 30% 30%, rgba(99,102,241,.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 70%, rgba(16,185,129,.08) 0%, transparent 60%);
+    }
+
+    /* SVG illustrations per step */
+    .il-wrapper {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center; gap: 20px;
+      text-align: center;
+    }
+    .il-circle {
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      border: 2px solid var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 4.5rem;
+      animation: float 4s ease-in-out infinite;
+    }
+    .il-title {
+      font-size: .9rem; font-weight: 600; color: var(--text-2);
+    }
+    .il-sub {
+      font-size: .78rem; color: var(--text-3); line-height: 1.5; max-width: 220px;
+    }
+
+    /* Mini cards en la ilustración */
+    .il-cards {
+      display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 280px;
+    }
+    .il-card {
+      background: var(--bg-3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      animation: slide-up .4s ease both;
+    }
+    .il-card:nth-child(2) { animation-delay: .1s; }
+    .il-card:nth-child(3) { animation-delay: .2s; }
+    .il-card-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--accent-soft); border: 1px solid var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .9rem; flex-shrink: 0;
+    }
+    .il-card-text { font-size: .78rem; color: var(--text-2); font-weight: 500; }
+    .il-card-sub  { font-size: .68rem; color: var(--text-3); }
+
+    /* ── Modal de finalización ─────────────────────────────────────────────── */
+    .completion-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s;
+    }
+    .completion-overlay.show {
+      opacity: 1; pointer-events: all;
+    }
+    .completion-modal {
+      background: var(--bg-2);
+      border: 1px solid var(--accent-glow);
+      border-radius: 20px;
+      padding: 48px;
+      max-width: 480px; width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+      animation: slide-up .4s ease both;
+    }
+    .completion-modal .cm-icon {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #818cf8);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px; font-size: 2.2rem;
+      box-shadow: 0 0 32px var(--accent-glow);
+    }
+    .completion-modal h2 {
+      font-size: 1.6rem; font-weight: 800;
+      color: var(--text); margin-bottom: 12px;
+    }
+    .completion-modal p {
+      font-size: .9rem; color: var(--text-2); line-height: 1.7;
+      margin-bottom: 28px;
+    }
+    .cm-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+<div class="tour-shell">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside class="tour-sidebar">
+    <div class="ts-brand">
+      <div class="logo-icon">Lx</div>
+      <div class="ts-brand-name">LexOS</div>
+    </div>
+
+    <!-- Progress global -->
+    <div class="ts-progress">
+      <div class="ts-progress-label">
+        <span>Progreso</span>
+        <span id="pctLabel">{{ porcentaje }}%</span>
+      </div>
+      <div class="ob-progress-bar">
+        <div class="ob-progress-fill" id="globalBar" style="width:{{ porcentaje }}%;"></div>
+      </div>
+    </div>
+
+    <!-- Phases list -->
+    <div class="ts-phases" id="phasesList">
+      {% for f in fases %}
+      {% set is_done    = f.id in fases_completadas %}
+      {% set is_active  = f.id == fase_actual %}
+      {% set is_locked  = (not is_done) and (not is_active) %}
+      <div class="ts-phase {% if is_active %}active{% elif is_done %}done{% else %}locked{% endif %}"
+           data-fase="{{ f.id }}"
+           onclick="jumpToPhase({{ f.id }})">
+        <div class="ts-phase-header">
+          <div class="ts-phase-icon">{{ icon(f.icono, 16, 16) }}</div>
+          <div class="ts-phase-info">
+            <div class="ts-phase-title">{{ f.titulo }}</div>
+            <div class="ts-phase-steps">{{ f.pasos|length }} pasos</div>
+          </div>
+          <div class="ts-phase-check" id="check-{{ f.id }}">
+            {% if is_done %}✓{% endif %}
+          </div>
+        </div>
+        <!-- Step dots -->
+        <div class="ts-phase-dots" id="dots-{{ f.id }}">
+          {% for p in f.pasos %}
+          {% set dot_done    = is_done or (is_active and p.id < paso_actual) %}
+          {% set dot_current = is_active and p.id == paso_actual %}
+          <div class="ts-phase-dot {% if dot_done %}done{% elif dot_current %}current{% endif %}"
+               id="dot-{{ f.id }}-{{ p.id }}"></div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Skip -->
+    <div class="ts-skip">
+      <form method="POST" action="{{ url_for('onboarding.skip') }}" id="skipForm">
+        <button type="button" class="btn btn-ghost w-full text-xs"
+                style="color:var(--text-3);" onclick="confirmSkip()">
+          Omitir configuración
+        </button>
+      </form>
+      <p class="text-xs text-muted" style="margin-top:8px;text-align:center;line-height:1.5;">
+        Puedes completarlo desde el menú en cualquier momento.
+      </p>
+    </div>
+  </aside>
+
+  <!-- ── Main ──────────────────────────────────────────────────────────────── -->
+  <div class="tour-main">
+
+    <!-- Topbar -->
+    <div class="tour-topbar">
+      <div class="tour-topbar-left">
+        <div class="tour-phase-badge" id="phaseBadge">
+          <span id="phaseIcon">{{ icon(fase.icono, 14, 14) }}</span>
+          <span id="phaseTitle">{{ fase.titulo }}</span>
+        </div>
+        <div class="tour-step-counter" id="stepCounter">
+          Paso {{ pasos_hechos + 1 }} de {{ total_pasos }}
+        </div>
+      </div>
+      <div style="font-size:.8rem;color:var(--text-3);">
+        {% if tenant %}
+        {{ tenant.nombre_despacho }}
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Body: step + ilustración -->
+    <div class="tour-body">
+
+      <!-- Step content -->
+      <div class="tour-step-content" id="stepContent">
+        <div class="tour-step-eyebrow" id="stepEyebrow">
+          Fase {{ fase_actual + 1 }} · {{ fase.titulo }}
+        </div>
+        <div class="tour-step-title" id="stepTitle">{{ paso.titulo }}</div>
+        <div class="tour-step-sub" id="stepSub">{{ paso.subtitulo }}</div>
+        <div class="tour-step-desc" id="stepDesc">{{ paso.descripcion }}</div>
+        <div class="tour-step-tip" id="stepTip">
+          <span class="tip-icon">{{ icon_lightbulb(16, 16) }}</span>
+          <span id="stepTipText">{{ paso.consejo }}</span>
+        </div>
+
+        <div class="tour-actions">
+          <a href="{{ paso.accion_url }}" class="btn btn-primary" id="actionBtn"
+             onclick="markStepDone(event)">
+            {{ paso.accion_label }}
+          </a>
+          {% if paso.omitible %}
+          <button type="button" class="btn btn-ghost text-sm" onclick="skipStep()">
+            Omitir este paso
+          </button>
+          {% endif %}
+          <button type="button" class="btn btn-ghost text-sm" id="nextBtn"
+                  onclick="nextStep()" style="margin-left:auto;">
+            Siguiente →
+          </button>
+        </div>
+      </div>
+
+      <!-- Ilustración -->
+      <div class="tour-ilustration">
+        <div class="il-wrapper" id="ilWrapper">
+          <!-- Rendered via JS based on step -->
+        </div>
+      </div>
+
+    </div><!-- /tour-body -->
+  </div><!-- /tour-main -->
+</div><!-- /tour-shell -->
+
+<!-- ── Modal de completado ─────────────────────────────────────────────────── -->
+<div class="completion-overlay" id="completionOverlay">
+  <div class="completion-modal">
+    <div class="cm-icon">{{ icon_check_circle(36, 36) }}</div>
+    <h2>¡Configuración completa!</h2>
+    <p>
+      Tu despacho <strong>{{ tenant.nombre_despacho if tenant else '' }}</strong>
+      está listo para operar. Descarga tu badge de
+      <em>Despacho Digital</em> como constancia.
+    </p>
+    <div class="cm-actions">
+      <a href="{{ url_for('onboarding.badge_pdf') }}" class="btn btn-primary">
+        Descargar Badge PDF
+      </a>
+      <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary">
+        Ir al Dashboard →
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Estado del tour ────────────────────────────────────────────────────────── */
+const FASES = {{ fases | tojson }};
+let faseCurrent = {{ fase_actual }};
+let pasoCurrent = {{ paso_actual }};
+let fasesCompletadas = {{ fases_completadas | tojson }};
+
+const FASE_ICON_SVGS = {
+  settings: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+  user: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  dollar: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+  zap: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+};
+
+/* ── Ilustraciones por slug ─────────────────────────────────────────────────── */
+const ILUSTRACIONES = {
+  logo: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/><line x1="2" y1="18" x2="22" y2="18"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', text: 'Logo del despacho', sub: 'Sube tu imagen corporativa' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>', text: 'Datos de contacto', sub: 'Teléfono, dirección, email' },
+    ]
+  },
+  equipo: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 8 5 12 9 8"/><polyline points="15 8 19 12 23 8"/><line x1="1" y1="8" x2="23" y2="8"/></svg>', text: 'Abogado titular', sub: 'Rol: admin' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>', text: 'Asistente legal', sub: 'Rol: asistente' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', text: 'Socio', sub: 'Rol: abogado' },
+    ]
+  },
+  cliente: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><path d="M9 22v-4h6v4"/></svg>', text: 'Empresa S.A. de C.V.', sub: 'Persona moral' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>', text: '0 asuntos activos', sub: 'Primer expediente pendiente' },
+    ]
+  },
+  asunto: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 8 5 12 9 8"/><polyline points="15 8 19 12 23 8"/><line x1="1" y1="8" x2="23" y2="8"/></svg>', text: 'Expediente civil', sub: 'Juzgado 3° Civil' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>', text: '$15,000 honorarios', sub: 'Anticipo pendiente' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>', text: 'Audiencia: próx. semana', sub: 'Recordatorio activo' },
+    ]
+  },
+  cobro: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', text: 'Anticipo pagado', sub: '$5,000' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 00-.586-1.414L12 12l-4.414 4.414A2 2 0 007 17.828V22"/><path d="M7 2v4.172a2 2 0 00.586 1.414L12 12l4.414-4.414A2 2 0 0017 6.172V2"/></svg>', text: 'Segunda exhibición', sub: '$10,000 · Vence 30 abr' },
+    ]
+  },
+  portal: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>', text: 'Estado del asunto', sub: 'Visible para el cliente' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', text: 'Documentos', sub: 'Acceso controlado' },
+    ]
+  },
+  calendario: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>', text: 'Audiencia inicial', sub: 'Hoy 10:00 am · Urgente' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>', text: 'Plazo procesal', sub: 'Viernes · 3 días restantes' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', text: 'Reunión cliente', sub: 'Lunes próximo' },
+    ]
+  },
+  biblioteca: {
+    emoji: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>',
+    cards: [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>', text: 'Código Civil Federal', sub: 'Última reforma 2024' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 8 5 12 9 8"/><polyline points="15 8 19 12 23 8"/><line x1="1" y1="8" x2="23" y2="8"/></svg>', text: 'Tesis: Amparo directo', sub: 'Novena Época · SCJN' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>', text: 'Template: Demanda civil', sub: 'Reutilizable · Tu despacho' },
+    ]
+  },
+};
+
+function renderIlustracion(slug) {
+  const il = ILUSTRACIONES[slug] || ILUSTRACIONES['logo'];
+  const wrapper = document.getElementById('ilWrapper');
+  let cardsHtml = il.cards.map(c => `
+    <div class="il-card">
+      <div class="il-card-icon">${c.icon}</div>
+      <div>
+        <div class="il-card-text">${c.text}</div>
+        <div class="il-card-sub">${c.sub}</div>
+      </div>
+    </div>`).join('');
+  wrapper.innerHTML = `
+    <div class="il-circle">${il.emoji}</div>
+    <div class="il-cards">${cardsHtml}</div>`;
+}
+
+/* ── Render del paso actual ──────────────────────────────────────────────────── */
+function renderStep(faseId, pasoId) {
+  const fase = FASES[faseId];
+  if (!fase) return;
+  const paso = fase.pasos[pasoId];
+  if (!paso) return;
+
+  // Topbar
+  document.getElementById('phaseIcon').innerHTML = FASE_ICON_SVGS[fase.icono] || fase.icono;
+  document.getElementById('phaseTitle').textContent = fase.titulo;
+
+  // Calcular paso global
+  let globalDone = 0;
+  for (let i = 0; i < faseId; i++) globalDone += FASES[i].pasos.length;
+  globalDone += pasoId;
+  const total = FASES.reduce((s, f) => s + f.pasos.length, 0);
+  document.getElementById('stepCounter').textContent = `Paso ${globalDone + 1} de ${total}`;
+
+  // Content
+  document.getElementById('stepEyebrow').textContent = `Fase ${faseId + 1} · ${fase.titulo}`;
+  document.getElementById('stepTitle').textContent   = paso.titulo;
+  document.getElementById('stepSub').textContent     = paso.subtitulo;
+  document.getElementById('stepDesc').textContent    = paso.descripcion;
+  document.getElementById('stepTipText').textContent = paso.consejo;
+
+  // Action button
+  const actionBtn = document.getElementById('actionBtn');
+  actionBtn.textContent = paso.accion_label;
+  actionBtn.href = paso.accion_url;
+
+  // Skip step button
+  const btns = document.querySelector('.tour-actions');
+  const existing = btns.querySelector('.skip-step-btn');
+  if (existing) existing.remove();
+  if (paso.omitible) {
+    const skipBtn = document.createElement('button');
+    skipBtn.type = 'button';
+    skipBtn.className = 'btn btn-ghost text-sm skip-step-btn';
+    skipBtn.textContent = 'Omitir este paso';
+    skipBtn.onclick = skipStep;
+    actionBtn.after(skipBtn);
+  }
+
+  // Ilustración
+  renderIlustracion(paso.ilustracion);
+
+  // Sidebar
+  updateSidebar(faseId, pasoId);
+}
+
+function updateSidebar(faseId, pasoId) {
+  FASES.forEach(f => {
+    const el = document.querySelector(`.ts-phase[data-fase="${f.id}"]`);
+    if (!el) return;
+    el.className = 'ts-phase';
+    if (f.id === faseId)            el.classList.add('active');
+    else if (fasesCompletadas.includes(f.id)) el.classList.add('done');
+    else                             el.classList.add('locked');
+
+    // Check mark
+    const check = document.getElementById(`check-${f.id}`);
+    if (check) check.textContent = fasesCompletadas.includes(f.id) ? '✓' : '';
+
+    // Dots
+    f.pasos.forEach(p => {
+      const dot = document.getElementById(`dot-${f.id}-${p.id}`);
+      if (!dot) return;
+      dot.className = 'ts-phase-dot';
+      if (fasesCompletadas.includes(f.id) || (f.id === faseId && p.id < pasoId)) {
+        dot.classList.add('done');
+      } else if (f.id === faseId && p.id === pasoId) {
+        dot.classList.add('current');
+      }
+    });
+  });
+
+  // Progress bar
+  let done = 0;
+  fasesCompletadas.forEach(fId => { if (fId < FASES.length) done += FASES[fId].pasos.length; });
+  done += pasoId;
+  const total = FASES.reduce((s, f) => s + f.pasos.length, 0);
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('globalBar').style.width = pct + '%';
+  document.getElementById('pctLabel').textContent = pct + '%';
+}
+
+/* ── Guardar progreso en servidor ────────────────────────────────────────────── */
+async function saveProgress(faseId, pasoId) {
+  try {
+    await fetch('{{ url_for("onboarding.save_progress") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fase: faseId, paso: pasoId }),
+    });
+  } catch (_) {}
+}
+
+/* ── Navegación ──────────────────────────────────────────────────────────────── */
+function nextStep() {
+  const fase = FASES[faseCurrent];
+  if (!fase) return;
+
+  let nextFase = faseCurrent;
+  let nextPaso = pasoCurrent + 1;
+
+  if (nextPaso >= fase.pasos.length) {
+    // Completar esta fase
+    if (!fasesCompletadas.includes(faseCurrent)) {
+      fasesCompletadas.push(faseCurrent);
+    }
+    nextFase = faseCurrent + 1;
+    nextPaso = 0;
+
+    if (nextFase >= FASES.length) {
+      // Tour completo
+      completeTour();
+      return;
+    }
+  }
+
+  faseCurrent = nextFase;
+  pasoCurrent = nextPaso;
+  saveProgress(faseCurrent, pasoCurrent);
+  renderStep(faseCurrent, pasoCurrent);
+}
+
+function skipStep() {
+  nextStep();
+}
+
+function jumpToPhase(faseId) {
+  if (faseId > faseCurrent && !fasesCompletadas.includes(faseCurrent)) return;
+  faseCurrent = faseId;
+  pasoCurrent = 0;
+  saveProgress(faseCurrent, pasoCurrent);
+  renderStep(faseCurrent, pasoCurrent);
+}
+
+function markStepDone(e) {
+  // No prevent default — let the link navigate
+  // Just save progress that we're "at" this step
+  saveProgress(faseCurrent, pasoCurrent);
+}
+
+/* ── Completar tour ──────────────────────────────────────────────────────────── */
+async function completeTour() {
+  try {
+    await fetch('{{ url_for("onboarding.complete") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (_) {}
+  document.getElementById('completionOverlay').classList.add('show');
+}
+
+/* ── Skip tour completo ──────────────────────────────────────────────────────── */
+function confirmSkip() {
+  if (confirm('¿Seguro que deseas omitir la configuración? Podrás completarla más tarde desde el menú.')) {
+    document.getElementById('skipForm').submit();
+  }
+}
+
+/* ── Init ────────────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function () {
+  renderIlustracion('{{ paso.ilustracion }}');
+  updateSidebar(faseCurrent, pasoCurrent);
+});
+</script>
+</body>
+</html>

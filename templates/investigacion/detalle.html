@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon_scale %}
+{% block title %}{{ investigacion.titulo }}{% endblock %}
+{% block page_title %}Investigación{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ investigacion.titulo }}</h1>
+    {% if investigacion.asunto_titulo %}
+    <p class="page-subtitle">{{ icon_scale(14, 14) }} {{ investigacion.asunto_titulo }}</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <form method="POST" action="{{ url_for('investigacion.eliminar', id=investigacion.id) }}"
+          data-confirm="¿Eliminar esta investigación?">
+      <button class="btn btn-danger btn-sm">Eliminar</button>
+    </form>
+    <a href="{{ url_for('investigacion.index') }}" class="btn btn-ghost">← Volver</a>
+  </div>
+</div>
+
+<div style="max-width: 800px;">
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="detail-meta" style="margin-bottom: 16px;">
+        <div class="meta-item">
+          <div class="meta-label">Fuente</div>
+          <div class="meta-value">{{ investigacion.fuente or '—' }}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Fecha</div>
+          <div class="meta-value">{{ investigacion.fecha_alta[:10] if investigacion.fecha_alta else '—' }}</div>
+        </div>
+      </div>
+      {% if investigacion.url_referencia %}
+      <div style="margin-bottom:16px;">
+        <a href="{{ investigacion.url_referencia }}" target="_blank" class="btn btn-ghost btn-sm">
+          Ver fuente original ↗
+        </a>
+      </div>
+      {% endif %}
+      {% if investigacion.contenido %}
+      <div style="border-top:1px solid var(--border); padding-top:16px;">
+        <div class="meta-label" style="margin-bottom:10px;">Contenido</div>
+        <div style="color:var(--text-2); line-height:1.8; font-size:.88rem; white-space:pre-wrap;">{{ investigacion.contenido }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

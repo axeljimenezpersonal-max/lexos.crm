@@ -1,0 +1,1296 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon_building, icon_user, icon_folder, icon_dollar, icon_file_text, icon_edit, icon_phone, icon_mail, icon_message, icon_pin, icon_paperclip, icon_image %}
+{% set nombre_display = (cliente.razon_social or cliente.nombre) if cliente.tipo == 'persona_moral' else (cliente.nombre ~ ' ' ~ (cliente.apellidos or '')) %}
+{% block title %}{{ nombre_display | trim }}{% endblock %}
+{% block page_title %}{{ nombre_display | trim | truncate(40) }}{% endblock %}
+
+{% block breadcrumb %}
+<span class="tb-bc-sep">/</span>
+<a href="{{ url_for('clientes.index') }}" class="tb-bc-link">Clientes</a>
+<span class="tb-bc-sep">/</span>
+<span class="tb-bc-current">{{ nombre_display | trim | truncate(30) }}</span>
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/clientes.css') }}">
+<style>
+/* ── Client detail-specific overrides ─────────────────────────────────── */
+.cl-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 0 20px;
+  margin-bottom: 4px;
+}
+.cl-photo-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.cl-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ed), var(--e));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 300;
+  color: #fff;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.cl-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.cl-photo-edit-btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--c);
+  border: 1px solid var(--border-m);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ash);
+  transition: color .15s, border-color .15s;
+}
+.cl-photo-edit-btn:hover { color: var(--e); border-color: var(--e); }
+.cl-detail-meta { flex: 1; min-width: 0; }
+.cl-detail-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--fog);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-detail-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ash);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cl-detail-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.cl-tag-chip {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--c2);
+  border: 1px solid var(--border);
+  color: var(--ash);
+}
+.cl-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── health badge ──────────────────────────────────────────────────────── */
+.health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--c2);
+  border: 1px solid var(--border);
+  color: var(--ash);
+}
+.health-badge.salud-verde  { border-color: rgba(0,223,162,.25); color: var(--e); }
+.health-badge.salud-amarillo { border-color: rgba(184,146,42,.3); color: var(--gold); }
+.health-badge.salud-rojo   { border-color: rgba(239,68,68,.3); color: #EF4444; }
+.health-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── Info grid ─────────────────────────────────────────────────────────── */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.info-grid .full { grid-column: 1 / -1; }
+
+/* ── Editable fields ───────────────────────────────────────────────────── */
+.editable-field { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+.editable-value {
+  cursor: pointer;
+  font-family: 'Libre Baskerville', serif;
+  font-size: 13px;
+  color: var(--fog);
+  border-bottom: 1px dashed transparent;
+  transition: border-color .15s;
+}
+.editable-value:hover { border-bottom-color: var(--border-m); }
+.editable-value.editing { opacity: 0; pointer-events: none; }
+.editable-input {
+  background: var(--c2);
+  border: 1px solid var(--e);
+  border-radius: 4px;
+  color: var(--fog);
+  padding: 2px 6px;
+  font-size: 13px;
+  font-family: 'Libre Baskerville', serif;
+  outline: none;
+}
+.editable-spinner {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--border-m);
+  border-top-color: var(--e);
+  border-radius: 50%;
+  display: none;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── inline selects ────────────────────────────────────────────────────── */
+.lex-select {
+  background: var(--c2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fog);
+  padding: 4px 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.lex-select:hover, .lex-select:focus { border-color: var(--border-m); }
+
+/* ── tag list ──────────────────────────────────────────────────────────── */
+.tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--edim);
+  border: 1px solid var(--border);
+  color: var(--e);
+  cursor: pointer;
+  transition: background .15s;
+}
+.tag:hover { background: rgba(0,223,162,.2); }
+
+/* ── KPI stats row ─────────────────────────────────────────────────────── */
+.cobros-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.cobros-kpi-card {
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cobros-kpi-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ash);
+}
+.cobros-kpi-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--fog);
+  line-height: 1;
+}
+.cobros-kpi-card.kpi-green { border-color: rgba(0,223,162,.2); }
+.cobros-kpi-card.kpi-green .cobros-kpi-val { color: var(--e); }
+.cobros-kpi-card.kpi-gold  { border-color: rgba(184,146,42,.3); }
+.cobros-kpi-card.kpi-gold  .cobros-kpi-val { color: var(--gold); }
+.cobros-kpi-card.kpi-red   { border-color: rgba(239,68,68,.3); }
+.cobros-kpi-card.kpi-red   .cobros-kpi-val { color: #EF4444; }
+
+/* ── doc drop zone ─────────────────────────────────────────────────────── */
+.doc-drop-zone {
+  border: 1.5px dashed var(--border-m);
+  border-radius: 8px;
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ash);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  transition: border-color .15s, background .15s;
+}
+.doc-drop-zone:hover, .doc-drop-zone.drag-over {
+  border-color: var(--e);
+  background: var(--edim);
+  color: var(--e);
+}
+
+/* ── doc list ──────────────────────────────────────────────────────────── */
+.doc-list { display: flex; flex-direction: column; gap: 6px; }
+.doc-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color .15s;
+}
+.doc-item:hover { border-color: var(--border-m); }
+.doc-icon { color: var(--ash); flex-shrink: 0; }
+.doc-info { flex: 1; min-width: 0; }
+.doc-name {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 13px;
+  color: var(--fog);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .06em;
+  color: var(--ash);
+  margin-top: 2px;
+}
+.doc-actions { flex-shrink: 0; }
+.doc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  background: var(--c2);
+  border: 1px solid var(--border);
+  color: var(--ash);
+  text-decoration: none;
+  transition: color .15s, border-color .15s;
+}
+.doc-btn:hover { color: var(--e); border-color: var(--border-m); }
+
+/* ── timeline ──────────────────────────────────────────────────────────── */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.timeline-item:last-child { border-bottom: none; }
+.timeline-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--c2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ash);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.timeline-content { flex: 1; min-width: 0; }
+.timeline-text {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 13px;
+  color: var(--fog);
+  line-height: 1.5;
+}
+.timeline-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ash);
+  margin-top: 4px;
+}
+
+/* ── add entry form ────────────────────────────────────────────────────── */
+.add-entry-form {
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.add-entry-form textarea {
+  background: var(--c2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fog);
+  font-family: 'Libre Baskerville', serif;
+  font-size: 13px;
+  padding: 10px;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.add-entry-form textarea:focus { border-color: var(--border-m); }
+.add-entry-row { display: flex; gap: 8px; align-items: center; }
+
+/* ── portal section cards ──────────────────────────────────────────────── */
+.portal-card {
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.portal-card h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  font-weight: 300;
+  color: var(--fog);
+  margin: 0 0 10px;
+}
+.portal-active-banner {
+  background: rgba(0,223,162,.06);
+  border: 1px solid rgba(0,223,162,.2);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.portal-active-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--e);
+}
+.portal-active-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--ash);
+  margin-top: 2px;
+}
+
+/* ── det-panel ─────────────────────────────────────────────────────────── */
+.det-panel { display: none; padding-top: 16px; }
+.det-panel.active { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Detail header ─────────────────────────────────────────────────────── -->
+<div class="cl-detail-header">
+  <div class="cl-photo-wrap">
+    <div class="cl-avatar" id="clientePhoto">
+      {% if cliente.foto_url %}
+      <img src="{{ cliente.foto_url }}" alt="">
+      {% else %}
+      {{ (nombre_display | trim)[0].upper() }}
+      {% endif %}
+    </div>
+    <label class="cl-photo-edit-btn" title="Cambiar foto" for="photoFileInput">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    </label>
+    <input type="file" id="photoFileInput" accept="image/*" style="display:none;" onchange="subirFoto(this)">
+  </div>
+
+  <div class="cl-detail-meta">
+    <div class="cl-detail-name">{{ nombre_display | trim }}</div>
+    <div class="cl-detail-sub">
+      {% if cliente.tipo == 'persona_moral' %}{{ icon_building(13, 13) }} Persona Moral{% else %}{{ icon_user(13, 13) }} Persona Física{% endif %}
+      {% if cliente.rfc %}<span>·</span><span>RFC: {{ cliente.rfc }}</span>{% endif %}
+      {% if abogado_nombre %}<span>·</span><span>{{ abogado_nombre }}</span>{% endif %}
+    </div>
+    <div class="cl-detail-pills">
+      <span class="badge badge-{{ cliente.estatus or 'activo' }}">{{ (cliente.estatus or 'activo') | capitalize }}</span>
+      <span class="health-badge {{ salud.class }}">
+        <span class="health-dot"></span>
+        {{ salud.label }}
+      </span>
+      {% for tag in cliente.etiquetas[:5] %}
+      <span class="cl-tag-chip">{{ tag }}</span>
+      {% endfor %}
+      {% if cliente.etiquetas | length > 5 %}
+      <span class="cl-tag-chip">+{{ cliente.etiquetas | length - 5 }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cl-detail-actions">
+    <a href="{{ url_for('clientes.exportar_pdf', id=cliente.id) }}" class="btn btn-ghost btn-sm" title="Exportar PDF">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+      PDF
+    </a>
+    <button class="btn btn-danger btn-sm" onclick="confirmarEliminar({{ cliente.id }}, '{{ nombre_display | trim | replace("'", "\\'") | truncate(30) }}')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      Eliminar
+    </button>
+  </div>
+</div>
+
+<!-- ── Tab bar ────────────────────────────────────────────────────────────── -->
+<div class="tab-bar" id="detTabs">
+  <button class="tab active" onclick="showTab('info')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    Datos
+  </button>
+  <button class="tab" onclick="showTab('asuntos')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+    Asuntos
+    {% if asuntos %}<span class="tab-count">{{ asuntos | length }}</span>{% endif %}
+  </button>
+  <button class="tab" onclick="showTab('facturas')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+    Pagos
+    {% if cobros %}<span class="tab-count">{{ cobros | length }}</span>{% endif %}
+  </button>
+  <button class="tab" onclick="showTab('documentos')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13,2 13,9 20,9"/></svg>
+    Documentos
+    {% if documentos %}<span class="tab-count">{{ documentos | length }}</span>{% endif %}
+  </button>
+  <button class="tab" onclick="showTab('historial')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+    Actividad
+    {% if comunicaciones %}<span class="tab-count">{{ comunicaciones | length }}</span>{% endif %}
+  </button>
+  <button class="tab" onclick="showTab('notas')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Notas
+    {% if notas %}<span class="tab-count">{{ notas | length }}</span>{% endif %}
+  </button>
+  <button class="tab" onclick="showTab('portal')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Portal
+    {% if cliente.invitar_portal %}<span class="tab-count" style="background:var(--e);color:var(--n);">ON</span>{% endif %}
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 1 — DATOS
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="det-panel active" id="panel-info">
+  {% macro data_row(label, value) %}
+  <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:baseline;">
+    <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">{{ label }}</span>
+    <span style="font-family:'Libre Baskerville',serif;font-size:13px;color:var(--fog);">{{ value }}</span>
+  </div>
+  {% endmacro %}
+
+  {% macro editable(field, value, label, placeholder='') %}
+  <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:baseline;">
+    <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">{{ label }}</span>
+    <span class="editable-field">
+      <span class="editable-value" onclick="startEdit(this, '{{ field }}', '{{ (value or '') | replace("'", "\\'") }}')"
+            data-field="{{ field }}" data-value="{{ value or '' }}"
+            title="Clic para editar">{{ value or '—' }}</span>
+      <span class="editable-spinner" id="spin-{{ field }}"></span>
+    </span>
+  </div>
+  {% endmacro %}
+
+  <div class="info-grid">
+
+    <!-- Datos personales -->
+    <div class="card" style="padding:20px;margin-bottom:0;">
+      <div class="card-header" style="margin-bottom:14px;">
+        <span class="card-title">Datos personales</span>
+      </div>
+      {% if cliente.tipo == 'persona_fisica' %}
+      {{ editable('nombre', cliente.nombre, 'Nombre') }}
+      {{ editable('apellidos', cliente.apellidos, 'Apellidos') }}
+      {{ editable('fecha_nacimiento', (cliente.fecha_nacimiento or '')[:10], 'Fecha nacimiento') }}
+      {{ editable('curp', cliente.curp, 'CURP') }}
+      {% else %}
+      {{ editable('razon_social', cliente.razon_social, 'Razón social') }}
+      {{ editable('giro_comercial', cliente.giro_comercial, 'Giro comercial') }}
+      {{ editable('representante_legal', cliente.representante_legal, 'Representante legal') }}
+      {{ editable('contacto_principal', cliente.contacto_principal, 'Contacto principal') }}
+      {% endif %}
+      {{ editable('rfc', cliente.rfc, 'RFC') }}
+    </div>
+
+    <!-- Contacto -->
+    <div class="card" style="padding:20px;margin-bottom:0;">
+      <div class="card-header" style="margin-bottom:14px;">
+        <span class="card-title">Contacto</span>
+      </div>
+      {{ editable('email', cliente.email, 'Correo') }}
+      {{ editable('celular', cliente.celular, 'Celular') }}
+      {{ editable('telefono', cliente.telefono, 'Teléfono') }}
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">Estatus</span>
+        <select id="selectEstatus" onchange="editarCampo('estatus', this.value)" class="lex-select">
+          <option value="activo"    {% if (cliente.estatus or 'activo') == 'activo' %}selected{% endif %}>Activo</option>
+          <option value="prospecto" {% if cliente.estatus == 'prospecto' %}selected{% endif %}>Prospecto</option>
+          <option value="inactivo"  {% if cliente.estatus == 'inactivo' %}selected{% endif %}>Inactivo</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Dirección -->
+    <div class="card" style="padding:20px;margin-bottom:0;">
+      <div class="card-header" style="margin-bottom:14px;">
+        <span class="card-title">Dirección</span>
+      </div>
+      {{ editable('direccion', cliente.direccion, 'Calle') }}
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:baseline;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">Número</span>
+        <span style="display:flex;gap:12px;">
+          <span class="editable-field">
+            <span class="editable-value" onclick="startEdit(this,'num_ext','{{ cliente.num_ext or '' }}')" title="Ext.">Ext: {{ cliente.num_ext or '—' }}</span>
+          </span>
+          <span class="editable-field">
+            <span class="editable-value" onclick="startEdit(this,'num_int','{{ cliente.num_int or '' }}')" title="Int.">Int: {{ cliente.num_int or '—' }}</span>
+          </span>
+        </span>
+      </div>
+      {{ editable('colonia', cliente.colonia, 'Colonia') }}
+      {{ editable('municipio', cliente.municipio, 'Municipio') }}
+      {{ editable('ciudad', cliente.ciudad, 'Ciudad') }}
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">Estado</span>
+        <select onchange="editarCampo('estado', this.value)" class="lex-select">
+          <option value="">— Sin especificar —</option>
+          {% for e in estados_mx %}
+          <option value="{{ e }}" {% if cliente.estado == e %}selected{% endif %}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {{ editable('cp', cliente.cp, 'CP') }}
+    </div>
+
+    <!-- CRM -->
+    <div class="card" style="padding:20px;margin-bottom:0;">
+      <div class="card-header" style="margin-bottom:14px;">
+        <span class="card-title">CRM</span>
+      </div>
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">Abogado</span>
+        <select onchange="editarCampo('abogado_id', this.value)" class="lex-select">
+          <option value="">Sin asignar</option>
+          {% for a in abogados %}
+          <option value="{{ a.id }}" {% if cliente.abogado_id == a.id %}selected{% endif %}>{{ a.nombre }} {{ a.apellidos }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">Origen</span>
+        <select onchange="editarCampo('origen_cliente', this.value)" class="lex-select">
+          <option value="">— Sin especificar —</option>
+          {% for o in origenes %}
+          <option value="{{ o }}" {% if cliente.origen_cliente == o %}selected{% endif %}>{{ o }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:baseline;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">Potencial</span>
+        <span class="editable-field">
+          <span class="editable-value" onclick="startEdit(this,'potencial_facturacion','{{ cliente.potencial_facturacion or 0 }}')"
+                data-field="potencial_facturacion">
+            ${{ "{:,.0f}".format(cliente.potencial_facturacion or 0) }} MXN
+          </span>
+        </span>
+      </div>
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;padding-top:4px;">Etiquetas</span>
+        <div style="flex:1;">
+          <div class="tag-list" id="detTagList">
+            {% for t in cliente.etiquetas %}<span class="tag" onclick="removeTag('{{ t }}')">{{ t }} ×</span>{% endfor %}
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <input type="text" id="detTagInput" placeholder="Nueva etiqueta…" class="lex-input" style="flex:1;padding:4px 8px;font-size:11px;" onkeydown="if(event.key==='Enter'){addTag(this.value);this.value=''}">
+            <button class="btn btn-ghost btn-sm" style="padding:4px 10px;" onclick="addTag(document.getElementById('detTagInput').value);document.getElementById('detTagInput').value=''">+</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;padding:10px 0;align-items:baseline;">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);min-width:140px;flex-shrink:0;">Alta</span>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);">{{ (cliente.fecha_alta or '')[:10] }}</span>
+      </div>
+    </div>
+
+    <!-- Notas internas -->
+    <div class="card full" style="padding:20px;margin-bottom:0;">
+      <div class="card-header" style="margin-bottom:10px;">
+        <span class="card-title">Notas internas del despacho</span>
+      </div>
+      <textarea id="notasInternas" rows="3" class="lex-input"
+                style="width:100%;resize:vertical;font-family:'Libre Baskerville',serif;font-size:13px;padding:10px;line-height:1.5;"
+                placeholder="Notas privadas del equipo…"
+                onfocus="this.style.borderColor='var(--e)'"
+                onblur="this.style.borderColor='var(--border)';editarCampo('notas',this.value)">{{ cliente.notas or '' }}</textarea>
+    </div>
+
+  </div><!-- /info-grid -->
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 2 — ASUNTOS
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="det-panel" id="panel-asuntos">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <a href="{{ url_for('asuntos.nuevo') }}?cliente_id={{ cliente.id }}" class="btn btn-primary btn-sm">
+      + Nuevo asunto
+    </a>
+  </div>
+  {% if asuntos %}
+  <table class="lex-table">
+    <thead>
+      <tr>
+        <th>Expediente</th>
+        <th>Tipo</th>
+        <th>Estado</th>
+        <th>Prioridad</th>
+        <th>Inicio</th>
+        <th>Honorarios</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in asuntos %}
+      <tr>
+        <td>
+          <a href="{{ url_for('asuntos.detalle', id=a.id) }}" style="font-family:'Libre Baskerville',serif;font-weight:600;color:var(--fog);text-decoration:none;">
+            {{ a.titulo | truncate(45) }}
+          </a>
+          {% if a.numero_expediente %}
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;color:var(--ash);margin-top:2px;">{{ a.numero_expediente }}</div>
+          {% endif %}
+        </td>
+        <td><span class="badge" style="font-size:.7rem;">{{ a.tipo_asunto or '—' }}</span></td>
+        <td><span class="badge badge-{{ a.estado }}">{{ a.estado }}</span></td>
+        <td><span class="badge badge-{{ a.prioridad }}">{{ a.prioridad }}</span></td>
+        <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">{{ (a.fecha_inicio or '')[:10] }}</td>
+        <td style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:300;color:var(--fog);">
+          {% if a.honorarios_pactados %}${{ "{:,.0f}".format(a.honorarios_pactados) }}{% else %}—{% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('asuntos.detalle', id=a.id) }}" class="btn btn-ghost btn-sm" style="padding:4px 8px;">Ver →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="es-icon">{{ icon_folder(24, 24) }}</div>
+    <div class="empty-title">Sin asuntos</div>
+    <div class="empty-sub">Este cliente aún no tiene expedientes registrados.</div>
+    <a href="{{ url_for('asuntos.nuevo') }}?cliente_id={{ cliente.id }}" class="btn btn-primary btn-sm" style="margin-top:16px;">+ Crear primer asunto</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 3 — PAGOS / COBROS
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="det-panel" id="panel-facturas">
+
+  <!-- KPI row -->
+  <div class="cobros-kpi-row">
+    <div class="cobros-kpi-card">
+      <div class="cobros-kpi-label">Total facturado</div>
+      <div class="cobros-kpi-val">${{ "{:,.0f}".format(cobros_resumen.total) }}</div>
+    </div>
+    <div class="cobros-kpi-card kpi-green">
+      <div class="cobros-kpi-label">Cobrado</div>
+      <div class="cobros-kpi-val">${{ "{:,.0f}".format(cobros_resumen.pagado) }}</div>
+    </div>
+    <div class="cobros-kpi-card kpi-gold">
+      <div class="cobros-kpi-label">Pendiente</div>
+      <div class="cobros-kpi-val">${{ "{:,.0f}".format(cobros_resumen.pendiente) }}</div>
+    </div>
+    <div class="cobros-kpi-card kpi-red">
+      <div class="cobros-kpi-label">Vencido</div>
+      <div class="cobros-kpi-val">${{ "{:,.0f}".format(cobros_resumen.vencido) }}</div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <a href="{{ url_for('cobranzas.index') }}?cliente_id={{ cliente.id }}" class="btn btn-primary btn-sm">+ Registrar cobro</a>
+  </div>
+
+  {% if cobros %}
+  <table class="lex-table">
+    <thead>
+      <tr>
+        <th>Concepto</th>
+        <th>Monto</th>
+        <th>Estado</th>
+        <th>Emisión</th>
+        <th>Vencimiento</th>
+        <th>Pago</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in cobros %}
+      <tr>
+        <td style="font-family:'Libre Baskerville',serif;">{{ c.concepto }}</td>
+        <td style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:300;color:var(--fog);">${{ "{:,.0f}".format(c.monto) }}</td>
+        <td><span class="badge badge-{{ c.estado }}">{{ c.estado }}</span></td>
+        <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">{{ (c.fecha_emision or '')[:10] }}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:10px;color:{% if c.estado == 'pendiente' and c.fecha_vencimiento and c.fecha_vencimiento[:10] < today_str %}#EF4444{% else %}var(--ash){% endif %};">
+          {{ (c.fecha_vencimiento or '')[:10] }}
+        </td>
+        <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--e);">{{ (c.fecha_pago or '')[:10] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="es-icon">{{ icon_dollar(24, 24) }}</div>
+    <div class="empty-title">Sin cobros registrados</div>
+    <a href="{{ url_for('cobranzas.index') }}?cliente_id={{ cliente.id }}" class="btn btn-ghost btn-sm" style="margin-top:16px;">+ Registrar cobro</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 4 — DOCUMENTOS
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="det-panel" id="panel-documentos">
+  <div class="doc-drop-zone" id="docDropZone"
+       onclick="document.getElementById('docFileInput').click()"
+       ondragover="event.preventDefault();this.classList.add('drag-over')"
+       ondragleave="this.classList.remove('drag-over')"
+       ondrop="handleDocDrop(event)">
+    {{ icon_paperclip(14, 14) }} Arrastra documentos aquí o haz clic para subir
+  </div>
+  <input type="file" id="docFileInput" style="display:none;" multiple onchange="subirDocumentos(this.files)">
+
+  <div id="docList" class="doc-list">
+    {% if documentos %}
+    {% for d in documentos %}
+    <div class="doc-item" id="doc-{{ d.id }}">
+      <div class="doc-icon">
+        {% if d.mime_type and 'pdf' in d.mime_type %}{{ icon_file_text(14, 14) }}
+        {% elif d.mime_type and 'image' in d.mime_type %}{{ icon_image(14, 14) }}
+        {% elif d.mime_type and ('word' in d.mime_type or 'document' in d.mime_type) %}{{ icon_edit(14, 14) }}
+        {% else %}{{ icon_paperclip(14, 14) }}{% endif %}
+      </div>
+      <div class="doc-info">
+        <div class="doc-name">{{ d.nombre }}</div>
+        <div class="doc-meta">
+          {{ (d.fecha_subida or '')[:10] }}
+          {% if d.tamanio %} · {{ (d.tamanio / 1024) | round(1) }} KB{% endif %}
+          {% if d.descripcion %} · {{ d.descripcion }}{% endif %}
+        </div>
+      </div>
+      <div class="doc-actions">
+        {% if d.archivo_url %}
+        <a href="{{ d.archivo_url }}" target="_blank" class="doc-btn" title="Descargar">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state" id="docEmpty">
+      <div class="es-icon">{{ icon_folder(24, 24) }}</div>
+      <div class="empty-sub">Sin documentos adjuntos.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 5 — ACTIVIDAD (HISTORIAL DE COMUNICACIONES)
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="det-panel" id="panel-historial">
+  <div class="add-entry-form">
+    <textarea id="comResumen" placeholder="Resumen de la comunicación…" rows="2"></textarea>
+    <div class="add-entry-row">
+      <select id="comTipo" class="lex-select" style="flex:1;">
+        {% for t in tipos_comunicacion %}<option value="{{ t }}">{{ t.title() }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="registrarComunicacion()">Registrar</button>
+    </div>
+  </div>
+
+  {% if comunicaciones %}
+  {% set com_icons = {'llamada': icon_phone(14,14), 'correo': icon_mail(14,14), 'reunion': icon_message(14,14), 'whatsapp': icon_message(14,14), 'otro': icon_pin(14,14)} %}
+  <div class="timeline" id="comTimeline">
+    {% for c in comunicaciones %}
+    <div class="timeline-item">
+      <div class="timeline-icon">{{ com_icons.get(c.tipo, icon_pin(14,14)) }}</div>
+      <div class="timeline-content">
+        <div class="timeline-text">{{ c.resumen }}</div>
+        <div class="timeline-meta">{{ c.tipo.title() }} · {{ (c.fecha or '')[:16] }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state" id="comEmpty">
+    <div class="es-icon">{{ icon_phone(24, 24) }}</div>
+    <div class="empty-title">Sin comunicaciones</div>
+    <div class="empty-sub">Registra llamadas, correos o reuniones con este cliente.</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 6 — NOTAS
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="det-panel" id="panel-notas">
+  <div class="add-entry-form">
+    <textarea id="notaContenido" placeholder="Escribe una nota…" rows="2"></textarea>
+    <div class="add-entry-row">
+      <select id="notaTipo" class="lex-select" style="flex:1;">
+        {% for t in tipos_nota %}<option value="{{ t }}">{{ t.title() }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="agregarNota()">Agregar nota</button>
+    </div>
+  </div>
+
+  {% set nota_icons = {'nota': icon_edit(14,14), 'llamada': icon_phone(14,14), 'reunion': icon_message(14,14), 'correo': icon_mail(14,14), 'whatsapp': icon_message(14,14), 'otro': icon_pin(14,14)} %}
+  <div class="timeline" id="notaTimeline">
+    {% if notas %}
+    {% for n in notas %}
+    <div class="timeline-item">
+      <div class="timeline-icon">{{ nota_icons.get(n.tipo, icon_edit(14,14)) }}</div>
+      <div class="timeline-content">
+        <div class="timeline-text">{{ n.contenido }}</div>
+        <div class="timeline-meta">{{ n.tipo.title() }} · {{ (n.fecha or '')[:16] }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state" id="notaEmpty">
+      <div class="es-icon">{{ icon_edit(24, 24) }}</div>
+      <div class="empty-title">Sin notas</div>
+      <div class="empty-sub">Agrega notas, recordatorios o minutas de este cliente.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 7 — PORTAL
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="det-panel" id="panel-portal">
+  <div style="max-width:520px;">
+    {% if cliente.invitar_portal %}
+    <div class="portal-active-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--e)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <div>
+        <div class="portal-active-label">Portal activo</div>
+        <div class="portal-active-sub">Este cliente tiene acceso al portal externo.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="generarMagicLink()">Generar link mágico</button>
+      <button class="btn btn-danger btn-sm" onclick="desactivarPortal()">Desactivar acceso</button>
+    </div>
+    {% else %}
+    <div class="portal-card">
+      <h3>Invitar al Portal de Clientes</h3>
+      <p style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ash);margin-bottom:14px;">
+        El cliente podrá ver sus asuntos, documentos, facturas y enviar mensajes desde un portal externo.
+      </p>
+      <div class="lex-form-group">
+        <label class="lex-label">Email de acceso</label>
+        <input class="lex-input" type="email" id="portalEmail" value="{{ cliente.email or '' }}" placeholder="email@cliente.com">
+      </div>
+      <div class="lex-form-group" style="margin-top:10px;">
+        <label class="lex-label">Contraseña (opcional — si no, usar link mágico)</label>
+        <input class="lex-input" type="password" id="portalPassword" placeholder="Contraseña del portal">
+      </div>
+      <button class="btn btn-primary" style="margin-top:14px;" onclick="invitarPortal()">Activar acceso al portal</button>
+    </div>
+    {% endif %}
+
+    <!-- Compartir documento -->
+    <div class="portal-card">
+      <h3>Compartir documento</h3>
+      <div class="lex-form-group">
+        <label class="lex-label">Título del documento</label>
+        <input class="lex-input" type="text" id="docTitulo" placeholder="Título del documento">
+      </div>
+      <div class="lex-form-group" style="margin-top:8px;">
+        <label class="lex-label">URL del archivo</label>
+        <input class="lex-input" type="text" id="docUrl" placeholder="URL del archivo">
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="compartirDoc()">Compartir con cliente</button>
+    </div>
+
+    <!-- Mensajes del portal -->
+    <div class="portal-card">
+      <h3>Mensajes del portal</h3>
+      <div id="portalMsgsContainer" style="max-height:300px;overflow-y:auto;">
+        <p style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);" id="portalMsgsEmpty">Cargando mensajes...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     MODAL — Confirmar eliminación
+────────────────────────────────────────────────────────────────────────── -->
+<div class="lex-overlay" id="deleteModal">
+  <div class="lex-modal" style="max-width:400px;">
+    <div class="lex-modal-header">
+      <span class="lex-modal-title" style="color:#EF4444;">Eliminar cliente</span>
+      <button class="lex-modal-close" onclick="this.closest('.lex-overlay').classList.remove('show')">&times;</button>
+    </div>
+    <div class="lex-modal-body">
+      <p style="font-family:'Libre Baskerville',serif;font-size:13px;color:var(--fog);line-height:1.6;">
+        ¿Seguro que deseas eliminar a <strong id="deleteClienteName"></strong>? Esta acción no se puede deshacer.
+      </p>
+    </div>
+    <div class="lex-modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('deleteModal').classList.remove('show')">Cancelar</button>
+      <button class="btn btn-danger" id="deleteConfirmBtn">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CLI_ID = {{ cliente.id }};
+let currentTags = {{ cliente.etiquetas | tojson }};
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+const TAB_ORDER = ["info","asuntos","facturas","documentos","historial","notas","portal"];
+function showTab(name) {
+  document.querySelectorAll(".tab-bar .tab").forEach((btn, i) => {
+    btn.classList.toggle("active", TAB_ORDER[i] === name);
+  });
+  document.querySelectorAll(".det-panel").forEach(p => {
+    p.classList.toggle("active", p.id === "panel-" + name);
+  });
+  history.replaceState(null, "", "#" + name);
+}
+// Restore tab from hash
+if (TAB_ORDER.includes(location.hash.slice(1))) showTab(location.hash.slice(1));
+
+// ── Inline editing ────────────────────────────────────────────────────────────
+async function editarCampo(campo, valor) {
+  try {
+    await fetch(`/clientes/${CLI_ID}/editar-campo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campo, valor }),
+    });
+  } catch (e) {}
+}
+
+function startEdit(spanEl, field, currentValue) {
+  const parent = spanEl.parentElement;
+  spanEl.classList.add("editing");
+  const input = document.createElement("input");
+  input.className = "editable-input";
+  input.value = currentValue;
+  input.style.width = Math.max(120, spanEl.offsetWidth) + "px";
+  parent.insertBefore(input, spanEl.nextSibling);
+  input.focus();
+  input.select();
+
+  const commit = async () => {
+    const newVal = input.value.trim();
+    spanEl.classList.remove("editing");
+    input.remove();
+    if (newVal !== currentValue) {
+      spanEl.textContent = newVal || "—";
+      const spin = document.getElementById("spin-" + field);
+      if (spin) { spin.style.display = "inline-block"; }
+      await editarCampo(field, newVal);
+      if (spin) { spin.style.display = "none"; }
+    }
+  };
+
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { input.value = currentValue; input.blur(); }
+  });
+}
+
+// ── Tags ──────────────────────────────────────────────────────────────────────
+function renderDetTags() {
+  const list = document.getElementById("detTagList");
+  list.innerHTML = "";
+  currentTags.forEach(t => {
+    const span = document.createElement("span");
+    span.className = "tag";
+    span.style.cursor = "pointer";
+    span.textContent = t + " ×";
+    span.onclick = () => removeTag(t);
+    list.appendChild(span);
+  });
+}
+function addTag(val) {
+  val = val.trim();
+  if (val && !currentTags.includes(val)) {
+    currentTags.push(val);
+    editarCampo("etiquetas", currentTags);
+    renderDetTags();
+  }
+}
+function removeTag(tag) {
+  currentTags = currentTags.filter(t => t !== tag);
+  editarCampo("etiquetas", currentTags);
+  renderDetTags();
+}
+
+// ── Photo upload ──────────────────────────────────────────────────────────────
+async function subirFoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("foto", file);
+  try {
+    const res  = await fetch(`/clientes/${CLI_ID}/foto`, { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      const ph = document.getElementById("clientePhoto");
+      // Replace inner content with the new image
+      ph.innerHTML = `<img src="${data.url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    }
+  } catch (e) {}
+}
+
+// ── Notas ─────────────────────────────────────────────────────────────────────
+const NOTA_ICONS = {
+  nota:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  llamada:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>',
+  reunion:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+  correo:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>',
+  whatsapp: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+  otro:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+};
+
+async function agregarNota() {
+  const contenido = document.getElementById("notaContenido").value.trim();
+  const tipo      = document.getElementById("notaTipo").value;
+  if (!contenido) return;
+  try {
+    const res  = await fetch(`/clientes/${CLI_ID}/notas`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contenido, tipo }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("notaContenido").value = "";
+      const empty = document.getElementById("notaEmpty");
+      if (empty) empty.remove();
+      const tl = document.getElementById("notaTimeline");
+      const item = document.createElement("div");
+      item.className = "timeline-item";
+      item.innerHTML = `<div class="timeline-icon">${NOTA_ICONS[tipo]||NOTA_ICONS.nota}</div>
+        <div class="timeline-content">
+          <div class="timeline-text">${contenido}</div>
+          <div class="timeline-meta">${tipo.charAt(0).toUpperCase()+tipo.slice(1)} · ${data.fecha}</div>
+        </div>`;
+      tl.insertBefore(item, tl.firstChild);
+    }
+  } catch (e) {}
+}
+
+// ── Comunicaciones ────────────────────────────────────────────────────────────
+const COM_ICONS = {
+  llamada:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>',
+  correo:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>',
+  reunion:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+  whatsapp: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+  otro:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+};
+
+async function registrarComunicacion() {
+  const resumen = document.getElementById("comResumen").value.trim();
+  const tipo    = document.getElementById("comTipo").value;
+  if (!resumen) return;
+  try {
+    const res  = await fetch(`/clientes/${CLI_ID}/comunicaciones`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resumen, tipo }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("comResumen").value = "";
+      const empty = document.getElementById("comEmpty");
+      if (empty) empty.remove();
+      const tl = document.getElementById("comTimeline");
+      if (!tl) { location.reload(); return; }
+      const item = document.createElement("div");
+      item.className = "timeline-item";
+      item.innerHTML = `<div class="timeline-icon">${COM_ICONS[tipo]||COM_ICONS.otro}</div>
+        <div class="timeline-content">
+          <div class="timeline-text">${resumen}</div>
+          <div class="timeline-meta">${tipo.charAt(0).toUpperCase()+tipo.slice(1)} · ${data.fecha}</div>
+        </div>`;
+      tl.insertBefore(item, tl.firstChild);
+    }
+  } catch (e) {}
+}
+
+// ── Documentos ────────────────────────────────────────────────────────────────
+function handleDocDrop(e) {
+  e.preventDefault();
+  document.getElementById("docDropZone").classList.remove("drag-over");
+  subirDocumentos(e.dataTransfer.files);
+}
+
+async function subirDocumentos(files) {
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append("archivo", file);
+    fd.append("nombre", file.name);
+    try {
+      const res  = await fetch(`/clientes/${CLI_ID}/documentos`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.ok) {
+        const empty = document.getElementById("docEmpty");
+        if (empty) empty.remove();
+        const list = document.getElementById("docList");
+        const item = document.createElement("div");
+        item.className = "doc-item";
+        item.id = `doc-${data.id}`;
+        const sz = (file.size / 1024).toFixed(1);
+        item.innerHTML = `<div class="doc-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></div>
+          <div class="doc-info">
+            <div class="doc-name">${file.name}</div>
+            <div class="doc-meta">Ahora · ${sz} KB</div>
+          </div>`;
+        list.appendChild(item);
+      }
+    } catch (e) {}
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+function confirmarEliminar(id, nombre) {
+  document.getElementById("deleteClienteName").textContent = nombre;
+  document.getElementById("deleteModal").classList.add("show");
+  document.getElementById("deleteConfirmBtn").onclick = async () => {
+    const res = await fetch(`/clientes/${id}/eliminar`, {
+      method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" }
+    });
+    const data = await res.json();
+    if (data.ok) window.location.href = "{{ url_for('clientes.index') }}";
+  };
+}
+document.getElementById("deleteModal").addEventListener("click", function(e) {
+  if (e.target === this) this.classList.remove("show");
+});
+
+// ── Portal ────────────────────────────────────────────────────────────────────
+function invitarPortal() {
+  const email = document.getElementById('portalEmail').value.trim();
+  const password = document.getElementById('portalPassword').value;
+  if (!email) { alert('Email requerido'); return; }
+  const fd = new FormData();
+  fd.append('email', email);
+  fd.append('password', password);
+  fetch('/portal/invitar/' + CLI_ID, { method: 'POST', body: fd })
+  .then(r => r.json()).then(d => {
+    if (d.ok) { alert('Acceso al portal activado'); location.reload(); }
+    else alert(d.error || 'Error');
+  });
+}
+
+function generarMagicLink() {
+  fetch('/portal/magic-link/' + CLI_ID, { method: 'POST' })
+  .then(r => r.json()).then(d => {
+    if (d.ok) prompt('Link mágico (válido 24h). Envíalo al cliente:', d.link);
+    else alert(d.error || 'Error');
+  });
+}
+
+function desactivarPortal() {
+  if (!confirm('¿Desactivar acceso al portal para este cliente?')) return;
+  fetch('/portal/desactivar/' + CLI_ID, { method: 'POST' })
+  .then(r => r.json()).then(d => { if (d.ok) location.reload(); });
+}
+
+function compartirDoc() {
+  const titulo = document.getElementById('docTitulo').value.trim();
+  const url = document.getElementById('docUrl').value.trim();
+  if (!titulo) { alert('Título requerido'); return; }
+  const fd = new FormData();
+  fd.append('titulo', titulo);
+  fd.append('archivo_url', url);
+  fetch('/portal/compartir-doc/' + CLI_ID, { method: 'POST', body: fd })
+  .then(r => r.json()).then(d => {
+    if (d.ok) { alert('Documento compartido'); document.getElementById('docTitulo').value = ''; document.getElementById('docUrl').value = ''; }
+    else alert(d.error || 'Error');
+  });
+}
+
+// Load portal messages on tab switch
+(function loadPortalMsgs() {
+  const container = document.getElementById('portalMsgsContainer');
+  if (!container) return;
+  // Lazy load when portal tab is shown
+  const observer = new MutationObserver(function() {
+    const panel = document.getElementById('panel-portal');
+    if (panel && panel.style.display !== 'none') {
+      fetch('/portal/responder/0').catch(() => {}); // just trigger; actual load below
+      // Simple: fetch all messages for this client via the admin endpoint
+      container.innerHTML = '<p style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--ash);">Revisa los mensajes en Portal > Todos los mensajes</p>';
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.body, { subtree: true, attributes: true });
+})();
+</script>
+{% endblock %}

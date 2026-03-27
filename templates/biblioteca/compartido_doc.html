@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ documento.titulo }} — {{ tenant.nombre_despacho if tenant else 'LexOS' }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    background: #F3F4F6;
+    color: #1F2937;
+    line-height: 1.7;
+  }
+  .header {
+    background: #fff;
+    border-bottom: 1px solid #E5E7EB;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-title { font-size: .9rem; font-weight: 700; color: var(--e); }
+  .header-sub { font-size: .78rem; color: #9CA3AF; }
+  .badge {
+    font-size: .68rem;
+    padding: 3px 10px;
+    border-radius: 100px;
+    background: rgba(0,223,162,.1);
+    color: var(--e);
+    font-weight: 700;
+  }
+  .content {
+    max-width: 800px;
+    margin: 32px auto;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    padding: 48px 56px;
+    min-height: 60vh;
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
+  }
+  .content h1 { font-size: 1.6rem; margin-bottom: 12px; }
+  .content h2 { font-size: 1.3rem; margin-bottom: 10px; }
+  .content h3 { font-size: 1.1rem; margin-bottom: 8px; }
+  .content p { margin-bottom: 10px; }
+  .content blockquote {
+    border-left: 3px solid var(--e);
+    padding-left: 12px;
+    color: #6B7280;
+    margin: 12px 0;
+  }
+  .content table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  .content th, .content td { border: 1px solid #E5E7EB; padding: 8px 10px; text-align: left; }
+  .content th { background: #F9FAFB; font-weight: 600; }
+  .content img { max-width: 100%; border-radius: 6px; }
+  .footer {
+    text-align: center;
+    padding: 24px;
+    font-size: .74rem;
+    color: #9CA3AF;
+  }
+  @media (max-width: 700px) {
+    .content { padding: 24px 18px; margin: 16px; }
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="header-title">{{ tenant.nombre_despacho if tenant else 'LexOS' }}</div>
+      <div class="header-sub">Documento compartido: {{ documento.titulo }}</div>
+    </div>
+    <span class="badge">Solo lectura</span>
+  </div>
+  <div class="content">
+    {{ documento.contenido_html | safe }}
+  </div>
+  <div class="footer">
+    Documento generado en LexOS · Este enlace es temporal y de solo lectura.
+  </div>
+</body>
+</html>

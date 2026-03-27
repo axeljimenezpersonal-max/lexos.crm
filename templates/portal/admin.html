@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Portal Clientes{% endblock %}
+{% block head %}
+<style>
+  .ptl-admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .ptl-admin-stat { background: var(--bg-card,#1F2937); border: 1px solid var(--border,#374151); border-radius: 12px; padding: 18px; }
+  .ptl-admin-stat-val { font-size: 1.6rem; font-weight: 700; }
+  .ptl-admin-stat-label { font-size: .78rem; color: var(--text-muted,#9CA3AF); }
+  .ptl-resp-form { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border,#374151); }
+  .ptl-resp-form input { flex: 1; }
+  .ptl-acc-actions { display: flex; gap: 6px; }
+  .ptl-acc-btn { background: none; border: 1px solid var(--border,#374151); border-radius: 6px; padding: 4px 10px; font-size: .72rem; cursor: pointer; color: var(--text-muted,#9CA3AF); transition: all .15s; }
+  .ptl-acc-btn:hover { border-color: var(--e); color: var(--e); }
+  .ptl-acc-btn-danger:hover { border-color: #EF4444; color: #EF4444; }
+  @media (max-width: 700px) { .ptl-admin-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tb-breadcrumb"><span>Portal de Clientes</span></div>
+
+<!-- Stats -->
+<div class="ptl-admin-grid">
+  <div class="ptl-admin-stat">
+    <div class="ptl-admin-stat-val">{{ accesos|length }}</div>
+    <div class="ptl-admin-stat-label">Clientes con acceso al portal</div>
+  </div>
+  <div class="ptl-admin-stat">
+    <div class="ptl-admin-stat-val" style="color:#F59E0B;">{{ mensajes_no_leidos|length }}</div>
+    <div class="ptl-admin-stat-label">Mensajes sin leer</div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab-group="portal" data-tab-target="tab-mensajes">
+    Mensajes ({{ mensajes_no_leidos|length }} nuevos)
+  </button>
+  <button class="tab-btn" data-tab-group="portal" data-tab-target="tab-accesos">
+    Accesos ({{ accesos|length }})
+  </button>
+  <button class="tab-btn" data-tab-group="portal" data-tab-target="tab-todos">
+    Todos los mensajes
+  </button>
+</div>
+
+<!-- Mensajes no leídos -->
+<div id="tab-mensajes" class="tab-content" data-tab-content="portal">
+  {% if mensajes_no_leidos %}
+  <div style="display:grid; gap:12px;">
+    {% for m in mensajes_no_leidos %}
+    <div class="card" style="padding:16px; border-left: 3px solid #F59E0B;">
+      <div class="d-flex justify-between align-center mb-2">
+        <div class="d-flex align-center gap-2">
+          <strong class="text-sm">{{ m.cliente_nombre or '—' }}</strong>
+          {% if m.asunto_titulo %}<span class="text-xs text-muted">· {{ m.asunto_titulo }}</span>{% endif %}
+        </div>
+        <span class="text-xs text-muted">{{ m.fecha[:16] if m.fecha else '' }}</span>
+      </div>
+      <p class="text-sm" style="color:var(--text-2); line-height:1.6;">{{ m.mensaje }}</p>
+      <div class="ptl-resp-form">
+        <input class="form-control" type="text" id="resp-{{ m.id }}" placeholder="Escribe una respuesta…">
+        <button class="btn btn-primary btn-sm" onclick="responder({{ m.id }})">Responder</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <h3>Sin mensajes pendientes</h3>
+    <p>Todos los mensajes han sido respondidos.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Accesos -->
+<div id="tab-accesos" class="tab-content" data-tab-content="portal" style="display:none;">
+  {% if accesos %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cliente</th><th>Email</th><th>Último login</th><th>Estado</th><th>Alta</th><th></th></tr></thead>
+      <tbody>
+      {% for a in accesos %}
+      <tr>
+        <td><strong>{{ a.cliente_nombre }}</strong></td>
+        <td class="text-sm">{{ a.email }}</td>
+        <td class="text-sm text-muted">{{ a.ultimo_login[:16] if a.ultimo_login else 'Nunca' }}</td>
+        <td><span class="badge badge-{{ 'activo' if a.activo else 'inactivo' }}">{{ 'Activo' if a.activo else 'Inactivo' }}</span></td>
+        <td class="text-xs text-muted">{{ a.fecha_alta[:10] if a.fecha_alta else '' }}</td>
+        <td>
+          <div class="ptl-acc-actions">
+            <button class="ptl-acc-btn" onclick="magicLink({{ a.cliente_id }})" title="Generar link mágico">Link</button>
+            {% if a.activo %}
+            <button class="ptl-acc-btn ptl-acc-btn-danger" onclick="desactivar({{ a.cliente_id }})" title="Desactivar">Desactivar</button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:40px;">
+    <h3>Sin accesos</h3>
+    <p>Invita clientes desde su ficha con "Invitar al Portal".</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Todos los mensajes -->
+<div id="tab-todos" class="tab-content" data-tab-content="portal" style="display:none;">
+  {% if mensajes_recientes %}
+  <div style="display:grid; gap:8px;">
+    {% for m in mensajes_recientes %}
+    <div class="card" style="padding:12px 16px;">
+      <div class="d-flex justify-between align-center">
+        <div class="d-flex align-center gap-2">
+          <span class="badge badge-{{ 'activo' if m.remitente=='despacho' else 'pendiente' }}" style="font-size:.6rem;">{{ m.remitente }}</span>
+          <strong class="text-sm">{{ m.cliente_nombre or '—' }}</strong>
+        </div>
+        <span class="text-xs text-muted">{{ m.fecha[:16] if m.fecha else '' }}</span>
+      </div>
+      <p class="text-sm" style="color:var(--text-2); margin-top:4px;">{{ m.mensaje[:120] }}{{ '…' if m.mensaje|length > 120 }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><p>Sin mensajes.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PREFIX = '{{ url_for("portal.index") }}'.replace(/\/$/,'');
+
+function responder(id) {
+  const input = document.getElementById('resp-' + id);
+  const msg = input.value.trim();
+  if (!msg) return;
+  fetch(PREFIX + '/responder/' + id, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({respuesta: msg})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) location.reload();
+    else alert(d.error || 'Error');
+  });
+}
+
+function magicLink(clienteId) {
+  fetch(PREFIX + '/magic-link/' + clienteId, {method: 'POST'})
+  .then(r => r.json()).then(d => {
+    if (d.ok) {
+      prompt('Link mágico generado (válido 24h). Cópialo:', d.link);
+    } else alert(d.error || 'Error');
+  });
+}
+
+function desactivar(clienteId) {
+  if (!confirm('¿Desactivar acceso al portal para este cliente?')) return;
+  fetch(PREFIX + '/desactivar/' + clienteId, {method: 'POST'})
+  .then(r => r.json()).then(d => { if (d.ok) location.reload(); });
+}
+</script>
+{% endblock %}

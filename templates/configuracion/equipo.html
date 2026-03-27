@@ -1,0 +1,476 @@
+{% extends "base.html" %}
+{% block title %}Equipo{% endblock %}
+{% block page_title %}Equipo{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/equipo.css') }}">
+<style>
+.eq-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-bottom:20px; }
+.eq-card { background:var(--c); border:1px solid var(--border); border-radius:8px; padding:20px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; transition:border-color .2s,box-shadow .2s; animation:fadeUp .35s ease both; animation-delay:calc(var(--i,0)*60ms); position:relative; }
+.eq-card:hover { border-color:var(--border-m); box-shadow:0 4px 20px rgba(0,223,162,.06); }
+.eq-card--inactive { opacity:.6; }
+.eq-card--suspended { opacity:.75; }
+.eq-avatar { width:52px; height:52px; border-radius:50%; background:var(--edim); border:1.5px solid var(--border-m); display:flex; align-items:center; justify-content:center; font-family:'DM Mono',monospace; font-size:16px; font-weight:500; color:var(--e); text-transform:uppercase; flex-shrink:0; overflow:hidden; text-decoration:none; }
+.eq-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.eq-name { font-family:'Libre Baskerville',serif; font-size:14px; font-weight:700; color:var(--fog); text-decoration:none; }
+.eq-name:hover { color:var(--e); }
+.eq-role { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash); }
+.eq-email { font-family:'DM Mono',monospace; font-size:10px; color:var(--ash); }
+.eq-stats { display:flex; gap:14px; margin-top:4px; }
+.eq-stat { text-align:center; }
+.eq-stat-val { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; color:var(--e); display:block; line-height:1; }
+.eq-stat-lbl { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); display:block; margin-top:2px; }
+.eq-actions { display:flex; gap:6px; margin-top:4px; width:100%; justify-content:center; }
+.eq-chips { display:flex; flex-wrap:wrap; gap:4px; justify-content:center; }
+.eq-chip { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.08em; text-transform:uppercase; padding:3px 7px; border-radius:4px; background:var(--edim); color:var(--e); border:1px solid var(--border-m); }
+.eq-chip--more { background:transparent; color:var(--ash); border-color:var(--border); }
+.eq-stat-bar { display:flex; flex-direction:column; align-items:center; gap:3px; flex:1; min-width:60px; }
+.eq-bar-track { width:100%; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.eq-bar-fill { height:100%; border-radius:2px; transition:width .4s; }
+.eq-bar-label { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.08em; text-transform:uppercase; }
+.eq-card-menu { position:absolute; top:12px; right:12px; }
+.eq-dots { background:none; border:none; color:var(--ash); cursor:pointer; padding:4px; display:flex; align-items:center; border-radius:4px; transition:background .15s,color .15s; }
+.eq-dots:hover { background:var(--border); color:var(--fog); }
+.eq-dropdown { position:absolute; right:0; top:100%; background:var(--c); border:1px solid var(--border-m); border-radius:8px; min-width:140px; z-index:100; padding:4px; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
+.eq-dropdown.show { display:block; }
+.eq-dropdown a, .eq-dropdown button { display:block; width:100%; text-align:left; padding:8px 12px; font-family:'DM Mono',monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--fog); background:none; border:none; cursor:pointer; border-radius:5px; text-decoration:none; transition:background .12s; }
+.eq-dropdown a:hover, .eq-dropdown button:hover { background:var(--border); }
+.eq-dropdown button.danger { color:#ef4444; }
+.eq-dropdown button.danger:hover { background:rgba(239,68,68,.08); }
+.eq-estatus { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.1em; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
+.eq-estatus--activo { background:rgba(0,223,162,.1); color:var(--e); border:1px solid var(--border-m); }
+.eq-estatus--pendiente { background:rgba(245,158,11,.1); color:#f59e0b; border:1px solid rgba(245,158,11,.25); }
+.eq-estatus--suspendido { background:rgba(239,68,68,.08); color:#ef4444; border:1px solid rgba(239,68,68,.2); }
+.eq-estatus--inactivo { background:var(--border); color:var(--ash); border:1px solid var(--border); }
+.eq-cargo-badge { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.1em; text-transform:uppercase; padding:3px 8px; border-radius:4px; color:#fff; }
+.eq-btn-ver { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; padding:6px 14px; border-radius:6px; border:1px solid var(--border-m); background:transparent; color:var(--e); cursor:pointer; transition:all .15s; text-decoration:none; display:inline-block; }
+.eq-btn-ver:hover { background:var(--edim); }
+
+/* Invite/Add form */
+.eq-invite-card { background:var(--c); border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:20px; }
+.eq-invite-title { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:300; color:var(--fog); margin-bottom:16px; }
+.eq-form-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+
+/* Modal */
+.eq-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1000; display:none; align-items:center; justify-content:center; padding:20px; }
+.eq-modal-overlay.show { display:flex; }
+.eq-modal { background:var(--c); border:1px solid var(--border-m); border-radius:10px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; }
+.eq-modal--lg { max-width:700px; }
+.eq-modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--border); }
+.eq-modal-header h3 { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:300; color:var(--fog); margin:0; }
+.eq-modal-close { background:none; border:none; color:var(--ash); cursor:pointer; font-size:20px; line-height:1; padding:4px; border-radius:4px; transition:color .15s; }
+.eq-modal-close:hover { color:var(--fog); }
+.eq-modal-body { padding:20px; }
+.eq-modal-footer { padding:16px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+.eq-form-group { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.eq-form-group label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash); }
+.eq-check-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; margin-top:4px; }
+.eq-check-item { display:flex; align-items:center; gap:6px; font-family:'DM Mono',monospace; font-size:10px; color:var(--fog); cursor:pointer; }
+.eq-check-item input[type="checkbox"] { accent-color:var(--e); }
+.eq-table { width:100%; border-collapse:collapse; }
+.eq-table th { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.15em; text-transform:uppercase; color:var(--ash); padding:8px 12px; border-bottom:1px solid var(--border); font-weight:400; text-align:left; }
+.eq-table td { padding:10px 12px; border-bottom:1px solid var(--border); font-family:'Libre Baskerville',serif; font-size:12px; color:var(--fog); }
+.eq-table tr:last-child td { border-bottom:none; }
+.eq-table tr:hover td { background:rgba(0,223,162,.02); }
+.eq-empty { text-align:center; color:var(--ash); font-family:'DM Mono',monospace; font-size:10px; letter-spacing:.08em; }
+.eq-det-profile { display:flex; gap:16px; align-items:flex-start; margin-bottom:16px; }
+.eq-det-avatar { width:60px; height:60px; border-radius:50%; background:var(--edim); border:1.5px solid var(--border-m); display:flex; align-items:center; justify-content:center; font-family:'DM Mono',monospace; font-size:20px; font-weight:500; color:var(--e); text-transform:uppercase; flex-shrink:0; overflow:hidden; }
+.eq-det-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.eq-det-info { flex:1; }
+.eq-det-row { display:flex; gap:8px; margin-bottom:6px; font-size:12px; }
+.eq-det-row strong { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); min-width:90px; }
+.eq-det-row span { font-family:'Libre Baskerville',serif; color:var(--fog); }
+.eq-det-upload { margin-bottom:14px; }
+.eq-det-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; gap:0; }
+.eq-det-tab { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.12em; text-transform:uppercase; padding:9px 14px; color:var(--ash); background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-1px; cursor:pointer; transition:all .15s; }
+.eq-det-tab:hover { color:var(--fog); }
+.eq-det-tab.active { color:var(--e); border-bottom-color:var(--e); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <div class="page-eyebrow">Gestión · LexOS</div>
+  <h1 class="page-title">Equipo</h1>
+  <div class="page-meta-row">
+    <span class="page-count">{{ members|length }} miembro{{ 's' if members|length != 1 }}</span>
+    <div class="page-actions">
+      {% if is_admin %}
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('modalInvitar').classList.add('show')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Invitar miembro
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="page-divider"></div>
+
+<!-- Grid de tarjetas -->
+<div class="eq-grid">
+  {% for m in members %}
+  <div class="eq-card {% if m.estatus == 'inactivo' %}eq-card--inactive{% elif m.estatus == 'suspendido' %}eq-card--suspended{% endif %}"
+       style="--i:{{ loop.index0 }}"
+       data-uid="{{ m.id }}">
+
+    {% if is_admin %}
+    <div class="eq-card-menu">
+      <button class="eq-dots" onclick="toggleMenu(this)" title="Opciones">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+        </svg>
+      </button>
+      <div class="eq-dropdown">
+        <a href="{{ url_for('equipo.perfil', uid=m.id) }}">Ver perfil</a>
+        <button onclick="openEditModal({{ m.id }})">Editar cargo</button>
+        {% if m.estatus == 'activo' %}
+        <button onclick="cambiarEstatus({{ m.id }}, 'suspender')">Suspender</button>
+        <button onclick="cambiarEstatus({{ m.id }}, 'desactivar')" class="danger">Desactivar</button>
+        {% else %}
+        <button onclick="cambiarEstatus({{ m.id }}, 'reactivar')">Reactivar</button>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Avatar -->
+    <a class="eq-avatar" style="background:{{ m.color }};" href="{{ url_for('equipo.perfil', uid=m.id) }}">
+      {% if m.avatar_url %}
+      <img src="{{ m.avatar_url }}" alt="{{ m.nombre }}">
+      {% else %}
+      {{ m.nombre[0] }}{{ (m.apellidos or '')[0] }}
+      {% endif %}
+    </a>
+
+    <!-- Nombre + cargo -->
+    <a class="eq-name" href="{{ url_for('equipo.perfil', uid=m.id) }}">{{ m.nombre }} {{ m.apellidos or '' }}</a>
+    <span class="eq-cargo-badge" style="background:{{ m.cargo_color }}">{{ (m.cargo or 'asociado')|capitalize }}</span>
+
+    <!-- Especialidades -->
+    <div class="eq-chips">
+      {% for esp in m.especialidades_list[:3] %}
+      <span class="eq-chip">{{ esp|capitalize }}</span>
+      {% endfor %}
+      {% if m.especialidades_list|length > 3 %}
+      <span class="eq-chip eq-chip--more">+{{ m.especialidades_list|length - 3 }}</span>
+      {% endif %}
+    </div>
+
+    <!-- Stats -->
+    <div class="eq-stats">
+      <div class="eq-stat">
+        <span class="eq-stat-val">{{ m.asuntos_activos }}</span>
+        <span class="eq-stat-lbl">Activos</span>
+      </div>
+      <div class="eq-stat">
+        <span class="eq-stat-val">{{ m.asuntos_completados }}</span>
+        <span class="eq-stat-lbl">Cerrados</span>
+      </div>
+    </div>
+
+    <!-- Carga de trabajo -->
+    <div class="eq-stat-bar" style="width:100%;padding:0 4px;">
+      <div class="eq-bar-track" style="width:100%;">
+        <div class="eq-bar-fill" style="width:{{ m.carga_pct }}%;background:{{ m.carga_color }}"></div>
+      </div>
+      <span class="eq-bar-label" style="color:{{ m.carga_color }}">{{ m.carga_label }}</span>
+    </div>
+
+    <!-- Estatus -->
+    <span class="eq-estatus eq-estatus--{{ m.estatus }}">
+      {% if m.estatus == 'activo' %}Activo
+      {% elif m.estatus == 'pendiente' %}Invitacion pendiente
+      {% elif m.estatus == 'suspendido' %}Suspendido
+      {% else %}Inactivo{% endif %}
+    </span>
+
+    <a class="eq-btn-ver" href="{{ url_for('equipo.perfil', uid=m.id) }}">Ver perfil</a>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MODAL: INVITAR MIEMBRO
+     ══════════════════════════════════════════════════════ -->
+<div class="eq-modal-overlay" id="modalInvitar" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="eq-modal">
+    <div class="eq-modal-header">
+      <h3>Invitar nuevo miembro</h3>
+      <button class="eq-modal-close" onclick="this.closest('.eq-modal-overlay').classList.remove('show')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('equipo.invitar') }}">
+      <div class="eq-modal-body">
+        <div class="eq-form-row">
+          <div class="eq-form-group">
+            <label class="lex-label">Nombre *</label>
+            <input type="text" class="lex-input" name="nombre" required>
+          </div>
+          <div class="eq-form-group">
+            <label class="lex-label">Apellidos</label>
+            <input type="text" class="lex-input" name="apellidos">
+          </div>
+        </div>
+        <div class="eq-form-group">
+          <label class="lex-label">Correo electronico *</label>
+          <input type="email" class="lex-input" name="email" required>
+        </div>
+        <div class="eq-form-group">
+          <label class="lex-label">Cargo</label>
+          <select class="lex-input" name="cargo">
+            {% for c in cargos %}
+            <option value="{{ c }}">{{ c|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="eq-form-group">
+          <label class="lex-label">Especialidades</label>
+          <div class="eq-check-grid">
+            {% for esp in especialidades %}
+            <label class="eq-check-item">
+              <input type="checkbox" name="especialidades" value="{{ esp }}">
+              <span>{{ esp|capitalize }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="eq-modal-footer">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="this.closest('.eq-modal-overlay').classList.remove('show')">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Enviar invitacion</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MODAL: DETALLE DE MIEMBRO
+     ══════════════════════════════════════════════════════ -->
+<div class="eq-modal-overlay" id="modalDetalle" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="eq-modal eq-modal--lg">
+    <div class="eq-modal-header">
+      <h3 id="detNombre">Miembro</h3>
+      <button class="eq-modal-close" onclick="this.closest('.eq-modal-overlay').classList.remove('show')">&times;</button>
+    </div>
+    <div class="eq-modal-body">
+      <!-- Profile section -->
+      <div class="eq-det-profile">
+        <div class="eq-det-avatar" id="detAvatar"></div>
+        <div class="eq-det-info">
+          <div class="eq-det-row"><strong>Correo:</strong> <span id="detEmail"></span></div>
+          <div class="eq-det-row"><strong>Telefono:</strong> <span id="detTelefono"></span></div>
+          <div class="eq-det-row"><strong>Cargo:</strong> <span id="detCargo"></span></div>
+          <div class="eq-det-row"><strong>Ingreso:</strong> <span id="detFechaIngreso"></span></div>
+          <div class="eq-det-row"><strong>Especialidades:</strong> <span id="detEspecialidades"></span></div>
+        </div>
+      </div>
+
+      {% if is_admin %}
+      <div class="eq-det-upload" id="detUploadSection">
+        <form id="avatarForm" enctype="multipart/form-data">
+          <input type="file" name="avatar" id="avatarInput" accept="image/*" style="display:none"
+                 onchange="uploadAvatar()">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('avatarInput').click()">
+            Cambiar foto
+          </button>
+        </form>
+      </div>
+      {% endif %}
+
+      <!-- Tabs -->
+      <div class="eq-det-tabs">
+        <button class="eq-det-tab active" onclick="showDetTab('activos', this)">Asuntos Activos</button>
+        <button class="eq-det-tab" onclick="showDetTab('historial', this)">Historial</button>
+        {% if is_admin %}
+        <button class="eq-det-tab" onclick="showDetTab('editar', this)">Editar</button>
+        {% endif %}
+      </div>
+
+      <div class="eq-det-panel" id="panelActivos">
+        <table class="eq-table">
+          <thead><tr><th>Asunto</th><th>Expediente</th><th>Estado</th><th>Fecha limite</th></tr></thead>
+          <tbody id="tbActivos"></tbody>
+        </table>
+      </div>
+
+      <div class="eq-det-panel" id="panelHistorial" style="display:none">
+        <table class="eq-table">
+          <thead><tr><th>Asunto</th><th>Expediente</th><th>Estado</th><th>Fecha</th></tr></thead>
+          <tbody id="tbHistorial"></tbody>
+        </table>
+      </div>
+
+      {% if is_admin %}
+      <div class="eq-det-panel" id="panelEditar" style="display:none">
+        <form id="editForm" onsubmit="return submitEdit(event)">
+          <div class="eq-form-row">
+            <div class="eq-form-group">
+              <label class="lex-label">Cargo</label>
+              <select class="lex-input" name="cargo" id="editCargo">
+                {% for c in cargos %}
+                <option value="{{ c }}">{{ c|capitalize }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="eq-form-group">
+              <label class="lex-label">Telefono</label>
+              <input type="text" class="lex-input" name="telefono" id="editTelefono">
+            </div>
+          </div>
+          <div class="eq-form-group">
+            <label class="lex-label">Fecha de ingreso</label>
+            <input type="date" class="lex-input" name="fecha_ingreso" id="editFechaIngreso">
+          </div>
+          <div class="eq-form-group">
+            <label class="lex-label">Especialidades</label>
+            <div class="eq-check-grid" id="editEspGrid">
+              {% for esp in especialidades %}
+              <label class="eq-check-item">
+                <input type="checkbox" name="especialidades" value="{{ esp }}" class="edit-esp-cb">
+                <span>{{ esp|capitalize }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="margin-top:12px">Guardar cambios</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+let currentDetailUid = null;
+
+/* ── Dropdown menu ── */
+function toggleMenu(btn) {
+  const dd = btn.nextElementSibling;
+  document.querySelectorAll('.eq-dropdown.show').forEach(d => { if(d !== dd) d.classList.remove('show'); });
+  dd.classList.toggle('show');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.eq-card-menu'))
+    document.querySelectorAll('.eq-dropdown.show').forEach(d => d.classList.remove('show'));
+});
+
+/* ── Detail modal ── */
+function openDetail(uid) {
+  currentDetailUid = uid;
+  fetch(`{{ url_for('equipo.index') }}detalle/${uid}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) return alert(data.error);
+      const m = data.member;
+
+      document.getElementById('detNombre').textContent = m.nombre + ' ' + (m.apellidos || '');
+      document.getElementById('detEmail').textContent = m.email;
+      document.getElementById('detTelefono').textContent = m.telefono || '—';
+      document.getElementById('detCargo').innerHTML = `<span class="eq-cargo-badge" style="background:${m.cargo_color}">${(m.cargo||'asociado').charAt(0).toUpperCase()+(m.cargo||'asociado').slice(1)}</span>`;
+      document.getElementById('detFechaIngreso').textContent = m.fecha_ingreso || '—';
+      document.getElementById('detEspecialidades').innerHTML = (m.especialidades_list||[]).map(e =>
+        `<span class="eq-chip">${e.charAt(0).toUpperCase()+e.slice(1)}</span>`
+      ).join('') || '—';
+
+      // Avatar
+      const av = document.getElementById('detAvatar');
+      if (m.avatar_url) {
+        av.innerHTML = `<img src="${m.avatar_url}">`;
+      } else {
+        av.style.background = m.color;
+        av.innerHTML = m.nombre[0] + (m.apellidos||'')[0];
+      }
+
+      // Activos table
+      const tbA = document.getElementById('tbActivos');
+      tbA.innerHTML = data.activos.length ? data.activos.map(a =>
+        `<tr><td><a href="/asuntos/${a.id}/detalle?tenant={{ g.tenant.slug }}">${a.titulo}</a></td>
+         <td>${a.numero_expediente||'—'}</td><td>${a.estado}</td>
+         <td>${a.fecha_limite||'—'}</td></tr>`
+      ).join('') : '<tr><td colspan="4" class="eq-empty">Sin asuntos activos</td></tr>';
+
+      // Historial table
+      const tbH = document.getElementById('tbHistorial');
+      tbH.innerHTML = data.historial.length ? data.historial.map(a =>
+        `<tr><td>${a.titulo}</td><td>${a.numero_expediente||'—'}</td>
+         <td>${a.estado}</td><td>${(a.fecha_alta||'').slice(0,10)}</td></tr>`
+      ).join('') : '<tr><td colspan="4" class="eq-empty">Sin historial</td></tr>';
+
+      // Edit form prefill
+      const ec = document.getElementById('editCargo');
+      if (ec) { ec.value = m.cargo || 'asociado'; }
+      const et = document.getElementById('editTelefono');
+      if (et) { et.value = m.telefono || ''; }
+      const ef = document.getElementById('editFechaIngreso');
+      if (ef) { ef.value = m.fecha_ingreso || ''; }
+      document.querySelectorAll('.edit-esp-cb').forEach(cb => {
+        cb.checked = (m.especialidades_list||[]).includes(cb.value);
+      });
+
+      // Reset to first tab
+      showDetTab('activos', document.querySelector('.eq-det-tab'));
+      document.getElementById('modalDetalle').classList.add('show');
+    });
+}
+
+function showDetTab(tab, btn) {
+  document.querySelectorAll('.eq-det-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.eq-det-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = 'block';
+  if (btn) btn.classList.add('active');
+}
+
+/* ── Edit ── */
+function submitEdit(e) {
+  e.preventDefault();
+  const form = document.getElementById('editForm');
+  const fd = new FormData(form);
+  fetch(`{{ url_for('equipo.index') }}editar/${currentDetailUid}`, {
+    method: 'POST', body: fd,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(r => r.json()).then(data => {
+    if (data.ok) { location.reload(); }
+    else alert(data.error || 'Error');
+  });
+  return false;
+}
+
+/* ── Edit modal (from dropdown) ── */
+function openEditModal(uid) {
+  openDetail(uid);
+  setTimeout(() => {
+    const editTab = document.querySelector('.eq-det-tab:last-child');
+    if (editTab) showDetTab('editar', editTab);
+  }, 500);
+}
+
+/* ── Estatus ── */
+function cambiarEstatus(uid, accion) {
+  if (!confirm(`¿${accion.charAt(0).toUpperCase()+accion.slice(1)} a este miembro?`)) return;
+  const fd = new FormData();
+  fd.append('accion', accion);
+  fetch(`{{ url_for('equipo.index') }}estatus/${uid}`, {
+    method: 'POST', body: fd,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(r => r.json()).then(data => {
+    if (data.ok) location.reload();
+    else alert(data.error || 'Error');
+  });
+}
+
+/* ── Avatar upload ── */
+function uploadAvatar() {
+  const fd = new FormData();
+  fd.append('avatar', document.getElementById('avatarInput').files[0]);
+  fetch(`{{ url_for('equipo.index') }}avatar/${currentDetailUid}`, {
+    method: 'POST', body: fd,
+  }).then(r => r.json()).then(data => {
+    if (data.ok) location.reload();
+    else alert(data.error || 'Error');
+  });
+}
+</script>
+{% endblock %}

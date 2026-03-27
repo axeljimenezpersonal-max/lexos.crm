@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Nueva Investigación{% endblock %}
+{% block page_title %}Nueva Investigación{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Nueva investigación</h1>
+    <p class="page-subtitle">Documenta jurisprudencia, doctrina o estrategia legal.</p>
+  </div>
+  <a href="{{ url_for('investigacion.index') }}" class="btn btn-ghost">← Cancelar</a>
+</div>
+
+<div style="max-width: 720px;">
+  <form method="POST">
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Datos</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Título <span class="text-danger">*</span></label>
+          <input class="form-control" type="text" name="titulo"
+                 value="{{ investigacion.get('titulo','') }}" required
+                 placeholder="Ej: Tesis sobre prescripción en materia civil…">
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Asunto relacionado</label>
+            <select class="form-control" name="asunto_id">
+              <option value="">— Sin asunto —</option>
+              {% for a in asuntos %}
+              <option value="{{ a.id }}" {{ 'selected' if investigacion.get('asunto_id')|string==a.id|string }}>{{ a.titulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fuente</label>
+            <input class="form-control" type="text" name="fuente"
+                   value="{{ investigacion.get('fuente','') }}"
+                   placeholder="SCJN, DOF, Doctrina…">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">URL de referencia</label>
+          <input class="form-control" type="url" name="url_referencia"
+                 value="{{ investigacion.get('url_referencia','') }}"
+                 placeholder="https://…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Etiquetas <span class="text-muted text-xs">(separadas por coma)</span></label>
+          <input class="form-control" type="text" name="tags"
+                 value="{{ investigacion.get('tags','') }}"
+                 placeholder="prescripción, civil, SCJN">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contenido</label>
+          <textarea class="form-control" name="contenido" rows="8"
+                    placeholder="Transcripción, resumen o análisis…">{{ investigacion.get('contenido','') }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Guardar investigación</button>
+      <a href="{{ url_for('investigacion.index') }}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

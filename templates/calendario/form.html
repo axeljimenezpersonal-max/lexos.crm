@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Nuevo Evento{% endblock %}
+{% block page_title %}Nuevo Evento{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Nuevo evento</h1>
+    <p class="page-subtitle">Agenda una audiencia, reunión, plazo o tarea.</p>
+  </div>
+  <a href="{{ url_for('calendario.index') }}" class="btn btn-ghost">← Cancelar</a>
+</div>
+
+<div style="max-width: 640px;">
+  <form method="POST">
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Datos del evento</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Título <span class="text-danger">*</span></label>
+          <input class="form-control" type="text" name="titulo"
+                 value="{{ evento.get('titulo','') }}" placeholder="Audiencia inicial…" required>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select class="form-control" name="tipo">
+              {% for t in ['audiencia','reunion','plazo','tarea','otro'] %}
+              <option value="{{ t }}" {{ 'selected' if evento.get('tipo','audiencia')==t }}>{{ t|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Asunto relacionado</label>
+            <select class="form-control" name="asunto_id">
+              <option value="">— Sin asunto —</option>
+              {% for a in asuntos %}
+              <option value="{{ a.id }}" {{ 'selected' if evento.get('asunto_id')|string==a.id|string }}>
+                {{ a.titulo }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <textarea class="form-control" name="descripcion" rows="2"
+                    placeholder="Detalles del evento…">{{ evento.get('descripcion','') }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Fecha y hora</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="todo_el_dia" id="todoDia"
+                   {{ 'checked' if evento.get('todo_el_dia') }}
+                   onchange="toggleHoras(this.checked)">
+            <span class="form-label" style="margin:0;">Todo el día</span>
+          </label>
+        </div>
+        <div class="form-grid-2" id="horasFields">
+          <div class="form-group">
+            <label class="form-label">Inicio <span class="text-danger">*</span></label>
+            <input class="form-control" type="datetime-local" name="fecha_inicio"
+                   value="{{ evento.get('fecha_inicio','') }}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fin (opcional)</label>
+            <input class="form-control" type="datetime-local" name="fecha_fin"
+                   value="{{ evento.get('fecha_fin','') }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Recordatorio (minutos antes)</label>
+          <select class="form-control" name="recordatorio" style="max-width:200px;">
+            <option value="">Sin recordatorio</option>
+            <option value="15">15 minutos</option>
+            <option value="30">30 minutos</option>
+            <option value="60">1 hora</option>
+            <option value="1440">1 día</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Lugar</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Lugar / Dirección</label>
+          <input class="form-control" type="text" name="lugar"
+                 value="{{ evento.get('lugar','') }}" placeholder="Juzgado 5° Civil, Sala 2">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Enlace de videollamada</label>
+          <input class="form-control" type="url" name="url_meet"
+                 value="{{ evento.get('url_meet','') }}" placeholder="https://meet.google.com/…">
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Crear evento</button>
+      <a href="{{ url_for('calendario.index') }}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleHoras(checked) {
+  document.getElementById('horasFields').style.opacity = checked ? '.4' : '1';
+}
+</script>
+{% endblock %}

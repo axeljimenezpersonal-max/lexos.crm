@@ -1,0 +1,76 @@
+{% from "components/icons.html" import icon_landmark %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seleccionar despacho — LexOS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body>
+<div class="auth-split">
+
+  <!-- Left panel -->
+  <div class="auth-left">
+    <div class="al-logo">
+      <div class="logo-icon">Lx</div>
+      <div>
+        <div style="font-weight:800;font-size:1.2rem;color:var(--text);">LexOS</div>
+        <div style="font-size:.65rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.8px;">Plataforma Legal</div>
+      </div>
+    </div>
+
+    <div style="margin:32px 0;display:flex;justify-content:center;">
+      <div style="width:80px;height:80px;background:var(--accent-soft);border:2px solid var(--accent-glow);
+                  border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;">
+        {{ icon_landmark(16,16) }}
+      </div>
+    </div>
+
+    <h2>Múltiples despachos</h2>
+    <p>
+      Tu correo <strong>{{ email }}</strong> está asociado a
+      {{ tenants|length }} despacho{{ 's' if tenants|length > 1 else '' }}.
+      Selecciona al que deseas ingresar.
+    </p>
+
+    <div style="margin-top:24px;font-size:.8rem;color:var(--text-3);">
+      <p>Si necesitas acceso a otro despacho o tienes algún problema, contacta al administrador correspondiente.</p>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="auth-right">
+    <div class="ar-inner">
+      <div class="ar-header">
+        <h1>Seleccionar despacho</h1>
+        <p>¿A cuál despacho quieres acceder hoy?</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        {% for t in tenants %}
+        <a href="{{ url_for('auth.login', tenant=t.slug, prefill_email=email) }}"
+           class="tenant-card" style="text-decoration:none;">
+          <div class="tc-icon">{{ t.nombre_despacho[0] }}</div>
+          <div style="flex:1;">
+            <div class="tc-name">{{ t.nombre_despacho }}</div>
+            <div class="tc-sub">{{ t.slug }}.lexos.mx</div>
+          </div>
+          <div class="tc-arrow">→</div>
+        </a>
+        {% endfor %}
+      </div>
+
+      <div style="text-align:center;margin-top:28px;">
+        <a href="{{ url_for('auth.landing') }}" class="text-sm text-accent">
+          ← Volver al inicio
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

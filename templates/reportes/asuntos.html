@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Reporte de Asuntos{% endblock %}
+{% block page_title %}Reporte de Asuntos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Reporte de Asuntos</h1>
+    <p class="page-subtitle">{{ asuntos|length }} expediente{{ 's' if asuntos|length != 1 }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button onclick="window.print()" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir</button>
+    <a href="{{ url_for('reportes.index') }}" class="btn btn-ghost">← Volver</a>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+  <div class="card-header"><span class="card-title">Filtros</span></div>
+  <div class="card-body">
+    <form method="GET" class="d-flex gap-3 align-center" style="flex-wrap:wrap;">
+      <div class="form-group" style="margin:0; min-width:160px;">
+        <label class="form-label">Estado</label>
+        <select class="form-control" name="estado">
+          <option value="">Todos</option>
+          {% for e in ['activo','suspendido','cerrado','archivado'] %}
+          <option value="{{ e }}" {{ 'selected' if filtros.estado==e }}>{{ e|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0; min-width:160px;">
+        <label class="form-label">Tipo</label>
+        <select class="form-control" name="tipo">
+          <option value="">Todos</option>
+          {% for t in ['civil','penal','mercantil','laboral','familiar','administrativo','fiscal','amparo'] %}
+          <option value="{{ t }}" {{ 'selected' if filtros.tipo==t }}>{{ t|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Desde</label>
+        <input class="form-control" type="date" name="desde" value="{{ filtros.desde }}">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Hasta</label>
+        <input class="form-control" type="date" name="hasta" value="{{ filtros.hasta }}">
+      </div>
+      <div style="align-self:flex-end; padding-bottom:18px;">
+        <button type="submit" class="btn btn-primary">Aplicar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if asuntos %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Expediente</th>
+        <th>Título</th>
+        <th>Cliente</th>
+        <th>Tipo</th>
+        <th>Estado</th>
+        <th>Prioridad</th>
+        <th>Inicio</th>
+        <th>Honorarios</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in asuntos %}
+      <tr>
+        <td><span class="text-xs text-muted">{{ a.numero_expediente or '—' }}</span></td>
+        <td><strong>{{ a.titulo }}</strong></td>
+        <td>{{ a.cliente_nombre or '—' }}</td>
+        <td><span class="text-xs">{{ a.tipo_asunto or '—' }}</span></td>
+        <td><span class="badge badge-{{ a.estado }}">{{ a.estado }}</span></td>
+        <td><span class="badge badge-{{ a.prioridad }}">{{ a.prioridad }}</span></td>
+        <td><span class="text-xs text-muted">{{ a.fecha_inicio or '—' }}</span></td>
+        <td class="text-success">${{ "{:,.0f}".format(a.honorarios_pactados or 0) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div style="margin-top:12px; text-align:right;" class="text-sm text-muted">
+  Total de honorarios: <strong class="text-success">${{ "{:,.2f}".format(asuntos|sum(attribute='honorarios_pactados') or 0) }} MXN</strong>
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>Sin resultados</h3>
+  <p>Ajusta los filtros para ver asuntos.</p>
+</div>
+{% endif %}
+{% endblock %}

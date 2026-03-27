@@ -1,0 +1,957 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD — Sinapsys Design Language
+   Tipografía: Cormorant Garamond · DM Mono · Libre Baskerville
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Asegura fuentes disponibles (base.html ya las importa, esto es fallback) */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Mono:wght@300;400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+/* ── Animaciones (si base.html no las tiene) ── */
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BLOQUE 1 — KPI CARDS
+   ═══════════════════════════════════════════════════════════════ */
+.ds-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1280px) { .ds-kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 860px)  { .ds-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .ds-kpi-grid { grid-template-columns: 1fr; } }
+
+.ds-kpi {
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--e);
+  border-radius: 8px;
+  padding: 20px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  animation: fadeUp 0.35s ease both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+.ds-kpi:hover {
+  border-color: var(--border-m);
+  box-shadow: 0 4px 20px rgba(0,223,162,0.06);
+}
+
+.ds-kpi-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ash);
+  margin-bottom: 10px;
+  display: block;
+}
+.ds-kpi-value {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 42px;
+  font-weight: 300;
+  color: var(--fog);
+  line-height: 1;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+  display: block;
+}
+.ds-kpi-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ash);
+  display: block;
+  line-height: 1.4;
+  margin-top: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BLOQUE 2 — ZONA ROJA (solo si hay plazos)
+   ═══════════════════════════════════════════════════════════════ */
+.ds-zona-roja {
+  background: var(--c);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-left: 3px solid var(--danger);
+  border-radius: 0 8px 8px 0;
+  padding: 0;
+  overflow: hidden;
+  margin-top: 20px;
+  animation: fadeUp 0.35s ease both;
+}
+.ds-zr-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(239,68,68,0.1);
+}
+.ds-zr-title {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--danger);
+}
+.ds-zr-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; font-weight: 500;
+  color: var(--danger);
+  background: rgba(239,68,68,0.1);
+  padding: 2px 8px; border-radius: 4px;
+}
+.ds-zr-list { display: flex; flex-direction: column; }
+.ds-zr-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  text-decoration: none; color: var(--fog);
+  transition: background 0.12s;
+}
+.ds-zr-item:last-child { border-bottom: none; }
+.ds-zr-item:hover { background: rgba(239,68,68,0.04); }
+.ds-zr-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(239,68,68,0.5);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+.ds-zr-item.zr-alta    .ds-zr-dot,
+.ds-zr-item.zr-media   .ds-zr-dot { background: var(--warn); box-shadow: 0 0 6px rgba(245,158,11,0.4); animation-duration: 2.5s; }
+.ds-zr-item.zr-vencido .ds-zr-dot { background: var(--danger); }
+.ds-zr-body { flex: 1; min-width: 0; }
+.ds-zr-ttl {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 12px; font-weight: 700; color: var(--fog);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-zr-caso {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; color: var(--ash); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-zr-cd {
+  flex-shrink: 0; text-align: right;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px; font-weight: 600; color: var(--fog);
+}
+.ds-zr-cd.vencido { color: var(--danger); }
+.ds-zr-cd.hoy     { color: var(--warn); }
+
+/* ═══════════════════════════════════════════════════════════════
+   BLOQUE 3 — GRÁFICAS (3 columnas)
+   ═══════════════════════════════════════════════════════════════ */
+.ds-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.4fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+@media (max-width: 1100px) { .ds-charts-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 720px)  { .ds-charts-grid { grid-template-columns: 1fr; } }
+
+.ds-chart-card {
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  animation: fadeUp 0.4s ease both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+  transition: border-color 0.2s;
+}
+.ds-chart-card:hover { border-color: var(--border-m); }
+
+/* Section header label */
+.ds-sec {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 8px; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--ash); margin-bottom: 16px;
+}
+
+/* Donut card inner layout */
+.ds-donut-wrap {
+  display: flex; align-items: center; gap: 24px;
+}
+.ds-donut-canvas-wrap {
+  width: 160px; height: 160px; flex-shrink: 0;
+  position: relative;
+}
+.ds-donut-legend {
+  flex: 1; display: flex; flex-direction: column; gap: 8px;
+  min-width: 0;
+}
+.ds-donut-item {
+  display: flex; align-items: center; gap: 8px;
+}
+.ds-donut-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.ds-donut-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--fog);
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-donut-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; color: var(--ash); margin-left: auto; flex-shrink: 0;
+}
+
+/* Activity feed */
+.ds-act-list { display: flex; flex-direction: column; }
+.ds-act-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(0,223,162,0.08);
+}
+.ds-act-item:last-child { border-bottom: none; }
+.ds-act-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 5px;
+}
+.ds-act-title {
+  display: block;
+  font-family: 'Libre Baskerville', serif;
+  font-size: 12px; font-weight: 700; color: var(--fog);
+  line-height: 1.4;
+}
+.ds-act-sub {
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; color: var(--ash); margin-top: 2px;
+  letter-spacing: 0.03em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BLOQUE 4 — ASUNTOS + PRÓXIMOS EVENTOS
+   ═══════════════════════════════════════════════════════════════ */
+.ds-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 0.6fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+@media (max-width: 960px) { .ds-bottom-grid { grid-template-columns: 1fr; } }
+
+/* Asunto priority card */
+.ds-asunto-card {
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+  animation: fadeUp 0.35s ease both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  cursor: default;
+}
+.ds-asunto-card:hover {
+  transform: translateY(-2px);
+}
+.ds-asunto-card.prio-alta  { border-left: 3px solid #B8922A; }
+.ds-asunto-card.prio-media { border-left: 3px solid #3B8BD4; }
+.ds-asunto-card.prio-baja  { border-left: 3px solid #00DFA2; }
+
+.ds-asunto-card:hover.prio-alta  { border-left-color: #d4a73a; }
+.ds-asunto-card:hover.prio-media { border-left-color: #5aa8f0; }
+.ds-asunto-card:hover.prio-baja  { border-left-color: #00f0b0; }
+
+.ds-asunto-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.ds-asunto-exp {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ash);
+}
+.ds-prio-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 4px;
+}
+.ds-prio-badge.alta  { background: rgba(184,146,42,0.15); color: #B8922A; }
+.ds-prio-badge.media { background: rgba(59,139,212,0.15); color: #3B8BD4; }
+.ds-prio-badge.baja  { background: rgba(0,223,162,0.12);  color: #00DFA2; }
+
+.ds-asunto-nombre {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 13px; font-weight: 700; color: var(--fog);
+  margin: 4px 0 8px;
+  line-height: 1.35;
+  text-decoration: none;
+  display: block;
+}
+.ds-asunto-nombre:hover { color: var(--e); }
+
+.ds-asunto-tags { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.ds-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px; font-weight: 400;
+  background: rgba(0,223,162,0.08);
+  color: var(--e);
+  padding: 2px 7px; border-radius: 4px;
+  white-space: nowrap;
+}
+.ds-asunto-monto {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; color: var(--fog);
+  margin-left: auto; flex-shrink: 0;
+}
+
+/* Próximos eventos list */
+.ds-ev-list { display: flex; flex-direction: column; }
+.ds-ev-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  animation: fadeUp 0.35s ease both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+.ds-ev-item:last-child { border-bottom: none; }
+.ds-ev-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 4px;
+}
+.ds-ev-dot.audiencia  { background: #3B82F6; box-shadow: 0 0 6px rgba(59,130,246,0.45); }
+.ds-ev-dot.plazo      { background: #F59E0B; box-shadow: 0 0 6px rgba(245,158,11,0.45); }
+.ds-ev-dot.vencimiento{ background: #EF4444; box-shadow: 0 0 6px rgba(239,68,68,0.45); }
+.ds-ev-dot.reunion    { background: #B8922A; }
+.ds-ev-dot.diligencia { background: #00DFA2; box-shadow: 0 0 6px rgba(0,223,162,0.35); }
+.ds-ev-dot.tarea      { background: #8A9BA8; }
+
+.ds-ev-center { flex: 1; min-width: 0; }
+.ds-ev-nombre {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 12px; color: var(--fog);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-ev-fecha {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; color: var(--ash); margin-top: 2px;
+}
+.ds-ev-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+  margin-left: auto;
+}
+.ds-ev-badge.audiencia  { background: rgba(59,130,246,0.12); color: #3B82F6; }
+.ds-ev-badge.plazo      { background: rgba(245,158,11,0.12); color: #F59E0B; }
+.ds-ev-badge.vencimiento{ background: rgba(239,68,68,0.12);  color: #EF4444; }
+.ds-ev-badge.reunion    { background: rgba(184,146,42,0.12); color: #B8922A; }
+.ds-ev-badge.diligencia { background: rgba(0,223,162,0.10);  color: #00DFA2; }
+.ds-ev-badge.tarea      { background: rgba(138,155,168,0.1); color: #8A9BA8; }
+
+/* ── Empty state ── */
+.ds-empty {
+  padding: 32px 16px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.ds-empty-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px; font-weight: 400; color: var(--ash);
+}
+.ds-empty-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; color: var(--ash); opacity: .6;
+}
+
+/* ── FAB (floating action button) ── */
+.fab-wrap {
+  position: fixed; bottom: 28px; right: 28px; z-index: 500;
+}
+.fab-main {
+  width: 50px; height: 50px; border-radius: 50%;
+  background: var(--e); color: var(--n);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,223,162,0.35);
+  transition: all .2s; position: relative; z-index: 2;
+}
+.fab-main:hover { background: var(--ed); transform: scale(1.06); }
+.fab-wrap.open .fab-main { transform: rotate(45deg); }
+.fab-items {
+  position: absolute; bottom: 58px; right: 0;
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
+  opacity: 0; pointer-events: none;
+  transform: translateY(10px); transition: opacity .2s, transform .2s;
+}
+.fab-wrap.open .fab-items { opacity: 1; pointer-events: all; transform: translateY(0); }
+.fab-item { display: flex; align-items: center; gap: 10px; }
+.fab-item-label {
+  font-family: 'DM Mono', monospace;
+  font-size: .62rem; letter-spacing: .06em;
+  background: var(--c); color: var(--fog);
+  padding: 4px 10px; border-radius: 4px;
+  border: 1px solid var(--border); white-space: nowrap;
+}
+.fab-item-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: none; cursor: pointer; text-decoration: none;
+  transition: transform .15s;
+}
+.fab-item-btn:hover { transform: scale(1.08); }
+.fab-item-btn.info    { background: #3B82F6; color: #fff; }
+.fab-item-btn.warning { background: #F59E0B; color: var(--n); }
+.fab-item-btn.success { background: #00DFA2; color: var(--n); }
+.fab-item-btn.accent  { background: #00DFA2; color: var(--n); }
+</style>
+{% endblock %}
+
+
+{% block content %}
+
+{# ─── ACTION COLORS for activity feed ─── #}
+{% set act_colors = {
+  'login': '#8A9BA8', 'logout': '#8A9BA8',
+  'crear': '#00DFA2', 'crear_asunto': '#00DFA2', 'crear_cliente': '#00DFA2',
+  'crear_evento': '#F97316', 'crear_cobro': '#3B8BD4',
+  'actualizar': '#3B8BD4', 'eliminar': '#EF4444',
+  'pago': '#3B8BD4', 'cobro': '#3B8BD4', 'pago_registrado': '#3B8BD4',
+  'documento': '#00DFA2', 'subir_documento': '#00DFA2', 'nota': '#00DFA2',
+  'cambiar_estado': '#B8922A', 'cambio_estado': '#B8922A', 'cambiar_estado_asunto': '#B8922A',
+  'audiencia': '#F97316', 'evento': '#F97316',
+  'login_failed': '#EF4444', 'error': '#EF4444'
+} %}
+
+{# ─── ACTION LABELS for activity feed ─── #}
+{% set act_labels = {
+  'login': 'Sesión iniciada',
+  'logout': 'Sesión cerrada',
+  'crear_asunto': 'Asunto creado',
+  'crear_cliente': 'Cliente creado',
+  'crear_evento': 'Audiencia creada',
+  'crear_cobro': 'Cobro creado',
+  'actualizar': 'Actualizado',
+  'actualizar_asunto': 'Asunto actualizado',
+  'eliminar': 'Eliminado',
+  'pago': 'Pago registrado',
+  'pago_registrado': 'Pago registrado',
+  'cobro': 'Cobro registrado',
+  'documento': 'Documento subido',
+  'subir_documento': 'Documento subido',
+  'nota': 'Nota agregada',
+  'cambiar_estado': 'Estado actualizado',
+  'cambiar_estado_asunto': 'Estado actualizado',
+  'cambio_estado': 'Estado actualizado',
+  'audiencia': 'Audiencia registrada',
+  'evento': 'Evento creado',
+  'login_failed': 'Acceso fallido'
+} %}
+
+{# ─── DONUT colors ─── #}
+{% set donut_colors = ['#00DFA2','#3B8BD4','#B8922A','#F59E0B','#EF4444','#8A9BA8','#6366F1'] %}
+
+<!-- ════════════════════════════════════════════════════════════
+     BLOQUE 1 — KPI CARDS (5)
+     ════════════════════════════════════════════════════════════ -->
+<div class="ds-kpi-grid">
+
+  <div class="ds-kpi animate__animated animate__fadeInUp" style="--i:0;--animate-delay:0s">
+    <span class="ds-kpi-label">Asuntos activos</span>
+    <span class="ds-kpi-value">{{ total_asuntos }}</span>
+    <span class="ds-kpi-sub">expedientes en curso</span>
+  </div>
+
+  <div class="ds-kpi animate__animated animate__fadeInUp" style="--i:1;--animate-delay:0.07s">
+    <span class="ds-kpi-label">Clientes</span>
+    <span class="ds-kpi-value">{{ total_clientes }}</span>
+    <span class="ds-kpi-sub">registrados y activos</span>
+  </div>
+
+  <div class="ds-kpi animate__animated animate__fadeInUp" style="--i:2;--animate-delay:0.14s">
+    <span class="ds-kpi-label">Facturación</span>
+    <span class="ds-kpi-value">${{ "{:,.0f}".format(facturacion_total) }}</span>
+    <span class="ds-kpi-sub">${{ "{:,.0f}".format(cobros_mes) }} cobrado este mes</span>
+  </div>
+
+  <div class="ds-kpi animate__animated animate__fadeInUp" style="--i:3;--animate-delay:0.21s">
+    <span class="ds-kpi-label">Pendiente</span>
+    <span class="ds-kpi-value">${{ "{:,.0f}".format(cobros_pendientes) }}</span>
+    <span class="ds-kpi-sub">
+      {% if facturacion_total > 0 %}
+        {{ "%.0f"|format(cobros_pendientes / facturacion_total * 100) }}% sin cobrar
+      {% else %}
+        sin cobros pendientes
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="ds-kpi animate__animated animate__fadeInUp" style="--i:4;--animate-delay:0.28s">
+    <span class="ds-kpi-label">Horas mes</span>
+    <span class="ds-kpi-value">{{ total_horas_mes | int }}h</span>
+    <span class="ds-kpi-sub">registradas este mes</span>
+  </div>
+
+</div><!-- /kpi-grid -->
+
+<!-- ════════════════════════════════════════════════════════════
+     ZONA ROJA (si hay plazos críticos)
+     ════════════════════════════════════════════════════════════ -->
+{% if plazos_criticos %}
+<div class="ds-zona-roja">
+  <div class="ds-zr-header">
+    <div class="ds-zr-title">
+      <span class="pulse-dot" style="background:var(--danger);animation-duration:1.2s;box-shadow:0 0 6px rgba(239,68,68,.6);"></span>
+      Plazos críticos
+    </div>
+    <span class="ds-zr-count">{{ plazos_criticos | length }}</span>
+  </div>
+  <div class="ds-zr-list">
+    {% for p in plazos_criticos %}
+    <a href="{% if p.asunto_id %}{{ url_for('asuntos.detalle', id=p.asunto_id) }}{% else %}{{ url_for('calendario.index') }}{% endif %}"
+       class="ds-zr-item zr-{{ p.urgencia }}">
+      <div class="ds-zr-dot"></div>
+      <div class="ds-zr-body">
+        <div class="ds-zr-ttl">{{ p.titulo }}</div>
+        {% if p.asunto_titulo %}
+        <div class="ds-zr-caso">{{ p.asunto_titulo }}{% if p.numero_expediente %} · {{ p.numero_expediente }}{% endif %}</div>
+        {% endif %}
+      </div>
+      <div class="ds-zr-cd {% if p.urgencia == 'vencido' %}vencido{% elif p.dias_restantes == 0 %}hoy{% endif %}">
+        {% if p.urgencia == 'vencido' %}
+          Vencido
+        {% elif p.dias_restantes == 0 %}
+          Hoy
+        {% elif p.dias_restantes == 1 %}
+          1 día
+        {% else %}
+          {{ p.dias_restantes }}d
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ════════════════════════════════════════════════════════════
+     BLOQUE 2 — GRÁFICAS (3 columnas)
+     ════════════════════════════════════════════════════════════ -->
+<div class="ds-charts-grid">
+
+  <!-- Col 1: Ingresos vs Cobros (líneas) -->
+  <div class="ds-chart-card" style="--i:0">
+    <div class="ds-sec">
+      <span class="pulse-dot" style="background:var(--e);"></span>
+      Ingresos vs Cobros · 6 meses
+    </div>
+    <div style="position:relative;height:160px;">
+      <canvas id="chartLineas"></canvas>
+    </div>
+  </div>
+
+  <!-- Col 2: Distribución por materia (donut) -->
+  <div class="ds-chart-card" style="--i:1">
+    <div class="ds-sec">
+      <span class="pulse-dot" style="background:#F59E0B;animation-delay:.4s;"></span>
+      Distribución por materia
+    </div>
+    <div class="ds-donut-wrap">
+      <div class="ds-donut-canvas-wrap">
+        <canvas id="chartDonut"></canvas>
+      </div>
+      <div class="ds-donut-legend">
+        {% if distribucion_materias %}
+          {% for row in distribucion_materias %}
+          <div class="ds-donut-item">
+            <div class="ds-donut-dot" style="background:{{ donut_colors[loop.index0 % donut_colors|length] }};"></div>
+            <span class="ds-donut-name">{{ row.materia }}</span>
+            <span class="ds-donut-count">{{ row.total }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="ds-donut-item">
+            <div class="ds-donut-dot" style="background:#3a4a56;"></div>
+            <span class="ds-donut-name" style="color:var(--ash);">Sin asuntos aún</span>
+            <span class="ds-donut-count">0</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Col 3: Actividad reciente -->
+  <div class="ds-chart-card" style="--i:2">
+    <div class="ds-sec">
+      <span class="pulse-dot" style="background:#3B82F6;animation-delay:.8s;"></span>
+      Actividad reciente
+    </div>
+    {% if actividad %}
+    <div class="ds-act-list">
+      {% for item in actividad %}
+      {% set dot_color = act_colors.get(item.accion, '#8A9BA8') %}
+      {% set act_label = act_labels.get(item.accion, item.accion | replace('_',' ') | capitalize) %}
+      <div class="ds-act-item">
+        <div class="ds-act-dot" style="background:{{ dot_color }};box-shadow:0 0 5px {{ dot_color }}55;"></div>
+        <div style="flex:1;min-width:0;">
+          <span class="ds-act-title">
+            {{ act_label }}{% if item.display_title %} — {{ item.display_title }}{% endif %}
+          </span>
+          <span class="ds-act-sub">
+            {{ item.user_nombre or 'Sistema' }}
+            {% if item.fecha %}· <span data-reltime="{{ item.fecha }}">{{ item.fecha[:16] }}</span>{% endif %}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="ds-empty">
+      <div class="ds-empty-title">Sin actividad reciente</div>
+      <div class="ds-empty-sub">Las acciones aparecerán aquí</div>
+    </div>
+    {% endif %}
+  </div>
+
+</div><!-- /charts-grid -->
+
+<!-- ════════════════════════════════════════════════════════════
+     BLOQUE 3 — ASUNTOS PRIORITARIOS + PRÓXIMOS EVENTOS
+     ════════════════════════════════════════════════════════════ -->
+<div class="ds-bottom-grid">
+
+  <!-- COLUMNA 1: Asuntos prioritarios -->
+  <div>
+    <div class="ds-sec" style="margin-bottom:14px;">
+      <span class="pulse-dot" style="background:var(--danger);animation-duration:1.5s;box-shadow:0 0 6px rgba(239,68,68,.5);"></span>
+      Asuntos prioritarios
+    </div>
+
+    {% if asuntos_prioritarios %}
+      {% for a in asuntos_prioritarios %}
+      {% set prio = a.prioridad | lower %}
+      <div class="ds-asunto-card prio-{{ prio }}" style="--i:{{ loop.index0 }}">
+        <div class="ds-asunto-top">
+          <span class="ds-asunto-exp">{{ a.numero_expediente or '—' }}</span>
+          <span class="ds-prio-badge {{ prio }}">{{ a.prioridad | upper }}</span>
+        </div>
+        <a href="{{ url_for('asuntos.detalle', id=a.id) }}" class="ds-asunto-nombre">
+          {{ a.titulo }}
+        </a>
+        <div class="ds-asunto-tags">
+          {% if a.materia %}
+          <span class="ds-tag">⚖ {{ a.materia }}</span>
+          {% endif %}
+          {% if a.cliente_nombre and a.cliente_nombre | trim %}
+          <span class="ds-tag">{{ a.cliente_nombre | trim | truncate(22) }}</span>
+          {% endif %}
+          <span class="ds-asunto-monto">
+            {% if a.monto_honorarios and a.monto_honorarios > 0 %}
+            ${{ "{:,.0f}".format(a.monto_honorarios) }}
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="ds-empty" style="background:var(--c);border:1px solid var(--border);border-radius:8px;">
+      <div class="ds-empty-title">Sin asuntos prioritarios</div>
+      <div class="ds-empty-sub">Los asuntos activos aparecerán aquí</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- COLUMNA 2: Próximos eventos -->
+  <div>
+    <div class="ds-sec" style="margin-bottom:14px;">
+      <span class="pulse-dot" style="background:#F97316;animation-duration:1.8s;box-shadow:0 0 6px rgba(249,115,22,.5);"></span>
+      Próximos eventos
+    </div>
+
+    {% if proximos_eventos %}
+    <div class="ds-ev-list">
+      {% for e in proximos_eventos %}
+      {% set tipo = e.tipo | lower %}
+      <div class="ds-ev-item" style="--i:{{ loop.index0 }}">
+        <div class="ds-ev-dot {{ tipo }}"></div>
+        <div class="ds-ev-center">
+          <div class="ds-ev-nombre">{{ e.titulo }}</div>
+          <div class="ds-ev-fecha">
+            {{ e.fecha_inicio[:10] if e.fecha_inicio else '' }}
+            {% if e.fecha_inicio and e.fecha_inicio | length > 10 %}
+            · {{ e.fecha_inicio[11:16] }}
+            {% endif %}
+            {% if e.asunto_titulo %} · {{ e.asunto_titulo | truncate(20) }}{% endif %}
+          </div>
+        </div>
+        <span class="ds-ev-badge {{ tipo }}">{{ e.tipo }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="ds-empty" style="background:var(--c);border:1px solid var(--border);border-radius:8px;">
+      <div class="ds-empty-title">Sin eventos próximos</div>
+      <div class="ds-empty-sub">Agenda libre los próximos 30 días</div>
+    </div>
+    {% endif %}
+  </div>
+
+</div><!-- /bottom-grid -->
+
+<!-- ── FAB ─────────────────────────────────────────────────────── -->
+<div class="fab-wrap" id="fabWrap">
+  <div class="fab-items" id="fabItems">
+    <div class="fab-item">
+      <span class="fab-item-label">Agendar evento</span>
+      <a href="{{ url_for('calendario.index') }}" class="fab-item-btn info">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+        </svg>
+      </a>
+    </div>
+    <div class="fab-item">
+      <span class="fab-item-label">Registrar cobro</span>
+      <a href="{{ url_for('cobranzas.index') }}" class="fab-item-btn warning">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+        </svg>
+      </a>
+    </div>
+    <div class="fab-item">
+      <span class="fab-item-label">Agregar cliente</span>
+      <a href="{{ url_for('clientes.nuevo') }}" class="fab-item-btn success">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </a>
+    </div>
+    <div class="fab-item">
+      <span class="fab-item-label">Crear asunto</span>
+      <a href="{{ url_for('asuntos.nuevo') }}" class="fab-item-btn accent">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+  <button class="fab-main" id="fabMain" aria-label="Acciones rápidas">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+(function() {
+  'use strict';
+
+  /* ── Chart.js global defaults ─────────────────────────────── */
+  Chart.defaults.font.family = "'DM Mono', monospace";
+  Chart.defaults.font.size   = 10;
+  Chart.defaults.color       = '#8A9BA8';
+
+  /* ── Data from Python (JSON) ──────────────────────────────── */
+  const labels   = {{ chart_labels_json | safe }};
+  const ingresos = {{ chart_ingresos_json | safe }};
+  const cobros   = {{ chart_cobros_json | safe }};
+  const matNombres = {{ materias_nombres_json | safe }};
+  const matTotales = {{ materias_totales_json | safe }};
+
+  /* ── Colores hardcoded (CSS vars no funcionan en Chart.js) ── */
+  const C_E    = '#00DFA2';
+  const C_BLUE = '#3B8BD4';
+  const C_C    = '#1C2630';
+  const C_BRD  = 'rgba(0,223,162,0.08)';
+  const C_BRD2 = 'rgba(0,223,162,0.15)';
+  const C_GRID = 'rgba(0,223,162,0.06)';
+  const C_ASH  = '#8A9BA8';
+  const C_FOG  = '#EAF0EC';
+
+  const DONUT_COLORS = [
+    '#00DFA2','#3B8BD4','#B8922A',
+    '#F59E0B','#EF4444','#8A9BA8','#6366F1'
+  ];
+
+  /* ── 1. GRÁFICA DE LÍNEAS ─────────────────────────────────── */
+  const ctxLine = document.getElementById('chartLineas');
+  if (ctxLine) {
+    new Chart(ctxLine, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Facturado',
+            data: ingresos,
+            borderColor: C_E,
+            backgroundColor: 'rgba(0,223,162,0.08)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: C_E,
+            pointBorderColor: C_C,
+            pointBorderWidth: 2,
+          },
+          {
+            label: 'Cobrado',
+            data: cobros,
+            borderColor: C_BLUE,
+            backgroundColor: 'rgba(59,139,212,0.06)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: C_BLUE,
+            pointBorderColor: C_C,
+            pointBorderWidth: 2,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom',
+            labels: {
+              font: { family: "'DM Mono', monospace", size: 10 },
+              color: C_ASH,
+              usePointStyle: true,
+              pointStyle: 'circle',
+              boxWidth: 6,
+              padding: 20,
+            }
+          },
+          tooltip: {
+            backgroundColor: '#1C2630',
+            borderColor: 'rgba(0,223,162,0.15)',
+            borderWidth: 1,
+            titleFont: { family: "'DM Mono', monospace", size: 10 },
+            bodyFont:  { family: "'DM Mono', monospace", size: 11 },
+            titleColor: C_ASH,
+            bodyColor:  C_FOG,
+            padding: 10,
+            cornerRadius: 6,
+            callbacks: {
+              label: function(ctx) {
+                const val = ctx.raw;
+                return ' ' + ctx.dataset.label + ': $' +
+                  val.toLocaleString('es-MX', { maximumFractionDigits: 0 });
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid:   { color: C_GRID },
+            border: { color: 'rgba(0,223,162,0.08)' },
+            ticks:  { color: C_ASH, font: { family: "'DM Mono', monospace", size: 9 } }
+          },
+          y: {
+            grid:   { color: C_GRID },
+            border: { color: 'rgba(0,223,162,0.08)' },
+            ticks: {
+              color: C_ASH,
+              font: { family: "'DM Mono', monospace", size: 9 },
+              maxTicksLimit: 5,
+              callback: function(val) {
+                if (val >= 1000) return '$' + (val / 1000).toFixed(0) + 'k';
+                return '$' + val;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /* ── 2. GRÁFICA DONUT ─────────────────────────────────────── */
+  const ctxDonut = document.getElementById('chartDonut');
+  if (ctxDonut) {
+    const donutData    = matNombres.length > 0 ? matTotales : [1];
+    const donutColors  = matNombres.length > 0 ? DONUT_COLORS.slice(0, matNombres.length) : ['#2a3a46'];
+    const donutLabels  = matNombres.length > 0 ? matNombres : ['Sin datos'];
+    new Chart(ctxDonut, {
+      type: 'doughnut',
+      data: {
+        labels: donutLabels,
+        datasets: [{
+          data: donutData,
+          backgroundColor: donutColors,
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        elements: { arc: { borderWidth: 0 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: matNombres.length > 0,
+            backgroundColor: '#1C2630',
+            borderColor: C_BRD2,
+            borderWidth: 1,
+            titleFont: { family: "'DM Mono', monospace", size: 10 },
+            bodyFont:  { family: "'DM Mono', monospace", size: 11 },
+            titleColor: C_ASH,
+            bodyColor:  C_FOG,
+            padding: 10,
+            cornerRadius: 6,
+          }
+        }
+      }
+    });
+  }
+
+  /* ── Relative timestamps ──────────────────────────────────── */
+  document.querySelectorAll('[data-reltime]').forEach(function(el) {
+    const raw = el.getAttribute('data-reltime');
+    if (!raw) return;
+    try {
+      const d = new Date(raw.replace(' ', 'T'));
+      const diff = Math.floor((Date.now() - d) / 1000);
+      let txt;
+      if      (diff < 60)    txt = 'hace ' + diff + ' s';
+      else if (diff < 3600)  txt = 'hace ' + Math.floor(diff / 60) + ' min';
+      else if (diff < 86400) txt = 'hace ' + Math.floor(diff / 3600) + ' h';
+      else                   txt = 'hace ' + Math.floor(diff / 86400) + ' d';
+      el.textContent = txt;
+    } catch(e) {}
+  });
+
+})();
+</script>
+{% endblock %}

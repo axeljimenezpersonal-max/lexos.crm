@@ -1,0 +1,41 @@
+{% extends "portal/base_portal.html" %}
+{% block title %}Mis Documentos{% endblock %}
+
+{% block content %}
+<div class="ptl-page-header">
+  <h1>Mis Documentos</h1>
+  <p>Documentos compartidos por tu despacho.</p>
+</div>
+
+{% if docs %}
+<div class="ptl-docs-grid">
+  {% for d in docs %}
+  <div class="ptl-doc-card">
+    <div class="ptl-doc-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+    </div>
+    <div class="ptl-doc-body">
+      <div class="ptl-doc-title">{{ d.titulo }}</div>
+      {% if d.descripcion %}<div class="ptl-doc-desc">{{ d.descripcion }}</div>{% endif %}
+      <div class="ptl-doc-meta">
+        {% if d.asunto_titulo %}<span>{{ d.asunto_titulo }}</span> · {% endif %}
+        <span>{{ d.fecha[:10] if d.fecha else '' }}</span>
+        {% if d.tamanio %} · <span>{{ '{:.1f}'.format(d.tamanio / 1024) }} KB</span>{% endif %}
+      </div>
+    </div>
+    {% if d.archivo_url %}
+    <a href="{{ d.archivo_url }}" class="ptl-btn ptl-btn-sm ptl-btn-outline" download="{{ d.archivo_nombre or 'documento' }}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Descargar
+    </a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="ptl-empty">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+  <p>Tu despacho no ha compartido documentos aún.</p>
+</div>
+{% endif %}
+{% endblock %}

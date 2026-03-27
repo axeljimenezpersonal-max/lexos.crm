@@ -1,0 +1,101 @@
+{% extends "portal/base_portal.html" %}
+{% block title %}Mis Facturas{% endblock %}
+
+{% block content %}
+<div class="ptl-page-header">
+  <h1>Mis Facturas</h1>
+  <p>Historial de cobros y facturación.</p>
+</div>
+
+{% if cobros %}
+<div class="ptl-table-wrap">
+  <table class="ptl-table">
+    <thead>
+      <tr>
+        <th>Folio</th>
+        <th>Concepto</th>
+        <th>Asunto</th>
+        <th>Monto</th>
+        <th>Estado</th>
+        <th>Emisión</th>
+        <th>Vencimiento</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in cobros %}
+      <tr>
+        <td class="ptl-mono">{{ c.folio or c.id }}</td>
+        <td>{{ c.concepto or '—' }}</td>
+        <td>{{ c.asunto_titulo or '—' }}</td>
+        <td class="ptl-num">${{ '{:,.0f}'.format(c.total or c.monto) }}</td>
+        <td><span class="ptl-status ptl-status-{{ c.estado }}">{{ c.estado }}</span></td>
+        <td>{{ c.fecha_emision or '—' }}</td>
+        <td>{{ c.fecha_vencimiento or '—' }}</td>
+        <td class="ptl-actions-cell">
+          {% if c.archivo_factura_url %}
+          <a href="{{ c.archivo_factura_url }}" class="ptl-btn-icon" title="Descargar PDF" download>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </a>
+          {% endif %}
+          {% if c.estado in ('pendiente', 'vencido') %}
+          <button class="ptl-btn-icon ptl-btn-icon-warn" title="Marcar en revisión" onclick="marcarRevision({{ c.id }})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="ptl-empty">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+  <p>No tienes facturas registradas.</p>
+</div>
+{% endif %}
+
+<!-- Modal revisión -->
+<div class="ptl-modal-bg" id="modalRevision">
+  <div class="ptl-modal">
+    <h3>Marcar factura en revisión</h3>
+    <p class="ptl-text-muted ptl-text-sm">Tu abogado será notificado de que esta factura requiere revisión.</p>
+    <div class="ptl-field" style="margin-top:12px;">
+      <label>Motivo (opcional)</label>
+      <textarea id="revisionMotivo" rows="3" placeholder="Describe el motivo..."></textarea>
+    </div>
+    <div class="ptl-modal-actions">
+      <button class="ptl-btn ptl-btn-outline" onclick="closeModal()">Cancelar</button>
+      <button class="ptl-btn ptl-btn-primary" onclick="enviarRevision()">Enviar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let revCobroId = null;
+function marcarRevision(id) {
+  revCobroId = id;
+  document.getElementById('modalRevision').classList.add('open');
+}
+function closeModal() { document.getElementById('modalRevision').classList.remove('open'); }
+function enviarRevision() {
+  if (!revCobroId) return;
+  const motivo = document.getElementById('revisionMotivo').value.trim();
+  fetch('{{ url_for("portal.cliente_factura_revision", cobro_id=0) }}'.replace('/0/', '/' + revCobroId + '/'), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'motivo=' + encodeURIComponent(motivo)
+  }).then(r => r.json()).then(d => {
+    closeModal();
+    if (d.ok) alert(d.message || 'Enviado');
+    else alert(d.error || 'Error');
+  });
+}
+document.getElementById('modalRevision').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Nuevo Cobro{% endblock %}
+{% block page_title %}Nuevo Cobro{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ 'Editar cobro' if accion=='editar' else 'Nuevo cobro' }}</h1>
+    <p class="page-subtitle">Registra un honorario o pago pendiente.</p>
+  </div>
+  <a href="{{ url_for('cobranzas.index') }}" class="btn btn-ghost">← Cancelar</a>
+</div>
+
+<div style="max-width: 640px;">
+  <form method="POST">
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Datos del cobro</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Concepto <span class="text-danger">*</span></label>
+          <input class="form-control" type="text" name="concepto"
+                 value="{{ cobro.get('concepto','') }}" placeholder="Anticipo de honorarios…" required>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Monto <span class="text-danger">*</span></label>
+            <input class="form-control" type="number" name="monto" step="0.01" min="0"
+                   value="{{ cobro.get('monto','') }}" placeholder="0.00" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Moneda</label>
+            <select class="form-control" name="moneda">
+              <option value="MXN" {{ 'selected' if cobro.get('moneda','MXN')=='MXN' }}>MXN — Peso mexicano</option>
+              <option value="USD" {{ 'selected' if cobro.get('moneda')=='USD' }}>USD — Dólar</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-control" name="estado">
+            {% for e in ['pendiente','pagado','vencido','cancelado'] %}
+            <option value="{{ e }}" {{ 'selected' if cobro.get('estado','pendiente')==e }}>{{ e|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Relaciones</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Cliente</label>
+          <select class="form-control" name="cliente_id">
+            <option value="">— Sin cliente —</option>
+            {% for c in clientes %}
+            <option value="{{ c.id }}" {{ 'selected' if cobro.get('cliente_id')|string==c.id|string }}>
+              {{ c.nombre }} {{ c.apellidos or '' }}{{ c.razon_social or '' }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Asunto / Expediente</label>
+          <select class="form-control" name="asunto_id">
+            <option value="">— Sin asunto —</option>
+            {% for a in asuntos %}
+            <option value="{{ a.id }}" {{ 'selected' if cobro.get('asunto_id')|string==a.id|string }}>
+              {{ a.numero_expediente or '' }} {{ a.titulo }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><span class="card-title">Fechas y pago</span></div>
+      <div class="card-body">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Fecha de emisión</label>
+            <input class="form-control" type="date" name="fecha_emision" value="{{ cobro.get('fecha_emision','') }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha de vencimiento</label>
+            <input class="form-control" type="date" name="fecha_vencimiento" value="{{ cobro.get('fecha_vencimiento','') }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Método de pago</label>
+            <select class="form-control" name="metodo_pago">
+              <option value="">— Seleccionar —</option>
+              {% for m in ['efectivo','transferencia','cheque','tarjeta','otro'] %}
+              <option value="{{ m }}" {{ 'selected' if cobro.get('metodo_pago')==m }}>{{ m|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Referencia / Folio</label>
+            <input class="form-control" type="text" name="referencia" value="{{ cobro.get('referencia','') }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas</label>
+          <textarea class="form-control" name="notas" rows="2">{{ cobro.get('notas','') }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if accion=='editar' else 'Registrar cobro' }}</button>
+      <a href="{{ url_for('cobranzas.index') }}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

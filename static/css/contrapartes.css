@@ -1,0 +1,302 @@
+/* ── Modal ─────────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+  background: #1C2630;
+  border: 1px solid rgba(0,223,162,0.15);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 0.5px solid rgba(0,223,162,0.08);
+}
+.modal-title {
+  font-family: 'Merriweather', serif;
+  font-size: 18px;
+  font-weight: 300;
+  color: #EAF0EC;
+}
+.modal-close {
+  background: none; border: none;
+  color: #8A9BA8; font-size: 22px;
+  cursor: pointer; line-height: 1;
+  padding: 0 4px;
+  transition: color 0.15s;
+}
+.modal-close:hover { color: #EAF0EC; }
+.modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.modal-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #8A9BA8;
+}
+.modal-input {
+  background: #080C10;
+  border: 1px solid rgba(0,223,162,0.1);
+  border-radius: 6px;
+  color: #EAF0EC;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  padding: 9px 12px;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.modal-input:focus {
+  outline: none;
+  border-color: rgba(0,223,162,0.4);
+  box-shadow: 0 0 0 3px rgba(0,223,162,0.06);
+}
+.modal-input::placeholder { color: #8A9BA8; opacity: 0.5; }
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-top: 0.5px solid rgba(0,223,162,0.08);
+}
+.modal-btn-cancel {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 0.5px solid rgba(0,223,162,0.15);
+  color: #8A9BA8; padding: 8px 18px;
+  border-radius: 6px; cursor: pointer;
+  transition: all 0.15s;
+}
+.modal-btn-cancel:hover { border-color: rgba(0,223,162,0.3); color: #EAF0EC; }
+.modal-btn-primary {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: #00DFA2; color: #080C10;
+  border: none; padding: 8px 20px;
+  border-radius: 6px; cursor: pointer;
+  font-weight: 500; transition: background 0.15s;
+}
+.modal-btn-primary:hover { background: #00B882; }
+.modal-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Filtros panel ──────────────────────────────────────────────────────────── */
+.filters-panel {
+  display: none;
+  background: var(--c);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+.filters-panel.open { display: grid; }
+.filter-group label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--ash);
+  margin-bottom: 5px; display: block;
+}
+.filter-group select {
+  width: 100%; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px;
+  color: var(--fog); font-family: 'DM Mono', monospace;
+  font-size: 12px; padding: 7px 10px;
+}
+
+/* ── Tabs Stakeholders ─────────────────────────────────────────────────────── */
+.sh-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(0,223,162,0.08);
+  margin-bottom: 20px;
+}
+.sh-tab {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  color: #8A9BA8;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+}
+.sh-tab:hover { color: #EAF0EC; }
+.sh-tab.active { color: #00DFA2; border-bottom-color: #00DFA2; }
+
+/* ── Split layout ──────────────────────────────────────────────────────────── */
+.cp-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  transition: grid-template-columns 0.3s ease;
+}
+.cp-split.has-selected {
+  grid-template-columns: 1fr 300px;
+}
+
+/* ── Panel derecho ─────────────────────────────────────────────────────────── */
+.cp-panel {
+  background: #0D1117;
+  border-left: 0.5px solid rgba(0,223,162,0.08);
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+.cp-panel-header { margin-bottom: 16px; }
+.cp-panel-divider {
+  height: 0.5px;
+  background: rgba(0,223,162,0.08);
+  margin: 14px 0;
+}
+.cp-panel-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.cps-item { text-align: center; }
+.cps-v {
+  font-family: 'Merriweather', serif;
+  font-size: 22px;
+  font-weight: 300;
+  color: #EAF0EC;
+  display: block;
+  line-height: 1;
+}
+.cps-l {
+  font-family: 'DM Mono', monospace;
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #8A9BA8;
+  display: block;
+  margin-top: 3px;
+}
+.cp-panel-section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(0,223,162,0.4);
+  margin-bottom: 12px;
+}
+
+/* ── Insights ──────────────────────────────────────────────────────────────── */
+.cp-insight-item {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 0.5px solid rgba(0,223,162,0.06);
+}
+.cp-insight-item:last-of-type { border-bottom: none; }
+.cp-insight-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: #EAF0EC;
+  margin-bottom: 4px;
+}
+.cp-insight-body {
+  font-family: 'Merriweather', serif;
+  font-size: 11px;
+  color: #8A9BA8;
+  line-height: 1.6;
+  font-weight: 300;
+}
+.cp-insight-tag {
+  display: inline-block;
+  font-family: 'DM Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 0.5px solid;
+  margin-top: 6px;
+}
+
+/* ── Historial de casos ────────────────────────────────────────────────────── */
+.cp-hist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 0.5px solid rgba(0,223,162,0.05);
+}
+.cp-hist-item:last-child { border-bottom: none; }
+
+/* ── Badges resultado ──────────────────────────────────────────────────────── */
+.badge-resultado-favorable {
+  font-family: 'DM Mono', monospace; font-size: 7px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+  background: rgba(0,223,162,0.1); color: #00DFA2;
+  border: 0.5px solid rgba(0,223,162,0.2);
+}
+.badge-resultado-desfavorable {
+  font-family: 'DM Mono', monospace; font-size: 7px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+  background: rgba(239,68,68,0.1); color: #EF4444;
+  border: 0.5px solid rgba(239,68,68,0.2);
+}
+.badge-resultado-acuerdo {
+  font-family: 'DM Mono', monospace; font-size: 7px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+  background: rgba(59,139,212,0.1); color: #3B8BD4;
+  border: 0.5px solid rgba(59,139,212,0.2);
+}
+.badge-resultado-en_proceso {
+  font-family: 'DM Mono', monospace; font-size: 7px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+  background: rgba(245,158,11,0.1); color: #F59E0B;
+  border: 0.5px solid rgba(245,158,11,0.2);
+}
+
+/* ── Row seleccionada ──────────────────────────────────────────────────────── */
+.cp-row { cursor: pointer; }
+.cp-row.selected td { background: rgba(0,223,162,0.04) !important; }
+
+/* ── Avatar contraparte ────────────────────────────────────────────────────── */
+.cp-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(239,68,68,0.1); color: #EF4444;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  font-weight: 500; flex-shrink: 0;
+}
