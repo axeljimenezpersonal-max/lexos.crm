@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}CODEX{% endblock %} — {{ tenant.nombre_despacho if tenant else 'CODEX' }}</title>
+  <title>{% block title %}CODEX{% endblock %} — {{ tenant.nombre_despacho if tenant else 'Códex' }}</title>
 
   <!-- ── Google Fonts: CODEX typography stack ── -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -917,7 +917,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        Escribe para buscar en CODEX
+        Escribe para buscar en Códex
       </div>
     </div>
     <div class="sm-footer">
@@ -958,14 +958,14 @@
         </svg>
       </div>
       <div>
-        <div class="sb-logo-name">CODE<span>X</span></div>
-        <div class="sb-logo-by">Plataforma Legal</div>
+        <div class="sb-logo-name">Códe<span>x</span></div>
+        <div class="sb-logo-by">Sistema Legal</div>
       </div>
     </a>
 
     <!-- Despacho info -->
     <div class="sb-despacho">
-      <div class="sb-despacho-name">{{ tenant.nombre_despacho if tenant else 'CODEX' }}</div>
+      <div class="sb-despacho-name">{{ tenant.nombre_despacho if tenant else 'Códex' }}</div>
       <div class="sb-despacho-plan">
         {{ (tenant.plan | upper) if tenant and tenant.plan else 'PLAN PRO' }}
         {% if tenant and tenant.ciudad %} · {{ tenant.ciudad | upper }}{% endif %}
@@ -1140,7 +1140,7 @@
             </svg>
           </button>
           <div class="tb-context">
-            <span class="tb-brand">Code<span class="tb-brand-accent">x</span></span>
+            <span class="tb-brand">Códe<span class="tb-brand-accent">x</span></span>
             <span class="tb-ctx-sep">·</span>
             <span class="tb-ctx-date" id="tbPageDate"></span>
           </div>
@@ -1296,7 +1296,7 @@
     <!-- System footer -->
     <footer class="system-footer">
       <span style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--ash);opacity:.4;">
-        CODEX · PLATAFORMA LEGAL · {{ tenant.ciudad | upper if tenant and tenant.ciudad else 'MÉXICO' }}
+        Códex · SISTEMA LEGAL · {{ tenant.ciudad | upper if tenant and tenant.ciudad else 'MÉXICO' }}
       </span>
     </footer>
 

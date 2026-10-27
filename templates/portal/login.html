@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acceso al Portal — {{ tenant.nombre_despacho if tenant else 'CODEX' }}</title>
+  <title>Acceso al Portal — {{ tenant.nombre_despacho if tenant else 'Códex' }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/portal.css') }}">
 </head>
 <body class="ptl-login-body">
@@ -11,7 +11,7 @@
     {% if tenant and tenant.logo_url %}
     <img src="{{ tenant.logo_url }}" alt="" class="ptl-login-logo">
     {% endif %}
-    <h1 class="ptl-login-title">{{ tenant.nombre_despacho if tenant else 'CODEX' }}</h1>
+    <h1 class="ptl-login-title">{{ tenant.nombre_despacho if tenant else 'Códex' }}</h1>
     <p class="ptl-login-sub">Portal de Clientes</p>
 
     {% if error %}
@@ -32,7 +32,7 @@
 
     <p class="ptl-login-hint">Si no tienes contraseña, solicita a tu abogado un link de acceso.</p>
 
-    <div class="ptl-login-brand">Powered by <strong>CODEX</strong></div>
+    <div class="ptl-login-brand">Powered by <strong>Códex</strong></div>
   </div>
 </body>
 </html>

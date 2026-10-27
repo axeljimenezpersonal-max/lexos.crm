@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Portal{% endblock %} — {{ tenant.nombre_despacho if tenant else 'CODEX' }}</title>
+  <title>{% block title %}Portal{% endblock %} — {{ tenant.nombre_despacho if tenant else 'Códex' }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/portal.css') }}">
   {% block head %}{% endblock %}
 </head>
@@ -15,7 +15,7 @@
         {% if tenant and tenant.logo_url %}
         <img src="{{ tenant.logo_url }}" alt="" class="ptl-logo">
         {% endif %}
-        <span class="ptl-brand-name">{{ tenant.nombre_despacho if tenant else 'CODEX' }}</span>
+        <span class="ptl-brand-name">{{ tenant.nombre_despacho if tenant else 'Códex' }}</span>
       </div>
       <div class="ptl-header-right">
         <span class="ptl-user-name">{{ session.get('portal_cliente_nombre', 'Cliente') }}</span>
@@ -65,7 +65,7 @@
 
   <!-- Footer -->
   <footer class="ptl-footer">
-    <span>Portal de clientes · {{ tenant.nombre_despacho if tenant else 'CODEX' }}</span>
+    <span>Portal de clientes · {{ tenant.nombre_despacho if tenant else 'Códex' }}</span>
   </footer>
 
   {% block scripts %}{% endblock %}

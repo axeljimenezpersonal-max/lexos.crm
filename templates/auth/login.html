@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Iniciar sesión — {{ tenant.nombre_despacho if tenant else 'CODEX' }}</title>
+  <title>Iniciar sesión — {{ tenant.nombre_despacho if tenant else 'Códex' }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>
@@ -25,8 +25,8 @@
         <circle cx="16" cy="4" r="2" fill="#B8922A"/>
       </svg>
       <div>
-        <div style="font-weight:700;font-size:1.15rem;color:#1B3A6B;letter-spacing:0.02em;">CODE<span style="color:#B8922A;">X</span></div>
-        <div style="font-size:.65rem;color:#64748B;text-transform:uppercase;letter-spacing:.8px;">Plataforma Legal</div>
+        <div style="font-weight:700;font-size:1.15rem;color:#1B3A6B;letter-spacing:0.02em;">Códe<span style="color:#B8922A;">x</span></div>
+        <div style="font-size:.65rem;color:#64748B;text-transform:uppercase;letter-spacing:.8px;">Sistema Legal</div>
       </div>
     </div>
 
@@ -46,7 +46,7 @@
     <p>Tu despacho y tus clientes te esperan. Ingresa para continuar gestionando tu práctica legal.</p>
 
     <div class="auth-testimonial" style="margin-top:32px;">
-      <div class="quote">"CODEX transformó la manera en que gestionamos nuestros expedientes. Ahora todo el equipo trabaja sincronizado."</div>
+      <div class="quote">"Códex transformó la manera en que gestionamos nuestros expedientes. Ahora todo el equipo trabaja sincronizado."</div>
       <div class="author">— Lic. R. Ramírez · Bufete Ramírez & Asociados</div>
     </div>
   </div>
@@ -136,7 +136,7 @@
 
       <div style="text-align:center;margin-top:24px;">
         <p class="text-xs text-muted">
-          ¿Tu despacho no está en CODEX?
+          ¿Tu despacho no está en Códex?
           <a href="{{ url_for('auth.register_tenant') }}" class="text-accent">Regístralo gratis →</a>
         </p>
         <p class="text-xs text-muted" style="margin-top:8px;">

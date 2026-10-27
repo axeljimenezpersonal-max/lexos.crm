@@ -2,14 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "lexos",
+      "name": "LexOS Dev",
       "runtimeExecutable": "/Users/ajg/Desktop/CRM DESPACHO LEGAL/venv/bin/python",
-      "runtimeArgs": ["/Users/ajg/Desktop/CRM DESPACHO LEGAL/app.py"],
-      "port": 5001,
-      "env": {
-        "FLASK_APP": "app.py",
-        "FLASK_RUN_PORT": "5001"
-      }
+      "runtimeArgs": ["app.py"],
+      "port": 5001
     }
   ]
 }
