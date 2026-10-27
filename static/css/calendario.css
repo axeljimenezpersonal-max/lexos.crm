@@ -561,7 +561,7 @@
 }
 .cf-g input:not([type="checkbox"]):focus, .cf-g select:focus, .cf-g textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,223,162,.12);
+  box-shadow: 0 0 0 3px rgba(27,58,107,.12);
 }
 .cf-g textarea { resize: vertical; min-height: 60px; }
 .cf-g-sm { flex: 0 0 110px; }

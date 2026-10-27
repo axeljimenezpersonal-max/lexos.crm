@@ -90,15 +90,15 @@
   border-radius: 100px;
   font-size: .75rem;
   font-weight: 600;
-  background: rgba(0,223,162,.15);
+  background: rgba(27,58,107,.15);
   color: var(--accent);
-  border: 1px solid rgba(0,223,162,.3);
+  border: 1px solid rgba(27,58,107,.3);
 }
 .filter-chip button {
   width: 16px; height: 16px;
   border-radius: 50%;
   border: none;
-  background: rgba(0,223,162,.2);
+  background: rgba(27,58,107,.2);
   color: var(--accent);
   cursor: pointer;
   display: flex;
@@ -242,7 +242,7 @@
 .as-table th:hover { color: var(--text); }
 .as-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .as-table tr:last-child td { border-bottom: none; }
-.as-table tr:hover td { background: rgba(0,223,162,.04); }
+.as-table tr:hover td { background: rgba(27,58,107,.04); }
 .as-title-cell a { font-weight: 600; color: var(--text); text-decoration: none; }
 .as-title-cell a:hover { color: var(--accent); }
 .as-title-sub { font-size: .7rem; color: var(--text-3); margin-top: 1px; }
@@ -298,7 +298,7 @@
   background: var(--sidebar);
 }
 .kanban-drop-zone.drag-over {
-  background: rgba(0,223,162,.08);
+  background: rgba(27,58,107,.08);
   border-color: var(--accent);
 }
 .kanban-card {
@@ -590,8 +590,8 @@
   transition: border-color .15s, background .15s, transform .1s;
   background: var(--sidebar);
 }
-.template-card:hover { border-color: var(--accent); background: rgba(0,223,162,.06); }
-.template-card.selected { border-color: var(--accent); background: rgba(0,223,162,.1); }
+.template-card:hover { border-color: var(--accent); background: rgba(27,58,107,.06); }
+.template-card.selected { border-color: var(--accent); background: rgba(27,58,107,.1); }
 .template-card.selected .tc-icon { transform: scale(1.1); }
 .tc-icon { font-size: 1.6rem; margin-bottom: 5px; transition: transform .15s; }
 .tc-label { font-size: .75rem; font-weight: 700; color: var(--text-2); }
@@ -637,7 +637,7 @@
 }
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,223,162,.1); }
+.form-group textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(27,58,107,.1); }
 .form-group textarea { resize: vertical; min-height: 80px; }
 .form-hint { font-size: .72rem; color: var(--text-3); margin-top: 3px; }
 
@@ -664,7 +664,7 @@
   transition: background .1s;
 }
 .ac-item:last-child { border-bottom: none; }
-.ac-item:hover, .ac-item.focused { background: rgba(0,223,162,.1); color: var(--accent); }
+.ac-item:hover, .ac-item.focused { background: rgba(27,58,107,.1); color: var(--accent); }
 .ac-item-sub { font-size: .72rem; color: var(--text-3); margin-top: 1px; }
 
 /* ── Colaboradores multi-select ─────────────────────────────────────────── */
@@ -683,8 +683,8 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  background: rgba(0,223,162,.15);
-  border: 1px solid rgba(0,223,162,.3);
+  background: rgba(27,58,107,.15);
+  border: 1px solid rgba(27,58,107,.3);
   border-radius: 100px;
   font-size: .75rem;
   color: var(--accent);
@@ -762,7 +762,7 @@
 @media (max-width: 450px) {
   .tp-grid { grid-template-columns: repeat(2, 1fr); }
 }
-.template-card.tc-active { border-color: var(--accent); background: rgba(0,223,162,.12); }
+.template-card.tc-active { border-color: var(--accent); background: rgba(27,58,107,.12); }
 .template-card.tc-active .tc-icon { transform: scale(1.1); }
 .tc-color-bar { height: 3px; border-radius: 3px; margin-top: 8px; }
 
@@ -809,7 +809,7 @@
   padding: 2px 6px; border-radius: 5px;
   transition: background .1s;
 }
-.colab-check:hover { background: rgba(0,223,162,.08); color: var(--text); }
+.colab-check:hover { background: rgba(27,58,107,.08); color: var(--text); }
 .form-actions {
   display: flex; justify-content: flex-end; gap: 10px;
   padding: 20px 0 8px;
@@ -849,7 +849,7 @@
   cursor: pointer; user-select: none;
   border: 1px solid transparent;
 }
-.estado-activo      { background: rgba(0,223,162,.15);  color: var(--accent);   border-color: rgba(0,223,162,.3); }
+.estado-activo      { background: rgba(27,58,107,.15);  color: var(--accent);   border-color: rgba(27,58,107,.3); }
 .estado-por_iniciar { background: rgba(107,114,128,.15); color: var(--text-2);   border-color: rgba(107,114,128,.3); }
 .estado-en_espera   { background: rgba(245,158,11,.15);  color: var(--warning);  border-color: rgba(245,158,11,.3); }
 .estado-completado  { background: rgba(16,185,129,.15);  color: var(--success);  border-color: rgba(16,185,129,.3); }
@@ -865,7 +865,7 @@
   padding: 9px 14px; font-size: .83rem; cursor: pointer;
   transition: background .1s; color: var(--text-2);
 }
-.em-item:hover { background: rgba(0,223,162,.1); color: var(--accent); }
+.em-item:hover { background: rgba(27,58,107,.1); color: var(--accent); }
 .prioridad-pill {
   display: inline-flex; align-items: center;
   padding: 2px 8px; border-radius: 100px;
@@ -881,7 +881,7 @@
   color: var(--text-3); border-radius: 100px;
   padding: 1px 6px; font-weight: 700;
 }
-.as-tab.active .tab-count { background: rgba(0,223,162,.2); color: var(--accent); }
+.as-tab.active .tab-count { background: rgba(27,58,107,.2); color: var(--accent); }
 
 /* ── Resumen tab layout ──────────────────────────────────────────────────── */
 .resumen-grid {
@@ -927,7 +927,7 @@
 }
 .colab-tag {
   display: inline-flex; padding: 2px 8px;
-  background: rgba(0,223,162,.1); color: var(--accent);
+  background: rgba(27,58,107,.1); color: var(--accent);
   border-radius: 100px; font-size: .75rem; font-weight: 600; margin: 2px;
 }
 .fw-bold { font-weight: 700; }
@@ -963,7 +963,7 @@ textarea.inline-edit-input { min-height: 60px; resize: vertical; }
 /* ── Actividades extras ──────────────────────────────────────────────────── */
 .add-act-title { font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); margin-bottom: 10px; }
 .act-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
-.act-tipo-badge { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 1px 7px; border-radius: 100px; background: rgba(0,223,162,.15); color: var(--accent); }
+.act-tipo-badge { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 1px 7px; border-radius: 100px; background: rgba(27,58,107,.15); color: var(--accent); }
 .act-fecha { font-size: .72rem; color: var(--text-3); }
 .act-check-label { display: flex; align-items: center; gap: 4px; font-size: .75rem; color: var(--text-3); cursor: pointer; margin-left: auto; }
 .act-card-title { font-size: .86rem; font-weight: 600; color: var(--text); }
@@ -1001,7 +1001,7 @@ textarea.inline-edit-input { min-height: 60px; resize: vertical; }
   font-size: .84rem; transition: border-color .15s, background .15s;
   cursor: pointer; margin-bottom: 16px;
 }
-.doc-drop-zone:hover, .doc-drop-zone.dz-over { border-color: var(--accent); background: rgba(0,223,162,.04); }
+.doc-drop-zone:hover, .doc-drop-zone.dz-over { border-color: var(--accent); background: rgba(27,58,107,.04); }
 .dz-icon { font-size: 2rem; margin-bottom: 6px; }
 .dz-browse { color: var(--accent); text-decoration: underline; cursor: pointer; }
 .doc-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1017,7 +1017,7 @@ textarea.inline-edit-input { min-height: 60px; resize: vertical; }
 
 /* ── Sentencias extras ───────────────────────────────────────────────────── */
 .sent-titulo { font-size: .86rem; font-weight: 600; color: var(--text); margin-bottom: 3px; }
-.sent-tipo { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 1px 7px; border-radius: 100px; background: rgba(0,223,162,.12); color: var(--accent); }
+.sent-tipo { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 1px 7px; border-radius: 100px; background: rgba(27,58,107,.12); color: var(--accent); }
 .sent-content { font-size: .8rem; color: var(--text-2); margin-top: 5px; line-height: 1.5; }
 
 /* ── Cobranzas stats ─────────────────────────────────────────────────────── */
@@ -1044,7 +1044,7 @@ textarea.inline-edit-input { min-height: 60px; resize: vertical; }
   box-shadow: 0 4px 16px rgba(0,0,0,.25);
 }
 .mention-item { padding: 8px 12px; cursor: pointer; font-size: .83rem; color: var(--text-2); }
-.mention-item:hover { background: rgba(0,223,162,.1); color: var(--accent); }
+.mention-item:hover { background: rgba(27,58,107,.1); color: var(--accent); }
 .note-list { display: flex; flex-direction: column; gap: 10px; }
 .note-item { display: flex; gap: 12px; align-items: flex-start; }
 .note-avatar {
@@ -1063,7 +1063,7 @@ textarea.inline-edit-input { min-height: 60px; resize: vertical; }
 .note-fecha { font-size: .72rem; color: var(--text-3); }
 .note-text { font-size: .84rem; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
 .note-menciones { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; }
-.note-mention { font-size: .72rem; font-weight: 700; color: var(--accent); background: rgba(0,223,162,.1); padding: 1px 6px; border-radius: 100px; }
+.note-mention { font-size: .72rem; font-weight: 700; color: var(--accent); background: rgba(27,58,107,.1); padding: 1px 6px; border-radius: 100px; }
 
 /* ── Historial extras ────────────────────────────────────────────────────── */
 .hist-timeline { display: flex; flex-direction: column; }

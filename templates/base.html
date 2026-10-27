@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}LexOS{% endblock %} — {{ tenant.nombre_despacho if tenant else 'LexOS' }}</title>
+  <title>{% block title %}CODEX{% endblock %} — {{ tenant.nombre_despacho if tenant else 'CODEX' }}</title>
 
-  <!-- ── Google Fonts: Sinapsys typography stack ── -->
+  <!-- ── Google Fonts: CODEX typography stack ── -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -22,32 +22,36 @@
 
   <style>
   /* ══════════════════════════════════════════════════════════
-     SINAPSYS LAYOUT — base.html inline styles
+     CODEX LAYOUT — base.html inline styles
      Sidebar-first layout, 220px fixed left
      ══════════════════════════════════════════════════════════ */
 
-  /* ── Additional tokens (additive, do not override main.css) ── */
+  /* ── Additional tokens ── */
   :root {
     --side-w:   220px;
     --top-h:    56px;
-    --edim:     rgba(0,223,162,0.12);
-    --fog:      #EAF0EC;
-    --ash:      #8A9BA8;
-    --border:   rgba(0,223,162,0.08);
-    --border-m: rgba(0,223,162,0.15);
-    --c2:       #0D1117;
-    --n:        #080C10;
     /* Animate.css speed config */
     --animate-duration: 0.35s;
     --animate-delay:    0.05s;
   }
 
-  /* ── Global scrollbar (Sinapsys spec) ── */
-  * { scrollbar-width: thin; scrollbar-color: var(--edim) transparent; }
+  /* ── Sidebar-scoped variables: light text on navy background ── */
+  .sidebar {
+    --fog:      #EAF0EC;
+    --ash:      rgba(234,240,236,0.55);
+    --border:   rgba(255,255,255,0.08);
+    --border-m: rgba(255,255,255,0.14);
+    --edim:     rgba(184,146,42,0.15);
+    --e04:      rgba(255,255,255,0.04);
+    --e:        #B8922A;   /* gold accent inside sidebar */
+  }
+
+  /* ── Global scrollbar ── */
+  * { scrollbar-width: thin; scrollbar-color: rgba(27,58,107,0.15) transparent; }
   *::-webkit-scrollbar { width: 4px; height: 4px; }
   *::-webkit-scrollbar-track { background: transparent; }
-  *::-webkit-scrollbar-thumb { background: var(--edim); border-radius: 2px; }
-  *::-webkit-scrollbar-thumb:hover { background: var(--e); }
+  *::-webkit-scrollbar-thumb { background: rgba(27,58,107,0.15); border-radius: 2px; }
+  *::-webkit-scrollbar-thumb:hover { background: rgba(27,58,107,0.35); }
 
   /* ── Animations ── */
   @keyframes pulse {
@@ -67,19 +71,12 @@
     30%           { opacity: 0.9; }
   }
   @keyframes sig-glow {
-    0%, 100% { filter: drop-shadow(0 0 4px rgba(0,223,162,0.3)); }
-    50%      { filter: drop-shadow(0 0 14px rgba(0,223,162,0.7)); }
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(184,146,42,0.3)); }
+    50%      { filter: drop-shadow(0 0 12px rgba(184,146,42,0.6)); }
   }
-  @keyframes eye-blink {
-    0%,82% { transform: scaleY(1); }
-    87%    { transform: scaleY(0.06); }
-    92%    { transform: scaleY(0.06); }
-    97%    { transform: scaleY(1); }
-  }
-  @keyframes line-glow {
-    0%, 84%  { stroke-width:1.5; opacity: 0.45; filter: none; }
-    92%      { stroke-width:3.5; opacity: 1;    filter: drop-shadow(0 0 8px #00DFA2); }
-    97%      { stroke-width:1.5; opacity: 0.45; filter: none; }
+  @keyframes page-mark-pulse {
+    0%, 100% { opacity: 0.7; }
+    50%      { opacity: 1; }
   }
 
   /* Reusable pulsing dot */
@@ -90,18 +87,14 @@
   }
 
   /* Logo animations */
-  .iris-blink { transform-box: fill-box; transform-origin: center; animation: eye-blink 4s ease-in-out infinite; }
-  .axon-glow  { animation: line-glow 4s ease-in-out infinite; }
-  .tdot-1     { animation: dot-pulse 2.5s ease-in-out infinite 0s; }
-  .tdot-2     { animation: dot-pulse 2.5s ease-in-out infinite 0.3s; }
   .sig-logo   { animation: sig-glow 3s ease-in-out infinite; }
+  .page-mark-dot { animation: page-mark-pulse 2s ease-in-out infinite; }
 
   /* ── Scroll progress bar ── */
   .scroll-progress {
     position: fixed; top: 0; left: var(--side-w); right: 0;
     height: 2px; width: 0%; z-index: 9999;
-    background: linear-gradient(90deg, var(--e), var(--ed));
-    box-shadow: 0 0 10px rgba(0,223,162,0.5);
+    background: linear-gradient(90deg, #1B3A6B, #B8922A);
     pointer-events: none;
     transition: none;
   }
@@ -124,17 +117,8 @@
     z-index: 300;
     display: flex;
     flex-direction: column;
-    background: var(--c2);
-    background-image:
-      repeating-linear-gradient(90deg,
-        transparent, transparent 59px,
-        rgba(0,223,162,0.018) 59px,
-        rgba(0,223,162,0.018) 60px),
-      repeating-linear-gradient(0deg,
-        transparent, transparent 59px,
-        rgba(0,223,162,0.018) 59px,
-        rgba(0,223,162,0.018) 60px);
-    border-right: 1px solid var(--border);
+    background: #1B3A6B;
+    border-right: 1px solid rgba(255,255,255,0.08);
     overflow: hidden;
     transition: transform 0.25s cubic-bezier(.4,0,.2,1);
   }
@@ -300,7 +284,7 @@
   .sb-overlay {
     display: none;
     position: fixed; inset: 0; z-index: 299;
-    background: rgba(8,12,16,0.65);
+    background: rgba(15,23,42,0.55);
     backdrop-filter: blur(4px);
   }
   .sb-overlay.active { display: block; }
@@ -325,10 +309,9 @@
     top: 0; left: var(--side-w); right: 0;
     height: var(--top-h);
     z-index: 200;
-    background: rgba(8,12,16,0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
+    background: #FFFFFF;
+    border-bottom: 1px solid rgba(15,23,42,0.08);
+    box-shadow: 0 1px 4px rgba(15,23,42,0.05);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -362,7 +345,7 @@
     cursor: pointer; color: var(--ash); flex-shrink: 0;
     transition: all 0.15s;
   }
-  .tb-hamburger:hover { color: var(--e); border-color: var(--border-m); }
+  .tb-hamburger:hover { color: #1B3A6B; border-color: rgba(15,23,42,0.14); }
 
   /* Topbar context (left side) */
   .tb-context {
@@ -374,7 +357,7 @@
     letter-spacing: 0.12em;
     color: var(--fog);
   }
-  .tb-brand-accent { color: var(--e); }
+  .tb-brand-accent { color: #1B3A6B; }
   .tb-ctx-sep {
     color: var(--ash); opacity: 0.35; font-size: 11px;
   }
@@ -387,7 +370,7 @@
   /* Bóveda Online button */
   .tb-boveda-btn {
     display: flex; align-items: center; gap: 6px;
-    border: 1px solid var(--border-m); color: var(--e);
+    border: 1px solid rgba(27,58,107,0.2); color: #1B3A6B;
     font-family: 'DM Mono', monospace;
     font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase;
     padding: 6px 14px; border-radius: 4px;
@@ -397,10 +380,10 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .tb-boveda-btn:hover { background: var(--edim); border-color: var(--e); color: var(--e); }
+  .tb-boveda-btn:hover { background: rgba(27,58,107,0.06); border-color: #1B3A6B; color: #1B3A6B; }
   .tb-boveda-dot {
     width: 5px; height: 5px; border-radius: 50%;
-    background: var(--e);
+    background: #059669;
     animation: pulse 2s ease-in-out infinite;
     flex-shrink: 0;
   }
@@ -438,7 +421,7 @@
     transition: all 0.15s;
     position: relative; flex-shrink: 0;
   }
-  .btn-icon:hover { background: var(--edim); color: var(--e); border-color: var(--border-m); }
+  .btn-icon:hover { background: rgba(27,58,107,0.06); color: #1B3A6B; border-color: rgba(15,23,42,0.14); }
 
   /* Notif dot */
   .notif-dot {
@@ -456,14 +439,14 @@
   .tb-user-btn {
     width: 32px; height: 32px;
     border-radius: 50%;
-    background: var(--edim);
-    border: 1.5px solid var(--border-m);
+    background: rgba(27,58,107,0.08);
+    border: 1.5px solid rgba(27,58,107,0.2);
     display: flex; align-items: center; justify-content: center;
-    font-weight: 600; font-size: .72rem; color: var(--e);
+    font-weight: 600; font-size: .72rem; color: #1B3A6B;
     cursor: pointer; transition: all 0.15s; flex-shrink: 0;
     font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
   }
-  .tb-user-btn:hover { border-color: var(--e); }
+  .tb-user-btn:hover { border-color: #1B3A6B; background: rgba(27,58,107,0.14); }
 
   /* Dropdown wrapper */
   .tb-dd-wrap { position: relative; }
@@ -487,7 +470,7 @@
     cursor: pointer; transition: background 0.15s, color 0.15s;
     text-decoration: none;
   }
-  .td-item:hover { background: var(--edim); color: var(--fog); }
+  .td-item:hover { background: rgba(27,58,107,0.04); color: var(--fog); }
   .td-item.danger { color: var(--danger); }
   .td-item.danger:hover { background: rgba(239,68,68,0.08); }
   .td-item-icon { font-size: .9rem; flex-shrink: 0; margin-top: 1px; }
@@ -518,15 +501,6 @@
     flex: 1;
     padding: 28px 32px;
     background: var(--n);
-    background-image:
-      repeating-linear-gradient(90deg,
-        transparent, transparent 59px,
-        rgba(0,223,162,0.015) 59px,
-        rgba(0,223,162,0.015) 60px),
-      repeating-linear-gradient(0deg,
-        transparent, transparent 59px,
-        rgba(0,223,162,0.015) 59px,
-        rgba(0,223,162,0.015) 60px);
     min-height: calc(100vh - var(--top-h));
   }
 
@@ -539,7 +513,7 @@
   .system-footer {
     padding: 12px 32px;
     border-top: 1px solid var(--border);
-    background: var(--c2);
+    background: var(--n);
     text-align: center;
   }
 
@@ -567,7 +541,7 @@
   }
   .card:hover {
     border-color: var(--border-m);
-    box-shadow: 0 4px 20px rgba(0,223,162,0.06);
+    box-shadow: 0 4px 16px rgba(15,23,42,0.08);
   }
 
   /* Anim-in utility */
@@ -583,27 +557,27 @@
     padding: 2px 8px; border-radius: 4px; font-weight: 500;
     display: inline-block;
   }
-  .badge-activo     { background: rgba(0,223,162,.1); color: var(--e); border: 1px solid rgba(0,223,162,.2); }
-  .badge-cerrado    { background: rgba(255,255,255,.05); color: var(--ash); border: 1px solid var(--border); }
-  .badge-suspendido { background: rgba(245,158,11,.1); color: var(--warn); border: 1px solid rgba(245,158,11,.2); }
-  .badge-pendiente  { background: rgba(245,158,11,.1); color: var(--warn); border: 1px solid rgba(245,158,11,.2); }
-  .badge-audiencia  { background: rgba(59,130,246,.1); color: var(--info); border: 1px solid rgba(59,130,246,.2); }
-  .badge-plazo      { background: rgba(245,158,11,.1); color: var(--warn); border: 1px solid rgba(245,158,11,.2); }
-  .badge-reunion    { background: rgba(184,146,42,.1); color: var(--gold); border: 1px solid rgba(184,146,42,.2); }
-  .badge-diligencia { background: rgba(59,130,246,.1); color: var(--info); border: 1px solid rgba(59,130,246,.2); }
-  .badge-alta       { background: rgba(239,68,68,.1); color: var(--danger); border: 1px solid rgba(239,68,68,.2); }
-  .badge-media      { background: rgba(245,158,11,.1); color: var(--warn); border: 1px solid rgba(245,158,11,.2); }
-  .badge-baja       { background: rgba(255,255,255,.04); color: var(--ash); border: 1px solid var(--border); }
-  .badge-vencido    { background: rgba(239,68,68,.1); color: var(--danger); border: 1px solid rgba(239,68,68,.2); }
+  .badge-activo     { background: rgba(5,150,105,.10); color: #059669; border: 1px solid rgba(5,150,105,.2); }
+  .badge-cerrado    { background: rgba(100,116,139,.08); color: var(--ash); border: 1px solid var(--border); }
+  .badge-suspendido { background: rgba(37,99,235,.08); color: var(--info); border: 1px solid rgba(37,99,235,.18); }
+  .badge-pendiente  { background: rgba(217,119,6,.10); color: var(--warn); border: 1px solid rgba(217,119,6,.2); }
+  .badge-audiencia  { background: rgba(220,38,38,.10); color: var(--danger); border: 1px solid rgba(220,38,38,.2); }
+  .badge-plazo      { background: rgba(217,119,6,.10); color: var(--warn); border: 1px solid rgba(217,119,6,.2); }
+  .badge-reunion    { background: rgba(184,146,42,.10); color: var(--gold); border: 1px solid rgba(184,146,42,.2); }
+  .badge-diligencia { background: rgba(37,99,235,.08); color: var(--info); border: 1px solid rgba(37,99,235,.18); }
+  .badge-alta       { background: rgba(220,38,38,.10); color: var(--danger); border: 1px solid rgba(220,38,38,.2); }
+  .badge-media      { background: rgba(217,119,6,.10); color: var(--warn); border: 1px solid rgba(217,119,6,.2); }
+  .badge-baja       { background: rgba(100,116,139,.08); color: var(--ash); border: 1px solid var(--border); }
+  .badge-vencido    { background: rgba(220,38,38,.10); color: var(--danger); border: 1px solid rgba(220,38,38,.2); }
 
   /* Buttons */
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: .82rem; font-weight: 500; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; text-decoration: none; font-family: 'DM Mono', monospace; letter-spacing: 0.04em; }
-  .btn-primary { background: var(--e); color: var(--n); border-color: var(--e); }
-  .btn-primary:hover { background: var(--ed); border-color: var(--ed); color: var(--n); }
+  .btn-primary { background: #1B3A6B; color: #FFFFFF; border-color: #1B3A6B; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .btn-primary:hover { background: #142D52; border-color: #142D52; color: #FFFFFF; }
   .btn-ghost { background: transparent; color: var(--ash); border-color: var(--border); }
-  .btn-ghost:hover { background: var(--edim); color: var(--e); border-color: var(--border-m); }
-  .btn-danger { background: rgba(239,68,68,.1); color: var(--danger); border-color: rgba(239,68,68,.2); }
-  .btn-danger:hover { background: rgba(239,68,68,.15); }
+  .btn-ghost:hover { background: rgba(27,58,107,0.04); color: #1B3A6B; border-color: rgba(15,23,42,0.14); }
+  .btn-danger { background: rgba(220,38,38,.08); color: var(--danger); border-color: rgba(220,38,38,.2); }
+  .btn-danger:hover { background: rgba(220,38,38,.14); }
   .btn-sm { padding: 5px 12px; font-size: .72rem; }
   .btn-lg { padding: 11px 22px; font-size: .88rem; }
 
@@ -622,25 +596,25 @@
     font-family: 'Libre Baskerville', serif;
     animation: fadeUp 0.3s ease;
   }
-  .alert-success { background: rgba(0,223,162,.08); border-color: rgba(0,223,162,.2); color: var(--e); }
-  .alert-error, .alert-danger { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.2); color: var(--danger); }
-  .alert-warning { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.2); color: var(--warn); }
-  .alert-info { background: rgba(59,130,246,.08); border-color: rgba(59,130,246,.2); color: var(--info); }
+  .alert-success { background: rgba(5,150,105,.08); border-color: rgba(5,150,105,.25); color: #047857; }
+  .alert-error, .alert-danger { background: rgba(220,38,38,.06); border-color: rgba(220,38,38,.2); color: var(--danger); }
+  .alert-warning { background: rgba(217,119,6,.08); border-color: rgba(217,119,6,.2); color: #92400E; }
+  .alert-info { background: rgba(37,99,235,.08); border-color: rgba(37,99,235,.2); color: #1D4ED8; }
 
   /* ══════════════════════════════════════════════════════════
      SEARCH MODAL (unchanged structure, re-styled)
      ══════════════════════════════════════════════════════════ */
   .search-overlay {
     position: fixed; inset: 0;
-    background: rgba(8,12,16,.75); backdrop-filter: blur(6px);
+    background: rgba(15,23,42,.55); backdrop-filter: blur(6px);
     z-index: 1000; display: flex; align-items: flex-start; justify-content: center;
     padding-top: 80px; opacity: 0; pointer-events: none; transition: opacity 150ms;
   }
   .search-overlay.open { opacity: 1; pointer-events: all; }
   .search-modal {
-    background: var(--c); border: 0.5px solid var(--border-m);
+    background: var(--c); border: 1px solid var(--border-m);
     border-radius: 12px; width: 100%; max-width: 600px;
-    box-shadow: 0 24px 64px rgba(0,0,0,.7); overflow: hidden;
+    box-shadow: 0 8px 40px rgba(15,23,42,.18); overflow: hidden;
     transform: translateY(-12px); transition: transform 150ms;
   }
   .search-overlay.open .search-modal { transform: translateY(0); }
@@ -650,9 +624,9 @@
   .sm-input::placeholder { color: var(--ash); opacity: .5; }
   .sm-esc-kbd { font-family: 'DM Mono', monospace; background: var(--c2); border: 0.5px solid var(--border); border-radius: 2px; padding: 2px 7px; font-size: .6rem; color: var(--ash); letter-spacing: 0.1em; }
   .sm-body { max-height: 380px; overflow-y: auto; }
-  .sm-section-label { padding: 10px 20px 4px; font-family: 'DM Mono', monospace; font-size: 9px; color: rgba(0,223,162,.4); text-transform: uppercase; letter-spacing: 0.2em; }
+  .sm-section-label { padding: 10px 20px 4px; font-family: 'DM Mono', monospace; font-size: 9px; color: var(--ash); text-transform: uppercase; letter-spacing: 0.2em; }
   .sm-result-item { display: flex; align-items: center; gap: 12px; padding: 10px 20px; cursor: pointer; transition: background 0.12s; }
-  .sm-result-item:hover, .sm-result-item.focused { background: var(--edim); }
+  .sm-result-item:hover, .sm-result-item.focused { background: rgba(27,58,107,0.04); }
   .sm-result-icon { width: 32px; height: 32px; border-radius: 4px; background: var(--c2); border: 0.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: .85rem; flex-shrink: 0; }
   .sm-result-title { font-size: .85rem; font-weight: 500; color: var(--fog); }
   .sm-result-sub { font-size: .72rem; color: var(--ash); margin-top: 1px; }
@@ -704,7 +678,7 @@
     font-weight: 400;
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: rgba(0,223,162,0.6);
+    color: var(--ash);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -714,15 +688,15 @@
     display: block;
     width: 28px;
     height: 1px;
-    background: #00DFA2;
-    opacity: 0.5;
+    background: #1B3A6B;
+    opacity: 0.3;
     flex-shrink: 0;
   }
   .page-title {
-    font-family: 'Merriweather', serif;
-    font-size: 72px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
     font-weight: 300;
-    color: #EAF0EC;
+    color: var(--fog);
     letter-spacing: -0.02em;
     line-height: 1;
     margin: 0;
@@ -740,11 +714,11 @@
     font-family: 'DM Mono', monospace;
     font-size: 10px;
     letter-spacing: 0.06em;
-    background: rgba(0,223,162,0.1);
-    color: #00DFA2;
+    background: rgba(27,58,107,0.08);
+    color: #1B3A6B;
     padding: 4px 14px;
     border-radius: 100px;
-    border: 0.5px solid rgba(0,223,162,0.25);
+    border: 0.5px solid rgba(27,58,107,0.2);
     white-space: nowrap;
   }
   .page-actions {
@@ -754,28 +728,23 @@
     align-items: center;
   }
   .page-divider {
-    height: 0.5px;
-    background: rgba(0,223,162,0.08);
+    height: 1px;
+    background: var(--border);
     margin: 20px 0;
     width: 100%;
   }
 
-  /* Grid bg layer */
-  .grid-bg {
-    position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background:
-      repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(0,223,162,0.018) 59px, rgba(0,223,162,0.018) 60px),
-      repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(0,223,162,0.018) 59px, rgba(0,223,162,0.018) 60px);
-  }
+  /* Grid bg — removed for light theme */
+  .grid-bg { display: none; }
   .overlay {
     display: none; position: fixed; inset: 0;
-    background: rgba(8,12,16,.5); z-index: 180;
+    background: rgba(15,23,42,.45); z-index: 180;
     backdrop-filter: blur(2px);
   }
   .overlay.active { display: block; }
 
   /* ══════════════════════════════════════════════════════════
-     HOVER.CSS — 8 EFECTOS SELECCIONADOS (Sinapsys LexOS)
+     HOVER.CSS — 8 EFECTOS SELECCIONADOS (CODEX Navy Premium)
      Aplicados directamente a selectores existentes.
      No importar hover.css completo (muy pesado).
      ══════════════════════════════════════════════════════════ */
@@ -806,7 +775,7 @@
     position: absolute;
     z-index: -1;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: var(--edim);
+    background: rgba(255,255,255,0.06);
     transform: scaleX(0);
     transform-origin: 0 50%;
     transition: transform 0.3s ease-out;
@@ -844,7 +813,7 @@
   }
   .ds-kpi:hover, .lex-kpi:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 28px rgba(0,223,162,0.15);
+    box-shadow: 0 10px 28px rgba(27,58,107,0.12);
   }
 
   /* 8. hvr-ripple-out — .btn-ghost: ripple que se expande */
@@ -903,10 +872,10 @@
   .lex-toast.leaving {
     animation: toastOut 0.25s ease-in both;
   }
-  .lex-toast.success { border-color: rgba(0,223,162,0.3); }
-  .lex-toast.error   { border-color: rgba(239,68,68,0.3); }
-  .lex-toast.success::before { content:'✓'; color: var(--e); font-weight: 600; }
-  .lex-toast.error::before   { content:'✕'; color: #EF4444; font-weight: 600; }
+  .lex-toast.success { border-color: rgba(5,150,105,0.3); }
+  .lex-toast.error   { border-color: rgba(220,38,38,0.3); }
+  .lex-toast.success::before { content:'✓'; color: #059669; font-weight: 600; }
+  .lex-toast.error::before   { content:'✕'; color: #DC2626; font-weight: 600; }
   @keyframes toastIn {
     from { opacity: 0; transform: translateX(16px); }
     to   { opacity: 1; transform: translateX(0); }
@@ -948,7 +917,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        Escribe para buscar en todo LexOS
+        Escribe para buscar en CODEX
       </div>
     </div>
     <div class="sm-footer">
@@ -970,30 +939,33 @@
     <!-- Logo -->
     <a href="{{ url_for('dashboard.index') }}" class="sb-logo">
       <div class="sb-logo-mark sig-logo">
-        <svg width="28" height="28" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle class="iris-blink" cx="60" cy="60" r="18" fill="var(--e)" opacity=".85"/>
-          <circle cx="60" cy="60" r="8" fill="var(--n)"/>
-          <circle cx="63" cy="57" r="3" fill="rgba(255,255,255,.6)"/>
-          <line class="axon-glow" x1="60" y1="38" x2="60" y2="10" stroke="var(--e)" stroke-width="2" opacity=".4"/>
-          <line class="axon-glow" x1="60" y1="82" x2="60" y2="110" stroke="var(--e)" stroke-width="2" opacity=".4"/>
-          <line class="axon-glow" x1="38" y1="60" x2="10" y2="60" stroke="var(--e)" stroke-width="2" opacity=".4"/>
-          <line class="axon-glow" x1="82" y1="60" x2="110" y2="60" stroke="var(--e)" stroke-width="2" opacity=".4"/>
-          <circle class="tdot-1" cx="60" cy="8" r="3" fill="var(--e)"/>
-          <circle class="tdot-2" cx="60" cy="112" r="3" fill="var(--e)"/>
-          <circle class="tdot-1" cx="8" cy="60" r="3" fill="var(--e)"/>
-          <circle class="tdot-2" cx="112" cy="60" r="3" fill="var(--e)"/>
-          <circle cx="60" cy="60" r="30" stroke="var(--e)" stroke-width="1" opacity=".15" fill="none"/>
+        <!-- CODEX mark: open book / codex -->
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Book cover outline -->
+          <rect x="2" y="4" width="28" height="24" rx="2" fill="none" stroke="#B8922A" stroke-width="1.5" opacity="0.9"/>
+          <!-- Spine -->
+          <line x1="16" y1="4" x2="16" y2="28" stroke="#B8922A" stroke-width="1.5" opacity="0.9"/>
+          <!-- Left page lines -->
+          <line x1="5.5" y1="11" x2="13" y2="11" stroke="white" stroke-width="1.2" opacity="0.65"/>
+          <line x1="5.5" y1="15" x2="13" y2="15" stroke="white" stroke-width="1.2" opacity="0.65"/>
+          <line x1="5.5" y1="19" x2="10" y2="19" stroke="white" stroke-width="1.2" opacity="0.4"/>
+          <!-- Right page lines -->
+          <line x1="19" y1="11" x2="26.5" y2="11" stroke="white" stroke-width="1.2" opacity="0.65"/>
+          <line x1="19" y1="15" x2="26.5" y2="15" stroke="white" stroke-width="1.2" opacity="0.65"/>
+          <line x1="19" y1="19" x2="23" y2="19" stroke="white" stroke-width="1.2" opacity="0.4"/>
+          <!-- Gold dot on spine top -->
+          <circle cx="16" cy="4" r="2" fill="#B8922A" class="page-mark-dot"/>
         </svg>
       </div>
       <div>
-        <div class="sb-logo-name">LEX<span>OS</span></div>
-        <div class="sb-logo-by">by SINAPSYS</div>
+        <div class="sb-logo-name">CODE<span>X</span></div>
+        <div class="sb-logo-by">Plataforma Legal</div>
       </div>
     </a>
 
     <!-- Despacho info -->
     <div class="sb-despacho">
-      <div class="sb-despacho-name">{{ tenant.nombre_despacho if tenant else 'LexOS' }}</div>
+      <div class="sb-despacho-name">{{ tenant.nombre_despacho if tenant else 'CODEX' }}</div>
       <div class="sb-despacho-plan">
         {{ (tenant.plan | upper) if tenant and tenant.plan else 'PLAN PRO' }}
         {% if tenant and tenant.ciudad %} · {{ tenant.ciudad | upper }}{% endif %}
@@ -1168,7 +1140,7 @@
             </svg>
           </button>
           <div class="tb-context">
-            <span class="tb-brand">Lex<span class="tb-brand-accent">OS</span></span>
+            <span class="tb-brand">Code<span class="tb-brand-accent">x</span></span>
             <span class="tb-ctx-sep">·</span>
             <span class="tb-ctx-date" id="tbPageDate"></span>
           </div>
@@ -1279,10 +1251,10 @@
 
       <!-- Onboarding banner -->
       {% if current_user and not onboarding_done and onboarding_pct < 100 %}
-      <div style="background:rgba(0,223,162,.06);border-bottom:1px solid var(--border-m);
+      <div style="background:rgba(27,58,107,.05);border-bottom:1px solid rgba(27,58,107,.12);
                   padding:9px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
         <div style="flex:1;min-width:200px;">
-          <div style="font-size:.76rem;font-weight:500;color:var(--e);margin-bottom:4px;font-family:'DM Mono',monospace;letter-spacing:.06em;">
+          <div style="font-size:.76rem;font-weight:500;color:#1B3A6B;margin-bottom:4px;font-family:'DM Mono',monospace;letter-spacing:.06em;">
             {{ icon_zap(14,14) }} CONFIGURACIÓN INICIAL · {{ onboarding_pct }}% COMPLETA
           </div>
           <div class="ob-progress-bar" style="max-width:260px;">
@@ -1324,7 +1296,7 @@
     <!-- System footer -->
     <footer class="system-footer">
       <span style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--ash);opacity:.4;">
-        LEXOS · BY SINAPSYS · {{ tenant.ciudad | upper if tenant and tenant.ciudad else 'MÉXICO' }}
+        CODEX · PLATAFORMA LEGAL · {{ tenant.ciudad | upper if tenant and tenant.ciudad else 'MÉXICO' }}
       </span>
     </footer>
 

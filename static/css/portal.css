@@ -9,7 +9,7 @@
   --ptl-text: #1E293B;
   --ptl-muted: #64748B;
   --ptl-accent: var(--e);
-  --ptl-accent-light: rgba(0,223,162,.08);
+  --ptl-accent-light: rgba(27,58,107,.08);
   --ptl-success: #10B981;
   --ptl-warning: #F59E0B;
   --ptl-danger: #EF4444;
@@ -71,7 +71,7 @@ body {
   height: 52px;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0,223,162,.4);
+  box-shadow: 0 4px 12px rgba(27,58,107,.4);
   cursor: pointer;
 }
 .ptl-nav {
@@ -188,7 +188,7 @@ body {
   padding: 16px 18px;
   transition: border-color .15s, box-shadow .15s;
 }
-.ptl-case-card:hover { border-color: var(--ptl-accent); box-shadow: 0 2px 8px rgba(0,223,162,.08); }
+.ptl-case-card:hover { border-color: var(--ptl-accent); box-shadow: 0 2px 8px rgba(27,58,107,.08); }
 .ptl-case-card-full { padding: 18px 20px; }
 .ptl-case-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .ptl-case-title { font-weight: 600; font-size: .92rem; }
@@ -299,7 +299,7 @@ body {
   background: #F1F5F9; font-weight: 600; white-space: nowrap;
 }
 .ptl-table td { padding: 10px 14px; font-size: .82rem; border-top: 1px solid var(--ptl-border); }
-.ptl-table tbody tr:hover { background: rgba(0,223,162,.02); }
+.ptl-table tbody tr:hover { background: rgba(27,58,107,.02); }
 .ptl-mono { font-family: 'SF Mono', monospace; font-size: .78rem; }
 .ptl-num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .ptl-actions-cell { display: flex; gap: 6px; }
@@ -410,7 +410,7 @@ textarea {
 textarea:focus {
   outline: none;
   border-color: var(--ptl-accent);
-  box-shadow: 0 0 0 3px rgba(0,223,162,.1);
+  box-shadow: 0 0 0 3px rgba(27,58,107,.1);
 }
 
 /* ── Empty state ── */

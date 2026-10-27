@@ -146,7 +146,7 @@
   text-decoration: none;
   color: inherit;
 }
-.inv-result:hover { border-color: rgba(0,223,162,.4); }
+.inv-result:hover { border-color: rgba(27,58,107,.4); }
 .inv-result-icon {
   width: 36px;
   height: 36px;
@@ -156,7 +156,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.inv-result-icon.asunto { background: rgba(0,223,162,.12); color: var(--e); }
+.inv-result-icon.asunto { background: rgba(27,58,107,.12); color: var(--e); }
 .inv-result-icon.documento, .inv-result-icon.archivo { background: rgba(16,185,129,.12); color: #10B981; }
 .inv-result-icon.formato { background: rgba(245,158,11,.12); color: #F59E0B; }
 .inv-result-icon.nota { background: rgba(236,72,153,.12); color: #EC4899; }
@@ -170,7 +170,7 @@
   color: var(--text-muted, #9CA3AF); padding: 4px 8px; cursor: pointer;
   font-size: .68rem; transition: all .15s; flex-shrink: 0;
 }
-.inv-result-save:hover { background: rgba(0,223,162,.1); color: var(--e); border-color: var(--e); }
+.inv-result-save:hover { background: rgba(27,58,107,.1); color: var(--e); border-color: var(--e); }
 
 /* ── Empty state ── */
 .inv-empty {
@@ -195,11 +195,11 @@
   padding: 18px;
   transition: border-color .15s;
 }
-.inv-recurso:hover { border-color: rgba(0,223,162,.3); }
+.inv-recurso:hover { border-color: rgba(27,58,107,.3); }
 .inv-recurso-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .inv-recurso-icon {
   width: 36px; height: 36px; border-radius: 8px;
-  background: rgba(0,223,162,.12); color: var(--e);
+  background: rgba(27,58,107,.12); color: var(--e);
   display: flex; align-items: center; justify-content: center;
 }
 .inv-recurso-name { font-weight: 600; font-size: .86rem; }
@@ -258,7 +258,7 @@
 .inv-col-item a:hover { text-decoration: underline; }
 .inv-col-item-type {
   font-size: .6rem; padding: 1px 6px; border-radius: 4px;
-  background: rgba(0,223,162,.1); color: var(--e); font-weight: 600;
+  background: rgba(27,58,107,.1); color: var(--e); font-weight: 600;
   text-transform: uppercase;
 }
 .inv-col-item-del { background: none; border: none; color: #EF4444; cursor: pointer; font-size: .7rem; margin-left: auto; }
@@ -277,7 +277,7 @@
   text-decoration: none;
   color: inherit;
 }
-.inv-hist-item:hover { border-color: rgba(0,223,162,.4); }
+.inv-hist-item:hover { border-color: rgba(27,58,107,.4); }
 .inv-hist-term { font-weight: 500; flex: 1; }
 .inv-hist-count { font-size: .7rem; color: var(--text-muted, #9CA3AF); }
 .inv-hist-date { font-size: .68rem; color: var(--text-muted, #6B7280); }
@@ -309,7 +309,7 @@
   font-weight: 600;
 }
 .inv-table td { padding: 10px 14px; font-size: .82rem; border-bottom: 1px solid var(--border, #374151); }
-.inv-table tbody tr:hover { background: rgba(0,223,162,.04); }
+.inv-table tbody tr:hover { background: rgba(27,58,107,.04); }
 .inv-table-actions { display: flex; gap: 4px; }
 .inv-table-btn {
   background: none; border: 1px solid var(--border, #374151); border-radius: 6px;

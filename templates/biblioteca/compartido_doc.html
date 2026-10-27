@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ documento.titulo }} — {{ tenant.nombre_despacho if tenant else 'LexOS' }}</title>
+<title>{{ documento.titulo }} — {{ tenant.nombre_despacho if tenant else 'CODEX' }}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -69,7 +69,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">{{ tenant.nombre_despacho if tenant else 'LexOS' }}</div>
+      <div class="header-title">{{ tenant.nombre_despacho if tenant else 'CODEX' }}</div>
       <div class="header-sub">Documento compartido: {{ documento.titulo }}</div>
     </div>
     <span class="badge">Solo lectura</span>
@@ -78,7 +78,7 @@
     {{ documento.contenido_html | safe }}
   </div>
   <div class="footer">
-    Documento generado en LexOS · Este enlace es temporal y de solo lectura.
+    Documento generado en CODEX · Este enlace es temporal y de solo lectura.
   </div>
 </body>
 </html>
