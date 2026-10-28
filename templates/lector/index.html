@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Memoria del despacho{% endblock %}
+{% block page_title %}Memoria{% endblock %}
+
+{% block head %}
+<style>
+.lx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.lx-sub{color:var(--ash);font-size:14.5px;margin-top:4px;max-width:62ch}
+.lx-note{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:18px;font-size:13.5px;color:#3A4560}
+.lx-note svg{flex-shrink:0;color:var(--ok);margin-top:1px}
+.lx-note.warn{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.lx-note.warn svg{color:var(--warn)}
+.lx-note b{color:var(--fog)}
+.lx-note.warn b{color:#92400E}
+.lx-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.lx-kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px}
+.lx-kpi small{display:block;color:var(--ash);font-size:13px;font-weight:500}
+.lx-kpi b{display:block;font:600 26px/1.1 'Sora',sans-serif;color:var(--tinta);margin-top:8px}
+.lx-card{background:#fff;border:1px solid var(--border);border-radius:14px;margin-top:14px}
+.lx-card-h{padding:16px 18px 8px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.lx-card-h h2{font:600 15px 'Sora',sans-serif;color:var(--tinta)}
+.lx-search{display:flex;gap:8px;padding:4px 18px 14px}
+.lx-search input{flex:1;padding:11px 14px;border:1px solid var(--border);border-radius:10px;font:400 14.5px 'Inter',sans-serif;color:var(--fog);outline:none}
+.lx-search input:focus{border-color:var(--e);box-shadow:0 0 0 3px var(--edim)}
+.lx-results{padding:0 18px 16px}
+.lx-res{padding:12px 0;border-top:1px solid var(--border)}
+.lx-res-h{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.lx-res-h a{font-weight:600;color:var(--fog);text-decoration:none}
+.lx-res-h a:hover{color:var(--e)}
+.lx-res-h small{color:var(--ash);font-size:12px;white-space:nowrap}
+.lx-res p{color:#3A4560;font-size:13.5px;margin-top:4px;line-height:1.55}
+.lx-empty{color:var(--ash);font-size:13.5px;padding:8px 0 4px}
+.lx-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.lx-table th{text-align:left;font-size:12px;font-weight:600;text-transform:none;letter-spacing:normal;font-family:'Inter',sans-serif;color:var(--ash);padding:10px 18px;border-top:1px solid var(--border);background:#FAFBFD}
+.lx-table td{padding:11px 18px;border-top:1px solid var(--border);vertical-align:top}
+.lx-table td small{display:block;color:var(--ash);font-size:12px;margin-top:2px}
+.lx-chip{font:600 11.5px 'Inter',sans-serif;padding:3px 9px;border-radius:99px;white-space:nowrap;display:inline-block}
+.c-listo{background:#ECFDF5;color:var(--ok)} .c-proc{background:var(--edim);color:var(--e)} .c-ocr{background:#FFFBEB;color:var(--warn)} .c-err{background:#FEF2F2;color:var(--danger)} .c-gris{background:#F1F5F9;color:var(--ash)}
+.lx-table-wrap{overflow-x:auto}
+@media(max-width:900px){.lx-kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.lx-table .opt{display:none}.lx-search{flex-direction:column}}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set origenes = {'documento': 'Documento de asunto', 'sentencia': 'Sentencia o resolución', 'cliente': 'Documento de cliente', 'biblioteca': 'Biblioteca', 'plantilla': 'Machote'} %}
+{% set chips = {
+  'listo': ('c-listo', 'Leído'), 'pendiente': ('c-proc', 'En fila'), 'procesando': ('c-proc', 'Leyendo…'),
+  'requiere_ocr': ('c-ocr', 'Espera OCR'), 'sin_texto': ('c-gris', 'Sin texto'),
+  'no_soportado': ('c-gris', 'Formato no soportado'), 'error': ('c-err', 'Error')
+} %}
+
+<div class="lx-head">
+  <div>
+    <h1 class="page-title">Memoria del despacho</h1>
+    <p class="lx-sub">Lo que el asistente ya leyó de tus documentos: asuntos, sentencias, clientes y machotes. Cada archivo que subes se lee solo.</p>
+  </div>
+  <button class="btn btn-ghost" id="btnReintentar" type="button">Volver a leer pendientes</button>
+</div>
+
+<div class="lx-note">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+  <span><b>Todo se procesa en tu servidor.</b> La lectura, el OCR y el índice de búsqueda no mandan nada fuera. El texto se guarda cifrado con la llave de tu despacho.</span>
+</div>
+
+{% if not ocr %}
+<div class="lx-note warn">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>
+  <span><b>El lector de escaneos (OCR) no está instalado en este servidor.</b> Los PDF con texto, Word y Excel sí se leen. Los escaneos y fotos quedan en espera y se leen solos cuando se instale.</span>
+</div>
+{% endif %}
+
+<section class="lx-kpis" aria-label="Estado de la memoria">
+  <div class="lx-kpi"><small>Documentos leídos</small><b>{{ estado.listo }}</b></div>
+  <div class="lx-kpi"><small>En fila o leyendo</small><b id="kpiProc">{{ estado.pendiente + estado.procesando }}</b></div>
+  <div class="lx-kpi"><small>Esperan OCR</small><b>{{ estado.requiere_ocr }}</b></div>
+  <div class="lx-kpi"><small>Con problema</small><b>{{ estado.error + estado.sin_texto + estado.no_soportado }}</b></div>
+</section>
+
+<section class="lx-card">
+  <div class="lx-card-h"><h2>Buscar en la memoria</h2></div>
+  <form class="lx-search" id="buscarForm" role="search">
+    <input id="q" name="q" placeholder="Ej. pensión alimenticia, cláusula de penalización, artículo 14…" autocomplete="off" aria-label="Buscar en los documentos del despacho">
+    <button class="btn btn-primary" type="submit">Buscar</button>
+  </form>
+  <div class="lx-results" id="resultados" aria-live="polite"></div>
+</section>
+
+<section class="lx-card">
+  <div class="lx-card-h"><h2>Documentos</h2><span class="lx-sub" style="margin:0;font-size:13px">{{ estado.fragmentos }} fragmentos indexados</span></div>
+  {% if documentos %}
+  <div class="lx-table-wrap">
+    <table class="lx-table">
+      <thead><tr><th>Documento</th><th class="opt">De dónde viene</th><th>Estado</th><th class="opt">Páginas</th></tr></thead>
+      <tbody>
+        {% for d in documentos %}
+        {% set ch = chips.get(d.estado, ('c-gris', d.estado)) %}
+        <tr>
+          <td>{{ d.nombre or 'Sin nombre' }}{% if d.error %}<small>{{ d.error }}</small>{% endif %}</td>
+          <td class="opt">{{ origenes.get(d.origen, d.origen) }}{% if d.asunto_titulo %}<small>{{ d.numero_expediente or '' }} {{ d.asunto_titulo }}</small>{% endif %}</td>
+          <td><span class="lx-chip {{ ch[0] }}">{{ ch[1] }}</span>{% if d.uso_ocr %}<small>Leído con OCR</small>{% endif %}</td>
+          <td class="opt">{{ d.paginas or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="lx-empty" style="padding:0 18px 18px">Aún no hay documentos. Sube un archivo a un asunto, a un cliente o a la biblioteca y aparecerá aquí en unos segundos.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const ORIGENES = { documento: 'Documento de asunto', sentencia: 'Sentencia o resolución', cliente: 'Documento de cliente', biblioteca: 'Biblioteca', plantilla: 'Machote' };
+  const form = document.getElementById('buscarForm'), out = document.getElementById('resultados');
+  function el(tag, txt, cls) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const q = document.getElementById('q').value.trim();
+    if (!q) return;
+    out.replaceChildren(el('p', 'Buscando…', 'lx-empty'));
+    try {
+      const u = new URL('{{ url_for("lector.buscar") }}', location.origin);
+      u.searchParams.set('q', q);
+      const r = await fetch(u);
+      const j = await r.json();
+      out.replaceChildren();
+      if (!j.resultados.length) { out.append(el('p', 'No encontré nada sobre eso en los documentos del despacho.', 'lx-empty')); return; }
+      j.resultados.forEach(res => {
+        const box = el('div', null, 'lx-res');
+        const h = el('div', null, 'lx-res-h');
+        const a = el('a', res.documento || 'Documento'); a.href = res.url; a.target = '_blank'; a.rel = 'noopener';
+        h.append(a, el('small', `${ORIGENES[res.origen] || ''} · página ${res.pagina || 1}`));
+        box.append(h, el('p', res.resumen));
+        out.append(box);
+      });
+    } catch (_) {
+      out.replaceChildren(el('p', 'No se pudo buscar. Intenta de nuevo.', 'lx-empty'));
+    }
+  });
+
+  document.getElementById('btnReintentar').addEventListener('click', async () => {
+    const r = await fetch('{{ url_for("lector.reintentar") }}', { method: 'POST' });
+    const j = await r.json();
+    showToast(j.encolados ? `${j.encolados} documentos en fila para leer` : 'No hay pendientes');
+    if (j.encolados) setTimeout(() => location.reload(), 2500);
+  });
+
+  const enProceso = {{ estado.pendiente + estado.procesando }};
+  if (enProceso > 0) {
+    const t = setInterval(async () => {
+      const j = await (await fetch('{{ url_for("lector.estado") }}')).json();
+      if (j.pendiente + j.procesando === 0) { clearInterval(t); location.reload(); }
+      else document.getElementById('kpiProc').textContent = j.pendiente + j.procesando;
+    }, 3000);
+  }
+})();
+</script>
+{% endblock %}

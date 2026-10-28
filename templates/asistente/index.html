@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% block title %}{{ nombre }}{% endblock %}
+{% block page_title %}{{ nombre }}{% endblock %}
+
+{% block head %}
+<style>
+.as-wrap{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;height:calc(100vh - var(--top-h) - 70px);min-height:560px}
+.as-side{background:#fff;border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;min-height:0}
+.as-side-h{padding:12px}
+.as-new{width:100%}
+.as-list{flex:1;overflow-y:auto;padding:0 8px 10px;display:flex;flex-direction:column;gap:2px}
+.as-conv{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;cursor:pointer;border:0;background:none;text-align:left;font:500 13.5px 'Inter',sans-serif;color:#3A4560;width:100%}
+.as-conv:hover{background:#F2F4F9}
+.as-conv.on{background:var(--edim);color:var(--e)}
+.as-conv span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.as-conv svg{flex-shrink:0}
+.as-del{opacity:0;border:0;background:none;color:var(--ash);cursor:pointer;padding:2px 4px;border-radius:6px;font-size:16px;line-height:1}
+.as-conv:hover .as-del{opacity:1}
+.as-del:hover{color:var(--danger);background:#FEF2F2}
+.as-side-empty{color:var(--ash);font-size:13px;padding:8px 12px}
+
+.as-main{background:#fff;border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.as-top{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.as-top select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;font:400 13.5px 'Inter',sans-serif;color:var(--fog);background:#fff;max-width:340px}
+.as-badge{display:inline-flex;align-items:center;gap:6px;font:600 12px 'Inter',sans-serif;padding:5px 10px;border-radius:99px}
+.as-badge.priv{background:#FFFBEB;color:#92400E}
+.as-badge.ext{background:var(--edim);color:var(--e)}
+.as-toggle{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:#3A4560;cursor:pointer;margin-left:auto}
+.as-toggle input{accent-color:var(--warn);width:16px;height:16px}
+.as-lock{border:1px solid var(--border);background:#fff;border-radius:10px;padding:7px 10px;font:500 12.5px 'Inter',sans-serif;color:#3A4560;cursor:pointer}
+.as-lock:hover{border-color:var(--border-m)}
+
+.as-feed{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:18px}
+.as-hello{margin:auto;max-width:560px;text-align:center;padding:24px 0}
+.as-hello h1{font:600 24px/1.2 'Sora',sans-serif;color:var(--tinta)}
+.as-hello p{color:var(--ash);margin-top:8px;font-size:14.5px}
+.as-ejemplos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px;text-align:left}
+.as-ej{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer;font:500 13.5px 'Inter',sans-serif;color:#3A4560;text-align:left}
+.as-ej:hover{border-color:#C7D2FE;background:#FAFBFF}
+
+.as-msg{max-width:780px;width:100%}
+.as-msg.yo{align-self:flex-end;max-width:620px;width:auto;background:var(--edim);color:var(--fog);padding:10px 14px;border-radius:14px 14px 4px 14px;font-size:14.5px;white-space:pre-wrap}
+.as-msg.bot{align-self:flex-start;font-size:14.5px;line-height:1.65;color:var(--fog)}
+.as-msg.bot p{margin:0 0 10px} .as-msg.bot ul,.as-msg.bot ol{margin:0 0 10px 20px}
+.as-msg.bot strong{font-weight:600}
+.as-cita{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;margin:0 1px;border-radius:5px;background:var(--edim);color:var(--e);font:700 11px 'Inter',sans-serif;text-decoration:none;vertical-align:2px}
+.as-cita:hover{background:var(--e);color:#fff}
+.as-fuentes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:10px}
+.as-fuente{border:1px solid var(--border);border-radius:10px;padding:9px 11px;text-decoration:none;color:inherit;display:flex;gap:9px;align-items:flex-start;transition:border-color .15s}
+.as-fuente:hover,.as-fuente.flash{border-color:var(--e)}
+.as-fuente i{font-style:normal;flex-shrink:0;width:20px;height:20px;border-radius:6px;background:#F1F5F9;color:var(--tinta);display:grid;place-items:center;font:700 11px 'Inter',sans-serif}
+.as-fuente.despacho i{background:#FFFBEB;color:var(--warn)}
+.as-fuente.caso i{background:#ECFDF5;color:#047857}
+.as-fuente b{display:block;font-size:12.5px;font-weight:600;line-height:1.35}
+.as-fuente small{display:block;font-size:11.5px;color:var(--ash);margin-top:2px}
+.as-fuente em{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-style:normal;font-size:12px;color:#3A4560;margin-top:5px;line-height:1.45}
+.as-pensando{display:flex;gap:5px;padding:4px 0}
+.as-pensando span{width:7px;height:7px;border-radius:50%;background:#B9C1D6;animation:dot-pulse 1.2s infinite}
+.as-pensando span:nth-child(2){animation-delay:.2s} .as-pensando span:nth-child(3){animation-delay:.4s}
+.as-error{color:var(--danger);font-size:13.5px}
+
+.as-compose{border-top:1px solid var(--border);padding:12px 16px 14px}
+.as-box{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--border);border-radius:14px;padding:8px 8px 8px 14px;transition:border-color .15s}
+.as-box:focus-within{border-color:var(--e);box-shadow:0 0 0 3px var(--edim)}
+.as-box textarea{flex:1;border:0;outline:0;resize:none;font:400 14.5px/1.5 'Inter',sans-serif;color:var(--fog);max-height:180px;padding:6px 0;background:none}
+.as-send{width:40px;height:40px;border-radius:10px;border:0;background:var(--e);color:#fff;cursor:pointer;display:grid;place-items:center;flex-shrink:0}
+.as-send:disabled{background:#B9C1D6;cursor:default}
+.as-legal{font-size:11.5px;color:var(--ash);margin-top:8px;text-align:center}
+.as-menu{display:none}
+@media(max-width:900px){
+  .as-wrap{grid-template-columns:1fr;height:calc(100vh - var(--top-h) - 130px)}
+  .as-side{display:none;position:fixed;inset:var(--top-h) 0 0 0;z-index:150;border-radius:0}
+  .as-side.open{display:flex}
+  .as-menu{display:inline-flex}
+  .as-ejemplos{grid-template-columns:1fr}
+  .as-feed{padding:16px}
+  .as-toggle{margin-left:0}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="as-wrap">
+  <aside class="as-side" id="asSide" aria-label="Conversaciones">
+    <div class="as-side-h"><button class="btn btn-primary as-new" id="asNueva" type="button">+ Nueva conversación</button></div>
+    <div class="as-list" id="asLista">
+      {% for c in conversaciones %}
+      <div class="as-conv" data-id="{{ c.id }}" role="button" tabindex="0">
+        {% if c.privado %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Privada"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>{% endif %}
+        <span>{{ c.titulo }}</span>
+        <button class="as-del" type="button" data-del="{{ c.id }}" aria-label="Eliminar conversación">×</button>
+      </div>
+      {% else %}
+      <p class="as-side-empty">Tus conversaciones aparecerán aquí.</p>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section class="as-main">
+    <div class="as-top">
+      <button class="as-lock as-menu" id="asMenu" type="button">☰ Conversaciones</button>
+      <select id="asAsunto" aria-label="Asunto de la consulta">
+        <option value="">Consulta general (sin asunto)</option>
+        {% for a in asuntos %}
+        <option value="{{ a.id }}" data-privado="{{ a.privado }}">{{ '🔒 ' if a.privado }}{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
+        {% endfor %}
+      </select>
+      <button class="as-lock" id="asMarcar" type="button" hidden></button>
+      <span id="asEstado"></span>
+      <label class="as-toggle" id="asPrivWrap"><input type="checkbox" id="asPrivado"> Modo privado</label>
+    </div>
+
+    <div class="as-feed" id="asFeed" aria-live="polite">
+      <div class="as-hello" id="asHello">
+        <h1>{{ nombre }} <span style="font-weight:300;color:var(--ash)">de Habeas Corpus</span></h1>
+        <p>Pregúntame sobre la ley mexicana o sobre los asuntos y documentos de tu despacho. Te respondo citando de dónde sale cada cosa.</p>
+        <div class="as-ejemplos">
+          <button class="as-ej" type="button">¿Quiénes están obligados a dar alimentos y hasta qué grado?</button>
+          <button class="as-ej" type="button">¿Qué dice la Constitución sobre la retroactividad de la ley?</button>
+          <button class="as-ej" type="button">¿Cómo nos ha ido en juicios de pensión alimenticia y qué ha funcionado?</button>
+          <button class="as-ej" type="button">¿Qué publicó hoy el Diario Oficial que me deba importar?</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="as-compose">
+      <form class="as-box" id="asForm">
+        <textarea id="asTexto" rows="1" maxlength="4000" placeholder="Escribe tu pregunta…" aria-label="Pregunta"></textarea>
+        <button class="as-send" id="asEnviar" type="submit" aria-label="Enviar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </form>
+      <p class="as-legal" id="asLegal">{% if conectado %}Fuera del modo privado, la pregunta y los fragmentos relevantes se envían al modelo de lenguaje para redactar la respuesta. Verifica siempre las fuentes.{% else %}El modelo de lenguaje aún no está conectado: por ahora solo te muestro los pasajes relevantes.{% endif %}</p>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const URLS = {
+    preguntar: '{{ url_for("asistente.preguntar") }}',
+    conv: id => '{{ url_for("asistente.conversacion", cid=0) }}'.replace('/0', '/' + id),
+    del: id => '{{ url_for("asistente.eliminar", cid=0) }}'.replace('/0/', '/' + id + '/'),
+    priv: id => '{{ url_for("asistente.marcar_privado", asunto_id=0) }}'.replace('/0/', '/' + id + '/'),
+  };
+  const CONECTADO = {{ 'true' if conectado else 'false' }};
+  const PUEDE_MARCAR = {{ 'true' if current_role in ('super_admin', 'admin', 'abogado') else 'false' }};
+  const feed = document.getElementById('asFeed'), hello = document.getElementById('asHello');
+  const texto = document.getElementById('asTexto'), enviar = document.getElementById('asEnviar');
+  const selAsunto = document.getElementById('asAsunto'), chkPriv = document.getElementById('asPrivado');
+  let convId = null, convPrivado = false, enCurso = false, msgN = 0;
+
+  function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  /* Markdown mínimo y seguro: primero se escapa todo, luego se aplican negritas, listas y citas. */
+  function render(md, n) {
+    const bloques = esc(md).split(/\n{2,}/);
+    return bloques.map(b => {
+      const lineas = b.split('\n');
+      if (lineas.every(l => /^\s*[-*•]\s+/.test(l))) return '<ul>' + lineas.map(l => '<li>' + l.replace(/^\s*[-*•]\s+/, '') + '</li>').join('') + '</ul>';
+      if (lineas.every(l => /^\s*\d+[.)]\s+/.test(l))) return '<ol>' + lineas.map(l => '<li>' + l.replace(/^\s*\d+[.)]\s+/, '') + '</li>').join('') + '</ol>';
+      return '<p>' + lineas.join('<br>') + '</p>';
+    }).join('')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\[(\d{1,2})\]/g, (m, i) => `<a class="as-cita" href="#f-${n}-${i}" data-f="f-${n}-${i}">${i}</a>`);
+  }
+
+  function fuentesHTML(fuentes, n) {
+    const cont = el('div', 'as-fuentes');
+    fuentes.forEach((f, i) => {
+      const a = el('a', 'as-fuente' + (f.tipo === 'despacho' || f.tipo === 'caso' ? ' ' + f.tipo : ''));
+      a.id = `f-${n}-${i + 1}`; a.href = f.url || '#'; a.target = '_blank'; a.rel = 'noopener';
+      a.append(el('i', null, String(i + 1)));
+      const t = el('span'); t.append(el('b', null, `${f.titulo} · ${f.referencia}`), el('small', null, f.detalle || ''));
+      if (f.extracto) t.append(el('em', null, f.extracto));
+      a.append(t); cont.append(a);
+    });
+    return cont;
+  }
+
+  function burbujaUsuario(t) { hello.hidden = true; feed.append(el('div', 'as-msg yo', t)); }
+
+  function burbujaBot() {
+    hello.hidden = true;
+    const n = ++msgN, box = el('div', 'as-msg bot'), cuerpo = el('div'), pens = el('div', 'as-pensando');
+    pens.append(el('span'), el('span'), el('span'));
+    box.append(pens, cuerpo); feed.append(box);
+    feed.scrollTop = feed.scrollHeight;
+    return { n, box, cuerpo, pens, texto: '', fuentes: [] };
+  }
+
+  function pintar(b) {
+    b.cuerpo.innerHTML = render(b.texto, b.n);
+    b.cuerpo.querySelectorAll('.as-cita').forEach(c => c.addEventListener('click', e => {
+      const f = document.getElementById(c.dataset.f); if (!f) return;
+      e.preventDefault(); f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      f.classList.add('flash'); setTimeout(() => f.classList.remove('flash'), 1200);
+    }));
+  }
+
+  function mostrarRespuesta(t, fuentes) {
+    const b = burbujaBot(); b.pens.remove(); b.texto = t; pintar(b);
+    if (fuentes && fuentes.length) b.box.append(fuentesHTML(fuentes, b.n));
+  }
+
+  function estadoUI() {
+    const opt = selAsunto.selectedOptions[0], asuntoPriv = opt && opt.dataset.privado === '1';
+    const priv = convId ? convPrivado : (asuntoPriv || chkPriv.checked);
+    document.getElementById('asEstado').replaceChildren(priv
+      ? Object.assign(el('span', 'as-badge priv', '🔒 Privado: no sale del servidor'))
+      : el('span', 'as-badge ext', CONECTADO ? 'Con modelo de lenguaje' : 'Solo búsqueda (sin modelo conectado)'));
+    document.getElementById('asPrivWrap').hidden = !!convId || asuntoPriv;
+    selAsunto.disabled = !!convId;
+    const marcar = document.getElementById('asMarcar');
+    marcar.hidden = !PUEDE_MARCAR || !selAsunto.value || !!convId;
+    marcar.textContent = asuntoPriv ? 'Quitar privado al asunto' : 'Marcar asunto como privado';
+  }
+
+  async function preguntar(q) {
+    if (enCurso || !q.trim()) return;
+    enCurso = true; enviar.disabled = true;
+    burbujaUsuario(q); texto.value = ''; texto.style.height = '';
+    const b = burbujaBot();
+    try {
+      const r = await fetch(URLS.preguntar, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ pregunta: q, conversacion_id: convId, asunto_id: selAsunto.value || null, privado: chkPriv.checked }),
+      });
+      if (!r.ok || !r.body) throw new Error();
+      const lector = r.body.getReader(), dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const partes = buf.split('\n\n'); buf = partes.pop();
+        for (const p of partes) {
+          if (!p.startsWith('data: ')) continue;
+          const ev = JSON.parse(p.slice(6));
+          if (ev.tipo === 'conversacion') { const nueva = !convId; convId = ev.id; convPrivado = ev.privado; if (nueva) agregarALista(ev.id, q, ev.privado); estadoUI(); }
+          else if (ev.tipo === 'fuentes') { b.fuentes = ev.fuentes; }
+          else if (ev.tipo === 'texto') { b.pens.remove(); b.texto += ev.texto; pintar(b); feed.scrollTop = feed.scrollHeight; }
+          else if (ev.tipo === 'error') { b.pens.remove(); b.cuerpo.append(el('p', 'as-error', ev.mensaje)); }
+        }
+      }
+      if (b.fuentes.length) b.box.append(fuentesHTML(b.fuentes, b.n));
+    } catch (_) {
+      b.pens.remove(); b.cuerpo.append(el('p', 'as-error', 'No se pudo enviar la pregunta. Revisa tu conexión e intenta de nuevo.'));
+    } finally {
+      enCurso = false; enviar.disabled = false; texto.focus();
+      feed.scrollTop = feed.scrollHeight;
+    }
+  }
+
+  function agregarALista(id, titulo, privado) {
+    const lista = document.getElementById('asLista');
+    lista.querySelector('.as-side-empty')?.remove();
+    const item = el('div', 'as-conv on'); item.dataset.id = id; item.tabIndex = 0; item.setAttribute('role', 'button');
+    item.append(el('span', null, (privado ? '🔒 ' : '') + titulo.slice(0, 80)));
+    const del = el('button', 'as-del', '×'); del.type = 'button'; del.dataset.del = id; del.setAttribute('aria-label', 'Eliminar conversación');
+    item.append(del);
+    lista.querySelectorAll('.as-conv').forEach(c => c.classList.remove('on'));
+    lista.prepend(item);
+  }
+
+  async function abrir(id) {
+    const j = await (await fetch(URLS.conv(id))).json();
+    convId = j.id; convPrivado = j.privado;
+    feed.querySelectorAll('.as-msg').forEach(m => m.remove());
+    selAsunto.value = j.asunto_id || '';
+    j.mensajes.forEach(m => m.rol === 'usuario' ? burbujaUsuario(m.texto) : mostrarRespuesta(m.texto, m.fuentes));
+    document.querySelectorAll('.as-conv').forEach(c => c.classList.toggle('on', +c.dataset.id === id));
+    document.getElementById('asSide').classList.remove('open');
+    estadoUI(); feed.scrollTop = feed.scrollHeight;
+  }
+
+  function nueva() {
+    convId = null; convPrivado = false;
+    feed.querySelectorAll('.as-msg').forEach(m => m.remove());
+    hello.hidden = false; selAsunto.disabled = false; chkPriv.checked = false;
+    document.querySelectorAll('.as-conv').forEach(c => c.classList.remove('on'));
+    document.getElementById('asSide').classList.remove('open');
+    estadoUI(); texto.focus();
+  }
+
+  document.getElementById('asLista').addEventListener('click', async e => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      e.stopPropagation();
+      if (!confirm('¿Eliminar esta conversación? No se puede deshacer.')) return;
+      const r = await fetch(URLS.del(del.dataset.del), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: '{}' });
+      if (r.ok) { if (+del.dataset.del === convId) nueva(); del.closest('.as-conv').remove(); showToast('Conversación eliminada'); }
+      return;
+    }
+    const c = e.target.closest('.as-conv'); if (c) abrir(+c.dataset.id);
+  });
+  document.getElementById('asNueva').addEventListener('click', nueva);
+  document.getElementById('asMenu').addEventListener('click', () => document.getElementById('asSide').classList.toggle('open'));
+  document.querySelectorAll('.as-ej').forEach(b => b.addEventListener('click', () => preguntar(b.textContent)));
+  document.getElementById('asForm').addEventListener('submit', e => { e.preventDefault(); preguntar(texto.value); });
+  texto.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); preguntar(texto.value); } });
+  texto.addEventListener('input', () => { texto.style.height = ''; texto.style.height = Math.min(texto.scrollHeight, 180) + 'px'; });
+  selAsunto.addEventListener('change', estadoUI);
+  chkPriv.addEventListener('change', estadoUI);
+
+  document.getElementById('asMarcar').addEventListener('click', async () => {
+    const opt = selAsunto.selectedOptions[0], nuevo = opt.dataset.privado !== '1';
+    const r = await fetch(URLS.priv(selAsunto.value), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ privado: nuevo }) });
+    if (!r.ok) { showToast('No se pudo cambiar', 'error'); return; }
+    opt.dataset.privado = nuevo ? '1' : '0';
+    opt.textContent = (nuevo ? '🔒 ' : '') + opt.textContent.replace(/^🔒 /, '');
+    showToast(nuevo ? 'Asunto marcado como privado: su información no saldrá del servidor' : 'El asunto ya no es privado');
+    estadoUI();
+  });
+
+  {% if asunto_inicial %}selAsunto.value = '{{ asunto_inicial }}';{% endif %}
+  {% if pregunta_inicial %}document.getElementById('asTexto').value = {{ pregunta_inicial | tojson }};{% endif %}
+  estadoUI();
+  {% if conversacion_id %}abrir({{ conversacion_id }});{% endif %}
+})();
+</script>
+{% endblock %}

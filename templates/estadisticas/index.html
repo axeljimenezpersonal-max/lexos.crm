@@ -288,7 +288,7 @@
       <tbody>
         {% for c in tab_clientes %}
         <tr>
-          <td><a href="{{ url_for('clientes.ver_cliente', cliente_id=c.id) }}">{{ c.nombre }} {{ c.apellidos or '' }}</a></td>
+          <td><a href="{{ url_for('clientes.detalle', id=c.id) }}">{{ c.nombre }} {{ c.apellidos or '' }}</a></td>
           <td>{{ c.tipo|capitalize if c.tipo else '—' }}</td>
           <td class="est-num">{{ c.asuntos_activos }}</td>
           <td class="est-num">${{ '{:,.0f}'.format(c.total_cobrado) }}</td>

@@ -799,6 +799,13 @@ _MIGRATE_COLS = [
     ("eventos_calendario", "recurrencia",           "TEXT DEFAULT 'none'"),
     ("eventos_calendario", "recurrencia_parent_id", "INTEGER"),
     ("eventos_calendario", "gcal_event_id",         "TEXT"),
+    # ── Asistente: asuntos cuya información nunca sale del servidor ───────────
+    ("asuntos", "privado",                          "INTEGER DEFAULT 0"),
+    ("asuntos", "resultado",                        "TEXT"),
+    ("asuntos", "resultado_notas",                  "TEXT"),
+    ("asunto_sentencias", "sentido",                "TEXT"),
+    # ── Cobranza: horas ya cobradas ───────────────────────────────────────────
+    ("asunto_horas", "cobro_id",                    "INTEGER"),
 ]
 
 _MIGRATE_TABLES = """
@@ -1325,7 +1332,7 @@ def seed_tenant(slug: str, tenant_global_id: int):
                (numero_expediente, titulo, descripcion, tipo_asunto, estado, prioridad,
                 cliente_id, abogado_responsable, fecha_inicio, honorarios_pactados, creado_por)
                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (*a[:8], abogado_id, a[8], abogado_id),
+            (*a[:7], abogado_id, a[7], a[8], abogado_id),
         )
         asunto_ids.append(cur.lastrowid)
 

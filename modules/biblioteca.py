@@ -10,7 +10,6 @@ import json
 import math
 import os
 import secrets
-import uuid
 from datetime import date, datetime, timedelta
 
 from flask import (
@@ -18,6 +17,9 @@ from flask import (
     request, send_file, session, url_for,
 )
 
+from modules import boveda
+from modules import lector
+from modules.insights import machotes
 from modules.auth import login_required, role_required, tenant_required
 
 biblioteca_bp = Blueprint("biblioteca", __name__)
@@ -50,20 +52,7 @@ ALLOWED_EXT = {
     "txt", "csv", "xml", "zip", "rar",
 }
 
-VARIABLES_DINAMICAS = [
-    ("{{nombre_cliente}}", "Nombre completo del cliente"),
-    ("{{rfc_cliente}}", "RFC del cliente"),
-    ("{{numero_expediente}}", "Número de expediente del asunto"),
-    ("{{titulo_asunto}}", "Título del asunto"),
-    ("{{fecha_hoy}}", "Fecha actual (DD/MM/AAAA)"),
-    ("{{nombre_abogado}}", "Nombre del abogado responsable"),
-    ("{{despacho}}", "Nombre del despacho"),
-    ("{{email_cliente}}", "Email del cliente"),
-    ("{{telefono_cliente}}", "Teléfono del cliente"),
-    ("{{direccion_cliente}}", "Dirección del cliente"),
-    ("{{juzgado}}", "Juzgado del asunto"),
-    ("{{fecha_inicio_asunto}}", "Fecha de inicio del asunto"),
-]
+VARIABLES_DINAMICAS = [("{{%s}}" % clave, etiqueta) for clave, etiqueta in machotes.CAMPOS]
 
 PER_PAGE = 20
 
@@ -90,28 +79,13 @@ def _safe_int(v, default=None):
         return default
 
 
-def _upload_dir(*parts):
-    from config import Config
-    d = os.path.join(Config.UPLOAD_FOLDER, "biblioteca", *parts)
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
 def _save_file(f, subdir):
-    """Save uploaded file, return (url, original_name, size, mime, ext)."""
-    if not f or not f.filename:
+    """Guarda el archivo cifrado en la bóveda del despacho."""
+    info = boveda.guardar(f, "biblioteca", subdir, extensiones=ALLOWED_EXT)
+    if not info:
         return None
-    orig = f.filename
-    ext = os.path.splitext(orig)[1].lower().lstrip(".")
-    if ext not in ALLOWED_EXT:
-        return None
-    safe = f"{uuid.uuid4().hex}.{ext}"
-    dest = os.path.join(_upload_dir(subdir), safe)
-    f.save(dest)
-    size = os.path.getsize(dest)
-    mime = f.content_type or ""
-    url = f"/uploads/biblioteca/{subdir}/{safe}"
-    return {"url": url, "nombre_original": orig, "tamanio": size, "mime_type": mime, "extension": ext}
+    return {"url": info["url"], "nombre_original": info["nombre"], "tamanio": info["tamanio"],
+            "mime_type": info["mime"], "extension": info["ext"]}
 
 
 def _espacio_usado(tdb) -> int:
@@ -138,45 +112,9 @@ def _get_abogados():
 
 
 def _resolve_variables(html: str, asunto_id=None, cliente_id=None) -> str:
-    """Replace {{variables}} with real data from the DB."""
-    tdb = g.tenant_db
-    tenant = g.tenant
-    user = g.user
-
-    replacements = {
-        "{{fecha_hoy}}": date.today().strftime("%d/%m/%Y"),
-        "{{despacho}}": tenant["nombre_despacho"] if tenant else "LexOS",
-        "{{nombre_abogado}}": f"{user['nombre']} {user['apellidos']}" if user else "",
-    }
-
-    cliente = None
-    if cliente_id:
-        cliente = tdb.execute("SELECT * FROM clientes WHERE id=?", (cliente_id,)).fetchone()
-    elif asunto_id:
-        a = tdb.execute("SELECT cliente_id FROM asuntos WHERE id=?", (asunto_id,)).fetchone()
-        if a and a["cliente_id"]:
-            cliente = tdb.execute("SELECT * FROM clientes WHERE id=?", (a["cliente_id"],)).fetchone()
-
-    if cliente:
-        nombre = (cliente["razon_social"] or f"{cliente['nombre'] or ''} {cliente['apellidos'] or ''}").strip()
-        replacements["{{nombre_cliente}}"] = nombre
-        replacements["{{rfc_cliente}}"] = cliente["rfc"] or ""
-        replacements["{{email_cliente}}"] = cliente["email"] or ""
-        replacements["{{telefono_cliente}}"] = cliente["telefono"] or cliente["celular"] or ""
-        replacements["{{direccion_cliente}}"] = cliente["direccion"] or ""
-
-    asunto = None
-    if asunto_id:
-        asunto = tdb.execute("SELECT * FROM asuntos WHERE id=?", (asunto_id,)).fetchone()
-    if asunto:
-        replacements["{{numero_expediente}}"] = asunto["numero_expediente"] or ""
-        replacements["{{titulo_asunto}}"] = asunto["titulo"] or ""
-        replacements["{{juzgado}}"] = asunto["juzgado"] or ""
-        replacements["{{fecha_inicio_asunto}}"] = (asunto["fecha_inicio"] or "")[:10]
-
-    for var, val in replacements.items():
-        html = html.replace(var, val)
-    return html
+    """Reemplaza {{variables}} con los datos del asunto, del cliente y del despacho."""
+    valores = machotes.datos(g.tenant_db, g.tenant, g.user, asunto_id, cliente_id)
+    return machotes.resolver_html(html, valores)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -373,8 +311,10 @@ def upload():
             ),
         )
         usado += info["tamanio"]
-        uploaded.append({"id": cur.lastrowid, "nombre": info["nombre_original"]})
+        uploaded.append({"id": cur.lastrowid, "nombre": info["nombre_original"], "url": info["url"]})
     tdb.commit()
+    for u in uploaded:
+        lector.encolar(u.pop("url"), u["nombre"], "biblioteca", u["id"], asunto_id=asunto_id, cliente_id=cliente_id)
     _log("upload_archivos", None, {"count": len(uploaded)})
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify(ok=True, archivos=uploaded, count=len(uploaded))
@@ -385,8 +325,11 @@ def upload():
 @login_required
 @tenant_required
 def archivo_eliminar(id):
+    fila = g.tenant_db.execute("SELECT archivo_url FROM biblioteca_archivos WHERE id=?", (id,)).fetchone()
     g.tenant_db.execute("DELETE FROM biblioteca_archivos WHERE id=?", (id,))
     g.tenant_db.commit()
+    if fila:
+        boveda.eliminar(fila["archivo_url"])
     _log("eliminar_archivo", id)
     return jsonify(ok=True)
 
@@ -461,6 +404,7 @@ def plantilla_subir():
         ),
     )
     g.tenant_db.commit()
+    lector.encolar(info["url"], nombre, "plantilla", cur.lastrowid)
     _log("subir_plantilla", cur.lastrowid, {"nombre": nombre})
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify(ok=True, id=cur.lastrowid)
@@ -474,6 +418,9 @@ def plantilla_descargar(id):
     p = g.tenant_db.execute("SELECT * FROM biblioteca_plantillas WHERE id=?", (id,)).fetchone()
     if not p:
         abort(404)
+    nombre = p["archivo_nombre"] or f"{p['nombre']}.docx"
+    if boveda.es_de_boveda(p["archivo_url"]):
+        return boveda.respuesta(p["archivo_url"], nombre, descargar=True)
     from config import Config
     filepath = os.path.join(Config.UPLOAD_FOLDER, p["archivo_url"].lstrip("/uploads/").lstrip("/"))
     if not os.path.exists(filepath):
@@ -481,7 +428,7 @@ def plantilla_descargar(id):
         filepath = os.path.join(os.path.dirname(Config.UPLOAD_FOLDER), p["archivo_url"].lstrip("/"))
     if not os.path.exists(filepath):
         abort(404)
-    return send_file(filepath, as_attachment=True, download_name=p["archivo_nombre"] or f"{p['nombre']}.docx")
+    return send_file(filepath, as_attachment=True, download_name=nombre)
 
 
 @biblioteca_bp.route("/plantilla/<int:id>/eliminar", methods=["POST"])
@@ -489,8 +436,11 @@ def plantilla_descargar(id):
 @tenant_required
 @role_required("super_admin", "admin")
 def plantilla_eliminar(id):
+    fila = g.tenant_db.execute("SELECT archivo_url FROM biblioteca_plantillas WHERE id=?", (id,)).fetchone()
     g.tenant_db.execute("DELETE FROM biblioteca_plantillas WHERE id=?", (id,))
     g.tenant_db.commit()
+    if fila:
+        boveda.eliminar(fila["archivo_url"])
     return jsonify(ok=True)
 
 
@@ -579,9 +529,11 @@ def editor(doc_id=None):
     plantilla_html = ""
     if plantilla_id and not documento:
         p = tdb.execute("SELECT * FROM biblioteca_plantillas WHERE id=?", (plantilla_id,)).fetchone()
-        if p and p["archivo_url"]:
-            # Try to read DOCX content as HTML (simplified)
-            plantilla_html = f"<h2>{p['nombre']}</h2><p><em>Plantilla cargada: {p['nombre']}</em></p>"
+        if p and boveda.es_de_boveda(p["archivo_url"]) and p["archivo_url"].endswith(".docx"):
+            try:
+                plantilla_html = machotes.a_html(boveda.leer(p["archivo_url"]))
+            except Exception:
+                plantilla_html = ""
 
     asuntos = tdb.execute(
         "SELECT id, titulo, numero_expediente, cliente_id FROM asuntos "
@@ -847,6 +799,8 @@ def compartido_ver(token):
         archivo = tdb.execute("SELECT * FROM biblioteca_archivos WHERE id=?", (share["entidad_id"],)).fetchone()
         if not archivo:
             abort(404)
+        if boveda.es_de_boveda(archivo["archivo_url"]):
+            return boveda.respuesta(archivo["archivo_url"], archivo["nombre_original"] or archivo["nombre"])
         from config import Config
         filepath = os.path.join(os.path.dirname(Config.UPLOAD_FOLDER), archivo["archivo_url"].lstrip("/"))
         if os.path.exists(filepath):

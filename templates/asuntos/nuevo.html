@@ -1,1241 +1,212 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import icon, icon_search %}
-{% block title %}Nuevo Asunto{% endblock %}
-{% block page_title %}Nuevo Asunto{% endblock %}{% block head %}
+{% block title %}Nuevo asunto{% endblock %}
+{% block page_title %}Nuevo asunto{% endblock %}
+{% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
-<style>
-/* ═══════════════════════════════════════════════════════════════════════════
-   WIZARD — Nuevo Asunto (4 pasos)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── Layout ──────────────────────────── */
-.wiz-page { max-width: 860px; margin: 0 auto; padding: 0 20px 60px; }
-
-/* ── Progress Bar (sticky) ───────────── */
-.wiz-progress {
-  position: sticky; top: 0; z-index: 100;
-  background: var(--bg); border-bottom: 1px solid var(--border);
-  padding: 18px 0 14px; margin: 0 -20px; padding-left: 20px; padding-right: 20px;
-}
-.wiz-steps { display: flex; align-items: center; gap: 0; position: relative; }
-.wiz-step {
-  flex: 1; display: flex; align-items: center; gap: 8px;
-  cursor: pointer; padding: 4px 0; position: relative;
-  transition: opacity .15s;
-}
-.wiz-step.disabled { opacity: .4; cursor: default; }
-.wiz-step-num {
-  width: 32px; height: 32px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .75rem; font-weight: 800; flex-shrink: 0;
-  border: 2px solid var(--border); color: var(--text-3);
-  background: transparent; transition: all .25s;
-}
-.wiz-step.active .wiz-step-num {
-  border-color: var(--e); color: var(--e); background: rgba(0,223,162,.1);
-  box-shadow: 0 0 0 4px rgba(0,223,162,.1);
-}
-.wiz-step.done .wiz-step-num {
-  border-color: #10B981; background: #10B981; color: #fff;
-}
-.wiz-step-label { font-size: .78rem; font-weight: 600; color: var(--text-3); transition: color .15s; }
-.wiz-step.active .wiz-step-label { color: var(--text); font-weight: 700; }
-.wiz-step.done .wiz-step-label { color: #10B981; }
-
-/* Connector lines */
-.wiz-connector {
-  flex: 0 0 auto; width: 40px; height: 2px;
-  background: var(--border); margin: 0 4px; transition: background .25s;
-}
-.wiz-connector.done { background: #10B981; }
-
-/* Progress bar */
-.wiz-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 14px; overflow: hidden; }
-.wiz-bar-fill { height: 100%; background: linear-gradient(90deg, var(--e), var(--ed)); border-radius: 2px; transition: width .4s cubic-bezier(.4,0,.2,1); }
-.wiz-bar-label { font-size: .68rem; color: var(--text-3); margin-top: 6px; text-align: right; }
-
-/* ── Step Panels ─────────────────────── */
-.wiz-panel {
-  display: none; animation: wizFadeIn .35s ease;
-}
-.wiz-panel.active { display: block; }
-@keyframes wizFadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.wiz-panel-title {
-  font-size: 1.4rem; font-weight: 800; color: var(--text);
-  margin: 28px 0 6px; letter-spacing: -.3px;
-}
-.wiz-panel-sub {
-  font-size: .85rem; color: var(--text-3); margin-bottom: 24px;
-}
-
-/* ── Cards ───────────────────────────── */
-.wiz-card {
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 14px; padding: 22px; margin-bottom: 16px;
-}
-.wiz-card-title {
-  font-size: .82rem; font-weight: 700; color: var(--text);
-  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
-}
-
-/* ── Type Grid (Step 1) ──────────────── */
-.wiz-type-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 10px; margin-bottom: 20px;
-}
-.wiz-type-card {
-  background: var(--card); border: 1.5px solid var(--border);
-  border-radius: 12px; padding: 16px 12px; text-align: center;
-  cursor: pointer; transition: all .2s; position: relative; overflow: hidden;
-}
-.wiz-type-card:hover { border-color: var(--text-3); transform: translateY(-2px); }
-.wiz-type-card.selected {
-  border-color: var(--e); background: rgba(0,223,162,.08);
-}
-.wiz-type-card.selected::after {
-  content: '✓'; position: absolute; top: 6px; right: 8px;
-  width: 18px; height: 18px; border-radius: 50%; background: var(--e);
-  color: #fff; font-size: .6rem; display: flex; align-items: center;
-  justify-content: center; font-weight: 800;
-}
-.wiz-type-icon { font-size: 1.6rem; margin-bottom: 6px; }
-.wiz-type-label { font-size: .72rem; font-weight: 700; color: var(--text); }
-.wiz-type-bar {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
-  opacity: .6; transition: opacity .15s;
-}
-.wiz-type-card.selected .wiz-type-bar { opacity: 1; }
-
-/* ── Priority Toggle ─────────────────── */
-.wiz-prio-group { display: flex; gap: 6px; }
-.wiz-prio-btn {
-  flex: 1; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border);
-  background: transparent; color: var(--text-3); font-size: .82rem;
-  font-weight: 700; cursor: pointer; transition: all .2s; text-align: center;
-}
-.wiz-prio-btn.selected { color: #fff; }
-.wiz-prio-btn[data-p="baja"].selected { background: #10B981; border-color: #10B981; }
-.wiz-prio-btn[data-p="media"].selected { background: #F59E0B; border-color: #F59E0B; color: #000; }
-.wiz-prio-btn[data-p="alta"].selected { background: #EF4444; border-color: #EF4444; }
-
-/* ── Client Card (Step 2) ────────────── */
-.wiz-client-search {
-  position: relative;
-}
-.wiz-client-input {
-  width: 100%; padding: 12px 14px 12px 40px; font-size: .88rem;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; color: var(--text); transition: all .15s;
-}
-.wiz-client-input:focus { outline: none; border-color: var(--e); box-shadow: 0 0 0 3px rgba(0,223,162,.12); }
-.wiz-client-search-icon {
-  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-  color: var(--text-3); font-size: 1rem; pointer-events: none;
-}
-.wiz-client-results {
-  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.35);
-  max-height: 320px; overflow-y: auto; z-index: 50; display: none;
-}
-.wiz-client-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px; cursor: pointer; transition: background .1s;
-  border-bottom: 1px solid var(--border);
-}
-.wiz-client-item:last-child { border-bottom: none; }
-.wiz-client-item:hover { background: rgba(0,223,162,.08); }
-.wiz-client-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .65rem; font-weight: 800; color: #fff; flex-shrink: 0;
-}
-.wiz-client-info { flex: 1; min-width: 0; }
-.wiz-client-name { font-size: .85rem; font-weight: 700; color: var(--text); }
-.wiz-client-meta { font-size: .72rem; color: var(--text-3); }
-.wiz-client-create {
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 14px; cursor: pointer; color: var(--e);
-  font-size: .82rem; font-weight: 600; transition: background .1s;
-}
-.wiz-client-create:hover { background: rgba(0,223,162,.08); }
-
-/* Selected client */
-.wiz-client-selected {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 16px; background: rgba(0,223,162,.08);
-  border: 1px solid rgba(99,102,241,.25); border-radius: 10px;
-}
-.wiz-client-selected .wiz-cs-info { flex: 1; }
-.wiz-client-selected .wiz-cs-name { font-size: .88rem; font-weight: 700; color: var(--text); }
-.wiz-client-selected .wiz-cs-email { font-size: .75rem; color: var(--text-3); }
-.wiz-cs-change {
-  background: none; border: 1px solid var(--border); border-radius: 8px;
-  color: var(--text-3); font-size: .72rem; font-weight: 600;
-  padding: 5px 12px; cursor: pointer; transition: all .15s;
-}
-.wiz-cs-change:hover { border-color: #EF4444; color: #EF4444; }
-
-/* ── Toggle Section ──────────────────── */
-.wiz-toggle-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 0; cursor: pointer;
-}
-.wiz-toggle-label { font-size: .85rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
-.wiz-switch {
-  position: relative; width: 40px; height: 22px;
-  background: var(--border); border-radius: 11px;
-  cursor: pointer; transition: background .2s;
-}
-.wiz-switch.on { background: var(--e); }
-.wiz-switch::after {
-  content: ''; position: absolute; top: 2px; left: 2px;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: #fff; transition: transform .2s;
-}
-.wiz-switch.on::after { transform: translateX(18px); }
-.wiz-toggle-body { overflow: hidden; max-height: 0; transition: max-height .3s ease; }
-.wiz-toggle-body.open { max-height: 600px; }
-
-/* ── Form rows ───────────────────────── */
-.wiz-row { display: flex; gap: 14px; margin-bottom: 14px; }
-.wiz-row > * { flex: 1; }
-.wiz-field { margin-bottom: 14px; }
-.wiz-label {
-  display: block; font-size: .68rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .7px;
-  color: var(--text-3); margin-bottom: 5px;
-}
-.wiz-label .req { color: #EF4444; }
-.wiz-input {
-  width: 100%; padding: 10px 12px; font-size: .85rem;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text); transition: all .15s;
-  font-family: inherit;
-}
-.wiz-input:focus { outline: none; border-color: var(--e); box-shadow: 0 0 0 3px rgba(0,223,162,.12); }
-.wiz-input.shake { animation: wizShake .4s; border-color: #EF4444 !important; }
-@keyframes wizShake {
-  0%,100% { transform: translateX(0); }
-  20%,60% { transform: translateX(-6px); }
-  40%,80% { transform: translateX(6px); }
-}
-select.wiz-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
-textarea.wiz-input { resize: vertical; min-height: 80px; line-height: 1.5; }
-
-/* ── Urgency semaphore ───────────────── */
-.wiz-urgency {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 12px; border-radius: 20px; font-size: .72rem; font-weight: 700;
-  margin-top: 6px;
-}
-.wiz-urgency-green  { background: #10B98120; color: #10B981; }
-.wiz-urgency-yellow { background: #F59E0B20; color: #F59E0B; }
-.wiz-urgency-red    { background: #EF444420; color: #EF4444; }
-
-/* ── Team member cards (Step 4) ──────── */
-.wiz-member-list { display: flex; flex-direction: column; gap: 6px; }
-.wiz-member {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px; border-radius: 10px; cursor: pointer;
-  border: 1.5px solid var(--border); transition: all .15s;
-}
-.wiz-member:hover { border-color: var(--text-3); }
-.wiz-member.selected { border-color: var(--e); background: rgba(0,223,162,.06); }
-.wiz-member-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .6rem; font-weight: 800; color: #fff; flex-shrink: 0;
-}
-.wiz-member-info { flex: 1; }
-.wiz-member-name { font-size: .85rem; font-weight: 700; color: var(--text); }
-.wiz-member-meta { font-size: .72rem; color: var(--text-3); }
-.wiz-member-load {
-  padding: 3px 10px; border-radius: 12px; font-size: .65rem; font-weight: 700;
-}
-
-/* Collaborator checkboxes */
-.wiz-colab {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 8px; cursor: pointer;
-  transition: background .1s;
-}
-.wiz-colab:hover { background: rgba(99,102,241,.05); }
-.wiz-colab input[type="checkbox"] { accent-color: var(--e); width: 16px; height: 16px; }
-.wiz-colab-name { font-size: .82rem; font-weight: 600; color: var(--text); }
-.wiz-colab-cargo { font-size: .7rem; color: var(--text-3); }
-
-/* ── Summary (Step 4) ────────────────── */
-.wiz-summary {
-  background: linear-gradient(135deg, rgba(0,223,162,.08) 0%, rgba(139,92,246,.05) 100%);
-  border: 1px solid rgba(99,102,241,.2); border-radius: 14px;
-  padding: 22px; margin-bottom: 16px;
-}
-.wiz-summary-title { font-size: .82rem; font-weight: 800; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-.wiz-summary-row {
-  display: flex; align-items: center; gap: 8px;
-  font-size: .82rem; color: var(--text-2); padding: 5px 0;
-}
-.wiz-summary-row strong { color: var(--text); }
-.wiz-summary-divider { height: 1px; background: var(--border); margin: 10px 0; }
-
-/* ── Footer Buttons ──────────────────── */
-.wiz-footer {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 0; margin-top: 8px;
-  border-top: 1px solid var(--border);
-}
-.wiz-btn {
-  padding: 11px 28px; border-radius: 10px; font-size: .88rem;
-  font-weight: 700; cursor: pointer; transition: all .2s;
-  display: inline-flex; align-items: center; gap: 6px; border: none;
-}
-.wiz-btn-ghost {
-  background: transparent; color: var(--text-3);
-  border: 1px solid var(--border);
-}
-.wiz-btn-ghost:hover { border-color: var(--text-3); color: var(--text); }
-.wiz-btn-ghost:disabled { opacity: .3; cursor: default; }
-.wiz-btn-primary {
-  background: var(--e); color: var(--n);
-  box-shadow: 0 4px 16px rgba(0,223,162,.3);
-}
-.wiz-btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
-.wiz-btn-primary:disabled { opacity: .4; cursor: default; transform: none; filter: none; }
-.wiz-btn-create {
-  background: linear-gradient(135deg, #10B981, #059669);
-  color: #fff; box-shadow: 0 4px 16px rgba(16,185,129,.3);
-  padding: 13px 36px; font-size: .95rem;
-}
-.wiz-btn-create:hover { filter: brightness(1.1); transform: translateY(-1px); }
-
-/* ── Tooltip ─────────────────────────── */
-.wiz-tooltip {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; border-radius: 50%;
-  background: var(--border); color: var(--text-3);
-  font-size: .55rem; font-weight: 800; cursor: help;
-  margin-left: 4px; position: relative;
-}
-.wiz-tooltip:hover::after {
-  content: attr(data-tip); position: absolute; bottom: calc(100% + 6px);
-  left: 50%; transform: translateX(-50%);
-  background: var(--text); color: var(--bg);
-  padding: 4px 10px; border-radius: 6px; font-size: .7rem;
-  white-space: nowrap; font-weight: 600; z-index: 10;
-}
-
-/* ── Responsive ──────────────────────── */
-@media (max-width: 768px) {
-  .wiz-type-grid { grid-template-columns: repeat(3, 1fr); }
-  .wiz-row { flex-direction: column; gap: 0; }
-  .wiz-step-label { display: none; }
-  .wiz-bar-label span { display: none; }
-  .wiz-bar-label::after { content: attr(data-short); }
-}
-@media (max-width: 480px) {
-  .wiz-type-grid { grid-template-columns: repeat(2, 1fr); }
-}
-</style>
 {% endblock %}
 
 {% block content %}
+{% set f = form %}
+{% set tipo_sel = f.get('tipo_asunto') or '' %}
+<div class="an-wrap">
+  <nav class="af-migas"><a href="{{ url_for('asuntos.index') }}">Asuntos</a> / Nuevo</nav>
+  <h1 class="page-title" style="margin-top:6px">Nuevo asunto</h1>
+  <p class="as-sub">Solo el título es obligatorio. Lo demás lo puedes completar después desde la ficha del asunto.</p>
+  {% if err %}<div class="an-err" role="alert">{{ err }}</div>{% endif %}
 
-{% if err %}
-<div class="alert alert-danger" style="margin:0 auto 16px;max-width:860px">{{ err }}</div>
-{% endif %}
+  <form method="post" id="anForm" novalidate>
+    <input type="hidden" name="tipo_asunto" id="anTipo" value="{{ tipo_sel }}">
+    <input type="hidden" name="sub_tipo" id="anSub" value="{{ f.get('sub_tipo', '') }}">
 
-<div class="wiz-page">
-
-  <!-- ═══════════════════════════════════════════
-       PROGRESS BAR
-       ═══════════════════════════════════════════ -->
-  <div class="wiz-progress">
-    <div class="wiz-steps">
-      <div class="wiz-step active" data-step="1" onclick="goToStep(1)">
-        <div class="wiz-step-num">1</div>
-        <div class="wiz-step-label">Tipo de Derecho</div>
-      </div>
-      <div class="wiz-connector"></div>
-      <div class="wiz-step disabled" data-step="2" onclick="goToStep(2)">
-        <div class="wiz-step-num">2</div>
-        <div class="wiz-step-label">Cliente</div>
-      </div>
-      <div class="wiz-connector"></div>
-      <div class="wiz-step disabled" data-step="3" onclick="goToStep(3)">
-        <div class="wiz-step-num">3</div>
-        <div class="wiz-step-label">Detalles</div>
-      </div>
-      <div class="wiz-connector"></div>
-      <div class="wiz-step disabled" data-step="4" onclick="goToStep(4)">
-        <div class="wiz-step-num">4</div>
-        <div class="wiz-step-label">Equipo</div>
-      </div>
-    </div>
-    <div class="wiz-bar"><div class="wiz-bar-fill" id="wizBarFill" style="width:25%"></div></div>
-    <div class="wiz-bar-label" data-short="1/4"><span>Paso 1 de 4</span></div>
-  </div>
-
-  <form method="POST" id="wizForm" onsubmit="return false;">
-
-    <!-- ═══════════════════════════════════════════
-         PASO 1 — TIPO DE DERECHO
-         ═══════════════════════════════════════════ -->
-    <div class="wiz-panel active" id="step1">
-      <div class="wiz-panel-title">¿Qué tipo de asunto es?</div>
-      <div class="wiz-panel-sub">Selecciona el área de derecho para personalizar el formulario</div>
-
-      <div class="wiz-type-grid" id="tipoGrid">
-        {% for key, t in tipos_derecho.items() %}
-        <div class="wiz-type-card {% if key == 'civil' %}selected{% endif %}" data-tipo="{{ key }}" onclick="selectTipo('{{ key }}')">
-          <div class="wiz-type-icon">{{ icon(t.icon, 24, 24) }}</div>
-          <div class="wiz-type-label">{{ t.label }}</div>
-          <div class="wiz-type-bar" style="background:{{ t.color }}"></div>
-        </div>
+    <section class="an-sec">
+      <h2><i>1</i>¿De qué materia es?</h2>
+      <div class="an-materias" id="anMaterias" role="radiogroup" aria-label="Materia">
+        {% for k, t in tipos_derecho.items() %}
+        <button type="button" class="an-materia{% if tipo_sel == k %} on{% endif %}" data-tipo="{{ k }}" style="--m:{{ t.color }}" role="radio" aria-checked="{{ 'true' if tipo_sel == k else 'false' }}">
+          <span class="as-dot" style="--d:{{ t.color }}"></span>{{ t.label }}
+        </button>
         {% endfor %}
       </div>
+      <div class="an-subtipos" id="anSubtipos"></div>
+    </section>
 
-      <div class="wiz-card">
-        <div class="wiz-row">
-          <div>
-            <label class="wiz-label">Subtipo</label>
-            <select class="wiz-input" id="wizSubtipo" name="sub_tipo">
-              <option value="">— Sin subtipo —</option>
-            </select>
-          </div>
-          <div>
-            <label class="wiz-label">
-              No. expediente
-              <span class="wiz-tooltip" data-tip="Puedes modificar o dejar el auto-generado"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-            </label>
-            <input class="wiz-input" type="text" id="wizNumExp" name="numero_expediente"
-                   value="{{ auto_num }}" placeholder="{{ auto_num }}">
-          </div>
+    <section class="an-sec">
+      <h2><i>2</i>Lo básico</h2>
+      <div class="an-body">
+        <div class="full">
+          <label class="as-label" for="anTitulo">Título del asunto</label>
+          <input class="as-input" id="anTitulo" name="titulo" required maxlength="200" value="{{ f.get('titulo', '') }}" placeholder="Ej. Juicio ordinario mercantil — Constructora Omega vs Desarrollos Altamira" autofocus>
         </div>
-
         <div>
-          <label class="wiz-label">Prioridad</label>
-          <div class="wiz-prio-group">
-            <button type="button" class="wiz-prio-btn" data-p="baja" onclick="setPrio('baja')"><span style="color:#22c55e">●</span> Baja</button>
-            <button type="button" class="wiz-prio-btn selected" data-p="media" onclick="setPrio('media')"><span style="color:#eab308">●</span> Media</button>
-            <button type="button" class="wiz-prio-btn" data-p="alta" onclick="setPrio('alta')"><span style="color:#ef4444">●</span> Alta</button>
-          </div>
+          <label class="as-label" for="anCliente">Cliente</label>
+          <select class="as-select" id="anCliente" name="cliente_id">
+            <option value="">Sin cliente por ahora</option>
+            {% set cli_sel = (f.get('cliente_id') or cliente_inicial or '') | string %}
+            {% for c in clientes %}<option value="{{ c.id }}"{% if cli_sel == c.id | string %} selected{% endif %}>{{ c.razon_social or (c.nombre ~ ' ' ~ (c.apellidos or '')) }}</option>{% endfor %}
+          </select>
+          <small class="as-muted" style="display:block;font-size:12px;margin-top:5px">¿Es nuevo? <a href="{{ url_for('clientes.index') }}#nuevo" style="color:var(--e);font-weight:600;text-decoration:none">Agrégalo en Clientes</a></small>
         </div>
-      </div>
-
-      <input type="hidden" name="tipo_asunto" id="wizTipo" value="civil">
-      <input type="hidden" name="prioridad" id="wizPrioridad" value="media">
-      <input type="hidden" name="estado" value="activo">
-    </div>
-
-    <!-- ═══════════════════════════════════════════
-         PASO 2 — CLIENTE Y CONTRAPARTE
-         ═══════════════════════════════════════════ -->
-    <div class="wiz-panel" id="step2">
-      <div class="wiz-panel-title">¿Quién es el cliente?</div>
-      <div class="wiz-panel-sub">Selecciona o crea el cliente vinculado a este asunto</div>
-
-      <div class="wiz-card">
-        <div class="wiz-card-title">{{ icon("user", 14, 14) }} Cliente del asunto <span class="req" style="color:#EF4444;font-size:.7rem">*requerido</span></div>
-
-        <!-- Search state -->
-        <div id="clienteSearchWrap">
-          <div class="wiz-client-search">
-            <span class="wiz-client-search-icon">{{ icon_search(14, 14) }}</span>
-            <input class="wiz-client-input" type="text" id="wizClienteSearch"
-                   placeholder="Buscar cliente por nombre, correo o RFC..."
-                   autocomplete="off" oninput="wizBuscarCliente(this.value)">
-            <div class="wiz-client-results" id="wizClienteResults"></div>
-          </div>
-        </div>
-
-        <!-- Selected state (hidden initially) -->
-        <div class="wiz-client-selected" id="clienteSelected" style="display:none">
-          <div class="wiz-member-avatar" id="cSelAvatar" style="background:var(--e)">?</div>
-          <div class="wiz-cs-info">
-            <div class="wiz-cs-name" id="cSelName">—</div>
-            <div class="wiz-cs-email" id="cSelMeta">—</div>
-          </div>
-          <button type="button" class="wiz-cs-change" onclick="changeCliente()">✕ Cambiar</button>
-        </div>
-
-        <input type="hidden" name="cliente_id" id="wizClienteId" value="">
-      </div>
-
-      <!-- Contraparte toggle -->
-      <div class="wiz-card">
-        <div class="wiz-toggle-header" onclick="toggleSection('contraparte')">
-          <div class="wiz-toggle-label">{{ icon("scale", 14, 14) }} ¿Este asunto tiene contraparte?</div>
-          <div class="wiz-switch" id="switchContraparte"></div>
-        </div>
-        <div class="wiz-toggle-body" id="bodyContraparte">
-          <div class="wiz-row">
-            <div>
-              <label class="wiz-label">Nombre de la contraparte</label>
-              <input class="wiz-input" type="text" name="contrario_nombre" placeholder="Nombre completo o razón social">
-            </div>
-          </div>
-          <div class="wiz-row">
-            <div>
-              <label class="wiz-label">Abogado contrario</label>
-              <input class="wiz-input" type="text" name="contrario_abogado" placeholder="Lic. Nombre Apellido">
-            </div>
-            <div>
-              <label class="wiz-label">Despacho contrario</label>
-              <input class="wiz-input" type="text" name="contrario_despacho" placeholder="Nombre del despacho">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Juzgado toggle -->
-      <div class="wiz-card">
-        <div class="wiz-toggle-header" onclick="toggleSection('juzgado')">
-          <div class="wiz-toggle-label">{{ icon("landmark", 14, 14) }} ¿Tiene juzgado u órgano asignado?</div>
-          <div class="wiz-switch" id="switchJuzgado"></div>
-        </div>
-        <div class="wiz-toggle-body" id="bodyJuzgado">
-          <div class="wiz-row">
-            <div style="flex:2">
-              <label class="wiz-label">Juzgado / Tribunal</label>
-              <input class="wiz-input" type="text" name="juzgado" placeholder="Ej. Juzgado 4° Civil del Distrito">
-            </div>
-            <div>
-              <label class="wiz-label">No. expediente judicial</label>
-              <input class="wiz-input" type="text" name="numero_juicio" placeholder="Ej. 204/2025">
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════
-         PASO 3 — DETALLES
-         ═══════════════════════════════════════════ -->
-    <div class="wiz-panel" id="step3">
-      <div class="wiz-panel-title">Detalles del asunto</div>
-      <div class="wiz-panel-sub">Información del caso, fechas y honorarios</div>
-
-      <div class="wiz-card">
-        <div class="wiz-card-title">{{ icon("clipboard", 14, 14) }} Información del caso</div>
-        <div class="wiz-field">
-          <label class="wiz-label">Título del asunto <span class="req">*</span></label>
-          <input class="wiz-input" type="text" name="titulo" id="wizTitulo"
-                 placeholder="Ej. Juicio de divorcio — García vs García" required>
-        </div>
-        <div class="wiz-field">
-          <label class="wiz-label">Descripción / Hechos</label>
-          <textarea class="wiz-input" name="descripcion" id="wizDescripcion" rows="4"
-                    placeholder="Describe brevemente los hechos del caso..."></textarea>
-        </div>
-      </div>
-
-      <div class="wiz-card">
-        <div class="wiz-card-title">{{ icon("calendar", 14, 14) }} Fechas</div>
-        <div class="wiz-row">
-          <div>
-            <label class="wiz-label">Fecha de inicio <span class="req">*</span></label>
-            <input class="wiz-input" type="date" name="fecha_inicio" id="wizFechaInicio"
-                   value="{{ today_str }}">
-          </div>
-          <div>
-            <label class="wiz-label">Fecha límite</label>
-            <input class="wiz-input" type="date" name="fecha_limite" id="wizFechaLimite"
-                   onchange="updateUrgency()">
-            <div id="wizUrgency"></div>
-          </div>
-          <div>
-            <label class="wiz-label">Cierre estimado</label>
-            <input class="wiz-input" type="date" name="fecha_cierre">
-          </div>
-        </div>
-      </div>
-
-      <div class="wiz-card">
-        <div class="wiz-card-title">{{ icon("dollar", 14, 14) }} Honorarios y valor del litigio</div>
-        <div class="wiz-row">
-          <div>
-            <label class="wiz-label">Honorarios pactados (MXN)</label>
-            <input class="wiz-input" type="number" name="honorarios_pactados" placeholder="0.00" step="0.01" min="0">
-          </div>
-          <div>
-            <label class="wiz-label">Forma de cobro</label>
-            <select class="wiz-input" name="forma_cobro" id="wizFormaCobro" onchange="checkCobro()">
-              <option value="fijo">Honorario fijo</option>
-              <option value="por_hora">Por hora</option>
-              <option value="por_evento">Por evento</option>
-              <option value="contingencia">Contingencia</option>
-            </select>
-          </div>
-          <div>
-            <label class="wiz-label">Valor del litigio (MXN)</label>
-            <input class="wiz-input" type="number" name="monto_estimado" placeholder="0.00" step="0.01" min="0">
-          </div>
-        </div>
-        <div id="wizTarifaHora" style="display:none" class="wiz-field">
-          <label class="wiz-label">Tarifa por hora (MXN)</label>
-          <input class="wiz-input" type="number" name="tarifa_hora" placeholder="0.00" step="0.01" min="0" style="max-width:200px">
-        </div>
-      </div>
-
-      <div class="wiz-card" style="opacity:.8">
-        <div class="wiz-card-title" style="cursor:pointer" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? '' : 'none'">
-          {{ icon("edit", 14, 14) }} Notas internas
-          <span style="font-size:.65rem;color:var(--text-3);font-weight:400;margin-left:auto">Solo visible para el equipo</span>
-          <span style="color:var(--text-3);font-size:.8rem">▾</span>
-        </div>
-        <div style="display:none">
-          <textarea class="wiz-input" name="notas" rows="3" placeholder="Notas internas del equipo..."></textarea>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════
-         PASO 4 — EQUIPO
-         ═══════════════════════════════════════════ -->
-    <div class="wiz-panel" id="step4">
-      <div class="wiz-panel-title">Equipo asignado</div>
-      <div class="wiz-panel-sub">Selecciona quién será responsable y los colaboradores del caso</div>
-
-      <div class="wiz-card">
-        <div class="wiz-card-title">{{ icon("user", 14, 14) }} Abogado responsable <span class="req" style="color:#EF4444;font-size:.7rem">*requerido</span></div>
-        <div class="wiz-member-list" id="wizResponsableList">
-          {% for ab in abogados %}
-          <div class="wiz-member {% if ab.id == session.get('user_id') %}selected{% endif %}"
-               data-uid="{{ ab.id }}" onclick="selectResponsable({{ ab.id }})">
-            <div class="wiz-member-avatar" style="background:{{ ['#00DFA2','#EC4899','#F59E0B','#10B981','#0EA5E9','#8B5CF6'][loop.index0 % 6] }}">
-              {{ ab.nombre[0] }}{{ (ab.apellidos or 'X')[0] }}
-            </div>
-            <div class="wiz-member-info">
-              <div class="wiz-member-name">{{ ab.nombre }} {{ ab.apellidos }}</div>
-              <div class="wiz-member-meta">{{ ab.cargo or 'Asociado' | capitalize }}</div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-        <input type="hidden" name="abogado_responsable" id="wizResponsable"
-               value="{{ session.get('user_id', '') }}">
-      </div>
-
-      <div class="wiz-card">
-        <div class="wiz-card-title">{{ icon("users", 14, 14) }} Colaboradores adicionales <span style="font-size:.65rem;color:var(--text-3);font-weight:400">(opcional)</span></div>
-        <div id="wizColabList">
-          {% for ab in abogados %}
-          <label class="wiz-colab" data-uid="{{ ab.id }}" id="colab-{{ ab.id }}">
-            <input type="checkbox" class="wiz-colab-cb" value="{{ ab.id }}" onchange="syncColabs()">
-            <div class="wiz-member-avatar" style="width:28px;height:28px;font-size:.5rem;background:{{ ['#00DFA2','#EC4899','#F59E0B','#10B981','#0EA5E9','#8B5CF6'][loop.index0 % 6] }}">
-              {{ ab.nombre[0] }}{{ (ab.apellidos or 'X')[0] }}
-            </div>
-            <div>
-              <div class="wiz-colab-name">{{ ab.nombre }} {{ ab.apellidos }}</div>
-              <div class="wiz-colab-cargo">{{ ab.cargo or 'Asociado' | capitalize }}</div>
-            </div>
-          </label>
-          {% endfor %}
-        </div>
-        <input type="hidden" name="colaboradores" id="wizColabsInput" value="">
-      </div>
-
-      <!-- Summary -->
-      <div class="wiz-summary" id="wizSummary">
-        <div class="wiz-summary-title">{{ icon("chart", 14, 14) }} Resumen del asunto</div>
-        <div id="wizSummaryContent">
-          <!-- Populated by JS -->
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════
-         FOOTER BUTTONS
-         ═══════════════════════════════════════════ -->
-    <div class="wiz-footer">
-      <button type="button" class="wiz-btn wiz-btn-ghost" id="wizBtnPrev" onclick="prevStep()" disabled>
-        ← Anterior
-      </button>
-      <div style="display:flex;gap:8px;">
-        <a href="{{ url_for('asuntos.index') }}" class="wiz-btn wiz-btn-ghost" style="text-decoration:none">Cancelar</a>
-        <button type="button" class="wiz-btn wiz-btn-primary" id="wizBtnNext" onclick="nextStep()">
-          Siguiente →
-        </button>
-        <button type="button" class="wiz-btn wiz-btn-create" id="wizBtnCreate" onclick="createAsunto()" style="display:none">
-          Crear asunto →
-        </button>
-      </div>
-    </div>
-
-  </form>
-
-</div>
-
-<script>
-/* ═══════════════════════════════════════════════════════════════════════════
-   WIZARD STATE
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const WIZ = {
-  step: 1,
-  maxVisited: 1,
-  tipo: 'civil',
-  prioridad: 'media',
-  clienteId: null,
-  clienteName: '',
-  responsableId: {{ session.get('user_id', 'null') }},
-};
-
-const TIPOS = {{ tipos_derecho | tojson }};
-const CLIENTES = {{ clientes | tojson }};
-
-const ICON_SVGS = {
-  scale: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 8 5 12 9 8"/><polyline points="15 8 19 12 23 8"/><line x1="1" y1="8" x2="23" y2="8"/></svg>',
-  building: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><path d="M9 22v-4h6v4"/></svg>',
-  hard_hat: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v-1a10 10 0 0120 0v1"/><line x1="2" y1="18" x2="22" y2="18"/><path d="M12 2a7 7 0 017 7"/><path d="M12 2a7 7 0 00-7 7"/></svg>',
-  lock: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
-  heart: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg>',
-  landmark: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/><line x1="2" y1="18" x2="22" y2="18"/></svg>',
-  chart: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
-  shield: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
-  home: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
-  scroll: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h12a2 2 0 002-2v-2H10v2a2 2 0 11-4 0V5a2 2 0 012-2h14v14"/><path d="M4 19a2 2 0 01-2-2V5a2 2 0 012-2"/></svg>',
-  globe: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>',
-  folder: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>',
-};
-
-/* ── Navigation ─────────────────────── */
-function goToStep(n) {
-  if (n > WIZ.maxVisited + 1) return;
-  if (n > WIZ.step && !validateStep(WIZ.step)) return;
-  showStep(n);
-}
-
-function nextStep() {
-  if (!validateStep(WIZ.step)) return;
-  if (WIZ.step < 4) showStep(WIZ.step + 1);
-}
-
-function prevStep() {
-  if (WIZ.step > 1) showStep(WIZ.step - 1);
-}
-
-function showStep(n) {
-  WIZ.step = n;
-  if (n > WIZ.maxVisited) WIZ.maxVisited = n;
-
-  // Panels
-  document.querySelectorAll('.wiz-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById(`step${n}`).classList.add('active');
-
-  // Progress steps
-  document.querySelectorAll('.wiz-step').forEach(s => {
-    const sn = parseInt(s.dataset.step);
-    s.classList.remove('active', 'done', 'disabled');
-    if (sn === n) s.classList.add('active');
-    else if (sn < n) s.classList.add('done');
-    else if (sn <= WIZ.maxVisited) { /* clickable */ }
-    else s.classList.add('disabled');
-
-    s.querySelector('.wiz-step-num').textContent = sn < n ? '✓' : sn;
-  });
-
-  // Connectors
-  document.querySelectorAll('.wiz-connector').forEach((c, i) => {
-    c.classList.toggle('done', i + 1 < n);
-  });
-
-  // Progress bar
-  document.getElementById('wizBarFill').style.width = `${n * 25}%`;
-  document.querySelector('.wiz-bar-label').innerHTML = `<span>Paso ${n} de 4</span>`;
-  document.querySelector('.wiz-bar-label').dataset.short = `${n}/4`;
-
-  // Buttons
-  document.getElementById('wizBtnPrev').disabled = (n === 1);
-  document.getElementById('wizBtnNext').style.display = (n === 4) ? 'none' : '';
-  document.getElementById('wizBtnCreate').style.display = (n === 4) ? '' : 'none';
-
-  // Step 4 specific
-  if (n === 4) buildSummary();
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function validateStep(n) {
-  if (n === 1) {
-    return !!WIZ.tipo;
-  }
-  if (n === 2) {
-    if (!document.getElementById('wizClienteId').value) {
-      const input = document.getElementById('wizClienteSearch');
-      if (input) { input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 500); }
-      return false;
-    }
-    return true;
-  }
-  if (n === 3) {
-    const titulo = document.getElementById('wizTitulo');
-    if (!titulo.value.trim()) {
-      titulo.classList.add('shake');
-      setTimeout(() => titulo.classList.remove('shake'), 500);
-      titulo.focus();
-      return false;
-    }
-    return true;
-  }
-  return true;
-}
-
-/* ── Step 1: Tipo ───────────────────── */
-function selectTipo(tipo) {
-  WIZ.tipo = tipo;
-  document.getElementById('wizTipo').value = tipo;
-
-  document.querySelectorAll('.wiz-type-card').forEach(c => c.classList.remove('selected'));
-  const card = document.querySelector(`.wiz-type-card[data-tipo="${tipo}"]`);
-  if (card) card.classList.add('selected');
-
-  // Populate subtypes
-  const t = TIPOS[tipo] || {};
-  const sel = document.getElementById('wizSubtipo');
-  sel.innerHTML = '<option value="">— Sin subtipo —</option>';
-  (t.subtypes || []).forEach(s => {
-    const o = document.createElement('option');
-    o.value = s; o.textContent = s;
-    sel.appendChild(o);
-  });
-
-  // Pre-fill title placeholder
-  fetch(`/asuntos/ajax/plantilla/${tipo}`)
-    .then(r => r.json())
-    .then(data => {
-      const p = data.plantilla || {};
-      const titulo = document.getElementById('wizTitulo');
-      if (p.titulo_ejemplo) titulo.placeholder = p.titulo_ejemplo;
-      if (p.descripcion && !document.getElementById('wizDescripcion').value) {
-        document.getElementById('wizDescripcion').value = p.descripcion;
-      }
-    }).catch(() => {});
-}
-
-function setPrio(p) {
-  WIZ.prioridad = p;
-  document.getElementById('wizPrioridad').value = p;
-  document.querySelectorAll('.wiz-prio-btn').forEach(b => b.classList.remove('selected'));
-  document.querySelector(`.wiz-prio-btn[data-p="${p}"]`).classList.add('selected');
-}
-
-/* ── Step 2: Client search ──────────── */
-let clientDebounce = null;
-
-function wizBuscarCliente(q) {
-  clearTimeout(clientDebounce);
-  const box = document.getElementById('wizClienteResults');
-  if (!q || q.length < 2) { box.style.display = 'none'; return; }
-
-  clientDebounce = setTimeout(() => {
-    const ql = q.toLowerCase();
-    const matches = CLIENTES.filter(c => {
-      const n = ((c.nombre||'')+ ' ' +(c.apellidos||'')+ ' ' +(c.razon_social||'')).toLowerCase();
-      return n.includes(ql);
-    }).slice(0, 6);
-
-    let html = '';
-    matches.forEach(c => {
-      const label = c.tipo === 'moral'
-        ? (c.razon_social || c.nombre)
-        : ((c.nombre||'')+' '+(c.apellidos||'')).trim();
-      const initials = label.substring(0, 2).toUpperCase();
-      const color = c.tipo === 'moral' ? '#0EA5E9' : '#00DFA2';
-      html += `<div class="wiz-client-item" onclick="pickCliente(${c.id}, '${label.replace(/'/g,"\\'")}', '${color}', '${initials}')">
-        <div class="wiz-client-avatar" style="background:${color}">${initials}</div>
-        <div class="wiz-client-info">
-          <div class="wiz-client-name">${c.tipo === 'moral' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><path d="M9 22v-4h6v4"/></svg>' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'} ${label}</div>
-          <div class="wiz-client-meta">${c.tipo === 'moral' ? 'Persona Moral' : 'Persona Física'}</div>
-        </div>
-      </div>`;
-    });
-
-    if (!matches.length && q.length > 0) {
-      html = `<div class="wiz-client-create" onclick="abrirModalCrearCliente('${q.replace(/'/g, "\\'")}')">
-        + Crear cliente "${q}" rápidamente
-      </div>`;
-    }
-
-    box.innerHTML = html;
-    box.style.display = html ? 'block' : 'none';
-  }, 200);
-}
-
-function pickCliente(id, name, color, initials) {
-  WIZ.clienteId = id;
-  WIZ.clienteName = name;
-  document.getElementById('wizClienteId').value = id;
-  document.getElementById('wizClienteResults').style.display = 'none';
-
-  // Show selected card
-  document.getElementById('clienteSearchWrap').style.display = 'none';
-  const sel = document.getElementById('clienteSelected');
-  sel.style.display = 'flex';
-  document.getElementById('cSelAvatar').textContent = initials;
-  document.getElementById('cSelAvatar').style.background = color;
-  document.getElementById('cSelName').textContent = '✓ ' + name;
-
-  // Pre-fill title if empty
-  const titulo = document.getElementById('wizTitulo');
-  const tipoInfo = TIPOS[WIZ.tipo] || {};
-  if (!titulo.value) {
-    titulo.value = `${tipoInfo.label || ''} — ${name}`;
-  }
-}
-
-function changeCliente() {
-  WIZ.clienteId = null;
-  WIZ.clienteName = '';
-  document.getElementById('wizClienteId').value = '';
-  document.getElementById('clienteSelected').style.display = 'none';
-  document.getElementById('clienteSearchWrap').style.display = '';
-  const input = document.getElementById('wizClienteSearch');
-  input.value = '';
-  input.focus();
-}
-
-// Close dropdown on outside click
-document.addEventListener('click', e => {
-  if (!e.target.closest('.wiz-client-search')) {
-    document.getElementById('wizClienteResults').style.display = 'none';
-  }
-});
-
-/* ── Step 2: Toggle sections ────────── */
-function toggleSection(name) {
-  const sw = document.getElementById('switch' + name.charAt(0).toUpperCase() + name.slice(1));
-  const body = document.getElementById('body' + name.charAt(0).toUpperCase() + name.slice(1));
-  sw.classList.toggle('on');
-  body.classList.toggle('open');
-}
-
-/* ── Step 3: Urgency ────────────────── */
-function updateUrgency() {
-  const lim = document.getElementById('wizFechaLimite').value;
-  const el = document.getElementById('wizUrgency');
-  if (!lim) { el.innerHTML = ''; return; }
-
-  const diff = Math.ceil((new Date(lim) - new Date()) / 86400000);
-  if (diff > 30) {
-    el.innerHTML = '<div class="wiz-urgency wiz-urgency-green"><span style="color:#22c55e">●</span> Holgado — ' + diff + ' días</div>';
-  } else if (diff > 7) {
-    el.innerHTML = '<div class="wiz-urgency wiz-urgency-yellow"><span style="color:#eab308">●</span> Próximo — ' + diff + ' días</div>';
-  } else {
-    el.innerHTML = '<div class="wiz-urgency wiz-urgency-red"><span style="color:#ef4444">●</span> Urgente — ' + diff + ' días</div>';
-  }
-}
-
-function checkCobro() {
-  const v = document.getElementById('wizFormaCobro').value;
-  document.getElementById('wizTarifaHora').style.display = v === 'por_hora' ? '' : 'none';
-}
-
-/* ── Step 4: Responsable ────────────── */
-function selectResponsable(uid) {
-  WIZ.responsableId = uid;
-  document.getElementById('wizResponsable').value = uid;
-  document.querySelectorAll('#wizResponsableList .wiz-member').forEach(m => {
-    m.classList.toggle('selected', parseInt(m.dataset.uid) === uid);
-  });
-}
-
-function syncColabs() {
-  const ids = [...document.querySelectorAll('.wiz-colab-cb:checked')].map(c => c.value);
-  document.getElementById('wizColabsInput').value = ids.join(',');
-}
-
-/* ── Step 4: Summary ────────────────── */
-function buildSummary() {
-  const tipo = TIPOS[WIZ.tipo] || {};
-  const titulo = document.getElementById('wizTitulo').value || '(Sin título)';
-  const numExp = document.getElementById('wizNumExp').value || '—';
-  const subtipo = document.getElementById('wizSubtipo').value;
-  const prio = WIZ.prioridad;
-  const prioEmoji = {baja:'<span style="color:#22c55e">●</span>', media:'<span style="color:#eab308">●</span>', alta:'<span style="color:#ef4444">●</span>'}[prio] || '<span style="color:#eab308">●</span>';
-  const cliente = WIZ.clienteName || '(Sin cliente)';
-  const fechaInicio = document.getElementById('wizFechaInicio').value || '—';
-  const fechaLimite = document.getElementById('wizFechaLimite').value || '—';
-  const contraparte = document.querySelector('input[name="contrario_nombre"]').value || '';
-  const juzgado = document.querySelector('input[name="juzgado"]').value || '';
-  const honorarios = document.querySelector('input[name="honorarios_pactados"]').value || '';
-
-  let responsableEl = document.querySelector('#wizResponsableList .wiz-member.selected .wiz-member-name');
-  const responsable = responsableEl ? responsableEl.textContent.trim() : '—';
-
-  let html = `
-    <div class="wiz-summary-row"><strong><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> ${numExp}</strong> · ${ICON_SVGS[tipo.icon] || ''} ${tipo.label || ''} ${subtipo ? '/ ' + subtipo : ''} · ${prioEmoji} ${prio.charAt(0).toUpperCase()+prio.slice(1)}</div>
-    <div class="wiz-summary-row" style="font-size:.95rem;font-weight:700;color:var(--text)">${titulo}</div>
-    <div class="wiz-summary-divider"></div>
-    <div class="wiz-summary-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <strong>${cliente}</strong></div>`;
-
-  if (contraparte) html += `<div class="wiz-summary-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 8 5 12 9 8"/><polyline points="15 8 19 12 23 8"/><line x1="1" y1="8" x2="23" y2="8"/></svg> vs. ${contraparte}</div>`;
-  if (juzgado) html += `<div class="wiz-summary-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/><line x1="2" y1="18" x2="22" y2="18"/></svg> ${juzgado}</div>`;
-
-  html += `<div class="wiz-summary-divider"></div>`;
-  html += `<div class="wiz-summary-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Inicio: ${fechaInicio} ${fechaLimite !== '—' ? ' → Límite: ' + fechaLimite : ''}</div>`;
-
-  if (honorarios) html += `<div class="wiz-summary-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> $${parseFloat(honorarios).toLocaleString()} MXN</div>`;
-
-  html += `<div class="wiz-summary-divider"></div>`;
-  html += `<div class="wiz-summary-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <strong>${responsable}</strong> (responsable)</div>`;
-
-  document.getElementById('wizSummaryContent').innerHTML = html;
-}
-
-/* ── Create Asunto ──────────────────── */
-async function createAsunto() {
-  if (!validateStep(3)) { showStep(3); return; }
-  if (!WIZ.responsableId) {
-    alert('Selecciona un abogado responsable');
-    return;
-  }
-
-  const btn = document.getElementById('wizBtnCreate');
-  btn.disabled = true;
-  btn.innerHTML = '<svg class="emc-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Creando...';
-
-  // Submit via regular form
-  const form = document.getElementById('wizForm');
-  form.method = 'POST';
-  form.action = '{{ url_for("asuntos.nuevo") }}';
-  form.onsubmit = null;
-  form.submit();
-}
-
-/* ── Init ────────────────────────────── */
-selectTipo('civil');
-
-// No beforeunload — the form submit handles navigation cleanly
-
-/* ── Modal crear cliente rápido ──────── */
-function abrirModalCrearCliente(nombreInicial) {
-  document.getElementById('qcNombre').value = nombreInicial || '';
-  document.getElementById('qcTipo').value = 'persona_fisica';
-  document.getElementById('qcTelefono').value = '';
-  document.getElementById('qcEmail').value = '';
-  document.getElementById('qcRFC').value = '';
-  const btn = document.querySelector('.modal-btn-primary');
-  btn.textContent = 'Crear y vincular';
-  btn.disabled = false;
-  document.getElementById('modalCrearCliente').classList.add('open');
-  setTimeout(() => document.getElementById('qcNombre').focus(), 100);
-}
-
-function cerrarModalCliente() {
-  document.getElementById('modalCrearCliente').classList.remove('open');
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('modalCrearCliente').addEventListener('click', function(e) {
-    if (e.target === this) cerrarModalCliente();
-  });
-});
-
-async function guardarClienteRapido() {
-  const nombreInput = document.getElementById('qcNombre');
-  const nombre = nombreInput.value.trim();
-  if (!nombre) {
-    nombreInput.style.borderColor = '#EF4444';
-    nombreInput.focus();
-    return;
-  }
-  nombreInput.style.borderColor = '';
-
-  const btn = document.querySelector('.modal-btn-primary');
-  btn.textContent = 'Creando...';
-  btn.disabled = true;
-
-  const resp = await fetch('/clientes/crear-rapido', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
-    },
-    body: JSON.stringify({
-      nombre: nombre,
-      tipo: document.getElementById('qcTipo').value,
-      telefono: document.getElementById('qcTelefono').value,
-      email: document.getElementById('qcEmail').value,
-      rfc: document.getElementById('qcRFC').value.toUpperCase()
-    })
-  });
-
-  const data = await resp.json();
-  if (data.ok) {
-    const color = '#00DFA2';
-    const initials = nombre.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    pickCliente(data.id, data.nombre, color, initials);
-    cerrarModalCliente();
-  } else {
-    btn.textContent = 'Crear y vincular';
-    btn.disabled = false;
-    alert(data.error || 'Error al crear el cliente');
-  }
-}
-</script>
-
-<!-- Modal: Crear cliente rápido -->
-<div class="modal-overlay" id="modalCrearCliente">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h2 class="modal-title">Crear cliente rápido</h2>
-      <button class="modal-close" onclick="cerrarModalCliente()">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-field">
-        <label class="modal-label">Nombre completo *</label>
-        <input type="text" id="qcNombre" class="modal-input" placeholder="Ej. Marco Antonio Ramírez Herrera">
-      </div>
-      <div class="modal-row">
-        <div class="modal-field">
-          <label class="modal-label">Tipo de cliente</label>
-          <select id="qcTipo" class="modal-input">
-            <option value="persona_fisica">Persona Física</option>
-            <option value="persona_moral">Persona Moral</option>
+        <div>
+          <label class="as-label" for="anResp">Abogado responsable</label>
+          <select class="as-select" id="anResp" name="abogado_responsable">
+            {% set resp_sel = (f.get('abogado_responsable') or session.get('user_id')) | string %}
+            {% for a in abogados %}<option value="{{ a.id }}"{% if resp_sel == a.id | string %} selected{% endif %}>{{ a.nombre }} {{ a.apellidos }}</option>{% endfor %}
           </select>
         </div>
-        <div class="modal-field">
-          <label class="modal-label">Teléfono</label>
-          <input type="text" id="qcTelefono" class="modal-input" placeholder="443 000 0000">
+        <div>
+          <span class="as-label">Prioridad</span>
+          <div class="an-seg">
+            {% set prio = f.get('prioridad') or 'media' %}
+            {% for v, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<label><input type="radio" name="prioridad" value="{{ v }}"{% if prio == v %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}
+          </div>
+        </div>
+        <div>
+          <span class="as-label">Estado</span>
+          <div class="an-seg">
+            {% set est = f.get('estado') or 'activo' %}
+            {% for v, l in [('activo','Ya empezó'),('por_iniciar','Por iniciar')] %}<label><input type="radio" name="estado" value="{{ v }}"{% if est == v %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}
+          </div>
+        </div>
+        <div class="full">
+          <label class="as-label" for="anDesc">Hechos <small>(opcional)</small></label>
+          <textarea class="as-textarea" id="anDesc" name="descripcion" rows="3" maxlength="5000" placeholder="En pocas líneas: qué pasó y qué quiere lograr el cliente.">{{ f.get('descripcion', '') }}</textarea>
         </div>
       </div>
-      <div class="modal-field">
-        <label class="modal-label">Correo electrónico</label>
-        <input type="email" id="qcEmail" class="modal-input" placeholder="correo@ejemplo.com">
+    </section>
+
+    <section class="an-sec">
+      <h2><i>3</i>El juicio <span class="as-muted" style="font:500 13px Inter">(opcional)</span></h2>
+      <div class="an-body">
+        <div>
+          <label class="as-label" for="anExp">Expediente interno</label>
+          <input class="as-input" id="anExp" name="numero_expediente" maxlength="60" value="{{ f.get('numero_expediente', '') }}" placeholder="{{ auto_num }}">
+          <small class="as-muted" style="display:block;font-size:12px;margin-top:5px">Si lo dejas vacío se asigna {{ auto_num }}.</small>
+        </div>
+        <div>
+          <label class="as-label" for="anJuicio">Número de juicio <small>(del juzgado)</small></label>
+          <input class="as-input" id="anJuicio" name="numero_juicio" maxlength="60" value="{{ f.get('numero_juicio', '') }}" placeholder="Ej. 1234/2026">
+        </div>
+        <div class="full">
+          <label class="as-label" for="anJuz">Juzgado o autoridad</label>
+          <input class="as-input" id="anJuz" name="juzgado" maxlength="200" value="{{ f.get('juzgado', '') }}" placeholder="Ej. Juzgado Décimo de lo Civil de la CDMX">
+        </div>
+        <div>
+          <label class="as-label" for="anIni">Fecha de inicio</label>
+          <input class="as-input" type="date" id="anIni" name="fecha_inicio" value="{{ f.get('fecha_inicio') or today_str }}">
+        </div>
+        <div>
+          <label class="as-label" for="anLim">Fecha límite <small>(si ya la conoces)</small></label>
+          <input class="as-input" type="date" id="anLim" name="fecha_limite" value="{{ f.get('fecha_limite', '') }}">
+        </div>
+        <div class="full">
+          <label class="as-label" for="anCon">Contraparte</label>
+          <input class="as-input" id="anCon" name="contrario_nombre" maxlength="200" value="{{ f.get('contrario_nombre', '') }}" placeholder="Nombre de la persona o empresa contraria">
+        </div>
+        <div>
+          <label class="as-label" for="anConAb">Su abogado</label>
+          <input class="as-input" id="anConAb" name="contrario_abogado" maxlength="200" value="{{ f.get('contrario_abogado', '') }}">
+        </div>
+        <div>
+          <label class="as-label" for="anConDes">Su despacho</label>
+          <input class="as-input" id="anConDes" name="contrario_despacho" maxlength="200" value="{{ f.get('contrario_despacho', '') }}">
+        </div>
       </div>
-      <div class="modal-field">
-        <label class="modal-label">RFC</label>
-        <input type="text" id="qcRFC" class="modal-input" placeholder="XXXX000000XXX" style="text-transform:uppercase">
+    </section>
+
+    <section class="an-sec">
+      <h2><i>4</i>Honorarios y equipo <span class="as-muted" style="font:500 13px Inter">(opcional)</span></h2>
+      <div class="an-body">
+        <div>
+          <label class="as-label" for="anHon">Honorarios pactados</label>
+          <input class="as-input" type="number" min="0" step="0.01" id="anHon" name="honorarios_pactados" value="{{ f.get('honorarios_pactados', '') }}" placeholder="$0.00">
+        </div>
+        <div>
+          <label class="as-label" for="anForma">Forma de cobro</label>
+          <select class="as-select" id="anForma" name="forma_cobro">
+            {% for v, l in [('fijo','Cuota fija'),('por_hora','Por hora'),('por_evento','Por etapa o evento')] %}<option value="{{ v }}"{% if f.get('forma_cobro') == v %} selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="as-label" for="anMonto">Monto en litigio</label>
+          <input class="as-input" type="number" min="0" step="0.01" id="anMonto" name="monto_estimado" value="{{ f.get('monto_estimado', '') }}" placeholder="$0.00">
+        </div>
+        <div></div>
+        {% if abogados | length > 1 %}
+        <div class="full">
+          <span class="as-label">¿Quién más colabora?</span>
+          <div class="an-colabs">
+            {% set colabs = f.getlist('colaboradores') if f.getlist is defined else [] %}
+            {% for a in abogados %}<label data-colab="{{ a.id }}"><input type="checkbox" name="colaboradores" value="{{ a.id }}"{% if a.id | string in colabs %} checked{% endif %}>{{ a.nombre }} {{ a.apellidos }}</label>{% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        <label class="an-priv full">
+          <input type="checkbox" name="privado" value="1"{% if f.get('privado') %} checked{% endif %}>
+          <span><b>Asunto privado</b><small>{{ config.ASISTENTE_NOMBRE }} nunca enviará información de este asunto fuera del servidor del despacho. Recomendado para asuntos penales.</small></span>
+        </label>
+      </div>
+    </section>
+
+    <div class="an-pie">
+      <small>Podrás agregar documentos, audiencias y notas en cuanto lo crees.</small>
+      <div style="display:flex;gap:8px">
+        <a class="btn btn-ghost" href="{{ url_for('asuntos.index') }}">Cancelar</a>
+        <button class="btn btn-primary" id="anCrear">Crear asunto</button>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="modal-btn-cancel" onclick="cerrarModalCliente()">Cancelar</button>
-      <button class="modal-btn-primary" onclick="guardarClienteRapido()">Crear y vincular</button>
-    </div>
-  </div>
+  </form>
 </div>
+{% endblock %}
 
-<style>
-.modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.65);
-  backdrop-filter: blur(4px);
-  z-index: 9999;
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-.modal-overlay.open { display: flex; }
+{% block scripts %}
+<script>
+(() => {
+  const TIPOS = {{ tipos_derecho | tojson }};
+  const PLANTILLAS = {{ plantillas | tojson }};
+  const tipo = document.getElementById('anTipo'), sub = document.getElementById('anSub');
+  const cajaSub = document.getElementById('anSubtipos'), titulo = document.getElementById('anTitulo');
+  const desc = document.getElementById('anDesc'), privado = document.querySelector('input[name=privado]');
+  let privadoTocado = false;
+  privado.addEventListener('change', () => privadoTocado = true);
 
-.modal-box {
-  background: #1C2630;
-  border: 1px solid rgba(0,223,162,0.15);
-  border-radius: 10px;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-  overflow: hidden;
-}
+  function pintarSubtipos() {
+    cajaSub.innerHTML = '';
+    (TIPOS[tipo.value]?.subtypes || []).forEach(st => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = st; b.classList.toggle('on', sub.value === st);
+      b.addEventListener('click', () => { sub.value = sub.value === st ? '' : st; pintarSubtipos(); });
+      cajaSub.append(b);
+    });
+  }
 
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 24px;
-  border-bottom: 0.5px solid rgba(0,223,162,0.08);
-}
-.modal-title {
-  font-family: 'Merriweather', serif;
-  font-size: 18px;
-  font-weight: 300;
-  color: #EAF0EC;
-}
-.modal-close {
-  background: none; border: none;
-  color: #8A9BA8; font-size: 22px;
-  cursor: pointer; line-height: 1;
-  padding: 0 4px;
-  transition: color 0.15s;
-}
-.modal-close:hover { color: #EAF0EC; }
+  document.getElementById('anMaterias').addEventListener('click', e => {
+    const b = e.target.closest('.an-materia'); if (!b) return;
+    const cambio = tipo.value !== b.dataset.tipo;
+    tipo.value = b.dataset.tipo;
+    document.querySelectorAll('.an-materia').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
+    if (cambio) sub.value = '';
+    pintarSubtipos();
+    const p = PLANTILLAS[tipo.value] || {};
+    titulo.placeholder = p.titulo_ejemplo || 'Título del asunto';
+    if (p.descripcion && !desc.value.trim()) desc.placeholder = p.descripcion.trim();
+    if (!privadoTocado) privado.checked = tipo.value === 'penal';
+  });
 
-.modal-body {
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.modal-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.modal-field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.modal-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 8px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: #8A9BA8;
-}
-.modal-input {
-  background: #080C10;
-  border: 1px solid rgba(0,223,162,0.1);
-  border-radius: 6px;
-  color: #EAF0EC;
-  font-family: 'DM Mono', monospace;
-  font-size: 12px;
-  padding: 9px 12px;
-  transition: border-color 0.15s;
-  width: 100%;
-}
-.modal-input:focus {
-  outline: none;
-  border-color: rgba(0,223,162,0.4);
-  box-shadow: 0 0 0 3px rgba(0,223,162,0.06);
-}
-.modal-input::placeholder { color: #8A9BA8; opacity: 0.5; }
+  // Quien es responsable no aparece como colaborador.
+  const resp = document.getElementById('anResp');
+  function ocultarResp() {
+    document.querySelectorAll('[data-colab]').forEach(l => {
+      const es = l.dataset.colab === resp.value;
+      l.hidden = es; if (es) l.querySelector('input').checked = false;
+    });
+  }
+  resp.addEventListener('change', ocultarResp); ocultarResp();
 
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  border-top: 0.5px solid rgba(0,223,162,0.08);
-}
-.modal-btn-cancel {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px; letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: transparent;
-  border: 0.5px solid rgba(0,223,162,0.15);
-  color: #8A9BA8; padding: 8px 18px;
-  border-radius: 6px; cursor: pointer;
-  transition: all 0.15s;
-}
-.modal-btn-cancel:hover {
-  border-color: rgba(0,223,162,0.3);
-  color: #EAF0EC;
-}
-.modal-btn-primary {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px; letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: #00DFA2; color: #080C10;
-  border: none; padding: 8px 20px;
-  border-radius: 6px; cursor: pointer;
-  font-weight: 500; transition: background 0.15s;
-}
-.modal-btn-primary:hover { background: #00B882; }
-</style>
+  document.getElementById('anForm').addEventListener('submit', e => {
+    if (!titulo.value.trim()) { e.preventDefault(); titulo.focus(); showToast('Escribe un título para el asunto', 'error'); return; }
+    document.getElementById('anCrear').disabled = true;
+  });
+  pintarSubtipos();
+})();
+</script>
 {% endblock %}

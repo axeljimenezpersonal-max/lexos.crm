@@ -228,6 +228,11 @@ def create_app(env="default"):
     from modules.equipo       import equipo_bp
     from modules.correo       import correo_bp
     from modules.contrapartes import contrapartes_bp
+    from modules.boveda import boveda_bp
+    from modules.lector import lector_bp
+    from modules.corpus import corpus_bp
+    from modules.asistente import asistente_bp
+    from modules.insights import insights_bp
 
     app.register_blueprint(auth_bp,         url_prefix="/auth")
     app.register_blueprint(dashboard_bp,    url_prefix="/")
@@ -244,6 +249,11 @@ def create_app(env="default"):
     app.register_blueprint(equipo_bp,       url_prefix="/configuracion/equipo")
     app.register_blueprint(correo_bp,       url_prefix="/correo")
     app.register_blueprint(contrapartes_bp, url_prefix="/contrapartes")
+    app.register_blueprint(boveda_bp)
+    app.register_blueprint(lector_bp, url_prefix="/lector")
+    app.register_blueprint(corpus_bp, url_prefix="/base-legal")
+    app.register_blueprint(asistente_bp, url_prefix="/asistente")
+    app.register_blueprint(insights_bp, url_prefix="/precedentes")
 
     return app
 

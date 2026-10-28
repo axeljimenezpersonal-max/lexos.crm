@@ -27,15 +27,19 @@ calendario_bp = Blueprint("calendario", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 TIPOS_EVENTO = {
-    "audiencia":    {"label": "Audiencia",              "color": "#3B82F6", "icon": "gavel"},
-    "reunion":      {"label": "Reunión con cliente",    "color": "#8B5CF6", "icon": "users"},
-    "vencimiento":  {"label": "Vencimiento de término", "color": "#F59E0B", "icon": "clock"},
-    "diligencia":   {"label": "Diligencia",             "color": "#F97316", "icon": "flag"},
-    "fecha_limite": {"label": "Fecha límite crítica",   "color": "#EF4444", "icon": "alert_triangle"},
-    "recordatorio": {"label": "Recordatorio interno",   "color": "#6B7280", "icon": "bell"},
-    "tarea":        {"label": "Tarea",                  "color": "#10B981", "icon": "check_circle"},
-    "otro":         {"label": "Otro",                   "color": "#9CA3AF", "icon": "more_vertical"},
+    "audiencia":    {"label": "Audiencia",            "color": "#1D3FD6", "icon": "gavel"},
+    "vencimiento":  {"label": "Término",              "color": "#DC2626", "icon": "clock"},
+    "fecha_limite": {"label": "Fecha límite crítica", "color": "#991B1B", "icon": "alert_triangle"},
+    "diligencia":   {"label": "Diligencia",           "color": "#4F46E5", "icon": "flag"},
+    "reunion":      {"label": "Reunión",              "color": "#0284C7", "icon": "users"},
+    "tarea":        {"label": "Tarea",                "color": "#047857", "icon": "check_circle"},
+    "recordatorio": {"label": "Recordatorio",         "color": "#64708A", "icon": "bell"},
+    "otro":         {"label": "Otro",                 "color": "#64748B", "icon": "more_vertical"},
+    # Tipo heredado de versiones anteriores: se muestra como término pero no se ofrece al crear.
+    "plazo":        {"label": "Término",              "color": "#DC2626", "icon": "clock", "oculto": True},
 }
+
+TERMINO_TIPOS = ("vencimiento", "fecha_limite", "plazo")
 
 RECURRENCIAS = ["none", "diario", "semanal", "mensual", "anual"]
 
@@ -169,8 +173,37 @@ def index():
     except Exception:
         pass
 
+    terminos = []
+    marcas = ",".join("?" * len(TERMINO_TIPOS))
+    for r in tdb.execute(
+        f"""SELECT e.id, e.titulo, e.fecha_inicio, a.titulo AS asunto, a.numero_expediente
+            FROM eventos_calendario e LEFT JOIN asuntos a ON a.id = e.asunto_id
+            WHERE e.estado = 'pendiente' AND e.tipo IN ({marcas})
+              AND date(e.fecha_inicio) <= date('now', '+21 days')
+            ORDER BY date(e.fecha_inicio) LIMIT 8""",
+        TERMINO_TIPOS,
+    ).fetchall():
+        try:
+            dias = (date.fromisoformat(str(r["fecha_inicio"])[:10]) - today).days
+        except ValueError:
+            continue
+        if dias < 0:
+            cuando, tono = ("Vencido" if dias < -1 else "Venció ayer"), "red"
+        elif dias == 0:
+            cuando, tono = "Hoy", "red"
+        elif dias == 1:
+            cuando, tono = "Mañana", "red"
+        else:
+            cuando, tono = f"En {dias} días", ("amb" if dias <= 5 else "grn")
+        terminos.append({
+            "id": r["id"], "titulo": r["titulo"], "fecha": str(r["fecha_inicio"])[:10],
+            "detalle": r["numero_expediente"] or r["asunto"] or "",
+            "cuando": cuando, "tono": tono,
+        })
+
     return render_template(
         "calendario/index.html",
+        terminos=terminos,
         tipos_evento=TIPOS_EVENTO,
         recurrencias=RECURRENCIAS,
         recordatorio_opciones=RECORDATORIO_OPCIONES,
@@ -266,7 +299,7 @@ def ajax_crear():
         return jsonify(ok=False, error="La fecha de inicio es requerida"), 400
 
     tipo         = data.get("tipo", "otro")
-    if tipo not in TIPOS_EVENTO:
+    if tipo not in TIPOS_EVENTO or TIPOS_EVENTO[tipo].get("oculto"):
         tipo = "otro"
     color_custom = data.get("color_custom") or None
     recurrencia  = data.get("recurrencia", "none")
@@ -381,6 +414,10 @@ def ajax_editar(id: int):
         "titulo", "descripcion", "tipo", "color_custom", "asunto_id", "cliente_id",
         "fecha_inicio", "fecha_fin", "todo_el_dia", "recurrencia", "lugar", "recordatorio",
     }
+    if "todo_dia" in data:
+        data["todo_el_dia"] = 1 if data.pop("todo_dia") else 0
+    if "tipo" in data and data["tipo"] not in TIPOS_EVENTO:
+        data["tipo"] = "otro"
     sets, vals = [], []
     for k, v in data.items():
         if k in campos_permitidos:

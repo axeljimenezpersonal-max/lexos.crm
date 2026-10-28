@@ -1,10 +1,12 @@
+{% from "components/logo.html" import logo_mark %}
 {% from "components/icons.html" import icon, icon_lightbulb, icon_check_circle %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Configuración inicial — Códex</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/favicon.svg') }}">
+  <title>Configuración inicial — Habeas Corpus</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
   <style>
@@ -289,16 +291,8 @@
   <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
   <aside class="tour-sidebar">
     <div class="ts-brand">
-      <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
-        <rect x="2" y="4" width="28" height="24" rx="2" fill="none" stroke="#B8922A" stroke-width="1.5" opacity="0.9"/>
-        <line x1="16" y1="4" x2="16" y2="28" stroke="#B8922A" stroke-width="1.5" opacity="0.9"/>
-        <line x1="5.5" y1="11" x2="13" y2="11" stroke="white" stroke-width="1.2" opacity="0.65"/>
-        <line x1="5.5" y1="15" x2="13" y2="15" stroke="white" stroke-width="1.2" opacity="0.65"/>
-        <line x1="19" y1="11" x2="26.5" y2="11" stroke="white" stroke-width="1.2" opacity="0.65"/>
-        <line x1="19" y1="15" x2="26.5" y2="15" stroke="white" stroke-width="1.2" opacity="0.65"/>
-        <circle cx="16" cy="4" r="2" fill="#B8922A"/>
-      </svg>
-      <div class="ts-brand-name">Códe<span style="color:#B8922A;">x</span></div>
+      {{ logo_mark(28) }}
+      <div class="ts-brand-name">Habeas <span style="font-weight:400;">Corpus</span></div>
     </div>
 
     <!-- Progress global -->

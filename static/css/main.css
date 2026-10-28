@@ -8,39 +8,41 @@
 
 /* ── Variables ─────────────────────────────────────────────── */
 :root {
-  /* ── MARCA CODEX — Navy Premium ── */
-  --e:    #1B3A6B;   /* Navy — acento principal */
-  --ed:   #142D52;   /* Navy oscuro — hover */
-  --ex:   rgba(27,58,107,0.06);
-  --e10:  rgba(27,58,107,0.10);
-  --e20:  rgba(27,58,107,0.20);
-  --e04:  rgba(27,58,107,0.04);
-  --edim: rgba(27,58,107,0.08);
+  /* ── MARCA HABEAS CORPUS ── */
+  --e:    #1D3FD6;   /* Azul cobalto — acento principal */
+  --ed:   #1734B5;   /* Cobalto oscuro — hover */
+  --ex:   rgba(29,63,214,0.06);
+  --e10:  rgba(29,63,214,0.10);
+  --e20:  rgba(29,63,214,0.20);
+  --e04:  rgba(29,63,214,0.04);
+  --edim: #EEF2FF;
+  --tinta: #0A1A4A;
+  --cielo: #5BC0FF;
 
   /* ── FONDOS ── */
-  --n:    #F8FAFC;   /* Fondo de página */
+  --n:    #F6F7FB;   /* Fondo de página */
   --c:    #FFFFFF;   /* Fondo de tarjeta */
-  --c2:   #F1F5F9;   /* Inputs, superficies secundarias */
+  --c2:   #F2F4F9;   /* Inputs, superficies secundarias */
 
   /* ── TEXTO ── */
   --fog:  #0F172A;   /* Texto principal */
-  --ash:  #64748B;   /* Texto secundario */
-  --w:    #F8FAFC;
+  --ash:  #64708A;   /* Texto secundario */
+  --w:    #F6F7FB;
 
-  /* ── ACENTO DORADO ── */
-  --gold: #B8922A;
-  --gold-s: rgba(184,146,42,0.12);
+  /* ── ACENTO SECUNDARIO (se conserva el nombre por compatibilidad) ── */
+  --gold: #5BC0FF;
+  --gold-s: rgba(91,192,255,0.14);
 
-  /* ── SEMÁFOROS (ajustados para fondo claro) ── */
-  --ok:   #059669;
-  --warn: #D97706;
+  /* ── SEMÁFOROS ── */
+  --ok:   #047857;
+  --warn: #B45309;
   --danger: #DC2626;
-  --info: #2563EB;
+  --info: #1D3FD6;
 
   /* ── BORDES ── */
-  --border:   rgba(15,23,42,0.08);
-  --border-m: rgba(15,23,42,0.14);
-  --border-e: rgba(15,23,42,0.24);
+  --border:   #E5E8F0;
+  --border-m: #D3D9E6;
+  --border-e: #B9C1D6;
 
   /* ── ESPACIADO ── */
   --r-sm: 4px;
@@ -295,15 +297,6 @@ button, input, select, textarea { font-family: inherit; }
   background: var(--e10);
   color: var(--e);
   font-weight: 600;
-}
-.nav-item.active::after {
-  content: '';
-  position: absolute;
-  left: 20%; right: 20%;
-  bottom: -6px;
-  height: 2px;
-  background: var(--e);
-  border-radius: 2px 2px 0 0;
 }
 .nav-icon {
   width: 16px; height: 16px;
@@ -712,15 +705,8 @@ button, input, select, textarea { font-family: inherit; }
   border: none; cursor: pointer; transition: all var(--transition);
   white-space: nowrap; line-height: 1;
 }
-.btn-primary {
-  background: var(--e); color: #FFFFFF;
-  font-family: 'DM Mono', monospace;
-  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500;
-}
-.btn-primary:hover {
-  background: var(--ed); color: #FFFFFF;
-  transform: translateY(-1px); box-shadow: 0 4px 12px rgba(27,58,107,0.25);
-}
+.btn-primary { background: var(--e); color: #FFFFFF; }
+.btn-primary:hover { background: var(--ed); color: #FFFFFF; }
 .btn-secondary { background: var(--c); color: var(--fog); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--e04); color: var(--e); border-color: var(--border-m); }
 .btn-success { background: var(--ok); color: #fff; }
@@ -1073,15 +1059,12 @@ tbody td strong, tbody td a { color: var(--fog); }
   .topbar-nav.mobile-open .topbar-nav-scroll { flex-direction: column; align-items: stretch; padding: 4px 0 8px; }
   .topbar-nav.mobile-open .nav-item { padding: 10px 14px; border-radius: var(--r-sm); }
   .topbar-nav.mobile-open .nav-item.active::after { display: none; }
-  .main-content { margin-top: 54px; }
-  .page { padding: 16px; }
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
   .col-span-2, .col-span-3 { grid-column: span 1; }
   .page-header { flex-wrap: wrap; }
   .filters { flex-wrap: wrap; }
   .tb-search-btn { min-width: 120px; }
-  .tb-search-placeholder { display: none; }
   .tb-ai-btn { display: none; }
   .tb-brand-text { display: none; }
   .fab-wrap { bottom: 20px; right: 16px; }

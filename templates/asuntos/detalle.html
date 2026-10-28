@@ -1,1213 +1,679 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import icon %}
 {% block title %}{{ asunto.titulo }}{% endblock %}
 {% block page_title %}{{ asunto.titulo | truncate(40) }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/asunto_detalle.css') }}">
 {% endblock %}
+
+{% macro ic(n, s=16) -%}
+<svg width="{{ s }}" height="{{ s }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if n == 'user' %}<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+{%- elif n == 'gavel' %}<path d="m14 13-7.5 7.5a2.12 2.12 0 0 1-3-3L11 10M16 16l6-6M8 8l6-6M9 7l8 8M21 11l-8-8"/>
+{%- elif n == 'vs' %}<path d="M17 3v18M7 21V3M3 7l4-4 4 4M13 17l4 4 4-4"/>
+{%- elif n == 'note' %}<path d="M4 4h16v12l-4 4H4z"/><path d="M16 20v-4h4M8 9h8M8 13h5"/>
+{%- elif n == 'cal' %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
+{%- elif n == 'clock' %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- elif n == 'doc' %}<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>
+{%- elif n == 'scale' %}<path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z"/>
+{%- elif n == 'link' %}<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>
+{%- elif n == 'spark' %}<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/>
+{%- elif n == 'pen' %}<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>
+{%- elif n == 'more' %}<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>
+{%- elif n == 'down' %}<path d="m6 9 6 6 6-6"/>
+{%- elif n == 'check' %}<path d="m5 12 5 5 9-10"/>
+{%- elif n == 'lock' %}<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+{%- elif n == 'archive' %}<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>
+{%- endif %}</svg>
+{%- endmacro %}
+
+{% macro avatar(p, cls='') -%}
+{% if p %}<span class="as-av {{ cls }}" style="background:{{ p.color }}" title="{{ p.nombre }}">{{ p.iniciales }}</span>{% endif %}
+{%- endmacro %}
+
 {% block content %}
-<script>document.querySelector('.page').classList.add('page-fullbleed');</script>
-{% set ti = asunto.tipo_info %}
-{% set hon_pactados = asunto.honorarios_pactados or 0 %}
-{% set hon_cobrado  = cobros_resumen.pagado or 0 %}
-{% set hon_pend     = (hon_pactados - hon_cobrado) if hon_pactados > 0 else (cobros_resumen.pendiente or 0) %}
-{% set hon_pct      = ((hon_cobrado / hon_pactados * 100) | int) if hon_pactados > 0 else 0 %}
-{% set is_admin     = user_role in ('super_admin', 'admin', 'socio') %}
-{% set st           = col_a_stats %}
+{% set ti = asunto.tipo_info %}{% set ei = asunto.estado_info %}
+<nav class="af-migas"><a href="{{ url_for('asuntos.index') }}">Asuntos</a> / {{ asunto.numero_expediente or 'Sin expediente' }}</nav>
 
-<div class="ad-layout">
+<header class="af-head">
+  <div class="af-top">
+    <div style="flex:1;min-width:260px">
+      <div class="af-meta">
+        <span class="as-chip" style="--c-c:{{ ti.color }};--c-f:color-mix(in srgb, {{ ti.color }} 10%, #fff)"><span class="as-dot" style="--d:{{ ti.color }}"></span>{{ ti.label }}</span>
+        {% if asunto.sub_tipo %}<span class="as-chip">{{ asunto.sub_tipo }}</span>{% endif %}
+        {% if asunto.privado %}<span class="as-chip" style="--c-c:#991B1B;--c-f:#FEF2F2" title="{{ config.ASISTENTE_NOMBRE }} nunca envía información de este asunto fuera del servidor">{{ ic('lock', 12) }} Privado</span>{% endif %}
+        {% if asunto.prioridad == 'alta' %}<span class="as-chip" style="--c-c:#DC2626;--c-f:#FEF2F2">Prioridad alta</span>{% endif %}
+      </div>
+      <h1 class="af-title" id="afTitulo"{% if puede_editar %} contenteditable="true" spellcheck="false" title="Clic para editar"{% endif %}>{{ asunto.titulo }}</h1>
+      <div class="af-datos">
+        <span>{{ ic('user', 15) }}{% if asunto.cliente_id and asunto.cliente %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">{{ asunto.cliente }}</a>{% else %}<span class="as-muted">Sin cliente</span>{% endif %}</span>
+        {% if asunto.juzgado %}<span>{{ ic('gavel', 15) }}{{ asunto.juzgado }}</span>{% endif %}
+        {% if asunto.contrario_nombre %}<span>{{ ic('vs', 15) }}vs. {{ asunto.contrario_nombre }}</span>{% endif %}
+        <span>{{ avatar(responsable) }}{{ responsable.nombre if responsable else 'Sin responsable' }}</span>
+      </div>
+    </div>
 
-  <!-- ══ COLUMNA IZQUIERDA — CONTENIDO PRINCIPAL ══ -->
-  <div class="ad-main">
-
-    <!-- HEADER -->
-    <div class="ad-header">
-      <!-- Banda de color por estado -->
-      <div class="ad-band ad-band-{{ asunto.estado }}"></div>
-
-      <div class="ad-header-inner">
-        <!-- Fila superior -->
-        <div class="ad-top">
-          <div class="ad-top-left">
-            <div class="ad-exp">
-              {{ asunto.numero_expediente }}{% if asunto.tipo_asunto %} · {{ asunto.tipo_asunto }}{% endif %}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo }}{% endif %}
-            </div>
-            <h1 class="ad-title" id="adTitle" onclick="startEditTitle()" title="Click para editar">{{ asunto.titulo }}</h1>
-            <!-- Etiquetas -->
-            <div class="ad-tags" id="tagsRow">
-              {% for et in etiquetas %}
-              <span class="ad-tag-chip" style="--tc:{{ et.color }}">
-                {{ et.nombre }}<button class="ad-tag-remove" onclick="removeTag('{{ et.id }}',this.parentElement)">×</button>
-              </span>
-              {% endfor %}
-              <button class="ad-tag-add" id="tagAddBtn" onclick="toggleTagDropdown(event)">+ etiqueta</button>
-              <div class="tag-dropdown" id="tagDropdown">
-                <input type="text" placeholder="Nueva etiqueta…" id="tagInput" class="tag-input" maxlength="30">
-                <div class="tag-colors">
-                  <span class="tc selected" style="background:#00DFA2" onclick="selectColor('#00DFA2',this)"></span>
-                  <span class="tc" style="background:#3B8BD4" onclick="selectColor('#3B8BD4',this)"></span>
-                  <span class="tc" style="background:#F59E0B" onclick="selectColor('#F59E0B',this)"></span>
-                  <span class="tc" style="background:#EF4444" onclick="selectColor('#EF4444',this)"></span>
-                  <span class="tc" style="background:#8B5CF6" onclick="selectColor('#8B5CF6',this)"></span>
-                  <span class="tc" style="background:#EC4899" onclick="selectColor('#EC4899',this)"></span>
-                </div>
-                <button class="tag-create-btn" onclick="createTag()">Crear</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="ad-top-right">
-            <!-- Estado -->
-            <div class="ad-estado-badge ad-estado-{{ asunto.estado }}" onclick="toggleStatusMenu()">
-              {{ asunto.estado | replace('_',' ') | upper }}
-            </div>
-            <!-- Vencimiento -->
-            {% if asunto.semaforo %}
-            <div class="ad-vence">
-              <span class="ad-vdot ad-vdot-{{ asunto.semaforo.clase }}"></span>
-              {% if asunto.semaforo.dias %}Vence en {{ asunto.semaforo.dias }}d{% else %}{{ asunto.semaforo.label }}{% endif %}
-            </div>
-            {% endif %}
-            <!-- Acciones -->
-            <div class="ad-acciones">
-              <a href="{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}" class="ad-btn" target="_blank">PDF</a>
-              <div class="ad-mas-wrap">
-                <button class="ad-btn" onclick="toggleMasOpciones(event)">⋯</button>
-                <div class="ad-mas-menu" id="adMasMenu">
-                  <div class="ad-mas-title">Acciones del expediente</div>
-                  {% if es_responsable %}
-                  <button class="ad-mas-opt" onclick="abrirEditarAsunto()">
-                    <div class="ad-mas-dot" style="background:#00DFA2"></div>
-                    <span class="ad-mas-label">Editar datos del asunto</span>
-                  </button>
-                  {% endif %}
-                  <button class="ad-mas-opt"
-                          onclick="window.location.href='{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}'">
-                    <div class="ad-mas-dot" style="background:#3B8BD4"></div>
-                    <span class="ad-mas-label">Exportar PDF</span>
-                  </button>
-                  <button class="ad-mas-opt" onclick="copiarEnlace()">
-                    <div class="ad-mas-dot" style="background:#8A9BA8"></div>
-                    <span class="ad-mas-label">Copiar enlace</span>
-                  </button>
-                  <div class="ad-mas-sep"></div>
-                  {% if es_responsable %}
-                  <button class="ad-mas-opt ad-mas-danger" onclick="confirmarEliminar()">
-                    <div class="ad-mas-dot" style="background:#EF4444"></div>
-                    <span class="ad-mas-label">Eliminar asunto</span>
-                  </button>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-          </div>
+    <div class="af-acc">
+      <div class="af-estado">
+        <button type="button" class="af-estado-btn" id="afEstadoBtn" style="--c-c:{{ ei.color }};--c-f:{{ ei.fondo }}"{% if not puede_editar %} disabled{% endif %} aria-haspopup="true">
+          <span class="as-dot" style="--d:{{ ei.color }}"></span>{{ ei.label }}{% if puede_editar %} {{ ic('down', 14) }}{% endif %}
+        </button>
+        {% if puede_editar %}
+        <div class="af-menu" id="afEstadoMenu" role="menu">
+          {% for k in estados_menu %}{% set e = estados[k] %}
+          <button type="button" data-estado="{{ k }}" role="menuitem"><span class="as-dot" style="--d:{{ e.color }}"></span>{{ e.label }}{% if asunto.estado == k or (k == 'cerrado' and asunto.estado == 'completado') %}<span class="ok">{{ ic('check', 14) }}</span>{% endif %}</button>
+          {% endfor %}
         </div>
-
-        <!-- Fila de stats -->
-        <div class="ad-stats">
-          <div class="ad-stat">
-            <span class="ad-stat-v">{{ st.dias_activo if st.dias_activo is not none else '—' }}</span>
-            <span class="ad-stat-l">Días activo</span>
-          </div>
-          <div class="ad-stat">
-            <span class="ad-stat-v ad-stat-pendiente">${{ hon_pend | int }}</span>
-            <span class="ad-stat-l">Pendiente</span>
-            {% if hon_pactados > 0 %}
-            <span class="ad-stat-sub">{{ hon_pct }}% cobrado</span>
-            {% endif %}
-          </div>
-          <div class="ad-stat">
-            <span class="ad-stat-v">{{ tareas_pend | length }}</span>
-            <span class="ad-stat-l">Próx. actividades</span>
-          </div>
-          <div class="ad-stat ad-stat-editable" style="text-align:left;" onclick="editarJuzgado()" title="Click para editar">
-            <span class="ad-stat-v ad-stat-v-sm" id="adStatJuzgado" data-val="{{ asunto.juzgado or '' }}">{{ asunto.juzgado or '—' }}</span>
-            <span class="ad-stat-l">Juzgado <span class="ad-stat-edit-hint">✎</span></span>
-          </div>
+        {% endif %}
+      </div>
+      <a class="btn btn-secondary" href="{{ url_for('asistente.index', asunto=asunto.id) }}">{{ ic('spark', 15) }} Preguntar a {{ config.ASISTENTE_NOMBRE }}</a>
+      <a class="btn btn-secondary" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 15) }} Generar escrito</a>
+      <div class="af-estado">
+        <button type="button" class="btn btn-ghost" id="afMasBtn" aria-label="Más acciones" aria-haspopup="true" style="padding:9px 10px">{{ ic('more', 16) }}</button>
+        <div class="af-menu" id="afMasMenu" role="menu">
+          <a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">{{ ic('cal', 15) }} Agendar audiencia o término</a>
+          <a href="{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}">{{ ic('doc', 15) }} Descargar resumen en PDF</a>
+          <button type="button" id="afCopiar">{{ ic('link', 15) }} Copiar enlace</button>
+          {% if session.get('role') in ('super_admin', 'admin', 'abogado') %}
+          <button type="button" id="afPrivado" data-privado="{{ 1 if asunto.privado else 0 }}">{{ ic('lock', 15) }} {{ 'Quitar privado' if asunto.privado else 'Marcar como privado' }}</button>
+          {% endif %}
+          {% if puede_editar and asunto.estado != 'archivado' %}
+          <hr><button type="button" class="peligro" id="afArchivar">{{ ic('archive', 15) }} Archivar asunto</button>
+          {% endif %}
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Tabs -->
-      <div class="ad-tabs">
-        <a class="ad-tab active" href="#" onclick="filterTimeline('all',this);return false;">
-          Todos <span class="tab-counter" id="tc-all">{{ tl_counts.all }}</span>
-        </a>
-        <a class="ad-tab" href="#" onclick="filterTimeline('nota',this);return false;">
-          Notas <span class="tab-counter {% if not tl_counts.nota %}tc-zero{% endif %}" id="tc-nota">{{ tl_counts.nota }}</span>
-        </a>
-        <a class="ad-tab" href="#" onclick="filterTimeline('documento',this);return false;">
-          Docs <span class="tab-counter {% if not tl_counts.documento %}tc-zero{% endif %}" id="tc-documento">{{ tl_counts.documento }}</span>
-        </a>
-        <a class="ad-tab" href="#" onclick="filterTimeline('actividad',this);return false;">
-          Actividades <span class="tab-counter {% if not tl_counts.actividad %}tc-zero{% endif %}" id="tc-actividad">{{ tl_counts.actividad }}</span>
-        </a>
-        <a class="ad-tab" href="#" onclick="filterTimeline('sentencia',this);return false;">
-          Sentencias <span class="tab-counter {% if not tl_counts.sentencia %}tc-zero{% endif %}" id="tc-sentencia">{{ tl_counts.sentencia }}</span>
-        </a>
-        <a class="ad-tab" href="#" onclick="filterTimeline('llamada',this);return false;">
-          Llamadas <span class="tab-counter {% if not tl_counts.llamada %}tc-zero{% endif %}" id="tc-llamada">{{ tl_counts.llamada }}</span>
-        </a>
-        <a class="ad-tab" href="#" onclick="filterTimeline('cambio_estatus',this);return false;">
-          Cambios <span class="tab-counter {% if not tl_counts.cambio_estatus %}tc-zero{% endif %}" id="tc-cambio_estatus">{{ tl_counts.cambio_estatus }}</span>
-        </a>
-      </div>{# /ad-tabs #}
-    </div>{# /ad-header #}
+  <div class="af-strip">
+    <div class="{{ proximo.semaforo if proximo }}">
+      <small>Lo que sigue</small>
+      {% if proximo %}<b>{{ proximo.tipo }} · {{ proximo.corta }}</b><span>{{ proximo.cuando }} · {{ proximo.titulo | truncate(38) }}</span>
+      {% elif abierto %}<b>Nada agendado</b><span><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}" style="color:var(--e);font-weight:600;text-decoration:none">Agendar en el calendario</a></span>
+      {% else %}<b>{{ ei.label }}</b><span>{{ (asunto.fecha_cierre or '')[:10] or 'Sin fecha de cierre' }}</span>{% endif %}
+    </div>
+    <div>
+      <small>{{ 'Tiempo en curso' if abierto else 'Duró' }}</small>
+      {% if dias_llevamos is not none %}
+        {% if dias_llevamos >= 60 %}<b>{{ (dias_llevamos / 30.44) | round(1) }} meses</b>{% else %}<b>{{ dias_llevamos }} días</b>{% endif %}
+        <span>desde el {{ (asunto.fecha_inicio or '')[:10] }}</span>
+      {% else %}<b>—</b><span>sin fecha de inicio</span>{% endif %}
+    </div>
+    <div>
+      <small>Honorarios cobrados</small>
+      {% if dinero.pactados or dinero.facturado %}
+        <b>${{ '{:,.0f}'.format(dinero.cobrado) }} <small style="display:inline;font:500 13px Inter;color:var(--ash)">de ${{ '{:,.0f}'.format(dinero.pactados or dinero.facturado) }}</small></b>
+        <div class="af-bar"><i style="width:{{ dinero.pct }}%"></i></div>
+      {% else %}<b>—</b><span>sin honorarios pactados</span>{% endif %}
+    </div>
+    <div>
+      <small>Horas registradas</small>
+      <b>{{ horas_total | round(1) }} h</b><span>{{ horas | length }} registro{{ 's' if horas | length != 1 }}</span>
+    </div>
+  </div>
+</header>
 
-    <!-- TIMELINE -->
-    <div class="ad-content" id="tlFeed">
-      {% if grupos %}
-        {% for grupo in grupos %}
-        <div class="tl-date-sep"><span>{{ grupo.label }}</span></div>
-        {% for item in grupo.registros %}
-        <div class="tl-item" data-tipo="{{ item.tipo }}" data-id="{{ item.id }}">
-          <div class="tl-left">
-            <div class="tl-avatar" style="background:{{ item.tl_av_bg }};color:{{ item.tl_color }}">
-              {{ item.iniciales }}
-            </div>
-            {% if not loop.last %}<div class="tl-line" style="background:{{ item.tl_color }}"></div>{% endif %}
+<div class="af-grid">
+  <main class="as-card" style="min-width:0">
+    <div class="af-tabs" role="tablist">
+      {% set ns = namespace(n=0) %}{% for gr in bitacora %}{% set ns.n = ns.n + gr['items'] | length %}{% endfor %}
+      <button class="af-tab on" data-tab="actividad" role="tab">Actividad<span>{{ ns.n }}</span></button>
+      <button class="af-tab" data-tab="documentos" role="tab">Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
+      <button class="af-tab" data-tab="datos" role="tab">Datos del asunto</button>
+      <button class="af-tab" data-tab="estrategia" role="tab">Estrategia</button>
+      <button class="af-tab" data-tab="horas" role="tab">Horas<span>{{ horas_total | round(1) }}</span></button>
+    </div>
+
+    <!-- ── Actividad ──────────────────────────────────────────────── -->
+    <section class="af-panel on" id="p-actividad" role="tabpanel">
+      <div class="af-comp">
+        <div class="af-comp-tabs">
+          <button type="button" class="on" data-comp="nota">{{ ic('note', 14) }} Nota</button>
+          <button type="button" data-comp="actividad">{{ ic('cal', 14) }} Audiencia o pendiente</button>
+          <button type="button" data-comp="horas">{{ ic('clock', 14) }} Horas</button>
+        </div>
+        <form class="af-comp-b on" data-comp="nota" id="fNota">
+          <textarea name="contenido" rows="3" maxlength="5000" placeholder="Escribe una nota: qué pasó, qué acordaron, qué sigue…" required></textarea>
+          <div class="af-comp-f"><small>Solo la ve el equipo del despacho.</small><button class="btn btn-primary btn-sm">Guardar nota</button></div>
+        </form>
+        <form class="af-comp-b" data-comp="actividad" id="fActividad">
+          <div class="af-row">
+            <div style="grid-column:span 2"><label class="as-label" for="acTitulo">Qué es</label><input class="as-input" id="acTitulo" name="titulo" required maxlength="200" placeholder="Ej. Audiencia de pruebas y alegatos"></div>
+            <div><label class="as-label" for="acTipo">Tipo</label>
+              <select class="as-select" id="acTipo" name="tipo">
+                {% for t in tipos_actividad %}<option value="{{ t }}"{% if t == 'audiencia' %} selected{% endif %}>{{ actividad_label[t] }}</option>{% endfor %}
+              </select></div>
+            <div><label class="as-label" for="acFecha">Cuándo</label><input class="as-input" id="acFecha" name="fecha" type="datetime-local" required></div>
           </div>
-          <div class="tl-card {{ item.tl_cls }}">
-            <div class="tl-header">
-              <div class="tl-meta">
-                <span class="tl-who">{{ item.autor_nombre or 'Sistema' }}</span>
-                <span class="tl-dot">·</span>
-                <span class="tl-time">{{ item.tl_hora or '' }}</span>
-              </div>
-              <span class="tl-badge" style="background:{{ item.tl_badge_bg }};color:{{ item.tl_color }}">{{ item.tl_badge }}</span>
+          <textarea name="descripcion" rows="2" maxlength="2000" placeholder="Detalles (opcional): sala, qué llevar, quién asiste…"></textarea>
+          <div class="af-comp-f">
+            <label class="af-check"><input type="checkbox" name="crear_evento" checked> Agregar también al calendario</label>
+            <button class="btn btn-primary btn-sm">Agregar</button>
+          </div>
+        </form>
+        <form class="af-comp-b" data-comp="horas" id="fHoras">
+          <div class="af-row">
+            <div><label class="as-label" for="hrHoras">Horas</label><input class="as-input" id="hrHoras" name="horas" type="number" min="0.1" max="24" step="0.1" required placeholder="1.5"></div>
+            <div><label class="as-label" for="hrFecha">Fecha</label><input class="as-input" id="hrFecha" name="fecha" type="date" value="{{ today_str }}"></div>
+            <div style="grid-column:span 2"><label class="as-label" for="hrDesc">En qué</label><input class="as-input" id="hrDesc" name="descripcion" maxlength="300" placeholder="Ej. Redacción de contestación de demanda"></div>
+          </div>
+          <div class="af-comp-f"><small>Se suman a las horas del asunto.</small><button class="btn btn-primary btn-sm">Registrar horas</button></div>
+        </form>
+      </div>
+
+      <div class="af-filtros" id="afFiltros">
+        <button type="button" class="on" data-f="">Todo</button>
+        <button type="button" data-f="nota">Notas</button>
+        <button type="button" data-f="actividad">Audiencias y pendientes</button>
+        <button type="button" data-f="documento">Documentos</button>
+        <button type="button" data-f="sentencia">Resoluciones</button>
+      </div>
+
+      {% set colores = {'nota': ('#EEF2FF','#1D3FD6'), 'actividad': ('#FFF7ED','#C2410C'), 'documento': ('#ECFEFF','#0E7490'), 'sentencia': ('#F5F3FF','#6D28D9'), 'sistema': ('#F1F5F9','#64708A')} %}
+      {% set ico_tipo = {'nota': 'note', 'documento': 'doc', 'sentencia': 'scale'} %}
+      {% set clave_sentido = {'Favorable': 'favorable', 'Parcial': 'parcial', 'Desfavorable': 'desfavorable'} %}
+      <div id="afBitacora">
+      {% for grupo in bitacora %}
+        <div class="af-dia">{{ grupo.etiqueta }}</div>
+        {% for it in grupo['items'] %}
+        {% set c = colores[it.tipo] %}
+        <div class="af-it {{ it.tipo }}{% if it.realizado %} hecho{% endif %}" data-tipo="{{ it.tipo }}" style="--ib:{{ c[0] }};--ic:{{ c[1] }}">
+          {% if it.tipo == 'sistema' %}
+            <span class="af-ico">{{ avatar(it.autor) }}</span>
+          {% elif it.tipo == 'actividad' %}
+            <span class="af-ico"><button type="button" class="af-tick{% if it.realizado %} on{% endif %}" data-act="{{ it.id }}" aria-label="{{ 'Marcar como pendiente' if it.realizado else 'Marcar como hecho' }}" title="{{ 'Hecho' if it.realizado else 'Marcar como hecho' }}">{% if it.realizado %}{{ ic('check', 12) }}{% endif %}</button></span>
+          {% else %}
+            <span class="af-ico">{{ ic(ico_tipo[it.tipo], 15) }}</span>
+          {% endif %}
+          <div class="af-it-b">
+            <div class="af-it-h">
+              {% if it.etiqueta %}<em>{{ it.etiqueta }}</em>{% endif %}
+              {% if it.titulo %}<b>{{ it.titulo }}</b>{% elif it.tipo == 'nota' %}<b>{{ it.autor.nombre }}</b>{% endif %}
+              {% if it.sentido %}{% set rs = resultados[clave_sentido[it.sentido]] %}<span class="as-chip" style="--c-c:{{ rs.color }};--c-f:{{ rs.fondo }}">{{ it.sentido }}</span>{% endif %}
+              <small>{{ it.hora }}</small>
             </div>
-            {% if item.titulo %}<div class="tl-title">{{ item.titulo }}</div>{% endif %}
-            {% if item.contenido %}
-            <div class="tl-body{% if item.contenido|length > 200 %} truncated{% endif %}">{{ item.contenido }}</div>
-            {% if item.contenido|length > 200 %}
-            <button class="tl-expand" onclick="this.previousElementSibling.classList.toggle('truncated');this.textContent=this.textContent=='Ver más'?'Ver menos':'Ver más'">Ver más</button>
-            {% endif %}
-            {% endif %}
-            {% if item.tipo in ('documento','sentencia') and item.metadata %}
-            <div class="ad-tl-doc">
-              <span>📄</span>
-              <a href="{{ item.metadata.archivo_url or item.metadata.url or '#' }}" target="_blank" class="tl-doc-name">{{ item.metadata.archivo_nombre or item.titulo }}</a>
-              {% if item.metadata.tamanio %}<span class="tl-doc-size">{{ item.metadata.tamanio }}</span>{% endif %}
-            </div>
-            {% endif %}
-            {% if item.tipo == 'nota' and item.metadata and item.metadata.menciones %}
-            <div class="ad-tl-mentions">
-              {% for m in item.metadata.menciones %}<span class="ad-tl-mention">@{{ m }}</span>{% endfor %}
-            </div>
-            {% endif %}
-            {% if item.tipo == 'actividad' %}
-            <div class="tl-actions">
-              {% if not item.realizado %}
-              <button class="ad-tl-action-btn tl-action" onclick="marcarRealizado('{{ item.id }}',true,this)">✓ Marcar realizado</button>
-              {% else %}
-              <span class="tl-action" style="color:#00DFA2;border-color:rgba(0,223,162,0.2);cursor:default">✓ Realizado</span>
-              {% endif %}
-            </div>
-            {% endif %}
-            {% if item.tipo == 'nota' %}
-            <div class="tl-actions">
-              <span class="tl-action" onclick="editarNota({{ item.id }})">Editar</span>
-              <span class="tl-action tl-action-danger" onclick="eliminarNota({{ item.id }})">Eliminar</span>
-            </div>
-            {% endif %}
+            {% if it.tipo == 'actividad' and it.fecha_evento %}<div class="quien">Para el {{ it.fecha_evento }}</div>{% endif %}
+            {% if it.texto %}<p>{{ it.texto }}</p>{% endif %}
+            {% if it.url %}<a class="archivo" href="{{ it.url }}" target="_blank" rel="noopener">{{ ic('doc', 13) }} Abrir archivo</a>{% endif %}
+            {% if it.tipo != 'nota' %}<div class="quien">{{ it.autor.nombre }}</div>{% endif %}
           </div>
         </div>
-        {% endfor %}
         {% endfor %}
       {% else %}
-      <div class="ad-tl-empty">
-        <div class="ad-tl-empty-icon">○</div>
-        <div class="ad-tl-empty-text">Sin actividad registrada</div>
-        <div class="ad-tl-empty-hint">Usa el botón + para agregar notas, documentos o actividades</div>
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- FAB anclado al fondo de la columna de contenido -->
-    <div class="fab-wrap" id="fabContainer">
-      <div style="position:relative;">
-
-        <!-- Popup de formularios -->
-        <div class="fab-popup" id="fabPopup" style="display:none;width:320px;margin-bottom:8px;">
-          <div class="fab-popup-header">
-            <span id="fabPopupTitle" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#EAF0EC;"></span>
-            <button onclick="closeFab()" style="background:none;border:none;color:#8A9BA8;cursor:pointer;font-size:18px;line-height:1;padding:0;margin-left:auto;">×</button>
-          </div>
-          <div id="fabStep2">
-
-            <!-- NOTA -->
-            <div id="fabForm-nota" style="display:none">
-              <div class="fab-form-body">
-                <label class="fab-label">Escribe tu nota aquí:</label>
-                <textarea class="fab-textarea" id="fabNotaContenido" rows="6"
-                  placeholder="Escribe aquí el contenido de la nota. Puedes usar @nombre para mencionar a un colega del equipo."></textarea>
-                <div id="mentionDD" class="mention-dd" style="display:none"></div>
-              </div>
-              <div class="fab-form-footer">
-                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
-                <button class="fab-submit" onclick="fabGuardarNota()">Guardar nota</button>
-              </div>
-            </div>
-
-            <!-- ACTIVIDAD -->
-            <div id="fabForm-actividad" style="display:none">
-              <div class="fab-form-body">
-                <label class="fab-label">Tipo de actividad:</label>
-                <select class="fab-select" id="fabActTipo">
-                  {% for t in tipos_actividad %}<option value="{{ t.value }}">{{ t.label }}</option>{% endfor %}
-                </select>
-                <label class="fab-label" style="margin-top:8px;">Título o descripción breve:</label>
-                <input type="text" class="fab-input" id="fabActTitulo" placeholder="Ej: Audiencia inicial, Reunión con cliente…">
-                <div class="fab-row" style="margin-top:8px;">
-                  <div style="flex:1;">
-                    <label class="fab-label">Fecha y hora:</label>
-                    <input type="datetime-local" class="fab-input" id="fabActFecha" value="{{ today_str }}">
-                  </div>
-                  <div style="flex:1;">
-                    <label class="fab-label">Lugar (opcional):</label>
-                    <input type="text" class="fab-input" id="fabActLugar" placeholder="Ej: Juzgado 5, Oficina...">
-                  </div>
-                </div>
-                <label class="fab-label" style="margin-top:8px;">Notas adicionales:</label>
-                <textarea class="fab-textarea" id="fabActDesc" rows="2" placeholder="Detalles adicionales sobre la actividad (opcional)"></textarea>
-                <label class="fab-check" style="margin-top:8px;"><input type="checkbox" id="fabActEvento"> Agregar también al calendario</label>
-              </div>
-              <div class="fab-form-footer">
-                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
-                <button class="fab-submit" onclick="fabGuardarActividad()">Guardar actividad</button>
-              </div>
-            </div>
-
-            <!-- DOCUMENTO -->
-            <div id="fabForm-documento" style="display:none">
-              <div class="fab-form-body">
-                <label class="fab-label">Selecciona o arrastra el archivo:</label>
-                <div class="fab-dropzone" id="fabDropzone"
-                     ondragover="event.preventDefault();this.classList.add('drag-over')"
-                     ondragleave="this.classList.remove('drag-over')"
-                     ondrop="fabHandleDrop(event)">
-                  <input type="file" id="fabFileInput" multiple style="display:none" onchange="fabHandleFiles(this.files)">
-                  <div onclick="document.getElementById('fabFileInput').click()" style="cursor:pointer;text-align:center;">
-                    <div style="font-size:28px;margin-bottom:8px;">⬆</div>
-                    <div style="font-family:'DM Mono',monospace;font-size:9px;color:#8A9BA8;letter-spacing:0.1em;">Haz clic aquí o arrastra el archivo</div>
-                  </div>
-                  <div id="fabUploadProgress" style="display:none;margin-top:12px;width:100%;">
-                    <div style="height:2px;background:rgba(0,223,162,0.1);border-radius:1px;">
-                      <div id="fabProgressBar" style="height:100%;background:#00DFA2;width:0;transition:width 0.3s;"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- LLAMADA -->
-            <div id="fabForm-llamada" style="display:none">
-              <div class="fab-form-body">
-                <label class="fab-label">¿Con quién fue la llamada?</label>
-                <input type="text" class="fab-input" id="fabLlamadaCon" placeholder="Nombre del cliente, contraparte u otro contacto">
-                <div class="fab-row" style="margin-top:8px;">
-                  <div style="flex:1;">
-                    <label class="fab-label">Duración aproximada:</label>
-                    <input type="text" class="fab-input" id="fabLlamadaDuracion" placeholder="Ej: 15 minutos, 1 hora">
-                  </div>
-                  <div style="flex:1;">
-                    <label class="fab-label">Resultado:</label>
-                    <select class="fab-select" id="fabLlamadaResultado">
-                      <option value="contactado">Se contactó</option>
-                      <option value="no_contesto">No contestó</option>
-                      <option value="mensaje">Dejó mensaje</option>
-                      <option value="buzon">Buzón de voz</option>
-                    </select>
-                  </div>
-                </div>
-                <label class="fab-label" style="margin-top:8px;">Resumen de la llamada:</label>
-                <textarea class="fab-textarea" id="fabLlamadaNotas" rows="4"
-                  placeholder="Escribe aquí el resumen de lo que se habló en la llamada…"></textarea>
-              </div>
-              <div class="fab-form-footer">
-                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
-                <button class="fab-submit" onclick="fabGuardarLlamada()">Guardar llamada</button>
-              </div>
-            </div>
-
-            <!-- CORREO -->
-            <div id="fabForm-correo" style="display:none">
-              <div class="fab-form-body">
-                <label class="fab-label">Asunto del correo:</label>
-                <input type="text" class="fab-input" id="fabCorreoAsunto" placeholder="Ej: Citación a audiencia, Envío de documentos...">
-                <label class="fab-label" style="margin-top:8px;">Remitente o destinatario:</label>
-                <input type="text" class="fab-input" id="fabCorreoContacto" placeholder="Nombre o correo electrónico de la otra parte">
-                <label class="fab-label" style="margin-top:8px;">Resumen o contenido del correo:</label>
-                <textarea class="fab-textarea" id="fabCorreoContenido" rows="5"
-                  placeholder="Escribe aquí un resumen del correo enviado o recibido, o pega el contenido principal…"></textarea>
-              </div>
-              <div class="fab-form-footer">
-                <button class="fab-cancel" onclick="closeFab()">Cancelar</button>
-                <button class="fab-submit" onclick="fabGuardarCorreo()">Guardar correo</button>
-              </div>
-            </div>
-
-          </div>{# /fabStep2 #}
-        </div>{# /fab-popup #}
-
-        <!-- Menú principal -->
-        <div class="fab-menu" id="fabMenu">
-          <div class="fab-menu-header">¿Qué quieres agregar?</div>
-          <button class="fab-opt" onclick="abrirNota()">
-            <span class="fab-opt-icon" style="background:rgba(0,223,162,0.1);color:#00DFA2">✎</span>
-            <div class="fab-opt-text"><span class="fab-opt-label">Nota</span><span class="fab-opt-desc">Agregar una nota al expediente</span></div>
-          </button>
-          <button class="fab-opt" onclick="abrirActividad()">
-            <span class="fab-opt-icon" style="background:rgba(249,115,22,0.1);color:#F97316">◷</span>
-            <div class="fab-opt-text"><span class="fab-opt-label">Actividad</span><span class="fab-opt-desc">Agendar audiencia, diligencia o tarea</span></div>
-          </button>
-          <button class="fab-opt" onclick="abrirDocumento()">
-            <span class="fab-opt-icon" style="background:rgba(59,139,212,0.1);color:#3B8BD4">⬆</span>
-            <div class="fab-opt-text"><span class="fab-opt-label">Documento</span><span class="fab-opt-desc">Subir archivo al expediente</span></div>
-          </button>
-          <button class="fab-opt" onclick="abrirLlamada()">
-            <span class="fab-opt-icon" style="background:rgba(139,92,246,0.1);color:#8B5CF6">☎</span>
-            <div class="fab-opt-text"><span class="fab-opt-label">Llamada</span><span class="fab-opt-desc">Registrar llamada o contacto</span></div>
-          </button>
-          <button class="fab-opt" onclick="abrirCorreo()">
-            <span class="fab-opt-icon" style="background:rgba(0,223,162,0.1);color:#00DFA2">✉</span>
-            <div class="fab-opt-text"><span class="fab-opt-label">Correo</span><span class="fab-opt-desc">Registrar correo o comunicación</span></div>
-          </button>
-        </div>
-
-        <!-- Botón principal -->
-        <button class="fab-btn" id="fabBtn" onclick="toggleFabMenu()">
-          <span class="fab-icon">+</span>
-        </button>
-
-      </div>{# /relative wrapper #}
-    </div>{# /fab-wrap #}
-
-  </div>{# /ad-main #}
-
-  <!-- ══ COLUMNA DERECHA — SIDEBAR ══ -->
-  <aside class="ad-sidebar" id="adSidebar">
-
-    <!-- 1. Número de expediente -->
-    <div class="sb-sec">
-      <div class="sb-sec-label">Expediente</div>
-      <div style="font-family:'DM Mono',monospace;font-size:14px;color:#00DFA2;letter-spacing:0.08em;">
-        {{ asunto.numero_expediente }}
-      </div>
-      {% if asunto.numero_judicial %}
-      <div style="font-family:'DM Mono',monospace;font-size:10px;color:#8A9BA8;margin-top:4px;">
-        Judicial: {{ asunto.numero_judicial }}
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- 2. Semáforo -->
-    {% if asunto.semaforo %}
-    {% set sem_color = '#EF4444' if asunto.semaforo.clase == 'rojo' else ('#F59E0B' if asunto.semaforo.clase == 'amarillo' else '#00DFA2') %}
-    <div class="sem-indicator">
-      <div class="sem-dot {{ asunto.semaforo.clase }}" style="background:{{ sem_color }}"></div>
-      <span style="color:{{ sem_color }}">{{ asunto.semaforo.label }}</span>
-      {% if asunto.semaforo.dias %}<span style="color:#8A9BA8">· {{ asunto.semaforo.dias }}d</span>{% endif %}
-    </div>
-    {% endif %}
-
-    <!-- 3. Estado -->
-    <div class="sb-sec">
-      <div class="sb-sec-label">Estado</div>
-      <div style="position:relative;">
-        <button class="ad-status-btn st-{{ asunto.estado }}" id="statusBtn" onclick="toggleStatusMenu()">
-          <span>{{ asunto.estado | replace('_',' ') | title }}</span>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
-        </button>
-        <div class="ad-status-menu" id="statusMenu">
-          {% for col in kanban_cols %}
-          <button class="ad-status-opt" onclick="cambiarEstado('{{ col.key }}')">
-            <span class="so-dot" style="background:{{ col.color }}"></span>
-            {{ col.label }}
-            {% if asunto.estado == col.key %}<span class="so-check">✓</span>{% endif %}
-          </button>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. Prioridad -->
-    <div class="sb-sec">
-      <div class="sb-sec-label">Prioridad</div>
-      <div class="prioridad-btns">
-        <button class="prio-btn {% if asunto.prioridad == 'baja' %}active{% endif %}"
-                data-valor="baja"
-                onclick="cambiarPrioridad('baja')"
-                style="--pcolor:#00DFA2">BAJA</button>
-        <button class="prio-btn {% if asunto.prioridad == 'media' %}active{% endif %}"
-                data-valor="media"
-                onclick="cambiarPrioridad('media')"
-                style="--pcolor:#F59E0B">MEDIA</button>
-        <button class="prio-btn {% if asunto.prioridad == 'alta' %}active{% endif %}"
-                data-valor="alta"
-                onclick="cambiarPrioridad('alta')"
-                style="--pcolor:#EF4444">ALTA</button>
-      </div>
-    </div>
-
-    <!-- 5. Descripción del caso -->
-    <div class="sb-sec">
-      <div class="sb-sec-label">Descripción del caso</div>
-      <textarea class="caso-desc-input"
-                id="casoDescripcion"
-                placeholder="Describe brevemente los hechos y el estado actual del caso…"
-                maxlength="1000"
-                oninput="onDescInput()"
-                onblur="guardarDescripcion()">{{ asunto.descripcion or '' }}</textarea>
-      <div class="desc-counter">
-        <span id="descCount">{{ (asunto.descripcion or '') | length }}</span>/1000
-      </div>
-    </div>
-
-    <!-- 6. Equipo a cargo -->
-    <div class="sb-sec">
-      <div class="sb-sec-label">Equipo a cargo</div>
-      {% if abogado_resp %}
-      <div class="equipo-item">
-        <div class="eq-avatar">{{ (abogado_resp.nombre or '?')[0] | upper }}</div>
-        <div class="eq-info">
-          <div class="eq-nombre">{{ abogado_resp.nombre }} {{ abogado_resp.apellidos or '' }}</div>
-          <div class="eq-rol">Responsable</div>
-        </div>
-        {% if is_admin %}
-        <div class="ctx-tm-menu-wrap">
-          <button class="ctx-tm-dots" onclick="toggleTeamMenu(this)">⋮</button>
-          <div class="ctx-tm-menu">
-            {% for a in abogados %}{% if a.id != abogado_resp.id %}
-            <button class="ctx-tm-opt" onclick="cambiarResponsable('{{ a.id }}','{{ a.nombre }} {{ a.apellidos or '' }}')">→ {{ a.nombre }} {{ a.apellidos or '' }}</button>
-            {% endif %}{% endfor %}
-          </div>
-        </div>
-        {% endif %}
-      </div>
-      {% endif %}
-      {% for c in colaboradores %}
-      <div class="equipo-item">
-        <div class="eq-avatar">{{ (c.nombre or '?')[0] | upper }}</div>
-        <div class="eq-info">
-          <div class="eq-nombre">{{ c.nombre }} {{ c.apellidos or '' }}</div>
-          <div class="eq-rol">Colaborador</div>
-        </div>
-        {% if is_admin %}
-        <button class="eq-remove" onclick="quitarMiembro('{{ c.id }}','{{ c.nombre }} {{ c.apellidos or '' }}')" title="Remover">×</button>
-        {% endif %}
-      </div>
+        <p class="as-empty" style="margin-top:14px">Todavía no hay actividad. Escribe la primera nota o agenda la siguiente audiencia.</p>
       {% endfor %}
-      {% if is_admin %}
-      <button class="eq-agregar-btn" onclick="toggleAddColaborador()">
-        <span>+</span> Agregar colaborador
-      </button>
-      <div id="addColabWrap" style="display:none;margin-top:8px;">
-        <select class="eq-search-input" id="addColabSelect">
-          <option value="">Seleccionar abogado…</option>
-          {% for a in abogados %}
-          <option value="{{ a.id }}">{{ a.nombre }} {{ a.apellidos or '' }}</option>
-          {% endfor %}
-        </select>
-        <button class="ctx-add-confirm" onclick="addColaborador()" style="margin-top:6px;">Agregar</button>
       </div>
-      {% endif %}
-    </div>
+    </section>
 
-    <!-- 7. Cliente -->
-    {% if asunto.cid %}
-    <div class="sb-sec">
-      <div class="sb-sec-label">Cliente</div>
-      <div class="ctx-client">
-        <div class="ctx-client-top">
-          <div class="ctx-client-avatar" style="background:hsl({{ (asunto.cid | string | length * 47) % 360 }},35%,20%)">
-            {{ (asunto.cliente_razon or asunto.cliente_nombre or '?')[0] | upper }}
-          </div>
-          <div style="min-width:0;flex:1;">
-            <a href="{{ url_for('clientes.detalle', id=asunto.cid) }}" class="ctx-client-name-link">{{ asunto.cliente_razon or asunto.cliente_nombre }}</a>
-            {% if asunto.cliente_tipo %}<div class="ctx-client-tipo">{{ asunto.cliente_tipo }}</div>{% endif %}
-          </div>
+    <!-- ── Documentos ─────────────────────────────────────────────── -->
+    <section class="af-panel" id="p-documentos" role="tabpanel">
+      <div class="af-docs-h"><h4>Documentos del expediente</h4>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 13) }} Generar desde machote</a></div>
+      {% for d in documentos %}
+      {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+      <div class="af-doc">
+        <span class="af-ext {{ d.ext }}">{{ d.ext or 'doc' }}</span>
+        <div class="af-doc-b">
+          {% if enlace %}<a href="{{ d.archivo_url }}" target="_blank" rel="noopener">{{ d.nombre }}</a>{% else %}<b>{{ d.nombre }}</b>{% endif %}
+          <small>{{ d.dia }}{% if d.autor %} · {{ d.autor }}{% endif %}{% if d.tamanio %} · {{ (d.tamanio / 1024) | round | int }} KB{% endif %}</small>
         </div>
-        {% if asunto.cliente_email %}
-        <div class="ctx-contact-row">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
-          <span>{{ asunto.cliente_email }}</span>
-        </div>
-        {% endif %}
-        {% if asunto.cliente_celular %}
-        <div class="ctx-contact-row">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
-          <span>{{ asunto.cliente_celular }}</span>
-        </div>
-        {% endif %}
-        <a href="{{ url_for('clientes.detalle', id=asunto.cid) }}" class="ver-ficha-btn">
-          Ver ficha completa →
-        </a>
+        {% if enlace %}<a class="btn btn-ghost btn-sm" href="{{ d.archivo_url }}?descargar=1">Descargar</a>{% endif %}
       </div>
-    </div>
-    {% else %}
-    <div class="sb-sec">
-      <div class="sb-sec-label">Cliente</div>
-      <span style="font-family:'DM Mono',monospace;font-size:9px;color:#8A9BA8;">Sin cliente asignado</span>
-    </div>
-    {% endif %}
+      {% else %}<p class="as-empty">Aún no hay documentos en este asunto.</p>{% endfor %}
+      <label class="af-drop" id="afDrop">
+        <input type="file" id="afArchivo" hidden multiple>
+        <b>Arrastra archivos aquí</b> o haz clic para subirlos · Se guardan cifrados y se agregan a la memoria del despacho
+      </label>
 
-    <!-- 8. Cobranzas -->
-    <div class="sb-sec">
-      <div class="sb-sec-label">Cobranzas</div>
-      <div class="sb-kpis">
-        <div class="sb-kpi">
-          <span class="sb-kpi-v">${{ (cobros_resumen.total or 0) | int }}</span>
-          <span class="sb-kpi-l">Total</span>
-        </div>
-        <div class="sb-kpi">
-          <span class="sb-kpi-v" style="color:#00DFA2">${{ (cobros_resumen.pagado or 0) | int }}</span>
-          <span class="sb-kpi-l">Pagado</span>
-        </div>
-        <div class="sb-kpi">
-          <span class="sb-kpi-v" style="color:{% if hon_pend > 0 %}#F59E0B{% else %}#8A9BA8{% endif %}">${{ hon_pend | int }}</span>
-          <span class="sb-kpi-l">Pendiente</span>
+      <div class="af-docs-h" style="margin-top:24px"><h4>Resoluciones y sentencias</h4>
+        <button type="button" class="btn btn-secondary btn-sm" id="afNuevaRes">+ Agregar resolución</button></div>
+      {% for s in sentencias %}
+      <div class="af-doc">
+        <span class="af-ext" style="background:#F5F3FF;color:#6D28D9">{{ ic('scale', 16) }}</span>
+        <div class="af-doc-b">
+          {% if s.archivo_url and s.archivo_url.startswith('/archivos/') %}<a href="{{ s.archivo_url }}" target="_blank" rel="noopener">{{ s.titulo }}</a>{% else %}<b>{{ s.titulo }}</b>{% endif %}
+          <small>{{ s.etiqueta }}{% if s.fecha_emision %} · {{ s.fecha_emision[:10] }}{% endif %}{% if s.sentido_label %} · {{ s.sentido_label }}{% endif %}</small>
         </div>
       </div>
-      {% if hon_pactados > 0 %}
-      <div class="ctx-cobro-bar" style="margin-top:10px;">
-        <div class="ctx-cobro-fill" style="width:{{ hon_pct }}%"></div>
-      </div>
-      {% endif %}
-      {% for c in cobros[:3] %}
-      <div class="ctx-cobro-row">
-        <span class="ctx-cobro-folio">{{ c.folio }}</span>
-        <span class="ctx-cobro-monto">${{ c.monto | int }}</span>
-        <span class="badge-est est-{{ c.estado }}">{{ c.estado | upper }}</span>
-      </div>
-      {% endfor %}
-      <a href="{{ url_for('cobranzas.index') }}" class="ctx-add-btn" style="margin-top:8px;display:block;">+ Crear cobro</a>
-    </div>
+      {% else %}<p class="as-empty">Sin resoluciones registradas. Anotar si fueron favorables alimenta los precedentes del despacho.</p>{% endfor %}
+    </section>
 
-  </aside>{# /ad-sidebar #}
-</div>{# /ad-layout #}
+    <!-- ── Datos ──────────────────────────────────────────────────── -->
+    <section class="af-panel" id="p-datos" role="tabpanel">
+      <form class="af-form" id="fDatos">
+        <h4>El asunto</h4>
+        <div><label class="as-label" for="dTipo">Materia</label>
+          <select class="as-select" id="dTipo" name="tipo_asunto">{% for k, t in tipos_derecho.items() %}<option value="{{ k }}"{% if asunto.tipo_asunto == k %} selected{% endif %}>{{ t.label }}</option>{% endfor %}</select></div>
+        <div><label class="as-label" for="dSub">Tipo de juicio o trámite</label><input class="as-input" id="dSub" name="sub_tipo" value="{{ asunto.sub_tipo or '' }}" list="dSubOpc" maxlength="80"><datalist id="dSubOpc">{% for st in ti.subtypes %}<option value="{{ st }}">{% endfor %}</datalist></div>
+        <div><label class="as-label" for="dCliente">Cliente</label>
+          <select class="as-select" id="dCliente" name="cliente_id"><option value="">Sin cliente</option>{% for c in clientes %}<option value="{{ c.id }}"{% if asunto.cliente_id == c.id %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}</select></div>
+        <div><label class="as-label" for="dPrioridad">Prioridad</label>
+          <select class="as-select" id="dPrioridad" name="prioridad">{% for p, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<option value="{{ p }}"{% if asunto.prioridad == p %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+        <div><label class="as-label" for="dIni">Fecha de inicio</label><input class="as-input" type="date" id="dIni" name="fecha_inicio" value="{{ (asunto.fecha_inicio or '')[:10] }}"></div>
+        <div><label class="as-label" for="dLim">Fecha límite <small>(si la hay)</small></label><input class="as-input" type="date" id="dLim" name="fecha_limite" value="{{ (asunto.fecha_limite or '')[:10] }}"></div>
+        <div class="full"><label class="as-label" for="dDesc">Hechos y descripción</label><textarea class="as-textarea" id="dDesc" name="descripcion" rows="4" maxlength="5000">{{ asunto.descripcion or '' }}</textarea></div>
 
+        <h4>El juicio</h4>
+        <div><label class="as-label" for="dExp">Expediente interno</label><input class="as-input" id="dExp" name="numero_expediente" value="{{ asunto.numero_expediente or '' }}" maxlength="60"></div>
+        <div><label class="as-label" for="dJui">Número de juicio <small>(del juzgado)</small></label><input class="as-input" id="dJui" name="numero_juicio" value="{{ asunto.numero_juicio or '' }}" maxlength="60"></div>
+        <div class="full"><label class="as-label" for="dJuz">Juzgado o autoridad</label><input class="as-input" id="dJuz" name="juzgado" value="{{ asunto.juzgado or '' }}" maxlength="200"></div>
 
-<!-- ══ MODALS ══ -->
-<div class="lex-overlay" id="archiveModal" onclick="if(event.target===this)this.classList.remove('show')">
-  <div class="lex-modal">
-    <div class="lex-modal-header">
-      <h3 class="lex-modal-title">Archivar asunto</h3>
-      <button class="lex-modal-close" onclick="document.getElementById('archiveModal').classList.remove('show')">×</button>
-    </div>
-    <div class="lex-modal-body">
-      <p>¿Archivar <strong>{{ asunto.titulo }}</strong>?</p>
-      <p style="font-size:12px;color:#8A9BA8;margin-top:8px;">El asunto se archivará y podrás recuperarlo después.</p>
-    </div>
-    <div class="lex-modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('archiveModal').classList.remove('show')">Cancelar</button>
-      <form method="POST" action="{{ url_for('asuntos.eliminar', id=asunto.id) }}" style="display:inline;">
-        <input type="hidden" name="accion" value="archivar">
-        <button type="submit" class="btn btn-primary btn-sm">Archivar</button>
+        <h4>La contraparte</h4>
+        <div class="full"><label class="as-label" for="dCon">Nombre</label><input class="as-input" id="dCon" name="contrario_nombre" value="{{ asunto.contrario_nombre or '' }}" maxlength="200"></div>
+        <div><label class="as-label" for="dConAb">Su abogado</label><input class="as-input" id="dConAb" name="contrario_abogado" value="{{ asunto.contrario_abogado or '' }}" maxlength="200"></div>
+        <div><label class="as-label" for="dConDes">Su despacho</label><input class="as-input" id="dConDes" name="contrario_despacho" value="{{ asunto.contrario_despacho or '' }}" maxlength="200"></div>
+
+        <h4>Dinero</h4>
+        <div><label class="as-label" for="dMonto">Monto en litigio</label><input class="as-input" type="number" min="0" step="0.01" id="dMonto" name="monto_estimado" value="{{ asunto.monto_estimado or '' }}"></div>
+        <div><label class="as-label" for="dHon">Honorarios pactados</label><input class="as-input" type="number" min="0" step="0.01" id="dHon" name="honorarios_pactados" value="{{ asunto.honorarios_pactados or '' }}"></div>
+        <div><label class="as-label" for="dForma">Forma de cobro</label>
+          <select class="as-select" id="dForma" name="forma_cobro">{% for f, l in [('fijo','Cuota fija'),('por_hora','Por hora'),('por_evento','Por etapa o evento')] %}<option value="{{ f }}"{% if asunto.forma_cobro == f %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
       </form>
-    </div>
-  </div>
-</div>
+      <div class="af-guardar" id="fDatosBar"><div>Tienes cambios sin guardar <button type="button" class="btn btn-ghost btn-sm" id="fDatosDeshacer">Deshacer</button><button type="button" class="btn btn-primary btn-sm" id="fDatosGuardar">Guardar cambios</button></div></div>
+    </section>
 
-<div class="lex-overlay" id="deleteModal" onclick="if(event.target===this)this.classList.remove('show')">
-  <div class="lex-modal">
-    <div class="lex-modal-header">
-      <h3 class="lex-modal-title">Eliminar asunto</h3>
-      <button class="lex-modal-close" onclick="document.getElementById('deleteModal').classList.remove('show')">×</button>
-    </div>
-    <div class="lex-modal-body">
-      <p>Esta acción <strong>no se puede deshacer</strong>.</p>
-      <p style="font-size:12px;color:#8A9BA8;margin:10px 0 4px;">Escribe <strong style="color:#EF4444;">{{ asunto.numero_expediente or asunto.titulo[:20] }}</strong> para confirmar:</p>
-      <input type="text" class="lex-input" id="deleteConfirmInput" placeholder="Número de expediente"
-             oninput="document.getElementById('deleteConfirmBtn').disabled=this.value!=='{{ asunto.numero_expediente or asunto.titulo[:20] }}'">
-    </div>
-    <div class="lex-modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('deleteModal').classList.remove('show')">Cancelar</button>
-      <button id="deleteConfirmBtn" class="btn btn-danger btn-sm" disabled onclick="confirmarDeleteFinal()">Eliminar permanentemente</button>
-    </div>
-  </div>
-</div>
-
-<div class="lex-overlay" id="respModal" onclick="if(event.target===this)this.classList.remove('show')">
-  <div class="lex-modal">
-    <div class="lex-modal-header">
-      <h3 class="lex-modal-title">Cambiar responsable</h3>
-      <button class="lex-modal-close" onclick="document.getElementById('respModal').classList.remove('show')">×</button>
-    </div>
-    <div class="lex-modal-body">
-      <p>¿Cambiar el responsable a <strong id="respNewName"></strong>?</p>
-      <p style="font-size:12px;color:#8A9BA8;margin-top:8px;">El responsable actual pasará a ser colaborador.</p>
-    </div>
-    <div class="lex-modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('respModal').classList.remove('show')">Cancelar</button>
-      <button id="respConfirmBtn" class="btn btn-primary btn-sm" onclick="confirmarCambioResp()">Confirmar cambio</button>
-    </div>
-  </div>
-</div>
-
-<div class="lex-overlay" id="quitarModal" onclick="if(event.target===this)this.classList.remove('show')">
-  <div class="lex-modal">
-    <div class="lex-modal-header">
-      <h3 class="lex-modal-title">Quitar miembro</h3>
-      <button class="lex-modal-close" onclick="document.getElementById('quitarModal').classList.remove('show')">×</button>
-    </div>
-    <div class="lex-modal-body">
-      <p>¿Quitar a <strong id="quitarName"></strong> de este asunto?</p>
-    </div>
-    <div class="lex-modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('quitarModal').classList.remove('show')">Cancelar</button>
-      <button id="quitarConfirmBtn" class="btn btn-danger btn-sm" onclick="confirmarQuitar()">Sí, quitar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Editar datos del asunto -->
-<div class="lex-overlay" id="editAsuntoModal" onclick="if(event.target===this)this.classList.remove('show')">
-  <div class="lex-modal lex-modal-lg">
-    <div class="lex-modal-header">
-      <h3 class="lex-modal-title">Editar datos del asunto</h3>
-      <button class="lex-modal-close" onclick="document.getElementById('editAsuntoModal').classList.remove('show')">×</button>
-    </div>
-    <div class="lex-modal-body">
-      <div class="edit-grid">
-        <div class="edit-field edit-field-full">
-          <label class="edit-label">Título del asunto</label>
-          <input type="text" class="lex-input" id="editTitulo" value="{{ asunto.titulo }}">
-        </div>
-        <div class="edit-field">
-          <label class="edit-label">Tipo de asunto</label>
-          <input type="text" class="lex-input" id="editTipoAsunto" value="{{ asunto.tipo_asunto or '' }}" placeholder="Ej: Civil, Mercantil, Laboral…">
-        </div>
-        <div class="edit-field">
-          <label class="edit-label">Sub-tipo</label>
-          <input type="text" class="lex-input" id="editSubTipo" value="{{ asunto.sub_tipo or '' }}" placeholder="Ej: Divorcio, Cobro de pesos…">
-        </div>
-        <div class="edit-field">
-          <label class="edit-label">Fecha de inicio</label>
-          <input type="date" class="lex-input" id="editFechaInicio" value="{{ (asunto.fecha_inicio or '')[:10] }}">
-        </div>
-        <div class="edit-field">
-          <label class="edit-label">Fecha límite</label>
-          <input type="date" class="lex-input" id="editFechaLimite" value="{{ (asunto.fecha_limite or '')[:10] }}">
-        </div>
-        <div class="edit-field">
-          <label class="edit-label">Juzgado</label>
-          <input type="text" class="lex-input" id="editJuzgado" value="{{ asunto.juzgado or '' }}" placeholder="Ej: 5° Civil">
-        </div>
-        <div class="edit-field">
-          <label class="edit-label">Núm. de juicio</label>
-          <input type="text" class="lex-input" id="editNumeroJuicio" value="{{ asunto.numero_juicio or '' }}" placeholder="Número de expediente judicial">
-        </div>
+    <!-- ── Estrategia ─────────────────────────────────────────────── -->
+    <section class="af-panel" id="p-estrategia" role="tabpanel">
+      <p class="as-empty" style="margin-bottom:12px">La estrategia del caso en un solo lugar. Escribe un argumento o un riesgo por renglón.</p>
+      <form class="af-form" id="fFicha">
+        <div class="full"><label class="as-label" for="eObj">Qué quiere lograr el cliente</label><textarea class="as-textarea" id="eObj" name="objetivo_cliente" rows="2" maxlength="2000">{{ ficha.objetivo_cliente if ficha else '' }}</textarea></div>
+        <div><label class="as-label" for="eVia">Vía procesal</label><input class="as-input" id="eVia" name="via_procesal" maxlength="200" value="{{ ficha.via_procesal if ficha else '' }}" placeholder="Ej. Juicio ordinario mercantil"></div>
+        <div><label class="as-label">Probabilidad de éxito</label>
+          <div class="af-prob" id="eProb">{% set pv = ficha.probabilidad_exito if ficha else '' %}{% for v, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<button type="button" data-v="{{ v }}" class="{{ 'on' if pv == v }}">{{ l }}</button>{% endfor %}</div></div>
+        <div class="full"><label class="as-label" for="eJus">Por qué esa vía</label><textarea class="as-textarea" id="eJus" name="justificacion_via" rows="2" maxlength="2000">{{ ficha.justificacion_via if ficha else '' }}</textarea></div>
+        <div><label class="as-label" for="eArg">Argumentos clave</label><textarea class="as-textarea" id="eArg" name="argumentos_clave" rows="5" maxlength="4000">{{ (ficha.argumentos_clave | join('\n')) if ficha else '' }}</textarea></div>
+        <div><label class="as-label" for="eRie">Riesgos</label><textarea class="as-textarea" id="eRie" name="riesgos" rows="5" maxlength="4000">{{ (ficha.riesgos | join('\n')) if ficha else '' }}</textarea></div>
+      </form>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
+        <a href="{{ url_for('asistente.index', asunto=asunto.id) }}" style="display:inline-flex;gap:6px;align-items:center;font:600 13px Inter;color:var(--e);text-decoration:none">{{ ic('spark', 14) }} Pídele a {{ config.ASISTENTE_NOMBRE }} que revise la estrategia</a>
+        <button type="button" class="btn btn-primary btn-sm" id="fFichaGuardar">Guardar estrategia</button>
       </div>
+    </section>
+
+    <!-- ── Horas ──────────────────────────────────────────────────── -->
+    <section class="af-panel" id="p-horas" role="tabpanel">
+      <div class="af-horas-total"><b>{{ horas_total | round(1) }} h</b><span class="as-muted">registradas{% if asunto.forma_cobro == 'por_hora' %} · el asunto se cobra por hora{% endif %}</span></div>
+      {% for h in horas %}
+      <div class="af-hora"><span>{{ (h.fecha or '')[:10] }}</span><b>{{ h.horas | round(1) }} h</b><span>{{ h.descripcion or '—' }}</span><span class="as-muted">{{ h.autor }}</span></div>
+      {% else %}<p class="as-empty">Sin horas registradas. Regístralas desde la pestaña Actividad.</p>{% endfor %}
+    </section>
+  </main>
+
+  <aside class="af-side">
+    <section class="as-card">
+      <div class="as-card-h"><h3>Próximo</h3><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">+ Agendar</a></div>
+      <div class="as-card-b">
+        {% for e in eventos %}
+        <div class="af-pend"><div class="af-fecha"><b>{{ e.dia.split(' ')[0] }}</b><small>{{ e.dia.split(' ')[1] }}</small></div>
+          <div class="af-pend-b"><b>{{ e.titulo }}</b><small>{{ e.etiqueta }}{% if e.hora and e.hora != '00:00' %} · {{ e.hora }}{% endif %}{% if e.lugar %} · {{ e.lugar }}{% endif %}</small></div></div>
+        {% endfor %}
+        {% for t in pendientes %}
+        <div class="af-pend">
+          <button type="button" class="af-tick" data-act="{{ t.id }}" aria-label="Marcar como hecho" title="Marcar como hecho"></button>
+          <div class="af-pend-b"><b>{{ t.titulo }}</b><small class="{{ t.semaforo }}">{{ t.etiqueta }}{% if t.cuando %} · {{ t.cuando }}{% endif %}</small></div></div>
+        {% endfor %}
+        {% if not eventos and not pendientes %}<p class="as-empty">Nada agendado para este asunto.</p>{% endif %}
+      </div>
+    </section>
+
+    {% if not abierto or asunto.resultado %}
+    <section class="as-card">
+      <div class="as-card-h"><h3>Resultado</h3></div>
+      <div class="as-card-b">
+        <div class="as-res" id="pcRes">
+          {% for clave, info in resultados.items() %}<button type="button" data-res="{{ clave }}" class="{{ 'on' if asunto.resultado == clave }}" style="--rc:{{ info.color }};--rf:{{ info.fondo }}">{{ info.label }}</button>{% endfor %}
+        </div>
+        <textarea class="as-textarea pc-notas" id="pcNotas" maxlength="3000" rows="3" placeholder="¿Qué argumento o estrategia funcionó? ¿Qué harías distinto?">{{ asunto.resultado_notas or '' }}</textarea>
+        <div class="pc-hint" id="pcHint">{{ 'Se usa como precedente para asuntos parecidos.' if asunto.resultado else 'Regístralo: alimenta los precedentes del despacho.' }}</div>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="as-card">
+      <div class="as-card-h"><h3>Casos parecidos del despacho</h3><a href="{{ url_for('insights.index') }}">Precedentes</a></div>
+      <div class="as-card-b" id="pcCasos"><p class="as-empty">Buscando precedentes…</p></div>
+    </section>
+
+    <section class="as-card">
+      <div class="as-card-h"><h3>Equipo</h3></div>
+      <div class="as-card-b">
+        {% if responsable %}<div class="af-persona">{{ avatar(responsable, 'lg') }}<div><b>{{ responsable.nombre }}</b><small>Responsable</small></div></div>{% endif %}
+        {% for c in colaboradores %}
+        <div class="af-persona">{{ avatar(c, 'lg') }}<div><b>{{ c.nombre }}</b><small>Colabora</small></div>
+          {% if es_admin %}<button type="button" data-quitar="{{ c.id }}" aria-label="Quitar a {{ c.nombre }}" title="Quitar del asunto">×</button>{% endif %}</div>
+        {% endfor %}
+        {% if es_admin %}
+        {% set ya = colaboradores | map(attribute='id') | list %}
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <select class="as-select" id="eqAgregar" aria-label="Agregar al equipo">
+            <option value="">+ Agregar a alguien del equipo…</option>
+            {% for ab in abogados if (not responsable or ab.id != responsable.id) and ab.id not in ya %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+          </select>
+          <select class="as-select" id="eqResponsable" aria-label="Cambiar responsable">
+            <option value="">Cambiar responsable…</option>
+            {% for ab in abogados if not responsable or ab.id != responsable.id %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if asunto.cliente_id and asunto.cliente %}
+    <section class="as-card">
+      <div class="as-card-h"><h3>Cliente</h3><a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">Ver ficha</a></div>
+      <div class="as-card-b">
+        <div class="af-persona" style="padding-top:0"><div><b>{{ asunto.cliente }}</b><small>{{ 'Persona moral' if asunto.cliente_tipo == 'persona_moral' else 'Persona física' }}</small></div></div>
+        {% if asunto.cliente_email %}<div class="af-kv"><span class="as-muted">Correo</span><a href="mailto:{{ asunto.cliente_email }}" style="color:var(--e);text-decoration:none;font-weight:600">{{ asunto.cliente_email }}</a></div>{% endif %}
+        {% if asunto.cliente_tel %}<div class="af-kv"><span class="as-muted">Teléfono</span><a href="tel:{{ asunto.cliente_tel }}" style="color:var(--fog);text-decoration:none;font-weight:600">{{ asunto.cliente_tel }}</a></div>{% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="as-card">
+      <div class="as-card-h"><h3>Cobranza</h3><a href="{{ url_for('cobranzas.index', asunto=asunto.id, grupo='todos') }}">Ver cobros</a></div>
+      <div class="as-card-b">
+        <div class="af-kv"><span class="as-muted">Honorarios pactados</span><b>${{ '{:,.0f}'.format(dinero.pactados) }}</b></div>
+        <div class="af-kv"><span class="as-muted">Facturado</span><b>${{ '{:,.0f}'.format(dinero.facturado) }}</b></div>
+        <div class="af-kv"><span class="as-muted">Cobrado</span><b style="color:#047857">${{ '{:,.0f}'.format(dinero.cobrado) }}</b></div>
+        <div class="af-kv"><span class="as-muted">Por cobrar</span><b style="color:{{ '#B45309' if dinero.pendiente else 'var(--fog)' }}">${{ '{:,.0f}'.format(dinero.pendiente) }}</b></div>
+        {% if session.get('role') in ('super_admin', 'admin', 'abogado', 'asistente') %}
+        <a class="btn btn-secondary btn-sm" style="width:100%;justify-content:center;margin-top:10px" href="{{ url_for('cobranzas.index') }}#nuevo-asunto-{{ asunto.id }}">+ Nuevo cobro</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="as-card">
+      <div class="as-card-h"><h3>Etiquetas</h3></div>
+      <div class="as-card-b">
+        <div class="af-tags" id="afTags">
+          {% for et in etiquetas %}<span class="af-tag" style="--t:{{ et.color }}">{{ et.nombre }}<button type="button" data-et="{{ et.id }}" aria-label="Quitar etiqueta {{ et.nombre }}">×</button></span>{% endfor %}
+          <button type="button" class="af-tag-add" id="afTagAdd">+ Etiqueta</button>
+        </div>
+        <form id="afTagForm" hidden style="margin-top:8px;gap:6px">
+          <input class="as-input" id="afTagInput" list="afTagList" maxlength="30" placeholder="Ej. Urgente, Apelación…" style="flex:1">
+          <datalist id="afTagList">{% for et in todas_etiquetas %}<option value="{{ et.nombre }}">{% endfor %}</datalist>
+          <button class="btn btn-primary btn-sm">Agregar</button>
+        </form>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<div class="as-modal" id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTitulo">
+  <div class="as-modal-c">
+    <div class="as-modal-h"><h3 id="resTitulo">¿Cómo terminó el asunto?</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <div class="as-res" id="resOpciones">{% for k, r in resultados.items() %}<button type="button" data-res="{{ k }}" style="--rc:{{ r.color }};--rf:{{ r.fondo }}">{{ r.label }}</button>{% endfor %}</div>
+      <div><label class="as-label" for="resNotas">¿Qué funcionó o qué harías distinto? <small>(opcional)</small></label>
+        <textarea class="as-textarea" id="resNotas" rows="3" maxlength="3000"></textarea></div>
+      <p style="font-size:12.5px">Queda como precedente: los asuntos parecidos lo mostrarán y {{ config.ASISTENTE_NOMBRE }} lo tomará en cuenta.</p>
     </div>
-    <div class="lex-modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('editAsuntoModal').classList.remove('show')">Cancelar</button>
-      <button class="btn btn-primary btn-sm" onclick="guardarEdicionAsunto()">Guardar cambios</button>
-    </div>
+    <div class="as-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Ahora no</button><button type="button" class="btn btn-primary" id="resGuardar">Guardar resultado</button></div>
   </div>
 </div>
 
+<div class="as-modal" id="senModal" role="dialog" aria-modal="true" aria-labelledby="senTitulo">
+  <form class="as-modal-c" id="fSentencia">
+    <div class="as-modal-h"><h3 id="senTitulo">Agregar resolución</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <div><label class="as-label" for="sTit">Título</label><input class="as-input" id="sTit" name="titulo" required maxlength="200" placeholder="Ej. Sentencia definitiva de primera instancia"></div>
+      <div class="as-fila2">
+        <div><label class="as-label" for="sTipo">Tipo</label><select class="as-select" id="sTipo" name="tipo">{% for t in tipos_sentencia %}<option value="{{ t }}">{{ sentencia_label[t] }}</option>{% endfor %}</select></div>
+        <div><label class="as-label" for="sFecha">Fecha</label><input class="as-input" type="date" id="sFecha" name="fecha_emision" value="{{ today_str }}"></div>
+      </div>
+      <div><label class="as-label">¿Cómo nos fue?</label>
+        <div class="as-res" id="sSentido">{% for k, l in sentidos.items() %}<button type="button" data-res="{{ k }}" style="--rc:{{ resultados[k].color }};--rf:{{ resultados[k].fondo }}">{{ l }}</button>{% endfor %}</div></div>
+      <div><label class="as-label" for="sCont">Puntos resolutivos o resumen <small>(opcional)</small></label><textarea class="as-textarea" id="sCont" name="contenido" rows="3" maxlength="5000"></textarea></div>
+      <div><label class="as-label" for="sArch">Archivo <small>(opcional)</small></label><input class="as-input" type="file" id="sArch" name="archivo"></div>
+    </div>
+    <div class="as-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button class="btn btn-primary">Guardar</button></div>
+  </form>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const ASUNTO_ID    = '{{ asunto.id }}';
-const EXP_NUM      = '{{ asunto.numero_expediente or asunto.titulo[:20] }}';
-const ABOGADOS     = {{ abogados | tojson }};
-const CLIENT_EMAIL = '{{ asunto.cliente_email or "" }}';
-let TL_COUNTS      = {{ tl_counts | tojson }};
-let _tagColor      = '#00DFA2';
-let pendingTeamAction = null;
+(() => {
+  const ID = {{ asunto.id }};
+  const TIENE_RESULTADO = {{ (asunto.resultado or '') | tojson }} !== '';
+  const JSONH = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+  const $ = s => document.querySelector(s);
+  const post = (url, data, method = 'POST') => fetch(url, { method, headers: JSONH, body: JSON.stringify(data || {}) });
+  const recargar = tab => { history.replaceState(null, '', location.pathname + location.search.replace(/[?&]nuevo=1/, '') + (tab ? '#' + tab : '')); location.reload(); };
+  const tabActual = () => location.hash.slice(1);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/* ── Status ──────────────────────────────────── */
-function toggleStatusMenu() {
-  document.getElementById('statusMenu').classList.toggle('show');
-}
-async function cambiarEstado(estado) {
-  document.getElementById('statusMenu').classList.remove('show');
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/estado`, {
-    method:'PATCH', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({estado})
-  });
-  if (r.ok) {
-    const btn = document.getElementById('statusBtn');
-    btn.className = `ad-status-btn st-${estado}`;
-    btn.querySelector('span').textContent = estado.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-    showToast('Estado actualizado','success');
+  /* Pestañas */
+  function abrirTab(nombre) {
+    const btn = document.querySelector(`.af-tab[data-tab="${nombre}"]`); if (!btn) return;
+    document.querySelectorAll('.af-tab').forEach(t => t.classList.toggle('on', t === btn));
+    document.querySelectorAll('.af-panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + nombre));
   }
-}
+  document.querySelectorAll('.af-tab').forEach(t => t.addEventListener('click', () => { abrirTab(t.dataset.tab); history.replaceState(null, '', '#' + t.dataset.tab); }));
+  if (location.hash) abrirTab(tabActual());
+  window.addEventListener('hashchange', () => abrirTab(tabActual()));
 
-/* ── Priority ────────────────────────────────── */
-function cambiarPrioridad(prio) {
-  document.querySelectorAll('.prio-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelector(`.prio-btn[data-valor="${prio}"]`)?.classList.add('active');
-  editarCampo('prioridad', prio);
-}
+  /* Menús */
+  function menu(btnId, menuId) {
+    const b = document.getElementById(btnId), m = document.getElementById(menuId);
+    if (!b || !m) return;
+    b.addEventListener('click', e => { e.stopPropagation(); document.querySelectorAll('.af-menu.open').forEach(x => x !== m && x.classList.remove('open')); m.classList.toggle('open'); });
+  }
+  menu('afEstadoBtn', 'afEstadoMenu'); menu('afMasBtn', 'afMasMenu');
+  document.addEventListener('click', () => document.querySelectorAll('.af-menu.open').forEach(m => m.classList.remove('open')));
 
-/* ── Title inline edit ───────────────────────── */
-function startEditTitle() {
-  const h1 = document.getElementById('adTitle');
-  if (h1.querySelector('input')) return;
-  const val = h1.textContent.trim();
-  const inp = document.createElement('input');
-  inp.type='text'; inp.value=val; inp.className='ad-title-input';
-  h1.textContent=''; h1.appendChild(inp); inp.focus(); inp.select();
-  inp.addEventListener('blur', () => {
-    const nv = inp.value.trim() || val;
-    h1.textContent = nv;
-    if (nv !== val) editarCampo('titulo', nv);
-  });
-  inp.addEventListener('keydown', e => {
-    if (e.key==='Enter') inp.blur();
-    if (e.key==='Escape') { inp.value=val; inp.blur(); }
-  });
-}
-
-/* ── Descripción del caso ────────────────────── */
-let _descTimer = null;
-function onDescInput() {
-  const ta = document.getElementById('casoDescripcion');
-  const cc = document.getElementById('descCount');
-  if (cc) cc.textContent = ta.value.length;
-  clearTimeout(_descTimer);
-  _descTimer = setTimeout(() => editarCampo('descripcion', ta.value), 1000);
-}
-function guardarDescripcion() {
-  const ta = document.getElementById('casoDescripcion');
-  if (ta) editarCampo('descripcion', ta.value);
-}
-
-/* ── Generic field edit ──────────────────────── */
-async function editarCampo(campo, valor) {
-  try {
-    const r = await fetch(`/asuntos/${ASUNTO_ID}/editar-campo`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({campo, valor})
+  /* Título */
+  const titulo = $('#afTitulo');
+  if (titulo.isContentEditable) {
+    let original = titulo.textContent.trim();
+    titulo.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); titulo.blur(); } if (e.key === 'Escape') { titulo.textContent = original; titulo.blur(); } });
+    titulo.addEventListener('blur', async () => {
+      const nuevo = titulo.textContent.trim();
+      if (!nuevo) { titulo.textContent = original; return; }
+      if (nuevo === original) return;
+      const r = await post(`/asuntos/${ID}/editar-campo`, { campo: 'titulo', valor: nuevo });
+      if (r.ok) { original = nuevo; document.title = nuevo; showToast('Título actualizado'); } else { titulo.textContent = original; showToast('No se pudo guardar el título', 'error'); }
     });
-    if (!r.ok) showToast('Error al guardar','error');
-  } catch(e) { showToast('Error de conexión','error'); }
-}
+  }
 
-/* ── Timeline filter ─────────────────────────── */
-function filterTimeline(tipo, btn) {
-  document.querySelectorAll('.ad-tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('#tlFeed .tl-item').forEach(item => {
-    item.style.display = (tipo==='all' || item.dataset.tipo===tipo) ? '' : 'none';
+  /* Estado */
+  document.querySelectorAll('#afEstadoMenu [data-estado]').forEach(b => b.addEventListener('click', async () => {
+    const estado = b.dataset.estado;
+    const r = await post(`/asuntos/${ID}/estado`, { estado });
+    if (!r.ok) { showToast('No se pudo cambiar el estado', 'error'); return; }
+    if (estado === 'cerrado' && !TIENE_RESULTADO) { $('#resModal').classList.add('open'); return; }
+    recargar(tabActual());
+  }));
+
+  /* Resultado al concluir */
+  const resModal = $('#resModal'); let resElegido = '';
+  $('#resOpciones').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; resElegido = b.dataset.res; $('#resOpciones').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+  resModal.addEventListener('click', e => { if (e.target === resModal || e.target.closest('[data-cerrar]')) { resModal.classList.remove('open'); recargar(tabActual()); } });
+  $('#resGuardar').addEventListener('click', async () => {
+    if (!resElegido) { showToast('Elige cómo terminó el asunto', 'error'); return; }
+    const r = await post(`/precedentes/asunto/${ID}/resultado`, { resultado: resElegido, notas: $('#resNotas').value });
+    if (!r.ok) { showToast('No se pudo guardar el resultado', 'error'); return; }
+    recargar(tabActual());
   });
-  // hide date separators with no visible items
-  document.querySelectorAll('#tlFeed .tl-date-sep').forEach(sep => {
-    let next = sep.nextElementSibling;
-    let hasVisible = false;
-    while (next && !next.classList.contains('tl-date-sep')) {
-      if (next.classList.contains('tl-item') && next.style.display !== 'none') hasVisible = true;
-      next = next.nextElementSibling;
+
+  /* Tarjeta de resultado */
+  const pcRes = $('#pcRes');
+  if (pcRes) {
+    const notas = $('#pcNotas'); let actual = {{ (asunto.resultado or '') | tojson }}, guardadas = notas.value;
+    async function guardar(resultado) {
+      const r = await post(`/precedentes/asunto/${ID}/resultado`, { resultado, notas: notas.value });
+      if (!r.ok) { showToast('No se pudo guardar el resultado', 'error'); return false; }
+      actual = resultado || ''; guardadas = notas.value;
+      pcRes.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.res === actual));
+      $('#pcHint').textContent = actual ? 'Se usa como precedente para asuntos parecidos.' : 'Regístralo: alimenta los precedentes del despacho.';
+      return true;
     }
-    sep.style.display = hasVisible ? '' : 'none';
-  });
-}
-function updateTabCounter(tipo, delta) {
-  TL_COUNTS[tipo] = (TL_COUNTS[tipo]||0) + delta;
-  TL_COUNTS.all   = (TL_COUNTS.all  ||0) + delta;
-  const el = document.getElementById(`tc-${tipo}`);
-  const elAll = document.getElementById('tc-all');
-  if (el) el.textContent = TL_COUNTS[tipo];
-  if (elAll) elAll.textContent = TL_COUNTS.all;
-}
-
-/* ── Tags ────────────────────────────────────── */
-function toggleTagDropdown(e) {
-  e.stopPropagation();
-  const dd = document.getElementById('tagDropdown');
-  dd.classList.toggle('open');
-  if (dd.classList.contains('open')) setTimeout(()=>document.getElementById('tagInput')?.focus(), 50);
-}
-function selectColor(color, el) {
-  _tagColor = color;
-  document.querySelectorAll('.tc').forEach(d=>d.classList.remove('selected'));
-  el.classList.add('selected');
-}
-async function createTag() {
-  const nombre = document.getElementById('tagInput').value.trim();
-  if (!nombre) return;
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/etiquetas`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({nombre, color:_tagColor})
-  });
-  if (r.ok) {
-    const data = await r.json();
-    const row = document.getElementById('tagsRow');
-    const addBtn = row.querySelector('.ad-tag-add');
-    const tag = document.createElement('span');
-    tag.className='ad-tag-chip'; tag.style.cssText=`--tc:${_tagColor}`;
-    tag.innerHTML=`${nombre}<button class="ad-tag-remove" onclick="removeTag('${data.id}',this.parentElement)">×</button>`;
-    row.insertBefore(tag, addBtn);
-    document.getElementById('tagInput').value='';
-    document.getElementById('tagDropdown').classList.remove('open');
-  }
-}
-async function removeTag(eid, el) {
-  if (!eid) return;
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/etiquetas/${eid}`, {method:'DELETE'});
-  if (r.ok) el.remove();
-}
-/* keep legacy aliases */
-const quitarEtiqueta = removeTag;
-
-/* ── FAB ─────────────────────────────────────── */
-function toggleFabMenu() {
-  const menu = document.getElementById('fabMenu');
-  const btn  = document.getElementById('fabBtn');
-  const isOpen = menu.classList.toggle('open');
-  btn.classList.toggle('fab-open', isOpen);
-  if (isOpen) document.getElementById('fabPopup').style.display = 'none';
-}
-function abrirNota()      { closeFabMenu(); openFabForm('nota');      }
-function abrirActividad() { closeFabMenu(); openFabForm('actividad'); }
-function abrirDocumento() { closeFabMenu(); openFabForm('documento'); }
-function abrirLlamada()   { closeFabMenu(); openFabForm('llamada');   }
-function abrirCorreo()    { closeFabMenu(); openFabForm('correo');    }
-function closeFabMenu() {
-  document.getElementById('fabMenu').classList.remove('open');
-  document.getElementById('fabBtn').classList.remove('fab-open');
-}
-function openFabForm(tipo) {
-  const titles = {
-    nota:'Nueva nota', actividad:'Nueva actividad',
-    documento:'Subir documento', llamada:'Registrar llamada', correo:'Registrar correo'
-  };
-  document.getElementById('fabPopupTitle').textContent = titles[tipo] || '';
-  document.querySelectorAll('[id^="fabForm-"]').forEach(f => f.style.display = 'none');
-  const form = document.getElementById(`fabForm-${tipo}`);
-  if (form) form.style.display = '';
-  document.getElementById('fabPopup').style.display = 'flex';
-}
-function openFab(directTipo) { openFabForm(directTipo); }
-function closeFab() {
-  document.getElementById('fabPopup').style.display = 'none';
-  document.querySelectorAll('[id^="fabForm-"]').forEach(f => f.style.display = 'none');
-  document.getElementById('fabBtn').classList.remove('fab-open');
-}
-function fabGoTo(tipo) { openFabForm(tipo); }
-async function fabGuardarNota() {
-  const contenido = document.getElementById('fabNotaContenido').value.trim();
-  if (!contenido) return showToast('Escribe algo primero','error');
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/notas`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({contenido})
-  });
-  if (r.ok) {
-    const data = await r.json();
-    addToTimeline('nota','✎','Nota', contenido, data.autor_nombre||'Tú', contenido);
-    document.getElementById('fabNotaContenido').value='';
-    closeFab(); showToast('Nota guardada','success'); updateTabCounter('nota',1);
-  } else showToast('Error al guardar nota','error');
-}
-async function fabGuardarActividad() {
-  const titulo = document.getElementById('fabActTitulo').value.trim();
-  const tipo   = document.getElementById('fabActTipo').value;
-  const fecha  = document.getElementById('fabActFecha').value;
-  const lugar  = document.getElementById('fabActLugar').value.trim();
-  const desc   = document.getElementById('fabActDesc').value.trim();
-  const evento = document.getElementById('fabActEvento').checked;
-  if (!titulo) return showToast('Agrega un título','error');
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({tipo, titulo, fecha, lugar, descripcion:desc, crear_evento:evento})
-  });
-  if (r.ok) {
-    const data = await r.json();
-    addToTimeline('actividad','◷','Actividad', titulo, data.autor_nombre||'Tú', desc);
-    ['fabActTitulo','fabActDesc','fabActLugar'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    closeFab(); showToast('Actividad guardada','success'); updateTabCounter('actividad',1);
-  } else showToast('Error al guardar actividad','error');
-}
-function fabHandleDrop(e) {
-  e.preventDefault();
-  document.getElementById('fabDropzone').classList.remove('drag-over');
-  fabHandleFiles(e.dataTransfer.files);
-}
-async function fabHandleFiles(files) {
-  if (!files.length) return;
-  const prog = document.getElementById('fabUploadProgress');
-  const bar  = document.getElementById('fabProgressBar');
-  prog.style.display='';
-  for (let i=0; i<files.length; i++) {
-    const fd = new FormData(); fd.append('archivo', files[i]);
-    bar.style.width=`${Math.round((i/files.length)*100)}%`;
-    const r = await fetch(`/asuntos/${ASUNTO_ID}/documentos`, {method:'POST', body:fd});
-    if (r.ok) { addToTimeline('documento','⬆','Documento', files[i].name,'Tú',''); updateTabCounter('documento',1); }
-  }
-  bar.style.width='100%';
-  setTimeout(()=>{prog.style.display='none';bar.style.width='0';closeFab();showToast('Documento(s) subido(s)','success');},500);
-}
-async function fabGuardarLlamada() {
-  const con       = document.getElementById('fabLlamadaCon').value.trim();
-  const duracion  = document.getElementById('fabLlamadaDuracion').value.trim();
-  const resultado = document.getElementById('fabLlamadaResultado').value;
-  const notas     = document.getElementById('fabLlamadaNotas').value.trim();
-  const contenido = [con&&`Con: ${con}`, duracion&&`Duración: ${duracion}`, `Resultado: ${resultado}`, notas].filter(Boolean).join(' · ');
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({tipo:'llamada', titulo:con||'Llamada', descripcion:contenido})
-  });
-  if (r.ok) {
-    addToTimeline('llamada','☎','Llamada', con||'Llamada','Tú', contenido);
-    closeFab(); showToast('Llamada registrada','success'); updateTabCounter('llamada',1);
-  } else showToast('Error','error');
-}
-
-/* ── FAB — guardar correo ────────────────────── */
-async function fabGuardarCorreo() {
-  const asunto_correo = document.getElementById('fabCorreoAsunto').value.trim();
-  const contacto      = document.getElementById('fabCorreoContacto').value.trim();
-  const contenido     = document.getElementById('fabCorreoContenido').value.trim();
-  if (!contenido) return showToast('Escribe el contenido del correo','error');
-  const descripcion = [asunto_correo && `Asunto: ${asunto_correo}`, contacto && `Contacto: ${contacto}`, contenido].filter(Boolean).join('\n');
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({tipo:'nota', titulo: asunto_correo || 'Correo registrado', descripcion})
-  });
-  if (r.ok) {
-    addToTimeline('nota','✉','Correo', asunto_correo||'Correo', 'Tú', descripcion);
-    ['fabCorreoAsunto','fabCorreoContacto','fabCorreoContenido'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    closeFab(); showToast('Correo guardado correctamente','success'); updateTabCounter('nota',1);
-  } else showToast('Error al guardar el correo','error');
-}
-
-/* ── Mention DD ──────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
-  const ta = document.getElementById('fabNotaContenido');
-  const dd = document.getElementById('mentionDD');
-  if (!ta||!dd) return;
-  ta.addEventListener('input', () => {
-    const val=ta.value, pos=ta.selectionStart, at=val.lastIndexOf('@',pos-1);
-    if (at===-1||pos-at>20){dd.style.display='none';return;}
-    const query=val.slice(at+1,pos).toLowerCase();
-    const matches=ABOGADOS.filter(a=>`${a.nombre} ${a.apellidos||''}`.toLowerCase().includes(query));
-    if (!matches.length){dd.style.display='none';return;}
-    dd.innerHTML=matches.map(a=>`<button class="mention-opt" onclick="fabInsertMention('${a.nombre} ${a.apellidos||''}')">${a.nombre} ${a.apellidos||''}</button>`).join('');
-    dd.style.display='';
-  });
-});
-function fabInsertMention(name) {
-  const ta=document.getElementById('fabNotaContenido'), dd=document.getElementById('mentionDD');
-  const pos=ta.selectionStart, val=ta.value, at=val.lastIndexOf('@',pos-1);
-  ta.value=val.slice(0,at)+`@${name} `+val.slice(pos);
-  ta.focus(); ta.selectionStart=ta.selectionEnd=at+name.length+2; dd.style.display='none';
-}
-
-/* ── Mark realizado ──────────────────────────── */
-async function marcarRealizado(actId, realizado, el) {
-  const r = await fetch(`/asuntos/${ASUNTO_ID}/actividades/${actId}/realizado`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({realizado})
-  });
-  if (r.ok) {
-    const item = el.closest('.tl-item');
-    const badge = item?.querySelector('.ad-tl-status');
-    if (badge) { badge.className=`ad-tl-status ${realizado?'ad-tl-done':'ad-tl-pending'}`; badge.textContent=realizado?'✓ Realizado':'⏳ Pendiente'; }
-    el.style.display='none';
-    showToast(realizado?'Marcado como realizado':'Desmarcado','success');
-  }
-}
-
-/* ── Team ────────────────────────────────────── */
-function toggleTeamMenu(btn) {
-  const menu=btn.nextElementSibling;
-  const wasOpen=menu.classList.contains('show');
-  document.querySelectorAll('.ctx-tm-menu').forEach(m=>m.classList.remove('show'));
-  if (!wasOpen) menu.classList.add('show');
-}
-function toggleAddColaborador() {
-  const wrap=document.getElementById('addColabWrap');
-  wrap.style.display=wrap.style.display==='none'?'':'none';
-}
-async function addColaborador() {
-  const sel=document.getElementById('addColabSelect'); const uid=sel.value; if(!uid)return;
-  const r=await fetch(`/asuntos/${ASUNTO_ID}/editar-campo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campo:'colaborador_add',valor:uid})});
-  if(r.ok){showToast('Colaborador agregado','success');setTimeout(()=>location.reload(),800);}
-  else showToast('Error al agregar','error');
-}
-function cambiarResponsable(uid, nombre) {
-  pendingTeamAction={type:'cambiar_resp',uid};
-  document.getElementById('respNewName').textContent=nombre;
-  document.getElementById('respModal').classList.add('show');
-}
-async function confirmarCambioResp() {
-  if (!pendingTeamAction) return;
-  const r=await fetch(`/asuntos/${ASUNTO_ID}/equipo/${pendingTeamAction.uid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:'cambiar_responsable'})});
-  document.getElementById('respModal').classList.remove('show');
-  if(r.ok){showToast('Responsable actualizado','success');setTimeout(()=>location.reload(),800);}
-  else showToast('Error','error');
-  pendingTeamAction=null;
-}
-function quitarMiembro(uid, nombre) {
-  pendingTeamAction={type:'quitar',uid};
-  document.getElementById('quitarName').textContent=nombre;
-  document.getElementById('quitarModal').classList.add('show');
-}
-async function confirmarQuitar() {
-  if (!pendingTeamAction) return;
-  const r=await fetch(`/asuntos/${ASUNTO_ID}/equipo/${pendingTeamAction.uid}`,{method:'DELETE'});
-  document.getElementById('quitarModal').classList.remove('show');
-  if(r.ok){showToast('Miembro removido','success');setTimeout(()=>location.reload(),800);}
-  else showToast('Error','error');
-  pendingTeamAction=null;
-}
-
-/* ── Archive / Delete ────────────────────────── */
-function confirmarArchivar() { document.getElementById('archiveModal').classList.add('show'); }
-function confirmarEliminar() {
-  const input=document.getElementById('deleteConfirmInput');
-  const btn=document.getElementById('deleteConfirmBtn');
-  if(input) input.value=''; if(btn) btn.disabled=true;
-  document.getElementById('deleteModal').classList.add('show');
-}
-async function confirmarDeleteFinal() {
-  const r=await fetch(`/asuntos/${ASUNTO_ID}/eliminar`,{method:'POST'});
-  if(r.ok||r.redirected) window.location.href='/asuntos/';
-}
-
-/* ── Add to timeline (optimistic) ───────────── */
-function addToTimeline(tipo, icon, badge, titulo, autor, contenido) {
-  const cfg = {
-    nota:       {color:'#00DFA2', avBg:'rgba(0,223,162,0.12)',  badgeBg:'rgba(0,223,162,0.1)',  cls:'nota'},
-    documento:  {color:'#3B8BD4', avBg:'rgba(59,139,212,0.1)',  badgeBg:'rgba(59,139,212,0.1)', cls:'doc'},
-    actividad:  {color:'#F97316', avBg:'rgba(249,115,22,0.1)',  badgeBg:'rgba(249,115,22,0.1)', cls:'actividad'},
-    llamada:    {color:'#8B5CF6', avBg:'rgba(139,92,246,0.1)',  badgeBg:'rgba(139,92,246,0.1)', cls:'llamada'},
-  };
-  const c = cfg[tipo] || {color:'#8A9BA8', avBg:'rgba(138,155,168,0.08)', badgeBg:'rgba(138,155,168,0.08)', cls:'sistema'};
-  const feed = document.getElementById('tlFeed');
-  feed.querySelector('.ad-tl-empty')?.remove();
-
-  // Insert "Hoy" separator if not already first
-  const firstSep = feed.querySelector('.tl-date-sep');
-  const todayLabel = 'HOY';
-  if (!firstSep || !firstSep.textContent.toUpperCase().includes('HOY')) {
-    const sep = document.createElement('div');
-    sep.className = 'tl-date-sep';
-    const now = new Date();
-    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    sep.innerHTML = `<span>Hoy · ${now.getDate()} de ${meses[now.getMonth()]} ${now.getFullYear()}</span>`;
-    feed.prepend(sep);
+    pcRes.addEventListener('click', async e => { const b = e.target.closest('button'); if (!b) return; const n = b.dataset.res === actual ? '' : b.dataset.res; if (await guardar(n)) showToast(n ? `Resultado: ${b.textContent}` : 'Resultado quitado'); });
+    notas.addEventListener('blur', async () => { if (notas.value !== guardadas && await guardar(actual)) showToast('Notas guardadas'); });
   }
 
-  const iniciales = autor.split(' ').filter(Boolean).map(p=>p[0]).slice(0,2).join('').toUpperCase() || 'YO';
-  const hora = new Date().toTimeString().slice(0,5);
-  const div = document.createElement('div');
-  div.className = 'tl-item'; div.dataset.tipo = tipo;
-  div.style.animation = 'tlHighlight 1.5s ease';
-  div.innerHTML = `
-    <div class="tl-left">
-      <div class="tl-avatar" style="background:${c.avBg};color:${c.color}">${iniciales}</div>
-    </div>
-    <div class="tl-card ${c.cls}">
-      <div class="tl-header">
-        <div class="tl-meta">
-          <span class="tl-who">${autor}</span>
-          <span class="tl-dot">·</span>
-          <span class="tl-time">${hora}</span>
-        </div>
-        <span class="tl-badge" style="background:${c.badgeBg};color:${c.color}">${badge}</span>
-      </div>
-      ${titulo?`<div class="tl-title">${titulo}</div>`:''}
-      ${contenido?`<div class="tl-body">${contenido}</div>`:''}
-    </div>`;
-  // Insert after the "Hoy" separator
-  const todaySep = feed.querySelector('.tl-date-sep');
-  todaySep ? todaySep.insertAdjacentElement('afterend', div) : feed.prepend(div);
-}
+  /* Casos parecidos */
+  fetch(`/precedentes/asunto/${ID}/parecidos`).then(r => r.ok ? r.json() : Promise.reject()).then(d => {
+    const caja = $('#pcCasos');
+    if (!d.casos.length) {
+      caja.innerHTML = `<p class="as-empty">${d.concluidos ? 'Ningún asunto concluido del despacho se parece lo suficiente a este.' : 'Aún no hay asuntos concluidos con resultado. Cuando los registres, aquí verás cómo terminaron los casos parecidos.'}</p>`;
+      return;
+    }
+    const s = d.resumen, pl = s.total > 1 ? 's' : '';
+    caja.innerHTML = `<div class="pc-resumen">De <b>${s.total}</b> caso${pl} parecido${pl}, <b>${s.a_favor}</b> terminaron a favor del cliente${s.duracion_media ? ` · <b>${s.duracion_media}</b> meses en promedio` : ''}.</div>` +
+      d.casos.map(c => {
+        const ri = c.resultado_info || {}, tag = c.url ? 'a' : 'div';
+        const meta = [c.tipo_asunto, c.juzgado, c.duracion_meses ? `${c.duracion_meses} meses` : '', `${c.similitud}% parecido`].filter(Boolean).map(esc).join(' · ');
+        const leccion = c.resultado_notas ? `<div class="pc-leccion">${esc(c.resultado_notas.length > 170 ? c.resultado_notas.slice(0, 167) + '…' : c.resultado_notas)}</div>` : '';
+        return `<${tag} class="pc-caso"${c.url ? ` href="${esc(c.url)}"` : ''}><div class="pc-caso-h"><b>${c.privado ? '🔒 ' : ''}${esc(c.titulo)}</b><span class="as-chip" style="--c-c:${esc(ri.color)};--c-f:${esc(ri.fondo)}">${esc(ri.label)}</span></div><div class="pc-meta">${meta}</div>${leccion}</${tag}>`;
+      }).join('');
+  }).catch(() => { $('#pcCasos').innerHTML = '<p class="as-empty">No se pudieron calcular los casos parecidos.</p>'; });
 
-/* ── Juzgado inline edit ─────────────────────── */
-function editarJuzgado() {
-  const span = document.getElementById('adStatJuzgado');
-  if (!span || span.querySelector('input')) return;
-  const val = span.dataset.val || '';
-  const inp = document.createElement('input');
-  inp.type = 'text';
-  inp.value = val;
-  inp.placeholder = 'Ej: 5° Civil';
-  inp.style.cssText = 'width:100%;background:transparent;border:none;border-bottom:1px solid rgba(0,223,162,0.5);color:#EAF0EC;font-size:13px;font-family:\'DM Mono\',monospace;outline:none;padding:0;';
-  span.textContent = '';
-  span.appendChild(inp);
-  inp.focus();
-  inp.select();
-  inp.addEventListener('blur', () => {
-    const nv = inp.value.trim();
-    span.textContent = nv || '—';
-    span.dataset.val = nv;
-    if (nv !== val) editarCampo('juzgado', nv);
-  });
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') inp.blur();
-    if (e.key === 'Escape') { inp.value = val; inp.blur(); }
-  });
-}
+  /* Composer */
+  document.querySelectorAll('.af-comp-tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.af-comp-tabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.af-comp-b').forEach(f => f.classList.toggle('on', f.dataset.comp === b.dataset.comp));
+    document.querySelector(`.af-comp-b[data-comp="${b.dataset.comp}"] :is(input,textarea)`)?.focus();
+  }));
+  const manana = new Date(Date.now() + 864e5); manana.setHours(10, 0, 0, 0);
+  $('#acFecha').value = new Date(manana - manana.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
 
-/* ── Más opciones ────────────────────────────── */
-function toggleMasOpciones(e) {
-  e.stopPropagation();
-  document.getElementById('adMasMenu').classList.toggle('open');
-}
-function closeMasMenu() {
-  document.getElementById('adMasMenu')?.classList.remove('open');
-}
-function copiarEnlace() {
-  navigator.clipboard.writeText(window.location.href);
-  const btn = event.currentTarget;
-  const label = btn.querySelector('.ad-mas-label');
-  const original = label.textContent;
-  label.textContent = 'Enlace copiado ✓';
-  label.style.color = '#00DFA2';
-  setTimeout(() => {
-    label.textContent = original;
-    label.style.color = '';
-    document.getElementById('adMasMenu').classList.remove('open');
-  }, 1500);
-}
-function abrirEditarAsunto() {
-  closeMasMenu();
-  document.getElementById('editAsuntoModal').classList.add('show');
-}
-async function guardarEdicionAsunto() {
-  try {
-    const campos = {
-      titulo:        document.getElementById('editTitulo').value.trim(),
-      tipo_asunto:   document.getElementById('editTipoAsunto').value.trim(),
-      sub_tipo:      document.getElementById('editSubTipo').value.trim(),
-      fecha_inicio:  document.getElementById('editFechaInicio').value,
-      fecha_limite:  document.getElementById('editFechaLimite').value,
-      juzgado:       document.getElementById('editJuzgado').value.trim(),
-      numero_juicio: document.getElementById('editNumeroJuicio').value.trim(),
-    };
-    if (!campos.titulo) return showToast('El título es obligatorio', 'error');
-    const r = await fetch(`/asuntos/${ASUNTO_ID}/editar-campo`, {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({campo: 'multi', valor: campos})
+  function enviar(form, url, datos) {
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = form.querySelector('button.btn-primary'); btn.disabled = true;
+      try {
+        const r = await post(url, datos(new FormData(form)));
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || j.ok === false) { showToast(j.error || 'No se pudo guardar', 'error'); return; }
+        recargar('actividad');
+      } finally { btn.disabled = false; }
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    document.getElementById('editAsuntoModal').classList.remove('show');
-    showToast('Datos actualizados', 'success');
-    setTimeout(() => location.reload(), 800);
-  } catch(e) {
-    console.error('[guardarEdicionAsunto]', e);
-    showToast('Error al guardar — intenta de nuevo', 'error');
   }
-}
+  enviar($('#fNota'), `/asuntos/${ID}/notas`, fd => ({ contenido: fd.get('contenido') }));
+  enviar($('#fActividad'), `/asuntos/${ID}/actividades`, fd => ({ titulo: fd.get('titulo'), tipo: fd.get('tipo'), fecha: fd.get('fecha'), descripcion: fd.get('descripcion'), crear_evento: !!fd.get('crear_evento') }));
+  enviar($('#fHoras'), `/asuntos/${ID}/horas`, fd => ({ horas: fd.get('horas'), fecha: fd.get('fecha'), descripcion: fd.get('descripcion') }));
 
-/* ── Close on outside click ──────────────────── */
-document.addEventListener('click', e => {
-  if (!e.target.closest('.ad-mas-wrap'))
-    document.getElementById('adMasMenu')?.classList.remove('open');
-  if (!e.target.closest('#statusBtn') && !e.target.closest('#statusMenu'))
-    document.getElementById('statusMenu')?.classList.remove('show');
-  if (!e.target.closest('.tags-wrap'))
-    document.getElementById('tagDropdown')?.classList.remove('open');
-  if (!e.target.closest('.ctx-tm-menu-wrap'))
-    document.querySelectorAll('.ctx-tm-menu').forEach(m=>m.classList.remove('show'));
-  if (!e.target.closest('#fabContainer'))
-    document.getElementById('fabMenu')?.classList.remove('open');
-});
+  /* Hecho / pendiente */
+  document.querySelectorAll('.af-tick[data-act]').forEach(b => b.addEventListener('click', async () => {
+    const hecho = !b.classList.contains('on');
+    const r = await post(`/asuntos/${ID}/actividades/${b.dataset.act}/realizado`, { realizado: hecho });
+    if (!r.ok) { showToast('No se pudo actualizar', 'error'); return; }
+    recargar(tabActual());
+  }));
+
+  /* Filtros de la bitácora */
+  $('#afFiltros').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('#afFiltros').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('#afBitacora .af-it').forEach(it => it.hidden = !!b.dataset.f && it.dataset.tipo !== b.dataset.f);
+    document.querySelectorAll('#afBitacora .af-dia').forEach(d => {
+      let n = d.nextElementSibling, visible = false;
+      while (n && !n.classList.contains('af-dia')) { if (!n.hidden) visible = true; n = n.nextElementSibling; }
+      d.hidden = !visible;
+    });
+  });
+
+  /* Documentos */
+  const drop = $('#afDrop'), archivo = $('#afArchivo');
+  async function subir(files) {
+    for (const f of files) {
+      const fd = new FormData(); fd.append('archivo', f); fd.append('nombre', f.name.replace(/\.[^.]+$/, ''));
+      showToast(`Subiendo ${f.name}…`);
+      const r = await fetch(`/asuntos/${ID}/documentos`, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { showToast(j.error || `No se pudo subir ${f.name}`, 'error'); return; }
+    }
+    recargar('documentos');
+  }
+  archivo.addEventListener('change', () => archivo.files.length && subir([...archivo.files]));
+  ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('sobre'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('sobre')));
+  drop.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) subir([...e.dataTransfer.files]); });
+
+  /* Resoluciones */
+  const senModal = $('#senModal'); let sentido = '';
+  $('#afNuevaRes').addEventListener('click', () => { senModal.classList.add('open'); $('#sTit').focus(); });
+  senModal.addEventListener('click', e => { if (e.target === senModal || e.target.closest('[data-cerrar]')) senModal.classList.remove('open'); });
+  $('#sSentido').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sentido = sentido === b.dataset.res ? '' : b.dataset.res; $('#sSentido').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.res === sentido)); });
+  $('#fSentencia').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target); fd.append('sentido', sentido);
+    if (!fd.get('archivo')?.size) fd.delete('archivo');
+    const r = await fetch(`/asuntos/${ID}/sentencias`, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { showToast(j.error || 'No se pudo guardar la resolución', 'error'); return; }
+    recargar('documentos');
+  });
+
+  /* Datos del asunto */
+  const fDatos = $('#fDatos'), barra = $('#fDatosBar');
+  const leer = () => Object.fromEntries(new FormData(fDatos));
+  const base = JSON.stringify(leer());
+  fDatos.addEventListener('input', () => barra.classList.toggle('on', JSON.stringify(leer()) !== base));
+  $('#fDatosDeshacer').addEventListener('click', () => { fDatos.reset(); barra.classList.remove('on'); });
+  $('#fDatosGuardar').addEventListener('click', async () => {
+    const r = await post(`/asuntos/${ID}/editar-campo`, { campo: 'multi', valor: leer() });
+    if (!r.ok) { showToast('No se pudieron guardar los cambios', 'error'); return; }
+    recargar('datos');
+  });
+
+  /* Estrategia */
+  let prob = {{ ((ficha.probabilidad_exito if ficha else '') or '') | tojson }};
+  $('#eProb').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; prob = b.dataset.v; $('#eProb').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+  const lineas = t => (t || '').split('\n').map(s => s.trim()).filter(Boolean);
+  $('#fFichaGuardar').addEventListener('click', async () => {
+    const fd = new FormData($('#fFicha'));
+    const r = await post(`/asuntos/${ID}/ficha`, {
+      objetivo_cliente: fd.get('objetivo_cliente'), via_procesal: fd.get('via_procesal'), justificacion_via: fd.get('justificacion_via'),
+      argumentos_clave: lineas(fd.get('argumentos_clave')), riesgos: lineas(fd.get('riesgos')), probabilidad_exito: prob || 'media', insights: [],
+    });
+    r.ok ? showToast('Estrategia guardada') : showToast('No se pudo guardar la estrategia', 'error');
+  });
+
+  /* Equipo */
+  $('#eqAgregar')?.addEventListener('change', async e => {
+    if (!e.target.value) return;
+    const r = await post(`/asuntos/${ID}/editar-campo`, { campo: 'colaborador_add', valor: e.target.value });
+    r.ok ? recargar(tabActual()) : showToast('No se pudo agregar', 'error');
+  });
+  $('#eqResponsable')?.addEventListener('change', async e => {
+    if (!e.target.value) return;
+    const r = await post(`/asuntos/${ID}/equipo/${e.target.value}`, { accion: 'cambiar_responsable' }, 'PATCH');
+    r.ok ? recargar(tabActual()) : showToast('No se pudo cambiar el responsable', 'error');
+  });
+  document.querySelectorAll('[data-quitar]').forEach(b => b.addEventListener('click', async () => {
+    const r = await post(`/asuntos/${ID}/equipo/${b.dataset.quitar}`, {}, 'DELETE');
+    r.ok ? recargar(tabActual()) : showToast('No se pudo quitar', 'error');
+  }));
+
+  /* Etiquetas */
+  const tagForm = $('#afTagForm');
+  $('#afTagAdd').addEventListener('click', () => { tagForm.hidden = !tagForm.hidden; tagForm.style.display = tagForm.hidden ? 'none' : 'flex'; if (!tagForm.hidden) $('#afTagInput').focus(); });
+  tagForm.addEventListener('submit', async e => {
+    e.preventDefault(); const nombre = $('#afTagInput').value.trim(); if (!nombre) return;
+    const r = await post(`/asuntos/${ID}/etiquetas`, { nombre });
+    r.ok ? recargar(tabActual()) : showToast('No se pudo agregar la etiqueta', 'error');
+  });
+  $('#afTags').addEventListener('click', async e => {
+    const b = e.target.closest('[data-et]'); if (!b) return;
+    const r = await post(`/asuntos/${ID}/etiquetas/${b.dataset.et}`, {}, 'DELETE');
+    if (r.ok) b.parentElement.remove();
+  });
+
+  /* Más acciones */
+  $('#afCopiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText(location.origin + location.pathname); showToast('Enlace copiado'); } catch (_) {} });
+  $('#afPrivado')?.addEventListener('click', async e => {
+    const nuevo = e.currentTarget.dataset.privado !== '1';
+    const r = await post(`/asistente/asuntos/${ID}/privado`, { privado: nuevo });
+    r.ok ? recargar(tabActual()) : showToast('No se pudo cambiar', 'error');
+  });
+  $('#afArchivar')?.addEventListener('click', async () => {
+    if (!confirm('¿Archivar este asunto? Dejará de aparecer en los asuntos en curso. Puedes recuperarlo desde Archivados.')) return;
+    const r = await post(`/asuntos/${ID}/eliminar`, {});
+    if (r.ok) location.href = {{ url_for('asuntos.index') | tojson }}; else showToast('No se pudo archivar', 'error');
+  });
+
+  {% if recien_creado %}showToast('Asunto creado. Agenda lo que sigue o sube los primeros documentos.');{% endif %}
+})();
 </script>
 {% endblock %}

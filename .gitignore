@@ -6,3 +6,5 @@ databases/
 *.db
 .DS_Store
 *.sqlite
+storage/
+logs/

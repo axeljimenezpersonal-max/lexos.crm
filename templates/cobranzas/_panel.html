@@ -1,0 +1,95 @@
+{# Panel lateral de un cobro (se carga dentro de #cbDrawer) #}
+<span hidden data-info data-id="{{ co.id }}" data-saldo="{{ '%.2f' | format(co.saldo_v) }}" data-moneda="{{ co.moneda or 'MXN' }}"
+      data-concepto="{{ co.concepto }}" data-cliente="{{ co.cliente or 'Sin cliente' }}"></span>
+<div class="cb-dr-h">
+  <div style="min-width:0">
+    <span class="as-chip" style="--c-c:{{ co.estado_info.color }};--c-f:{{ co.estado_info.fondo }}">{{ co.estado_info.label }}</span><span class="cb-folio">{{ co.folio }}</span>
+    <h2>{{ co.concepto }}</h2>
+    <p>
+      {% if cli %}<a href="{{ url_for('clientes.detalle', id=cli.id) }}">{{ co.cliente }}</a>{% else %}Sin cliente{% endif %}
+      {% if co.asunto_id %} · <a href="{{ url_for('asuntos.detalle', id=co.asunto_id) }}">{{ co.asunto_titulo }}</a>{% endif %}
+    </p>
+  </div>
+  <button type="button" class="cerrar" aria-label="Cerrar">×</button>
+</div>
+
+<div class="cb-dr-b">
+  {% if co.estado == 'cancelado' %}
+  <section class="cb-saldo cancelado"><small>Cobro cancelado</small><b>{{ co.total_v | dinero(co.moneda) }}</b><span>No cuenta como saldo pendiente.</span></section>
+  {% elif co.saldo_v %}
+  <section class="cb-saldo">
+    <small>Saldo pendiente</small><b>{{ co.saldo_v | dinero(co.moneda) }}</b>
+    <div class="barra"><i style="width:{{ co.pct }}%"></i></div>
+    <span>{% if co.pagado_v %}Pagado {{ co.pagado_v | dinero(co.moneda) }} de {{ co.total_v | dinero(co.moneda) }}{% else %}Total {{ co.total_v | dinero(co.moneda) }}{% endif %}{% if co.vence %} · {{ co.vence.texto | lower }}{% endif %}</span>
+  </section>
+  {% else %}
+  <section class="cb-saldo pagado"><small>Pagado completo</small><b>{{ co.total_v | dinero(co.moneda) }}</b><span>{% if pagos %}Último pago el {{ pagos[0].fecha_txt }}{% endif %}</span></section>
+  {% endif %}
+
+  {% if puede and co.estado != 'cancelado' %}
+  <div class="cb-botones">
+    {% if co.saldo_v %}
+    <button type="button" class="btn btn-primary ancho" data-acc="pago">Registrar pago</button>
+    {% if whatsapp %}<a class="btn cb-wa" href="{{ whatsapp }}" target="_blank" rel="noopener">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4a.5.5 0 0 0 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.3-.2-.6-.3z"/></svg>
+      WhatsApp</a>
+    {% else %}<button type="button" class="btn btn-secondary" disabled title="El cliente no tiene celular registrado">WhatsApp</button>{% endif %}
+    <button type="button" class="btn btn-secondary" data-acc="correo"{% if not cli or not cli.email %} disabled title="El cliente no tiene correo registrado"{% endif %}>Recordar por correo</button>
+    {% endif %}
+    <button type="button" class="btn btn-secondary" data-acc="editar">Editar</button>
+    {% if cli %}<a class="btn btn-secondary" href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=cli.id) }}">Estado de cuenta</a>{% endif %}
+    {% if es_admin %}<button type="button" class="btn btn-ghost ancho" data-acc="nc">Descuento o cancelación</button>{% endif %}
+  </div>
+  {% endif %}
+
+  <section>
+    <h3>Desglose</h3>
+    <div class="cb-kv"><span>Honorarios</span><b>{{ desglose.honorarios | dinero(co.moneda) }}</b></div>
+    {% if desglose.descuento %}<div class="cb-kv"><span>Descuento</span><b>−{{ desglose.descuento | dinero(co.moneda) }}</b></div>{% endif %}
+    <div class="cb-kv"><span>{{ 'IVA %g%%' | format(desglose.iva_pct) if desglose.iva_pct else 'Sin IVA' }}</span><b>{{ desglose.iva | dinero(co.moneda) }}</b></div>
+    {% if desglose.ajuste %}<div class="cb-kv"><span>Descuentos posteriores</span><b>{{ desglose.ajuste | dinero(co.moneda) }}</b></div>{% endif %}
+    <div class="cb-kv total"><span>Total</span><b>{{ co.total_v | dinero(co.moneda) }}</b></div>
+  </section>
+
+  <section>
+    <h3>Pagos{% if pagos %}<span>{{ pagos | length }}</span>{% endif %}</h3>
+    {% for p in pagos %}
+    <div class="cb-pago">
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
+      <b>{{ p.metodo or 'Pago' }}{% if p.referencia %} · {{ p.referencia }}{% endif %}</b>
+      <span class="m">{{ p.monto | dinero(co.moneda) }}</span>
+      <small>{{ p.fecha_txt }}{% if p.autor %} · registró {{ p.autor }}{% endif %}{% if p.comprobante_url %} · <a href="{{ p.comprobante_url }}" target="_blank" rel="noopener">Comprobante</a>{% endif %}</small>
+      {% if es_admin and co.estado != 'cancelado' %}<button type="button" class="borrar" data-acc="borrar-pago" data-pid="{{ p.id }}">Borrar</button>{% else %}<span></span>{% endif %}
+    </div>
+    {% else %}<p class="as-empty">Aún no hay pagos registrados.</p>{% endfor %}
+  </section>
+
+  <section>
+    <h3>Datos</h3>
+    <div class="cb-kv"><span>Fecha del cobro</span><b>{{ emision }}</b></div>
+    <div class="cb-kv"><span>Fecha límite de pago</span><b>{{ vencimiento if co.fecha_vencimiento else 'Sin fecha' }}</b></div>
+    <div class="cb-kv"><span>Responsable</span><b>{{ abogado.nombre if abogado else '—' }}</b></div>
+    {% if co.moneda == 'USD' %}<div class="cb-kv"><span>Moneda</span><b>Dólares (USD)</b></div>{% endif %}
+    <div class="cb-kv"><span>Factura</span><b>
+      {% if co.archivo_factura_url %}<a href="{{ co.archivo_factura_url }}" target="_blank" rel="noopener">PDF</a>{% endif %}
+      {% if co.archivo_factura_url and co.archivo_xml_url %} · {% endif %}
+      {% if co.archivo_xml_url %}<a href="{{ co.archivo_xml_url }}" target="_blank" rel="noopener">XML</a>{% endif %}
+      {% if not co.archivo_factura_url and not co.archivo_xml_url %}<span class="as-muted" style="font-weight:500">Sin adjuntar</span>{% endif %}
+    </b></div>
+    {% if cli and (cli.celular or cli.telefono or cli.email) %}
+    <div class="cb-kv"><span>Contacto</span><b style="font-weight:500">{{ cli.celular or cli.telefono or '' }}{% if (cli.celular or cli.telefono) and cli.email %}<br>{% endif %}{{ cli.email or '' }}</b></div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h3>Notas internas<button type="button" class="btn btn-primary btn-sm" data-acc="notas" hidden>Guardar</button></h3>
+    <textarea class="as-textarea" id="drNotas" rows="3" maxlength="3000" placeholder="Acuerdos con el cliente, promesas de pago…"{% if not puede %} readonly{% endif %}>{{ co.notas or '' }}</textarea>
+  </section>
+
+  {% if actividad %}
+  <section>
+    <h3>Historial</h3>
+    {% for a in actividad %}<div class="cb-hist">{{ a.fecha }} · {{ a.accion }}{% if a.quien %} · {{ a.quien }}{% endif %}</div>{% endfor %}
+  </section>
+  {% endif %}
+</div>

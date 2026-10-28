@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ documento.titulo }} — {{ tenant.nombre_despacho if tenant else 'Códex' }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/favicon.svg') }}">
+<title>{{ documento.titulo }} — {{ tenant.nombre_despacho if tenant else 'Habeas Corpus' }}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -69,7 +70,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">{{ tenant.nombre_despacho if tenant else 'Códex' }}</div>
+      <div class="header-title">{{ tenant.nombre_despacho if tenant else 'Habeas Corpus' }}</div>
       <div class="header-sub">Documento compartido: {{ documento.titulo }}</div>
     </div>
     <span class="badge">Solo lectura</span>

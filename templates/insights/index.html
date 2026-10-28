@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Precedentes{% endblock %}
+{% block page_title %}Precedentes{% endblock %}
+
+{% block head %}
+<style>
+.pr-sub{color:var(--ash);font-size:14.5px;margin-top:4px;max-width:70ch}
+.pr-tabs{display:flex;gap:4px;margin-top:18px;border-bottom:1px solid var(--border)}
+.pr-tab{padding:10px 14px;font:600 13.5px 'Inter',sans-serif;color:var(--ash);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}
+.pr-tab.on{color:var(--e);border-color:var(--e)}
+.pr-tab span{font-weight:500;color:var(--ash);margin-left:4px}
+.pr-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+.pr-kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px}
+.pr-kpi small{display:block;color:var(--ash);font-size:13px;font-weight:500}
+.pr-kpi b{display:block;font:600 26px/1.1 'Sora',sans-serif;color:var(--tinta);margin-top:8px}
+.pr-kpi span{display:block;color:var(--ash);font-size:12px;margin-top:4px}
+.pr-u{font:500 14px 'Inter',sans-serif;font-style:normal;color:var(--ash)}
+.pr-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-top:14px;align-items:start}
+.pr-card{background:#fff;border:1px solid var(--border);border-radius:14px}
+.pr-card-h{padding:16px 18px 6px}
+.pr-card-h h2{font:600 15px 'Sora',sans-serif;color:var(--tinta)}
+.pr-card-h p{font-size:12.5px;color:var(--ash);margin-top:3px}
+.pr-body{padding:6px 18px 16px}
+.pr-row{display:grid;grid-template-columns:minmax(110px,1.1fr) 2fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+.pr-row:first-child{border-top:0}
+.pr-row b{font-weight:600;font-size:13.5px;color:var(--fog);text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-row small{font-size:12.5px;color:var(--ash);white-space:nowrap}
+.pr-bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:#EEF1F7}
+.pr-bar i{display:block;height:100%}
+.pr-leyenda{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ash);padding:4px 18px 14px}
+.pr-leyenda span{display:inline-flex;align-items:center;gap:6px}
+.pr-leyenda i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.pr-chip{display:inline-block;font:600 11.5px 'Inter',sans-serif;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.pr-lec{padding:12px 0;border-top:1px solid var(--border)}
+.pr-lec:first-child{border-top:0}
+.pr-lec-h{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.pr-lec-h a{font-weight:600;font-size:13.5px;color:var(--fog);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-lec-h a:hover{color:var(--e)}
+.pr-lec p{font-size:13px;color:#3A4560;line-height:1.55;margin-top:5px}
+.pr-lec .meta{font-size:12px;color:var(--ash);margin-top:4px}
+.pr-empty{background:#fff;border:1px dashed #C9D3E6;border-radius:14px;padding:28px;margin-top:18px;max-width:760px}
+.pr-empty h2{font:600 17px 'Sora',sans-serif;color:var(--tinta)}
+.pr-empty p,.pr-empty li{font-size:14px;color:#3A4560;line-height:1.6;margin-top:8px}
+.pr-empty ol{padding-left:20px}
+.pr-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.pr-nota{display:flex;gap:10px;align-items:flex-start;background:var(--edim);border:1px solid #C7D2FE;color:#1E3A8A;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;margin-top:16px}
+.pr-nota svg{flex:none;margin-top:1px}
+.mc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:14px}
+.mc-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.mc-card small{font:600 11.5px 'Inter',sans-serif;color:var(--e);text-transform:uppercase;letter-spacing:.04em}
+.mc-card b{font:600 15px 'Sora',sans-serif;color:var(--tinta);line-height:1.3}
+.mc-card p{font-size:13px;color:var(--ash);line-height:1.5;flex:1}
+.mc-card .btn{align-self:flex-start;margin-top:6px}
+.mc-campos{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mc-campos code{font:500 12px ui-monospace,Menlo,monospace;background:#F4F6FB;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:#1E3A8A;cursor:pointer}
+.mc-campos code:hover{border-color:var(--e)}
+@media(max-width:1000px){.pr-grid,.pr-two{grid-template-columns:1fr}.pr-kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+{% endblock %}
+
+{% macro barra(r) -%}
+<div class="pr-bar" role="img" aria-label="{{ r.a_favor }} de {{ r.total }} a favor">
+  {%- for clave, info in resultados.items() %}{% set n = r.conteo[clave] %}{% if n %}<i style="width:{{ (n / r.total * 100) | round(1) }}%;background:{{ info.color }}" title="{{ info.label }}: {{ n }}"></i>{% endif %}{% endfor -%}
+</div>
+{%- endmacro %}
+
+{% macro chip(clave) -%}
+{% set info = resultados.get(clave) %}{% if info %}<span class="pr-chip" style="color:{{ info.color }};background:{{ info.fondo }}">{{ info.label }}</span>{% endif %}
+{%- endmacro %}
+
+{% block content %}
+{% set gen = stats.general %}
+<h1 class="page-title">Precedentes del despacho</h1>
+<p class="pr-sub">Lo que el despacho ya vivió: cómo terminaron los asuntos, qué funcionó y los machotes listos para llenarse con los datos de cada caso.</p>
+
+<nav class="pr-tabs">
+  <a class="pr-tab{% if seccion != 'machotes' %} on{% endif %}" href="{{ url_for('insights.index') }}">Cómo nos ha ido<span>{{ gen.total }}</span></a>
+  <a class="pr-tab{% if seccion == 'machotes' %} on{% endif %}" href="{{ url_for('insights.index', seccion='machotes') }}">Machotes<span>{{ machotes | length }}</span></a>
+</nav>
+
+{% if seccion != 'machotes' %}
+  {% if not gen.total %}
+  <div class="pr-empty">
+    <h2>Aún no hay asuntos con resultado registrado</h2>
+    <p>Los precedentes se arman solos con cada asunto que concluye. Para alimentarlos:</p>
+    <ol>
+      <li>Abre un asunto concluido.</li>
+      <li>En la columna derecha, en <b>Resultado</b>, marca cómo terminó (ganado, convenio, parcial…).</li>
+      <li>Escribe en una o dos líneas qué argumento o estrategia funcionó.</li>
+    </ol>
+    <p>Desde ese momento, cada asunto nuevo parecido te mostrará esos precedentes, y {{ config.ASISTENTE_NOMBRE }} los tomará en cuenta.</p>
+  </div>
+  {% else %}
+  <section class="pr-kpis" aria-label="Resumen">
+    <div class="pr-kpi"><small>Asuntos concluidos</small><b>{{ gen.total }}</b><span>con resultado registrado</span></div>
+    <div class="pr-kpi"><small>A favor del cliente</small><b>{{ ((gen.a_favor / gen.total) * 100) | round | int }}%</b><span>{{ gen.a_favor }} ganados, parciales o en convenio</span></div>
+    <div class="pr-kpi"><small>Duración media</small><b>{{ gen.duracion_media if gen.duracion_media else '—' }}{% if gen.duracion_media %}<em class="pr-u"> meses</em>{% endif %}</b><span>del inicio a la resolución</span></div>
+    <div class="pr-kpi"><small>Lecciones registradas</small><b>{{ stats.lecciones | length }}</b><span>qué funcionó, en palabras del abogado</span></div>
+  </section>
+
+  <div class="pr-grid">
+    <section class="pr-card">
+      <div class="pr-card-h"><h2>Por materia</h2><p>Resultados de los asuntos concluidos en cada materia.</p></div>
+      <div class="pr-body">
+        {% for r in stats.por_materia %}
+        <div class="pr-row"><b>{{ r.nombre }}</b>{{ barra(r) }}<small>{{ r.a_favor }} de {{ r.total }} a favor</small></div>
+        {% endfor %}
+      </div>
+      <div class="pr-leyenda">{% for clave, info in resultados.items() %}<span><i style="background:{{ info.color }}"></i>{{ info.label }}</span>{% endfor %}</div>
+    </section>
+
+    <section class="pr-card">
+      <div class="pr-card-h"><h2>Lo que ha funcionado</h2><p>Notas de los abogados en asuntos ganados o resueltos con convenio.</p></div>
+      <div class="pr-body">
+        {% for f in stats.lecciones[:6] %}
+        <div class="pr-lec">
+          <div class="pr-lec-h"><a href="{{ url_for('asuntos.detalle', id=f.id) }}">{% if f.privado %}🔒 {% endif %}{{ f.titulo }}</a>{{ chip(f.resultado) }}</div>
+          <p>{{ f.resultado_notas | truncate(220) }}</p>
+          <div class="meta">{{ (f.tipo_asunto or '') | capitalize }}{% if f.juzgado %} · {{ f.juzgado }}{% endif %}{% if f.duracion_meses %} · {{ f.duracion_meses }} meses{% endif %}</div>
+        </div>
+        {% else %}
+        <p class="pr-lec" style="color:var(--ash);font-size:13px">Cuando registres qué funcionó en un asunto, aparecerá aquí.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="pr-two">
+    <section class="pr-card">
+      <div class="pr-card-h"><h2>Por juzgado</h2><p>Dónde se han litigado los asuntos concluidos.</p></div>
+      <div class="pr-body">
+        {% for r in stats.por_juzgado %}
+        <div class="pr-row"><b style="text-transform:none" title="{{ r.nombre }}">{{ r.nombre }}</b>{{ barra(r) }}<small>{{ r.a_favor }} de {{ r.total }}</small></div>
+        {% else %}<p style="color:var(--ash);font-size:13px;padding:8px 0">Sin juzgados registrados.</p>{% endfor %}
+      </div>
+    </section>
+    <section class="pr-card">
+      <div class="pr-card-h"><h2>Por despacho contrario</h2><p>Cómo nos ha ido contra cada despacho.</p></div>
+      <div class="pr-body">
+        {% for r in stats.por_contraparte %}
+        <div class="pr-row"><b style="text-transform:none" title="{{ r.nombre }}">{{ r.nombre }}</b>{{ barra(r) }}<small>{{ r.a_favor }} de {{ r.total }}</small></div>
+        {% else %}<p style="color:var(--ash);font-size:13px;padding:8px 0">Registra el despacho contrario en los asuntos para ver esta comparación.</p>{% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="pr-nota">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    <span>La comparación entre asuntos se calcula dentro del servidor del despacho. {{ config.ASISTENTE_NOMBRE }} solo usa los precedentes de asuntos no privados, y sin datos del cliente.</span>
+  </div>
+  {% endif %}
+
+{% else %}
+  <div class="pr-nota">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    <span><b>El llenado es 100% local.</b> El machote y los datos del asunto nunca salen del servidor del despacho ni pasan por ningún modelo de inteligencia artificial.</span>
+  </div>
+
+  {% if machotes %}
+  <div class="mc-grid">
+    {% for m in machotes %}
+    <div class="mc-card">
+      <small>{{ m.categoria or 'Machote' }}{% if m.tipo_derecho and m.tipo_derecho != 'Otro' %} · {{ m.tipo_derecho }}{% endif %}</small>
+      <b>{{ m.nombre }}</b>
+      <p>{{ m.descripcion or 'Plantilla Word del despacho.' }}</p>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('insights.machote', pid=m.id, asunto=request.args.get('asunto', type=int)) }}">Llenar con un asunto</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="pr-empty"{% if machotes %} style="margin-top:22px"{% endif %}>
+    <h2>{% if machotes %}Agregar más machotes{% else %}Todavía no hay machotes en Word{% endif %}</h2>
+    <p>Escribe en tu Word los campos entre llaves dobles, por ejemplo <code>{{ '{{nombre_cliente}}' }}</code>, y súbelo en <a href="{{ url_for('biblioteca.index', seccion='formatos') }}">Documentos → Formatos</a>. Se respetan el formato, los encabezados y las tablas del documento.</p>
+    <p>Campos que se llenan solos (clic para copiar). Cualquier otro campo que inventes, como <code>{{ '{{fecha_audiencia}}' }}</code>, se te pedirá al llenar.</p>
+    <div class="mc-campos" id="mcCampos">
+      {% for clave, etiqueta in campos_disponibles %}<code title="{{ etiqueta }}" data-c="{{ '{{' ~ clave ~ '}}' }}">{{ '{{' ~ clave ~ '}}' }}</code>{% endfor %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('mcCampos')?.addEventListener('click', async e => {
+  const c = e.target.closest('code'); if (!c) return;
+  try { await navigator.clipboard.writeText(c.dataset.c); showToast(`Copiado: ${c.dataset.c}`); } catch (_) {}
+});
+</script>
+{% endblock %}

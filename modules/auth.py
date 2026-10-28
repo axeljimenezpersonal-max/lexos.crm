@@ -129,11 +129,20 @@ def _ensure_onboarding(user_id: int):
 #  Decoradores públicos (importados por todos los módulos)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def sesion_del_despacho():
+    """La sesión solo vale si el usuario pertenece al despacho de esta petición."""
+    if not session.get("user_id"):
+        return False
+    if getattr(g, "tenant", None) is not None and getattr(g, "user", None) is None:
+        return False
+    return True
+
+
 def login_required(f):
-    """Redirige a /auth/login si no hay sesión activa."""
+    """Redirige a /auth/login si no hay sesión válida para este despacho."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get("user_id"):
+        if not sesion_del_despacho():
             flash("Debes iniciar sesión para continuar.", "warning")
             next_url = request.path
             return redirect(url_for("auth.login", next=next_url))
@@ -146,7 +155,7 @@ def role_required(*roles):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            if not session.get("user_id"):
+            if not sesion_del_despacho():
                 return redirect(url_for("auth.login"))
             if session.get("role") not in roles:
                 flash("No tienes permiso para acceder a esta sección.", "danger")
@@ -180,10 +189,53 @@ log_activity = _log
 
 @auth_bp.route("/landing")
 def landing():
-    """Página de bienvenida con discovery de email (lexos.mx raíz)."""
-    if session.get("user_id") and getattr(g, "tenant", None):
-        return redirect(url_for("dashboard.index"))
-    return render_template("auth/landing.html")
+    """Página pública de Habeas Corpus. Con sesión abierta ofrece volver al despacho."""
+    return render_template("auth/landing.html",
+                           en_sesion=bool(getattr(g, "user", None) and getattr(g, "tenant", None)))
+
+
+_RE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@auth_bp.route("/contacto", methods=["POST"])
+def contacto():
+    """Solicitud de demostración desde la página pública: se guarda y nos avisa por correo."""
+    d = request.get_json(silent=True) or request.form
+    if (d.get("sitio") or "").strip():          # campo trampa para bots
+        return jsonify(ok=True)
+    datos = {k: (d.get(k) or "").strip()[:n] for k, n in
+             (("nombre", 120), ("despacho", 160), ("email", 160), ("telefono", 30), ("tamano", 30), ("mensaje", 2000))}
+    datos["email"] = datos["email"].lower()
+    if not datos["nombre"] or not _RE_EMAIL.match(datos["email"]):
+        return jsonify(ok=False, error="Escribe tu nombre y un correo válido."), 400
+
+    gdb = _gdb()
+    gdb.execute("""CREATE TABLE IF NOT EXISTS contactos_landing (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, despacho TEXT, email TEXT, telefono TEXT,
+        tamano TEXT, mensaje TEXT, ip TEXT, atendido INTEGER DEFAULT 0, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    recientes = gdb.execute("SELECT COUNT(*) FROM contactos_landing WHERE ip=? AND fecha >= datetime('now','-1 hour')",
+                            (request.remote_addr,)).fetchone()[0]
+    if recientes >= 5:
+        return jsonify(ok=False, error="Ya recibimos tus datos. Te escribimos muy pronto."), 429
+    gdb.execute("INSERT INTO contactos_landing (nombre, despacho, email, telefono, tamano, mensaje, ip) VALUES (?,?,?,?,?,?,?)",
+                (*datos.values(), request.remote_addr))
+    gdb.commit()
+
+    destino = current_app.config.get("CONTACT_EMAIL")
+    if destino:
+        try:
+            from flask_mail import Message
+            from app import mail
+            import html as _html
+            filas = "".join(f"<tr><td style='padding:6px 12px 6px 0;color:#64708A'>{_html.escape(k.capitalize())}</td>"
+                            f"<td style='padding:6px 0;color:#0A1A4A'>{_html.escape(v) or '—'}</td></tr>" for k, v in datos.items())
+            mail.send(Message(subject=f"Nueva solicitud de demostración — {datos['despacho'] or datos['nombre']}",
+                              recipients=[destino], reply_to=datos["email"],
+                              html=f"<div style='font-family:Inter,Arial,sans-serif'><h2 style='color:#0A1A4A'>Solicitud de demostración</h2>"
+                                   f"<table>{filas}</table></div>"))
+        except Exception:
+            current_app.logger.warning("No se pudo enviar el aviso de contacto; quedó guardado en contactos_landing")
+    return jsonify(ok=True)
 
 
 @auth_bp.route("/discover", methods=["POST"])
@@ -258,7 +310,7 @@ def discover():
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get("user_id") and getattr(g, "tenant", None):
+    if getattr(g, "user", None) and getattr(g, "tenant", None):
         return redirect(url_for("dashboard.index"))
 
     prefill_email = request.args.get("prefill_email", "")

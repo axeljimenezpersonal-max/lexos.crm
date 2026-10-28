@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Base legal{% endblock %}
+{% block page_title %}Base legal{% endblock %}
+
+{% block head %}
+<style>
+.bl-sub{color:var(--ash);font-size:14.5px;margin-top:4px;max-width:66ch}
+.bl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+.bl-kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px}
+.bl-kpi small{display:block;color:var(--ash);font-size:13px;font-weight:500}
+.bl-kpi b{display:block;font:600 26px/1.1 'Sora',sans-serif;color:var(--tinta);margin-top:8px}
+.bl-kpi span{display:block;color:var(--ash);font-size:12px;margin-top:4px}
+.bl-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-top:14px;align-items:start}
+.bl-card{background:#fff;border:1px solid var(--border);border-radius:14px}
+.bl-card-h{padding:16px 18px 8px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.bl-card-h h2{font:600 15px 'Sora',sans-serif;color:var(--tinta)}
+.bl-search{display:flex;gap:8px;padding:4px 18px 10px}
+.bl-search input{flex:1;padding:11px 14px;border:1px solid var(--border);border-radius:10px;font:400 14.5px 'Inter',sans-serif;color:var(--fog);outline:none}
+.bl-search input:focus{border-color:var(--e);box-shadow:0 0 0 3px var(--edim)}
+.bl-filtros{display:flex;gap:6px;padding:0 18px 12px}
+.bl-chip{padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:#fff;color:#3A4560;font:500 12.5px 'Inter',sans-serif;cursor:pointer}
+.bl-chip.on{background:var(--edim);border-color:#C7D2FE;color:var(--e);font-weight:600}
+.bl-results{padding:0 18px 16px}
+.bl-res{padding:14px 0;border-top:1px solid var(--border)}
+.bl-res-h{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.bl-res-h b{font-weight:600;color:var(--fog)}
+.bl-ref{display:inline-block;font:600 12px 'Inter',sans-serif;color:var(--e);background:var(--edim);padding:2px 8px;border-radius:6px;margin-right:6px}
+.bl-res-h a{font-size:12.5px;color:var(--e);font-weight:600;text-decoration:none;white-space:nowrap}
+.bl-res p{color:#3A4560;font-size:13.5px;margin-top:6px;line-height:1.6;white-space:pre-line}
+.bl-res .meta{font-size:12px;color:var(--ash);margin-top:4px}
+.bl-mas{background:none;border:0;color:var(--e);font:600 12.5px 'Inter',sans-serif;cursor:pointer;padding:4px 0 0}
+.bl-empty{color:var(--ash);font-size:13.5px;padding:8px 0 4px}
+.bl-list{padding:0 18px 12px}
+.bl-item{display:block;padding:10px 0;border-top:1px solid var(--border);text-decoration:none;color:inherit}
+.bl-item:first-child{border-top:0}
+.bl-item b{display:block;font-weight:600;font-size:13.5px;color:var(--fog);line-height:1.4}
+.bl-item small{display:block;font-size:12px;color:var(--ash);margin-top:2px}
+.bl-item:hover b{color:var(--e)}
+.bl-fuente{font-size:12px;color:var(--ash);padding:0 18px 16px}
+@media(max-width:1000px){.bl-grid{grid-template-columns:1fr}.bl-kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.bl-search{flex-direction:column}}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set leyes = resumen.leyes %}{% set dof = resumen.dof %}
+<h1 class="page-title">Base legal de México</h1>
+<p class="bl-sub">Leyes federales vigentes y Diario Oficial de la Federación, descargados de las fuentes oficiales y actualizados todos los días. Es la base que consulta el asistente.</p>
+
+<section class="bl-kpis" aria-label="Contenido de la base">
+  <div class="bl-kpi"><small>Leyes federales</small><b>{{ leyes.documentos or 0 }}</b><span>de 317 publicadas por la Cámara de Diputados</span></div>
+  <div class="bl-kpi"><small>Artículos indexados</small><b>{{ '{:,}'.format(leyes.fragmentos or 0) }}</b><span>separados por artículo</span></div>
+  <div class="bl-kpi"><small>Notas del DOF</small><b>{{ '{:,}'.format(dof.documentos or 0) }}</b><span>publicaciones oficiales</span></div>
+  <div class="bl-kpi"><small>Última actualización</small><b style="font-size:17px">{{ (resumen.sincronizaciones[0].fin or resumen.sincronizaciones[0].inicio)[:16] if resumen.sincronizaciones else '—' }}</b><span>{{ 'En curso' if resumen.sincronizaciones and not resumen.sincronizaciones[0].fin else 'Diaria, automática' }}</span></div>
+</section>
+
+<div class="bl-grid">
+  <section class="bl-card">
+    <div class="bl-card-h"><h2>Buscar en la ley</h2></div>
+    <form class="bl-search" id="blForm" role="search">
+      <input id="blQ" placeholder="Ej. obligación de dar alimentos, artículo 14 constitucional, actos de comercio…" autocomplete="off" aria-label="Buscar en leyes federales y DOF">
+      <button class="btn btn-primary" type="submit">Buscar</button>
+    </form>
+    <div class="bl-filtros" role="group" aria-label="Fuente">
+      <button type="button" class="bl-chip on" data-f="">Todo</button>
+      <button type="button" class="bl-chip" data-f="ley_federal">Leyes federales</button>
+      <button type="button" class="bl-chip" data-f="dof">Diario Oficial</button>
+    </div>
+    <div class="bl-results" id="blRes" aria-live="polite"><p class="bl-empty">Escribe una pregunta o un tema. Te muestro el artículo exacto y de qué ley sale.</p></div>
+  </section>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <section class="bl-card">
+      <div class="bl-card-h"><h2>Recién publicado en el DOF</h2></div>
+      <div class="bl-list">
+        {% for n in resumen.recientes_dof %}
+        <a class="bl-item" href="{{ n.url_oficial }}" target="_blank" rel="noopener"><b>{{ n.titulo }}</b><small>{{ n.fecha_publicacion }} · {{ n.detalle }}</small></a>
+        {% else %}
+        <p class="bl-empty">Aún no hay notas descargadas.</p>
+        {% endfor %}
+      </div>
+    </section>
+    <section class="bl-card">
+      <div class="bl-card-h"><h2>Reformas más recientes</h2></div>
+      <div class="bl-list">
+        {% for r in resumen.reformas %}
+        <a class="bl-item" href="{{ r.url_oficial }}" target="_blank" rel="noopener"><b>{{ r.titulo }}</b><small>Última reforma DOF {{ r.ultima_reforma }}</small></a>
+        {% else %}
+        <p class="bl-empty">Aún no hay leyes descargadas.</p>
+        {% endfor %}
+      </div>
+      <p class="bl-fuente">Fuentes: Cámara de Diputados (Leyes Federales Vigentes) y Secretaría de Gobernación (SIDOF). El texto con validez oficial es el publicado en el DOF.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById('blForm'), out = document.getElementById('blRes');
+  let fuente = '';
+  function el(tag, txt, cls) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+  document.querySelectorAll('.bl-chip').forEach(c => c.addEventListener('click', () => {
+    fuente = c.dataset.f;
+    document.querySelectorAll('.bl-chip').forEach(x => x.classList.toggle('on', x === c));
+    if (document.getElementById('blQ').value.trim()) form.requestSubmit();
+  }));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const q = document.getElementById('blQ').value.trim();
+    if (!q) return;
+    out.replaceChildren(el('p', 'Buscando en la ley…', 'bl-empty'));
+    const u = new URL('{{ url_for("corpus.buscar") }}', location.origin);
+    u.searchParams.set('q', q);
+    if (fuente) u.searchParams.set('fuente', fuente);
+    try {
+      const j = await (await fetch(u)).json();
+      out.replaceChildren();
+      if (!j.resultados.length) { out.append(el('p', 'No encontré nada sobre eso.', 'bl-empty')); return; }
+      j.resultados.forEach(r => {
+        const box = el('div', null, 'bl-res');
+        const h = el('div', null, 'bl-res-h');
+        const t = el('span'); t.append(el('span', r.referencia, 'bl-ref'), el('b', r.titulo));
+        const a = el('a', r.fuente === 'dof' ? 'Ver en el DOF' : 'Ver ley oficial'); a.href = r.url_oficial; a.target = '_blank'; a.rel = 'noopener';
+        h.append(t, a);
+        const corto = r.texto.length > 600;
+        const p = el('p', corto ? r.texto.slice(0, 600) + '…' : r.texto);
+        box.append(h, el('div', r.fuente === 'dof' ? `DOF ${r.fecha_publicacion} · ${r.detalle || ''}` : `Última reforma DOF ${r.ultima_reforma || 's/f'}`, 'meta'), p);
+        if (corto) {
+          const mas = el('button', 'Leer completo', 'bl-mas'); mas.type = 'button';
+          mas.addEventListener('click', () => { p.textContent = r.texto; mas.remove(); });
+          box.append(mas);
+        }
+        out.append(box);
+      });
+    } catch (_) {
+      out.replaceChildren(el('p', 'No se pudo buscar. Intenta de nuevo.', 'bl-empty'));
+    }
+  });
+})();
+</script>
+{% endblock %}

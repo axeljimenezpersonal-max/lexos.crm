@@ -1,250 +1,254 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import icon %}
 {% block title %}Asuntos{% endblock %}
 {% block page_title %}Asuntos{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
-<style>
-.as-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
-.as-filters { display:none; background:var(--c); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px; }
-.as-filters.open { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
-.as-filters label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.15em; text-transform:uppercase; color:var(--ash); margin-bottom:5px; display:block; }
-.as-filters input, .as-filters select { background:var(--n); border:1px solid var(--border); border-radius:6px; color:var(--fog); font-family:'DM Mono',monospace; font-size:11px; padding:8px 10px; width:100%; outline:none; }
-.as-filters input:focus, .as-filters select:focus { border-color:var(--e); }
-.search-wrap { position:relative; flex:1; min-width:200px; max-width:380px; }
-.search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ash); pointer-events:none; }
-.search-input { background:var(--n); border:1px solid var(--border); border-radius:6px; color:var(--fog); font-family:'DM Mono',monospace; font-size:11px; padding:8px 10px 8px 32px; width:100%; outline:none; }
-.search-input:focus { border-color:var(--e); }
-.search-input::placeholder { color:var(--ash); opacity:0.5; font-size:10px; letter-spacing:0.06em; }
-.multi-check-group { display:flex; flex-direction:column; gap:4px; }
-.multi-check-group label { font-size:11px; display:flex; align-items:center; gap:6px; text-transform:none; letter-spacing:0; }
-.filter-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-</style>
 {% endblock %}
 
+{% macro proximo_html(a) -%}
+  {% if a.proximo %}
+    <span class="as-sem {{ a.proximo.semaforo }}"><b>{{ a.proximo.tipo }} · {{ a.proximo.corta }}</b><small>{{ a.proximo.cuando }}</small></span>
+  {% elif a.resultado_info %}
+    <span class="as-chip" style="--c-c:{{ a.resultado_info.color }};--c-f:{{ a.resultado_info.fondo }}">{{ a.resultado_info.label }}</span>
+  {% else %}<span class="as-muted">—</span>{% endif %}
+{%- endmacro %}
+
+{% macro avatar(p, cls='') -%}
+  {% if p %}<span class="as-av {{ cls }}" style="background:{{ p.color }}" title="{{ p.nombre }}">{{ p.iniciales }}</span>{% endif %}
+{%- endmacro %}
+
 {% block content %}
+<div class="as-head">
+  <div>
+    <h1 class="page-title">Asuntos</h1>
+    <p class="as-sub">{{ conteos.abiertos }} en curso · {{ conteos.concluidos }} concluidos</p>
+  </div>
+  {% if session.get('role') in ('super_admin', 'admin', 'abogado') %}
+  <a href="{{ url_for('asuntos.nuevo') }}" class="btn btn-primary">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    Nuevo asunto
+  </a>
+  {% endif %}
+</div>
 
-<!-- ── Page header ── -->
-<div class="page-header">
-  <div class="page-eyebrow">Gestión · Códex</div>
-  <h1 class="page-title">Asuntos</h1>
-  <div class="page-meta-row">
-    <span class="page-count">{{ total }} expediente{{ 's' if total != 1 else '' }}</span>
-    <div class="page-actions">
-      <a href="{{ url_for('asuntos.nuevo') }}" class="btn btn-primary btn-sm">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Nuevo asunto
-      </a>
-    </div>
+<section class="as-kpis" aria-label="Resumen">
+  <a class="as-kpi{% if grupo == 'abiertos' and not atencion and vista == 'lista' %} on{% endif %}" href="{{ liga(grupo='', atencion='', vista='') }}">
+    <small>En curso</small><b>{{ resumen.abiertos }}</b><span>por iniciar, activos y en espera</span>
+  </a>
+  <a class="as-kpi{% if resumen.termino %} alerta{% endif %}{% if atencion == 'termino' %} on{% endif %}" href="{{ liga(atencion='termino', grupo='', vista='') }}">
+    <small>Vencen en 7 días</small><b>{{ resumen.termino }}</b><span>términos, audiencias y pendientes</span>
+  </a>
+  <a class="as-kpi{% if resumen.sin_mov %} aviso{% endif %}{% if atencion == 'sin_mov' %} on{% endif %}" href="{{ liga(atencion='sin_mov', grupo='', vista='') }}">
+    <small>Sin movimiento</small><b>{{ resumen.sin_mov }}</b><span>más de 30 días sin actividad</span>
+  </a>
+  <a class="as-kpi{% if grupo == 'concluidos' %} on{% endif %}" href="{{ liga(grupo='concluidos', atencion='', vista='') }}">
+    <small>Concluidos este año</small><b>{{ resumen.concluidos }}</b><span>con su resultado en Precedentes</span>
+  </a>
+</section>
+
+<div class="as-toolbar">
+  <form class="as-search" method="get" action="{{ url_for('asuntos.index') }}" role="search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar por título, expediente, cliente o contraparte" aria-label="Buscar asuntos">
+    {% if grupo != 'abiertos' %}<input type="hidden" name="grupo" value="{{ grupo }}">{% endif %}
+    {% if tipo %}<input type="hidden" name="tipo" value="{{ tipo }}">{% endif %}
+    {% if abogado %}<input type="hidden" name="abogado" value="{{ abogado }}">{% endif %}
+    {% if vista == 'tablero' %}<input type="hidden" name="vista" value="tablero">{% endif %}
+  </form>
+  <select class="as-select" aria-label="Materia" onchange="location.href=this.value">
+    <option value="{{ liga(tipo='') }}">Todas las materias</option>
+    {% for k, t in tipos_derecho.items() %}<option value="{{ liga(tipo=k) }}"{% if tipo == k %} selected{% endif %}>{{ t.label }}</option>{% endfor %}
+  </select>
+  {% if abogados %}
+  <select class="as-select" aria-label="Responsable" onchange="location.href=this.value">
+    <option value="{{ liga(abogado='') }}">Todo el equipo</option>
+    {% for ab in abogados %}<option value="{{ liga(abogado=ab.id) }}"{% if abogado == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <div class="as-seg" role="tablist" aria-label="Vista">
+    <a href="{{ liga(vista='') }}" class="{{ 'on' if vista == 'lista' }}">Lista</a>
+    <a href="{{ liga(vista='tablero', grupo='') }}" class="{{ 'on' if vista == 'tablero' }}">Tablero</a>
   </div>
 </div>
-<div class="page-divider"></div>
 
-<!-- ── Toolbar ───────────────────────────────────────────────────────────── -->
-<form id="filterForm" method="GET" action="" style="display:contents;">
-  <div id="hiddenEstados"></div>
-  <div id="hiddenTipos"></div>
-  <input type="hidden" name="abogado"  id="hAbogado"  value="{{ abogado }}">
-  <input type="hidden" name="cliente"  id="hCliente"  value="{{ cliente_q }}">
-  <input type="hidden" name="desde"    id="hDesde"    value="{{ desde }}">
-  <input type="hidden" name="hasta"    id="hHasta"    value="{{ hasta }}">
-  <input type="hidden" name="vencidos" id="hVencidos" value="{{ vencidos }}">
-  <input type="hidden" name="vista"    id="hVista"    value="kanban">
-
-  <div class="as-toolbar">
-    <div class="search-wrap">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" name="q" class="search-input" placeholder="Buscar nombre, expediente, cliente…"
-             value="{{ q }}" id="searchQ" autocomplete="off">
-    </div>
-    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('asFilters').classList.toggle('open')">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-      Filtros
-      {% if estados or tipos or abogado or cliente_q or vencidos %}<span class="badge badge-activo" style="font-size:.65rem;padding:1px 5px;">ON</span>{% endif %}
-    </button>
-  </div>
-
-  <!-- Filters drawer -->
-  <div class="as-filters" id="asFilters">
-    <div>
-      <label>Estado</label>
-      <div class="multi-check-group" id="estadoGroup">
-        {% for col in kanban_cols %}
-        <label><input type="checkbox" name="_ec" value="{{ col.key }}" {% if col.key in estados %}checked{% endif %} onchange="syncMulti('estado')"> {{ col.label }}</label>
-        {% endfor %}
-      </div>
-    </div>
-    <div>
-      <label>Tipo de derecho</label>
-      <div class="multi-check-group" id="tipoGroup">
-        {% for key, td in tipos_derecho.items() %}
-        <label><input type="checkbox" name="_tc" value="{{ key }}" {% if key in tipos %}checked{% endif %} onchange="syncMulti('tipo')"> {{ td.label }}</label>
-        {% endfor %}
-      </div>
-    </div>
-    <div>
-      <label>Abogado</label>
-      <select id="fAbogado" onchange="document.getElementById('hAbogado').value=this.value;submitFilter()">
-        <option value="">Todos</option>
-        {% for a in abogados %}<option value="{{ a.id }}" {% if abogado==a.id|string %}selected{% endif %}>{{ a.nombre }} {{ a.apellidos }}</option>{% endfor %}
-      </select>
-    </div>
-    <div>
-      <label>Cliente</label>
-      <input type="text" id="fCliente" value="{{ cliente_q }}" placeholder="Buscar cliente…" oninput="document.getElementById('hCliente').value=this.value">
-    </div>
-    <div><label>Alta desde</label><input type="date" id="fDesde" value="{{ desde }}" onchange="document.getElementById('hDesde').value=this.value;submitFilter()"></div>
-    <div><label>Alta hasta</label><input type="date" id="fHasta" value="{{ hasta }}" onchange="document.getElementById('hHasta').value=this.value;submitFilter()"></div>
-    <div>
-      <label>Vencimientos</label>
-      <select id="fVencidos" onchange="document.getElementById('hVencidos').value=this.value;submitFilter()">
-        <option value="">Todos</option>
-        <option value="1" {% if vencidos=='1' %}selected{% endif %}>Solo vencidos</option>
-        <option value="0" {% if vencidos=='0' %}selected{% endif %}>No vencidos</option>
-      </select>
-    </div>
-    <div style="align-self:flex-end;"><button type="button" class="btn btn-ghost btn-sm" onclick="clearFilters()">Limpiar todo</button></div>
-  </div>
-</form>
-
-<!-- Active chips -->
-{% if estados or tipos or abogado or cliente_q or vencidos %}
-<div class="filter-chips">
-  {% for e in estados %}<span class="filter-chip">{{ e }}<button onclick="removeEstado('{{ e }}')">×</button></span>{% endfor %}
-  {% for t in tipos %}<span class="filter-chip">{{ tipos_derecho[t].label if t in tipos_derecho else t }}<button onclick="removeTipo('{{ t }}')">×</button></span>{% endfor %}
-  {% if abogado %}<span class="filter-chip">Abogado<button onclick="document.getElementById('hAbogado').value='';submitFilter()">×</button></span>{% endif %}
-  {% if cliente_q %}<span class="filter-chip">Cliente: {{ cliente_q }}<button onclick="document.getElementById('hCliente').value='';submitFilter()">×</button></span>{% endif %}
-  {% if vencidos %}<span class="filter-chip">{{ 'Vencidos' if vencidos=='1' else 'Sin vencer' }}<button onclick="document.getElementById('hVencidos').value='';submitFilter()">×</button></span>{% endif %}
-</div>
-{% endif %}
-
-<!-- ═══ KANBAN ═══════════════════════════════════════════════════════════════ -->
-<div id="viewKanban">
-  <div class="kanban-board">
-    {% for col in kanban_cols %}
-    {% set cards = kanban_data.get(col.key, []) %}
-    <div class="kanban-col">
-      <div class="kanban-col-head" style="background:{{ col.color }}18;border-color:{{ col.color }}44;">
-        <span class="kanban-col-title" style="color:{{ col.color }};">{{ col.label }}</span>
-        <span class="kanban-count" style="background:{{ col.color }}20;color:{{ col.color }};" id="kcount-{{ col.key }}">{{ cards|length }}</span>
-      </div>
-      <div class="kanban-drop-zone" id="kzone-{{ col.key }}" data-estado="{{ col.key }}"
-           ondragover="event.preventDefault();this.classList.add('drag-over')"
-           ondragleave="this.classList.remove('drag-over')"
-           ondrop="handleDrop(event,this)">
-        {% for a in cards %}
-        {% set ti = a.tipo_info %}
-        <div class="kanban-card" id="kcard-{{ a.id }}" data-id="{{ a.id }}" draggable="true"
-             ondragstart="handleDragStart(event,{{ a.id }})" ondragend="handleDragEnd(event)"
-             data-href="{{ url_for('asuntos.detalle', id=a.id) }}"
-             style="cursor:pointer;">
-          <div class="kanban-card-left-bar" style="background:{{ ti.color }};"></div>
-          <div class="kanban-card-title" style="padding-left:7px;font-family:'Libre Baskerville',Georgia,serif;">
-            {{ a.titulo | truncate(48) }}
-          </div>
-          <div class="kanban-card-meta" style="padding-left:7px;">
-            <span class="tipo-badge" style="background:{{ ti.color }};font-size:.65rem;">{{ icon(ti.icon, 12, 12) }} {{ ti.label }}</span>
-          </div>
-          {% if a.cliente_razon or a.cliente_nombre %}
-          <div class="kanban-card-meta" style="padding-left:7px;">{{ icon("user", 12, 12) }} {{ (a.cliente_razon or a.cliente_nombre or '') | trim | truncate(26) }}</div>
-          {% endif %}
-          <div class="kanban-card-foot">
-            <span class="sem-dot {{ a.semaforo.clase }}" style="font-size:.68rem;">{{ a.semaforo.label }}</span>
-            <span class="badge badge-{{ a.prioridad }}" style="font-size:.65rem;">{{ a.prioridad }}</span>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
+{% if vista == 'lista' %}
+<div class="as-toolbar" style="margin-top:12px">
+  <div class="as-seg" aria-label="Estado">
+    {% for k, g_ in grupos.items() %}
+    <a href="{{ liga(grupo=k if k != 'abiertos' else '', atencion='') }}" class="{{ 'on' if grupo == k and not atencion }}">{{ g_[0] }}<span>{{ conteos[k] }}</span></a>
     {% endfor %}
   </div>
 </div>
+{% endif %}
 
-<!-- No pagination needed for Kanban -->
+{% if atencion %}
+<div class="as-filtro">{{ 'Vencen en los próximos 7 días (o ya vencieron)' if atencion == 'termino' else 'Más de 30 días sin movimiento' }}<a href="{{ liga(atencion='') }}" aria-label="Quitar filtro">×</a></div>
+{% endif %}
 
+{% if vista == 'lista' %}
+<div class="as-tabla-wrap">
+  {% if asuntos %}
+  <table class="as-tabla">
+    <thead><tr>
+      <th>Asunto</th><th>Cliente</th><th>{{ 'Resultado' if grupo == 'concluidos' else 'Lo que sigue' }}</th>
+      <th>Responsable</th><th>Estado</th><th>Movimiento</th>
+    </tr></thead>
+    <tbody>
+      {% for a in asuntos %}
+      <tr data-href="{{ url_for('asuntos.detalle', id=a.id) }}">
+        <td>
+          <div class="as-tit">
+            <span class="as-dot" style="--d:{{ a.tipo_info.color }}" title="{{ a.tipo_info.label }}"></span>
+            <div style="min-width:0">
+              <a href="{{ url_for('asuntos.detalle', id=a.id) }}">{{ a.titulo }}</a>{% if a.privado %}<span class="as-lock" title="Asunto privado">🔒</span>{% endif %}
+              <small>{{ a.numero_expediente or 'Sin expediente' }} · {{ a.tipo_info.label }}{% if a.sub_tipo %} · {{ a.sub_tipo }}{% endif %}</small>
+            </div>
+          </div>
+        </td>
+        <td class="c-cli">{{ a.cliente or '—' }}</td>
+        <td class="c-prox">{{ proximo_html(a) }}</td>
+        <td class="c-resp">{% if a.responsable %}<span class="as-resp">{{ avatar(a.responsable) }}<span>{{ a.responsable.corto }}</span></span>{% else %}<span class="as-muted">Sin asignar</span>{% endif %}</td>
+        <td class="c-est"><span class="as-chip" style="--c-c:{{ a.estado_info.color }};--c-f:{{ a.estado_info.fondo }}">{{ a.estado_info.label }}</span></td>
+        <td class="c-mov as-muted">{{ a.movimiento }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if total_pages > 1 %}
+  <div class="as-pag">
+    <span>Página {{ page }} de {{ total_pages }} · {{ total }} asuntos</span>
+    <div>
+      {% if page > 1 %}<a class="btn btn-secondary btn-sm" href="{{ liga(page=page - 1) }}">← Anterior</a>{% endif %}
+      {% if page < total_pages %}<a class="btn btn-secondary btn-sm" href="{{ liga(page=page + 1) }}">Siguiente →</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="as-vacio">
+    {% if q or tipo or abogado or atencion %}
+      <h3>Nada coincide con esos filtros</h3>
+      <p>Prueba con otra búsqueda o quita los filtros.</p>
+      <a class="btn btn-secondary" href="{{ url_for('asuntos.index') }}">Ver todos los asuntos en curso</a>
+    {% elif grupo == 'abiertos' %}
+      <h3>No hay asuntos en curso</h3>
+      <p>Da de alta el primero: en un minuto queda listo con su cliente, juzgado y responsable.</p>
+      <a class="btn btn-primary" href="{{ url_for('asuntos.nuevo') }}">Nuevo asunto</a>
+    {% else %}
+      <h3>No hay asuntos aquí</h3>
+      <p>Cuando haya asuntos en este estado, aparecerán en esta lista.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<div class="as-board" id="asBoard">
+  {% for col in tablero %}
+  <section class="as-col" data-estado="{{ col.key }}" aria-label="{{ col.label }}">
+    <div class="as-col-h">
+      <b><span class="as-dot" style="--d:{{ estados[col.key].color }}"></span>{{ col.label }}</b>
+      <span>{{ col.asuntos | length }}</span>
+    </div>
+    {% for a in col.asuntos %}
+    <a class="as-kcard" href="{{ url_for('asuntos.detalle', id=a.id) }}" draggable="true" data-id="{{ a.id }}" data-titulo="{{ a.titulo }}">
+      <b>{{ a.titulo }}{% if a.privado %} <span class="as-lock">🔒</span>{% endif %}</b>
+      <div class="cli">{{ a.cliente or 'Sin cliente' }}</div>
+      <div class="pie">
+        <span class="as-chip" style="--c-c:{{ a.tipo_info.color }};--c-f:color-mix(in srgb, {{ a.tipo_info.color }} 10%, #fff)">{{ a.tipo_info.label }}</span>
+        {% if a.proximo %}<span class="vence {{ a.proximo.semaforo }}" title="{{ a.proximo.titulo }}">{{ a.proximo.tipo }} · {{ a.proximo.cuando | lower }}</span>
+        {% elif a.resultado_info %}<span class="as-chip" style="--c-c:{{ a.resultado_info.color }};--c-f:{{ a.resultado_info.fondo }}">{{ a.resultado_info.label }}</span>{% endif %}
+        {{ avatar(a.responsable) }}
+      </div>
+    </a>
+    {% else %}
+    <div class="as-col-vacia">Arrastra aquí un asunto</div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+
+<div class="as-modal" id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTitulo">
+  <div class="as-modal-c">
+    <div class="as-modal-h"><h3 id="resTitulo">¿Cómo terminó el asunto?</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <p id="resAsunto"></p>
+      <div class="as-res" id="resOpciones">
+        {% for k, r in resultados.items() %}<button type="button" data-res="{{ k }}" style="--rc:{{ r.color }};--rf:{{ r.fondo }}">{{ r.label }}</button>{% endfor %}
+      </div>
+      <div>
+        <label class="as-label" for="resNotas">¿Qué funcionó o qué harías distinto? <small>(opcional)</small></label>
+        <textarea class="as-textarea" id="resNotas" rows="3" maxlength="3000" placeholder="Ej. La pericial en ingeniería fue decisiva para probar el avance de obra."></textarea>
+      </div>
+      <p style="font-size:12.5px">Queda como precedente: los asuntos parecidos lo mostrarán y Tribuno lo tomará en cuenta.</p>
+    </div>
+    <div class="as-modal-f">
+      <button type="button" class="btn btn-ghost" data-cerrar>Ahora no</button>
+      <button type="button" class="btn btn-primary" id="resGuardar">Guardar resultado</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ── Filters ───────────────────────────────────────────────────────────────────
-function syncMulti(type) {
-  const grp = type==="estado" ? "estadoGroup" : "tipoGroup";
-  const hid = type==="estado" ? "hiddenEstados" : "hiddenTipos";
-  const name = type==="estado" ? "estado" : "tipo";
-  const container = document.getElementById(hid);
-  container.innerHTML = "";
-  document.querySelectorAll(`#${grp} input:checked`).forEach(cb => {
-    const inp = document.createElement("input");
-    inp.type = "hidden"; inp.name = name; inp.value = cb.value;
-    container.appendChild(inp);
+(() => {
+  document.querySelectorAll('.as-tabla tbody tr').forEach(tr => tr.addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    location.href = tr.dataset.href;
+  }));
+
+  const board = document.getElementById('asBoard');
+  if (!board) return;
+  const JSONH = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+  let arrastrado = null;
+
+  board.addEventListener('dragstart', e => {
+    const c = e.target.closest('.as-kcard'); if (!c) return;
+    arrastrado = c; c.classList.add('arrastrando');
+    e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.dataset.id);
   });
-}
-function submitFilter() { syncMulti("estado"); syncMulti("tipo"); document.getElementById("filterForm").submit(); }
-
-let searchTimer;
-document.getElementById("searchQ").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(submitFilter, 350); });
-document.getElementById("fCliente").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(submitFilter, 350); });
-
-function clearFilters() {
-  document.querySelectorAll("#estadoGroup input,#tipoGroup input").forEach(cb => cb.checked=false);
-  ["hAbogado","hCliente","hDesde","hHasta","hVencidos"].forEach(id => { const el=document.getElementById(id); if(el) el.value=""; });
-  document.getElementById("hiddenEstados").innerHTML = "";
-  document.getElementById("hiddenTipos").innerHTML = "";
-  document.getElementById("searchQ").value = "";
-  submitFilter();
-}
-function removeEstado(e) { const cb=document.querySelector(`#estadoGroup input[value="${e}"]`); if(cb) cb.checked=false; syncMulti("estado"); submitFilter(); }
-function removeTipo(t)   { const cb=document.querySelector(`#tipoGroup input[value="${t}"]`);   if(cb) cb.checked=false; syncMulti("tipo");   submitFilter(); }
-
-// Open filters if active
-{% if estados or tipos or abogado or cliente_q or vencidos %}
-document.getElementById("asFilters").classList.add("open");
-{% endif %}
-syncMulti("estado"); syncMulti("tipo");
-
-// ── Kanban drag & drop ────────────────────────────────────────────────────────
-let dragId = null;
-let wasDragged = false;
-function handleDragStart(e, id) {
-  dragId = id;
-  wasDragged = true;
-  e.dataTransfer.effectAllowed = "move";
-  setTimeout(() => document.getElementById("kcard-"+id)?.classList.add("dragging"), 0);
-}
-function handleDragEnd(e) {
-  document.querySelectorAll(".kanban-card.dragging").forEach(el => el.classList.remove("dragging"));
-  setTimeout(() => { wasDragged = false; }, 200);
-}
-
-// Click anywhere on card → navigate (but not if dragging)
-document.querySelectorAll(".kanban-card[data-href]").forEach(card => {
-  card.addEventListener("click", function(e) {
-    if (wasDragged) return;
-    window.location.href = this.dataset.href;
-  });
-});
-async function handleDrop(e, zone) {
-  e.preventDefault();
-  zone.classList.remove("drag-over");
-  const newEstado = zone.dataset.estado;
-  if (!dragId || !newEstado) return;
-  const card = document.getElementById("kcard-"+dragId);
-  if (!card) return;
-  zone.appendChild(card);
-  // Update count badges
-  document.querySelectorAll(".kanban-drop-zone").forEach(z => {
-    const col = z.closest(".kanban-col");
-    const key = z.id.replace("kzone-","");
-    const badge = document.getElementById("kcount-"+key);
-    if (badge) badge.textContent = z.querySelectorAll(".kanban-card").length;
-  });
-  try {
-    await fetch(`/asuntos/${dragId}/estado`, {
-      method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({estado: newEstado}),
+  board.addEventListener('dragend', () => { arrastrado?.classList.remove('arrastrando'); board.querySelectorAll('.sobre').forEach(c => c.classList.remove('sobre')); });
+  board.querySelectorAll('.as-col').forEach(col => {
+    col.addEventListener('dragover', e => { if (arrastrado) { e.preventDefault(); col.classList.add('sobre'); } });
+    col.addEventListener('dragleave', e => { if (!col.contains(e.relatedTarget)) col.classList.remove('sobre'); });
+    col.addEventListener('drop', async e => {
+      e.preventDefault(); col.classList.remove('sobre');
+      const card = arrastrado; if (!card || card.parentElement === col) return;
+      const origen = card.parentElement;
+      col.querySelector('.as-col-vacia')?.remove();
+      col.insertBefore(card, col.querySelector('.as-kcard'));
+      contar();
+      const r = await fetch(`/asuntos/${card.dataset.id}/estado`, { method: 'POST', headers: JSONH, body: JSON.stringify({ estado: col.dataset.estado }) });
+      if (!r.ok) { origen.append(card); contar(); showToast('No se pudo cambiar el estado', 'error'); return; }
+      showToast(`Movido a ${col.querySelector('.as-col-h b').textContent.trim()}`);
+      if (col.dataset.estado === 'cerrado') pedirResultado(card.dataset.id, card.dataset.titulo);
     });
-  } catch(err) {}
-  dragId = null;
-}
+  });
+  function contar() { board.querySelectorAll('.as-col').forEach(c => c.querySelector('.as-col-h span').textContent = c.querySelectorAll('.as-kcard').length); }
+
+  // Al concluir, se pide el resultado para alimentar los precedentes.
+  const modal = document.getElementById('resModal'), opciones = document.getElementById('resOpciones');
+  let asuntoRes = null, elegido = '';
+  function pedirResultado(id, titulo) {
+    asuntoRes = id; elegido = '';
+    document.getElementById('resAsunto').textContent = titulo;
+    document.getElementById('resNotas').value = '';
+    opciones.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+    modal.classList.add('open');
+  }
+  opciones.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    elegido = b.dataset.res; opciones.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  });
+  modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-cerrar]')) modal.classList.remove('open'); });
+  document.getElementById('resGuardar').addEventListener('click', async () => {
+    if (!elegido) { showToast('Elige cómo terminó el asunto', 'error'); return; }
+    const r = await fetch(`/precedentes/asunto/${asuntoRes}/resultado`, { method: 'POST', headers: JSONH,
+      body: JSON.stringify({ resultado: elegido, notas: document.getElementById('resNotas').value }) });
+    if (!r.ok) { showToast('No se pudo guardar el resultado', 'error'); return; }
+    modal.classList.remove('open'); showToast('Resultado guardado como precedente');
+  });
+})();
 </script>
 {% endblock %}

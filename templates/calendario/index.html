@@ -17,125 +17,108 @@
 
 {% block content %}
 
-<!-- ── Page header ── -->
-<div class="page-header">
-  <div class="page-eyebrow">Gestión · Códex</div>
-  <h1 class="page-title">Calendario</h1>
-  <div class="page-meta-row">
-    <span></span>
-    <div class="page-actions"></div>
+<div class="cal-head">
+  <div>
+    <h1 class="page-title">Calendario</h1>
+    <p class="cal-sub">Audiencias, términos y citas de todo el despacho.</p>
   </div>
+  <button class="btn btn-primary" onclick="openCreate()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    Nuevo evento
+  </button>
 </div>
-<div class="page-divider"></div>
 
 <div class="cal-page">
 
-  <!-- ══════════════════════════════════════════
-       SIDEBAR
-       ══════════════════════════════════════════ -->
-  <div class="cal-side">
+  <aside class="cal-side" aria-label="Panel del calendario">
 
-    <!-- Mini Calendar -->
-    <div class="cal-side-card">
+    <section class="cal-side-card">
       <div class="mini-cal-head">
         <span class="mini-cal-title" id="miniTitle"></span>
         <div class="mini-cal-nav">
-          <button onclick="miniPrev()">‹</button>
-          <button onclick="miniNext()">›</button>
+          <button type="button" onclick="miniPrev()" aria-label="Mes anterior">‹</button>
+          <button type="button" onclick="miniNext()" aria-label="Mes siguiente">›</button>
         </div>
       </div>
       <div class="mini-cal-grid" id="miniGrid"></div>
-    </div>
+    </section>
 
-    <!-- Filtros -->
-    <div class="cal-side-card">
-      <div class="cal-side-title">Filtros</div>
-      <select class="cal-filter-sel" id="filterTipo" onchange="reloadEvents()">
-        <option value="">Todos los tipos</option>
-        {% for key, t in tipos_evento.items() %}
-        <option value="{{ key }}">{{ t.label }}</option>
+    <section class="cal-side-card">
+      <div class="cal-side-title">Términos próximos</div>
+      {% if terminos %}
+      <div class="term-list">
+        {% for t in terminos %}
+        <button type="button" class="term-row" onclick="jumpTo('{{ t.fecha }}')">
+          <span class="term-dot t-{{ t.tono }}"></span>
+          <span class="term-tx"><b>{{ t.titulo }}</b>{% if t.detalle %}<small>{{ t.detalle }}</small>{% endif %}</span>
+          <span class="term-when t-{{ t.tono }}">{{ t.cuando }}</span>
+        </button>
         {% endfor %}
-      </select>
+      </div>
+      {% else %}
+      <p class="cal-side-empty">Sin términos en las próximas tres semanas.</p>
+      {% endif %}
+    </section>
+
+    <section class="cal-side-card">
+      <div class="cal-side-title">Mostrar</div>
+      <input type="hidden" id="filterTipo" value="">
+      <div class="tipo-filter" id="tipoFilter">
+        <button type="button" class="tf-chip active" data-tipo="" onclick="filterByTipo('')">Todo</button>
+        {% for key, t in tipos_evento.items() if not t.oculto %}
+        <button type="button" class="tf-chip" data-tipo="{{ key }}" onclick="filterByTipo('{{ key }}')"><i style="background:{{ t.color }}"></i>{{ t.label }}</button>
+        {% endfor %}
+      </div>
+      <label class="cal-field-label" for="filterAbogado">Abogado</label>
       <select class="cal-filter-sel" id="filterAbogado" onchange="reloadEvents()">
-        <option value="">Todos los abogados</option>
+        <option value="">Todo el equipo</option>
         {% for ab in abogados %}
         <option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>
         {% endfor %}
       </select>
+      <label class="cal-field-label" for="filterAsunto">Asunto</label>
       <select class="cal-filter-sel" id="filterAsunto" onchange="reloadEvents()">
         <option value="">Todos los asuntos</option>
         {% for a in asuntos %}
         <option value="{{ a.id }}">{{ a.numero_expediente or a.titulo }}</option>
         {% endfor %}
       </select>
-    </div>
+    </section>
 
-    <!-- Google Calendar -->
-    <div class="cal-side-card">
-      <div class="cal-side-title">Google Calendar</div>
+    <section class="cal-side-card">
+      <div class="cal-side-title">Conectar y exportar</div>
       <div class="gcal-status {{ 'on' if gcal_active else 'off' }}" id="gcalStatus">
-        <div class="gcal-dot"></div>
-        <span>{{ 'Sincronizado' if gcal_active else 'No conectado' }}</span>
+        <span class="gcal-dot"></span>
+        <span>Google Calendar: {{ 'sincronizado' if gcal_active else 'no conectado' }}</span>
       </div>
-      {% if gcal_active %}
-      <button class="btn btn-secondary btn-sm" style="width:100%;margin-bottom:6px" onclick="sincronizarGcal()">
-        {{ icon_refresh(14, 14) }} Sincronizar ahora
-      </button>
-      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="toggleGcal(false)">
-        Desactivar sync
-      </button>
-      {% else %}
-      <a href="{{ url_for('calendario.oauth_google') }}" class="btn btn-primary btn-sm" style="width:100%">
-        {{ icon_link(14, 14) }} Conectar Google Calendar
-      </a>
-      {% endif %}
-    </div>
-
-    <!-- Exportar -->
-    <div class="cal-side-card">
-      <div class="cal-side-title">Exportar</div>
-      <button class="btn btn-secondary btn-sm" style="width:100%" onclick="exportIcs()">{{ icon_calendar(14, 14) }} Descargar .ics</button>
-    </div>
-
-    <!-- Tipos / leyenda -->
-    <div class="cal-side-card">
-      <div class="cal-side-title">Tipos de evento</div>
-      {% for key, t in tipos_evento.items() %}
-      <div style="display:flex; align-items:center; gap:6px; padding:2px 0; font-size:.78rem; color:var(--text-2)">
-        <span style="width:10px; height:10px; border-radius:50%; background:{{ t.color }}; flex-shrink:0"></span>
-        {{ t.label }}
+      <div class="cal-side-actions">
+        {% if gcal_active %}
+        <button class="btn btn-ghost btn-sm" onclick="sincronizarGcal()">{{ icon_refresh(14, 14) }} Sincronizar</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleGcal(false)">Desconectar</button>
+        {% else %}
+        <a href="{{ url_for('calendario.oauth_google') }}" class="btn btn-ghost btn-sm">{{ icon_link(14, 14) }} Conectar Google</a>
+        {% endif %}
+        <button class="btn btn-ghost btn-sm" onclick="exportIcs()">{{ icon_calendar(14, 14) }} Descargar .ics</button>
       </div>
-      {% endfor %}
-    </div>
-  </div>
+    </section>
+  </aside>
 
-  <!-- ══════════════════════════════════════════
-       MAIN CALENDAR
-       ══════════════════════════════════════════ -->
   <div class="cal-main">
-
-    <!-- Toolbar -->
     <div class="cal-toolbar">
       <div class="cal-nav">
-        <button onclick="goToday()">Hoy</button>
-        <button onclick="goPrev()">‹</button>
-        <button onclick="goNext()">›</button>
+        <button type="button" class="cal-today-btn" onclick="goToday()">Hoy</button>
+        <button type="button" class="cal-arrow" onclick="goPrev()" aria-label="Anterior">‹</button>
+        <button type="button" class="cal-arrow" onclick="goNext()" aria-label="Siguiente">›</button>
       </div>
       <div class="cal-date-label" id="dateLabel"></div>
-      <div class="cal-view-switch">
-        <button class="cal-view-btn" data-view="week"   onclick="setView('week')">Semana</button>
-        <button class="cal-view-btn" data-view="month"  onclick="setView('month')">Mes</button>
-        <button class="cal-view-btn" data-view="day"    onclick="setView('day')">Día</button>
-        <button class="cal-view-btn" data-view="agenda" onclick="setView('agenda')">Agenda</button>
-      </div>
-      <div class="cal-toolbar-actions">
-        <button class="btn btn-primary btn-sm" onclick="openCreate()">+ Evento</button>
+      <div class="cal-view-switch" role="tablist" aria-label="Vista">
+        <button type="button" class="cal-view-btn" data-view="day"    onclick="setView('day')">Día</button>
+        <button type="button" class="cal-view-btn" data-view="week"   onclick="setView('week')">Semana</button>
+        <button type="button" class="cal-view-btn" data-view="month"  onclick="setView('month')">Mes</button>
+        <button type="button" class="cal-view-btn" data-view="agenda" onclick="setView('agenda')">Lista</button>
       </div>
     </div>
-
-    <!-- Calendar container -->
-    <div id="calContainer" style="flex:1; overflow:hidden; display:flex; flex-direction:column;"></div>
-
+    <div id="calContainer" class="cal-container"></div>
   </div>
 </div>
 
@@ -224,7 +207,7 @@
         <button class="btn btn-danger btn-sm" onclick="deleteFromDetail()">{{ icon_trash(14, 14) }} Eliminar</button>
       </div>
       <div class="cal-modal-foot-right">
-        <button class="btn btn-ghost btn-sm" onclick="completeFromDetail()">✓ Completar</button>
+        <button class="btn btn-ghost btn-sm" onclick="completeFromDetail()">✓ Marcar como hecho</button>
         <button class="btn btn-primary btn-sm" onclick="editFromDetail()">{{ icon_edit(14, 14) }} Editar</button>
       </div>
     </div>
@@ -244,18 +227,18 @@
 
       <!-- ── SECCIÓN: Información básica ── -->
       <div class="cf-section">
-        <div class="cf-section-title">Informacion del evento</div>
+        <div class="cf-section-title">Qué es</div>
         <div class="cf-row">
           <div class="cf-g">
-            <label>Titulo <span class="req">*</span></label>
-            <input type="text" id="mTitulo" placeholder="Ej. Audiencia — Garcia vs Lopez">
+            <label for="mTitulo">Título <span class="req">*</span></label>
+            <input type="text" id="mTitulo" placeholder="Ej. Audiencia de pruebas — García vs. López">
           </div>
         </div>
         <div class="cf-row">
           <div class="cf-g">
             <label>Tipo de evento <span class="req">*</span></label>
             <div class="tipo-picker" id="tipoPicker">
-              {% for key, t in tipos_evento.items() %}
+              {% for key, t in tipos_evento.items() if not t.oculto %}
               <div class="tipo-opt" data-tipo="{{ key }}" onclick="pickTipo('{{ key }}')"
                    style="--tc:{{ t.color }}" data-tip="{{ tipo_descs.get(key, '') }}">
                 <span class="tipo-opt-dot" style="background:{{ t.color }}"></span>
@@ -270,7 +253,7 @@
 
       <!-- ── SECCIÓN: Fecha y hora ── -->
       <div class="cf-section">
-        <div class="cf-section-title">Fecha y hora</div>
+        <div class="cf-section-title">Cuándo</div>
 
         <!-- Valores reales para el submit -->
         <input type="hidden" id="mInicio">
@@ -356,7 +339,7 @@
 
       <!-- ── SECCIÓN: Vinculación ── -->
       <div class="cf-section">
-        <div class="cf-section-title">Vinculacion</div>
+        <div class="cf-section-title">De qué asunto es</div>
         <div class="cf-row">
           <div class="cf-g">
             <label>Asunto vinculado</label>
@@ -372,7 +355,7 @@
           <div class="cf-g">
             <label>Cliente vinculado</label>
             <select id="mCliente">
-              <option value="">— Auto-fill desde asunto —</option>
+              <option value="">— Se llena con el asunto —</option>
               {% for c in clientes %}
               <option value="{{ c.id }}">
                 {{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}
@@ -401,21 +384,21 @@
         <div class="cf-section-title">Detalles</div>
         <div class="cf-row">
           <div class="cf-g">
-            <label>Descripcion</label>
-            <textarea id="mDesc" rows="2" placeholder="Detalles del evento..."></textarea>
+            <label for="mDesc">Descripción</label>
+            <textarea id="mDesc" rows="2" placeholder="Notas para el equipo…"></textarea>
           </div>
         </div>
         <div class="cf-row">
           <div class="cf-g">
             <label>Lugar</label>
-            <input type="text" id="mLugar" placeholder="Ej. Juzgado 4to Civil">
+            <input type="text" id="mLugar" placeholder="Ej. Juzgado Cuarto de lo Civil, sala 3">
           </div>
         </div>
         <div class="cf-row">
           <div class="cf-g">
-            <label>Color personalizado (opcional)</label>
+            <label>Color (opcional)</label>
             <div class="color-picker" id="colorPicker">
-              {% for c in ['#3B82F6','#8B5CF6','#F59E0B','#F97316','#EF4444','#6B7280','#10B981','#EC4899','#06B6D4','#14B8A6'] %}
+              {% for c in ['#1D3FD6','#0284C7','#4F46E5','#7C3AED','#DC2626','#EA580C','#B45309','#047857','#0F766E','#64708A'] %}
               <div class="color-swatch" style="background:{{ c }}" data-color="{{ c }}"
                    onclick="pickColor('{{ c }}')"></div>
               {% endfor %}
@@ -428,7 +411,7 @@
 
       <!-- Conflictos -->
       <div id="conflictWarn" class="conflict-warn" style="display:none">
-        <div class="conflict-warn-title">{{ icon_alert_triangle(14, 14) }} Conflicto de horario detectado</div>
+        <div class="conflict-warn-title">{{ icon_alert_triangle(14, 14) }} Se empalma con otro evento. Se guardó de todos modos.</div>
         <div id="conflictItems"></div>
       </div>
 
@@ -453,18 +436,18 @@
   <!-- Columna izquierda: calendario -->
   <div class="cp-cal">
     <div class="cp-cal-header">
-      <button type="button" class="cp-nav" id="cpNavPrev">&#8593;</button>
-      <span class="cp-month-year" id="cpMonthYear">Marzo 2026 &#9660;</span>
-      <button type="button" class="cp-nav" id="cpNavNext">&#8595;</button>
+      <button type="button" class="cp-nav" id="cpNavPrev" aria-label="Mes anterior">‹</button>
+      <span class="cp-month-year" id="cpMonthYear"></span>
+      <button type="button" class="cp-nav" id="cpNavNext" aria-label="Mes siguiente">›</button>
     </div>
     <div class="cp-weekdays">
-      <div>S</div><div>M</div><div>T</div><div>W</div>
-      <div>T</div><div>F</div><div>S</div>
+      <div>D</div><div>L</div><div>M</div><div>M</div>
+      <div>J</div><div>V</div><div>S</div>
     </div>
     <div class="cp-days" id="cpDays"></div>
     <div class="cp-footer">
-      <button type="button" class="cp-clear" id="cpClear">Clear</button>
-      <button type="button" class="cp-today" id="cpToday">Today</button>
+      <button type="button" class="cp-clear" id="cpClear">Borrar</button>
+      <button type="button" class="cp-today" id="cpToday">Hoy</button>
     </div>
   </div>
   <!-- Divisor vertical -->
@@ -508,7 +491,8 @@ const HOUR_H     = 64; /* px per hour */
 
 /* ── State ───────────────────────────────────── */
 let currentDate  = new Date(TODAY);
-let currentView  = localStorage.getItem("lexos_cal_view") || "week";
+let currentView  = (() => { try { return localStorage.getItem("lexos_cal_view"); } catch (_) { return null; } })()
+                 || (window.innerWidth < 700 ? "agenda" : "week");
 let events       = [];
 let editingId    = null;
 let selectedColor= "";
@@ -531,7 +515,40 @@ function weekStart(d) {
   w.setHours(0,0,0,0); return w;
 }
 function daysInMonth(y,m) { return new Date(y,m+1,0).getDate(); }
-function evtColor(e) { return e.color || (TIPOS[e.tipo]||{}).color || "#6B7280"; }
+function evtColor(e) { return e.color || (TIPOS[e.tipo]||{}).color || "#64748B"; }
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+/* Acomoda eventos que se empalman en carriles lado a lado */
+function layoutDay(dayEvts) {
+  const items = dayEvts.map(e => {
+    const sd = new Date(e.inicio);
+    const ed = e.fin ? new Date(e.fin) : new Date(sd.getTime()+3600000);
+    const startMin = (sd.getHours()-START_HOUR)*60 + sd.getMinutes();
+    const endMin   = Math.max(startMin + 20, (ed.getHours()-START_HOUR)*60 + ed.getMinutes());
+    return {e, startMin, endMin};
+  }).sort((a,b) => a.startMin - b.startMin || b.endMin - a.endMin);
+  let cluster = [], lanes = [], clusterEnd = -1;
+  const flush = () => { cluster.forEach(it => it.size = lanes.length); cluster = []; lanes = []; };
+  items.forEach(it => {
+    if (it.startMin >= clusterEnd) { flush(); clusterEnd = -1; }
+    let lane = lanes.findIndex(end => end <= it.startMin);
+    if (lane === -1) { lane = lanes.length; lanes.push(it.endMin); } else lanes[lane] = it.endMin;
+    it.lane = lane; cluster.push(it); clusterEnd = Math.max(clusterEnd, it.endMin);
+  });
+  flush();
+  return items;
+}
+function evtBlock(it, extraStyle) {
+  const e = it.e, clr = evtColor(e);
+  const top = Math.max(0, it.startMin * (HOUR_H/60));
+  const height = Math.max(22, (it.endMin - it.startMin) * (HOUR_H/60));
+  const w = 100 / it.size;
+  return `<div class="cal-evt" style="top:${top}px; height:${height}px; left:calc(${it.lane*w}% + 2px); width:calc(${w}% - 4px); --c:${clr};${extraStyle||""}" data-id="${e.id}">
+    <div class="cal-evt-title">${esc(e.titulo)}${e.gcal?'<span class="gcal-badge">Google</span>':''}</div>
+    <div class="cal-evt-time">${fmtTime(e.inicio)} – ${fmtTime(e.fin)}</div>
+  </div>`;
+}
 
 /* ── Data loading ────────────────────────────── */
 async function loadEvents(start, end) {
@@ -590,7 +607,7 @@ function goNext() {
 }
 function setView(v) {
   currentView = v;
-  localStorage.setItem("lexos_cal_view", v);
+  try { localStorage.setItem("lexos_cal_view", v); } catch (_) {}
   document.querySelectorAll(".cal-view-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.view===v));
   reloadEvents();
@@ -608,7 +625,7 @@ function updateLabel() {
   } else if (currentView==="day") {
     lbl = `${DAY_FULL[currentDate.getDay()]}, ${fmtDate(currentDate)}`;
   } else {
-    lbl = `Agenda — desde ${fmtDate(currentDate)}`;
+    lbl = `Próximos 30 días`;
   }
   document.getElementById("dateLabel").textContent = lbl;
 }
@@ -628,7 +645,7 @@ function render() {
 /* ── Bind click listeners via event delegation ── */
 function bindEventClicks() {
   /* All .cal-evt and .cal-ag-item and .cal-month-evt */
-  document.querySelectorAll('.cal-evt[data-id], .cal-ag-item[data-id], .cal-month-evt[data-id]').forEach(el => {
+  document.querySelectorAll('.cal-evt[data-id], .cal-ag-item[data-id], .cal-month-evt[data-id], .cal-allday-evt[data-id]').forEach(el => {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
       const id = parseInt(this.dataset.id);
@@ -654,6 +671,17 @@ function renderWeek(container) {
     </div>`;
   });
   h += `</div>`;
+
+  /* Todo el día (términos, recordatorios) */
+  const allDayByDay = days.map(d => events.filter(e => e.todo_dia && (e.inicio||"").slice(0,10)===iso(d)));
+  if (allDayByDay.some(l => l.length)) {
+    h += `<div class="cal-week-allday"><div class="cal-allday-label">Todo el día</div>`;
+    allDayByDay.forEach(list => {
+      h += `<div class="cal-allday-cell">${list.map(e =>
+        `<div class="cal-allday-evt" style="--c:${evtColor(e)}" data-id="${e.id}">${esc(e.titulo)}</div>`).join("")}</div>`;
+    });
+    h += `</div>`;
+  }
 
   /* Body */
   h += `<div class="cal-week-body">`;
@@ -684,34 +712,8 @@ function renderWeek(container) {
       }
     }
     /* Events */
-    const dayEvts = events.filter(e => {
-      if (e.todo_dia) return false;
-      const ed = e.inicio ? e.inicio.slice(0,10) : "";
-      return ed === dateStr;
-    });
-    dayEvts.forEach(e => {
-      const sd = new Date(e.inicio);
-      const ed = e.fin ? new Date(e.fin) : new Date(sd.getTime()+3600000);
-      const startMin = (sd.getHours()-START_HOUR)*60 + sd.getMinutes();
-      const endMin   = (ed.getHours()-START_HOUR)*60 + ed.getMinutes();
-      const top  = Math.max(0, startMin * (HOUR_H/60));
-      const height = Math.max(20, (endMin-startMin) * (HOUR_H/60));
-      const clr  = evtColor(e);
-      h += `<div class="cal-evt" style="top:${top}px; height:${height}px; background:${clr}18; border-left-color:${clr}; color:${clr}"
-                 data-id="${e.id}">
-        <div class="cal-evt-title">${e.titulo}${e.gcal?'<span class="gcal-badge">GCal</span>':''}</div>
-        <div class="cal-evt-time">${fmtTime(e.inicio)} — ${fmtTime(e.fin)}</div>
-      </div>`;
-    });
-    /* All-day events at top */
-    const allDay = events.filter(e => e.todo_dia && (e.inicio||"").slice(0,10)===dateStr);
-    allDay.forEach((e,i) => {
-      const clr = evtColor(e);
-      h += `<div class="cal-evt" style="top:${i*22}px; height:20px; left:0; right:0; background:${clr}30; border-left-color:${clr}; color:${clr}; z-index:6; font-size:.66rem"
-                 data-id="${e.id}">
-        <div class="cal-evt-title">${e.titulo}</div>
-      </div>`;
-    });
+    const dayEvts = events.filter(e => !e.todo_dia && (e.inicio||"").slice(0,10) === dateStr);
+    layoutDay(dayEvts).forEach(it => { h += evtBlock(it); });
     h += `</div>`;
   });
   h += `</div></div>`;
@@ -747,8 +749,7 @@ function renderMonth(container) {
     const dayEvts = events.filter(e => (e.inicio||"").slice(0,10)===dateStr);
     dayEvts.slice(0,3).forEach(e => {
       const clr = evtColor(e);
-      h += `<div class="cal-month-evt" style="background:${clr}22; color:${clr}"
-                 data-id="${e.id}">${e.titulo}</div>`;
+      h += `<div class="cal-month-evt" style="--c:${clr}" data-id="${e.id}">${e.todo_dia ? "" : `<span class="cal-month-time">${fmtTime(e.inicio)}</span>`}${esc(e.titulo)}</div>`;
     });
     if (dayEvts.length>3) {
       h += `<div class="cal-month-more">+${dayEvts.length-3} más</div>`;
@@ -764,7 +765,9 @@ function renderMonth(container) {
 function renderDay(container) {
   const dateStr = iso(currentDate);
   let h = `<div class="cal-day-view">`;
-  h += `<div class="cal-day-view-head">${DAY_FULL[currentDate.getDay()]}, ${fmtDate(currentDate)}</div>`;
+  const allDayList = events.filter(e => e.todo_dia && (e.inicio||"").slice(0,10)===dateStr);
+  h += `<div class="cal-day-view-head">${allDayList.length ? `<span class="cal-allday-label">Todo el día</span>${allDayList.map(e =>
+      `<div class="cal-allday-evt" style="--c:${evtColor(e)}" data-id="${e.id}">${esc(e.titulo)}</div>`).join("")}` : `<span class="cal-allday-label">Sin eventos de todo el día</span>`}</div>`;
   h += `<div class="cal-day-view-body">`;
   /* Time col */
   h += `<div class="cal-time-col">`;
@@ -790,20 +793,7 @@ function renderDay(container) {
   }
   /* Events */
   const dayEvts = events.filter(e => !e.todo_dia && (e.inicio||"").slice(0,10)===dateStr);
-  dayEvts.forEach(e => {
-    const sd = new Date(e.inicio);
-    const ed = e.fin ? new Date(e.fin) : new Date(sd.getTime()+3600000);
-    const startMin = (sd.getHours()-START_HOUR)*60 + sd.getMinutes();
-    const endMin   = (ed.getHours()-START_HOUR)*60 + ed.getMinutes();
-    const top = Math.max(0, startMin*(HOUR_H/60));
-    const height = Math.max(20, (endMin-startMin)*(HOUR_H/60));
-    const clr = evtColor(e);
-    h += `<div class="cal-evt" style="top:${top}px; height:${height}px; background:${clr}18; border-left-color:${clr}; color:${clr}; right:20px"
-               data-id="${e.id}">
-      <div class="cal-evt-title">${e.titulo}${e.gcal?'<span class="gcal-badge">GCal</span>':''}</div>
-      <div class="cal-evt-time">${fmtTime(e.inicio)} — ${fmtTime(e.fin)}</div>
-    </div>`;
-  });
+  layoutDay(dayEvts).forEach(it => { h += evtBlock(it); });
   h += `</div></div></div>`;
   container.innerHTML = h;
   const body = container.querySelector(".cal-day-view-body");
@@ -813,7 +803,7 @@ function renderDay(container) {
 /* ── AGENDA VIEW ─────────────────────────────── */
 function renderAgenda(container) {
   if (!events.length) {
-    container.innerHTML = `<div class="cal-agenda"><div class="cal-ag-empty">{{ icon_calendar(14, 14) }} Sin eventos próximos</div></div>`;
+    container.innerHTML = `<div class="cal-agenda"><div class="cal-ag-empty">{{ icon_calendar(14, 14) }} Nada agendado en los próximos 30 días.</div></div>`;
     return;
   }
   const sorted = [...events].sort((a,b) => (a.inicio||"").localeCompare(b.inicio||""));
@@ -831,11 +821,11 @@ function renderAgenda(container) {
       <div class="cal-ag-time">${e.todo_dia ? 'Todo el día' : fmtTime(e.inicio)}</div>
       <div class="cal-ag-color" style="background:${clr}"></div>
       <div class="cal-ag-info">
-        <div class="cal-ag-title">${e.titulo}${e.gcal?'<span class="gcal-badge" style="margin-left:6px">GCal</span>':''}</div>
+        <div class="cal-ag-title">${esc(e.titulo)}${e.gcal?'<span class="gcal-badge">Google</span>':''}</div>
         <div class="cal-ag-meta">
           ${CAL_ICON_SVGS[(TIPOS[e.tipo]||{}).icon]||""} ${(TIPOS[e.tipo]||{}).label||e.tipo}
-          ${e.asunto ? ' · <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> '+e.asunto : ''}
-          ${e.lugar  ? ' · <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> '+e.lugar  : ''}
+          ${e.asunto ? ' · <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> '+esc(e.asunto) : ''}
+          ${e.lugar  ? ' · <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> '+esc(e.lugar)  : ''}
         </div>
       </div>
     </div>`;
@@ -1027,8 +1017,8 @@ function setFechaBtn(id, text) {
    CustomPicker — date/time picker (clean rewrite)
    ════════════════════════════════════════════════════════════════════════ */
 const CustomPicker = (() => {
-  const MONTHS = ["January","February","March","April","May","June",
-                  "July","August","September","October","November","December"];
+  const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   let wrap, anchor, cb, mode;
   let selY, selM, selD, selH, selMin, selAp;
   let viewY, viewM;
@@ -1105,7 +1095,7 @@ const CustomPicker = (() => {
   }
 
   function buildHeader() {
-    document.getElementById("cpMonthYear").textContent = MONTHS[viewM] + " " + viewY + " \u25bc";
+    document.getElementById("cpMonthYear").textContent = MONTHS[viewM] + " " + viewY;
   }
 
   function buildGrid() {
@@ -1303,11 +1293,11 @@ function autoFillCliente() {
 
 async function submitEvent() {
   const titulo = document.getElementById("mTitulo").value.trim();
-  if (!titulo) { alert("El título es requerido"); return; }
+  if (!titulo) { showToast("Escribe un título para el evento", "error"); document.getElementById("mTitulo").focus(); return; }
   const inicio = document.getElementById("mInicio").value;
-  if (!inicio) { alert("La fecha de inicio es requerida"); return; }
+  if (!inicio) { showToast("Elige la fecha de inicio", "error"); return; }
   const fin = document.getElementById("mFin").value;
-  if (fin && fin <= inicio) { alert("La fecha de fin debe ser posterior al inicio"); return; }
+  if (fin && fin <= inicio) { showToast("El fin debe ser después del inicio", "error"); return; }
 
   const participantes = [...document.querySelectorAll(".part-cb:checked")].map(c => parseInt(c.value));
 
@@ -1336,13 +1326,13 @@ async function submitEvent() {
     body: JSON.stringify(body),
   });
   const j = await r.json();
-  if (!j.ok) { alert(j.error); return; }
+  if (!j.ok) { showToast(j.error || "No se pudo guardar", "error"); return; }
 
   /* Show conflicts */
   if (j.conflictos && j.conflictos.length) {
     const warn = document.getElementById("conflictWarn");
     document.getElementById("conflictItems").innerHTML = j.conflictos.map(c =>
-      `<div class="conflict-item">{{ icon_alert_triangle(14, 14) }} ${c.titulo} — ${(c.fecha_inicio||"").slice(11,16)}</div>`
+      `<div class="conflict-item">{{ icon_alert_triangle(14, 14) }} ${esc(c.titulo)} — ${(c.fecha_inicio||"").slice(11,16)}</div>`
     ).join("");
     warn.style.display = "block";
     /* Don't close modal so user can see conflicts, but event is already saved */
@@ -1350,6 +1340,7 @@ async function submitEvent() {
   } else {
     closeModal();
     reloadEvents();
+    showToast(editingId ? "Cambios guardados" : "Evento creado");
   }
 }
 
@@ -1380,10 +1371,10 @@ function showPopover(id, ev) {
   document.getElementById("detailTipo").style.color = clr;
 
   /* Date & time */
-  const startD = e.inicio ? new Date(e.inicio) : null;
+  const startD = e.inicio ? new Date(e.inicio.length === 10 ? e.inicio + "T12:00" : e.inicio) : null;
   if (startD) {
     document.getElementById("detailDate").textContent =
-      `${DAY_FULL[startD.getDay()]}, ${startD.getDate()} de ${MONTH_NAMES[startD.getMonth()]} ${startD.getFullYear()}`;
+      `${DAY_FULL[startD.getDay()]} ${startD.getDate()} de ${MONTH_NAMES[startD.getMonth()].toLowerCase()} de ${startD.getFullYear()}`;
   }
   document.getElementById("detailTime").textContent = e.todo_dia
     ? "Todo el día"
@@ -1490,8 +1481,8 @@ function miniJump(dateStr) {
 async function sincronizarGcal() {
   const r = await fetch("/calendario/ajax/sincronizar", {method:"POST", headers:{"Content-Type":"application/json"}});
   const j = await r.json();
-  if (j.ok) { alert(`Sincronización completa. ${j.importados} eventos importados.`); reloadEvents(); }
-  else alert("Error: " + j.error);
+  if (j.ok) { showToast(`Sincronizado: ${j.importados} eventos importados`); reloadEvents(); }
+  else showToast(j.error || "No se pudo sincronizar", "error");
 }
 async function toggleGcal(activo) {
   await fetch("/calendario/ajax/toggle-gcal", {
@@ -1499,6 +1490,19 @@ async function toggleGcal(activo) {
     body: JSON.stringify({activo}),
   });
   location.reload();
+}
+
+/* ── Filtro por tipo y salto a fecha ─────────── */
+function filterByTipo(tipo) {
+  document.getElementById("filterTipo").value = tipo;
+  document.querySelectorAll("#tipoFilter .tf-chip").forEach(c => c.classList.toggle("active", c.dataset.tipo === tipo));
+  reloadEvents();
+}
+function jumpTo(dateStr) {
+  currentDate = new Date(dateStr + "T12:00");
+  miniDate = new Date(currentDate);
+  renderMini();
+  if (currentView === "agenda" || currentView === "month") setView("week"); else reloadEvents();
 }
 
 /* ── Export .ics ─────────────────────────────── */
@@ -1514,6 +1518,13 @@ function exportIcs() {
     b.classList.toggle("active", b.dataset.view===currentView));
   renderMini();
   reloadEvents();
+  const nuevo = location.hash.match(/^#nuevo(?:-asunto-(\d+))?$/);
+  if (nuevo) {
+    openCreate(iso(new Date()));
+    const sel = document.getElementById("mAsunto");
+    if (nuevo[1] && sel.querySelector(`option[value="${nuevo[1]}"]`)) { sel.value = nuevo[1]; autoFillCliente(); }
+    history.replaceState(null, "", location.pathname + location.search);
+  }
 })();
 </script>
 {% endblock %}

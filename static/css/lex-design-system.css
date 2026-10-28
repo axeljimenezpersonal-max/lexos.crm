@@ -235,28 +235,25 @@
    BOTONES
    ════════════════════════════════════════════════════════════════ */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: 'DM Mono', monospace;
-  font-size: 9px; font-weight: 500;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 9px 18px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13.5px; font-weight: 600; line-height: 1.2;
+  letter-spacing: normal; text-transform: none;
+  padding: 9px 16px; border-radius: 10px;
   border: 1px solid transparent;
-  cursor: pointer; transition: all 0.15s ease;
+  cursor: pointer; transition: background .15s, border-color .15s, color .15s;
   text-decoration: none; white-space: nowrap;
 }
 .btn svg { flex-shrink: 0; }
-.btn-primary {
-  background: #1B3A6B; color: #FFFFFF;
-  border-color: #1B3A6B;
-}
-.btn-primary:hover { background: #142D52; border-color: #142D52; color: #FFFFFF; }
+.btn-primary { background: var(--e); color: #FFFFFF; border-color: var(--e); }
+.btn-primary:hover { background: var(--ed); border-color: var(--ed); color: #FFFFFF; }
 
 .btn-ghost, .btn-secondary {
-  background: transparent; color: #1B3A6B;
-  border: 1px solid rgba(27,58,107,0.2);
+  background: #FFFFFF; color: var(--fog);
+  border: 1px solid var(--border);
 }
 .btn-ghost:hover, .btn-secondary:hover {
-  background: rgba(27,58,107,0.06); color: #1B3A6B;
+  background: #FFFFFF; color: var(--fog); border-color: var(--border-m);
 }
 
 .btn-danger {

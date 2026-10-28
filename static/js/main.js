@@ -1,29 +1,5 @@
-/* LexOS — main.js v3 (horizontal nav) */
+/* Habeas Corpus — main.js */
 "use strict";
-
-// ── Mobile hamburger nav toggle ──────────────────────────────────────────────
-(function () {
-  const hamburger = document.getElementById("navHamburger");
-  const nav       = document.getElementById("topbarNav");
-  const overlay   = document.getElementById("overlay");
-
-  if (!hamburger || !nav) return;
-
-  function openNav() {
-    nav.classList.add("mobile-open");
-    overlay?.classList.add("active");
-  }
-  function closeNav() {
-    nav.classList.remove("mobile-open");
-    overlay?.classList.remove("active");
-  }
-
-  hamburger.addEventListener("click", () => {
-    nav.classList.contains("mobile-open") ? closeNav() : openNav();
-  });
-  overlay?.addEventListener("click", closeNav);
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeNav(); });
-})();
 
 // ── Topbar dropdowns (notifications + user avatar) ────────────────────────────
 function toggleTopbarDropdown(id, triggerEl) {

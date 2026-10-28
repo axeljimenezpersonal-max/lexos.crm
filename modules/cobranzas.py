@@ -1,22 +1,26 @@
 """
-LexOS — modules/cobranzas.py
-Módulo de cobranzas/facturación: listado con tabs, dashboard, modal de creación,
-registro de pagos parciales, estado de cuenta PDF, exportación Excel.
+Habeas Corpus — modules/cobranzas.py
+Cobranza del despacho: qué nos deben, quién y desde cuándo. Cobros con sus pagos
+(abonos), recordatorios por correo o WhatsApp, horas por facturar, estado de cuenta
+en PDF y exportación a Excel.
 """
 from __future__ import annotations
 
+import html
 import io
 import json
 import math
-import os
-import uuid
-from datetime import date, datetime, timedelta
+import re
+from datetime import date, timedelta
+from urllib.parse import quote
 
 from flask import (
-    Blueprint, g, jsonify, redirect, render_template,
+    Blueprint, abort, g, jsonify, redirect, render_template,
     request, send_file, session, url_for,
 )
 
+from modules import boveda
+from modules.asuntos import _FILTRO_PROPIOS, _fecha, _hoy, _solo_lo_suyo, _usuarios, puede_ver
 from modules.auth import login_required, role_required, tenant_required
 
 cobranzas_bp = Blueprint("cobranzas", __name__)
@@ -25,1034 +29,1040 @@ cobranzas_bp = Blueprint("cobranzas", __name__)
 #  Constantes
 # ─────────────────────────────────────────────────────────────────────────────
 
-MONEDAS = {
-    "MXN": {"simbolo": "$",    "nombre": "Peso mexicano"},
-    "USD": {"simbolo": "USD ", "nombre": "Dólar americano"},
-    "EUR": {"simbolo": "€",    "nombre": "Euro"},
+ESTADOS = {
+    "pendiente": {"label": "Por cobrar",   "color": "#1D3FD6", "fondo": "#EEF2FF"},
+    "abono":     {"label": "Pago parcial", "color": "#0369A1", "fondo": "#E0F2FE"},
+    "vencido":   {"label": "Vencido",      "color": "#DC2626", "fondo": "#FEF2F2"},
+    "pagado":    {"label": "Pagado",       "color": "#047857", "fondo": "#ECFDF5"},
+    "cancelado": {"label": "Cancelado",    "color": "#64708A", "fondo": "#F1F5F9"},
+}
+ABIERTOS = ("pendiente", "abono", "vencido")
+
+GRUPOS = {
+    "abiertos":   "Por cobrar",
+    "vencidos":   "Vencidos",
+    "pagados":    "Pagados",
+    "cancelados": "Cancelados",
+    "todos":      "Todos",
 }
 
-METODOS_PAGO = ["Efectivo", "Transferencia", "Tarjeta", "Cheque", "SPEI", "Otro"]
+MONEDAS = {"MXN": "$", "USD": "US$"}
+METODOS_PAGO = ["Transferencia", "Efectivo", "Tarjeta", "Cheque", "Otro"]
+CONCEPTOS = ["Anticipo de honorarios", "Honorarios por etapa", "Iguala mensual",
+             "Honorarios de éxito", "Gastos y derechos"]
+MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+ROLES_COBRANZA = ("super_admin", "admin", "abogado", "asistente")
+PER_PAGE = 25
 
-ESTADOS_COLOR = {
-    "pendiente": ("cbr-amarillo", "Pendiente"),
-    "abono":     ("cbr-azul",     "Abono"),
-    "pagado":    ("cbr-verde",    "Pagado"),
-    "vencido":   ("cbr-rojo",     "Vencido"),
-    "cancelado": ("cbr-gris",     "Cancelado"),
-}
-
-MESES_ES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
-
-PER_PAGE = 20
+# Montos en SQL. Los cobros viejos guardaban solo `monto`; desde este módulo siempre hay `total`.
+TOTAL = "COALESCE(NULLIF(co.total, 0), co.monto, 0)"
+SALDO = (f"(CASE WHEN co.estado IN ('pagado','cancelado') THEN 0 "
+         f"ELSE MAX({TOTAL} - COALESCE(co.monto_abonado, 0), 0) END)")
+CLIENTE = "COALESCE(NULLIF(c.razon_social, ''), TRIM(c.nombre || ' ' || COALESCE(c.apellidos, '')))"
+ABIERTO_SQL = "co.estado IN ('pendiente','abono','vencido')"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _log(accion, entidad_id=None, detalles=None):
     try:
         g.tenant_db.execute(
             "INSERT INTO actividad_log (user_id, accion, entidad, entidad_id, detalles, ip) VALUES (?,?,?,?,?,?)",
             (session.get("user_id"), accion, "cobro", entidad_id,
-             json.dumps(detalles or {}), request.remote_addr),
+             json.dumps(detalles or {}, ensure_ascii=False), request.remote_addr),
         )
         g.tenant_db.commit()
     except Exception:
         pass
 
 
-def _safe_float(v, default=0.0):
+def _num(v, default=0.0) -> float:
     try:
-        return float(v) if v not in (None, "", "None") else default
+        return float(str(v).replace(",", "").replace("$", "").strip()) if v not in (None, "", "None") else default
     except (TypeError, ValueError):
         return default
 
 
-def _safe_int(v, default=None):
+def _int(v, default=None):
     try:
         return int(v) if v not in (None, "", "None") else default
     except (TypeError, ValueError):
         return default
 
 
+def dinero(v, moneda="MXN", decimales=True) -> str:
+    v = float(v or 0)
+    simbolo = MONEDAS.get(moneda or "MXN", "$")
+    signo = "-" if v < 0 else ""
+    return f"{signo}{simbolo}{abs(v):,.2f}" if decimales else f"{signo}{simbolo}{abs(v):,.0f}"
+
+
+cobranzas_bp.add_app_template_filter(dinero, "dinero")
+
+
+def _fecha_txt(v, anio=True) -> str:
+    f = _fecha(v)
+    if not f:
+        return "—"
+    return f"{f.day} {MESES[f.month - 1]}" + (f" {f.year}" if anio else "")
+
+
 def _auto_folio(tdb) -> str:
-    year  = date.today().year
-    count = tdb.execute(
-        "SELECT COUNT(*) FROM cobros WHERE strftime('%Y', fecha_alta)=?", (str(year),)
-    ).fetchone()[0] + 1
-    return f"FAC-{year}-{count:04d}"
+    anio = _hoy().year
+    usados = {r[0] for r in tdb.execute(
+        "SELECT numero_factura FROM cobros WHERE numero_factura LIKE ?", (f"C-{anio}-%",)).fetchall()}
+    n = len(usados) + 1
+    while f"C-{anio}-{n:04d}" in usados:
+        n += 1
+    return f"C-{anio}-{n:04d}"
 
 
-def _get_abogados():
+def _calcular(monto: float, iva_pct: float, descuento: float) -> dict:
+    base = max(round(monto - descuento, 2), 0)
+    iva = round(base * iva_pct / 100, 2)
+    return {"iva_monto": iva, "total": round(base + iva, 2)}
+
+
+def _alcance() -> tuple[str, list]:
+    """Los abogados solo ven los cobros de sus asuntos, los que llevan o los que crearon."""
+    if not _solo_lo_suyo():
+        return "1", []
+    uid = session.get("user_id")
+    return (f"(co.abogado_id=? OR co.creado_por=? OR co.asunto_id IN (SELECT a.id FROM asuntos a WHERE {_FILTRO_PROPIOS}))",
+            [uid, uid, uid, uid, uid])
+
+
+def _puede_ver_cobro(tdb, cid: int) -> bool:
+    alc, p = _alcance()
+    return bool(tdb.execute(f"SELECT 1 FROM cobros co WHERE co.id=? AND {alc}", (cid, *p)).fetchone())
+
+
+def _es_admin() -> bool:
+    return session.get("role") in ("super_admin", "admin")
+
+
+def al_dia(tdb) -> None:
+    """Pone la cartera al día: montos de cobros viejos, pagos sin historial y vencimientos."""
+    hoy = _hoy().isoformat()
     try:
-        rows = g.global_db.execute(
-            "SELECT id, nombre, apellidos FROM tenant_users "
-            "WHERE tenant_id=? AND rol IN ('abogado','admin','super_admin') AND activo=1 "
-            "ORDER BY nombre",
-            (g.tenant["id"],),
-        ).fetchall()
-        return [dict(r) for r in rows]
+        tdb.execute("UPDATE cobros SET total=monto, iva_monto=0, iva_pct=0 "
+                    "WHERE COALESCE(total,0)=0 AND monto>0 AND COALESCE(iva_monto,0)=0")
+        # Pagos registrados antes de que existiera el historial de pagos
+        tdb.execute("""INSERT INTO cobro_pagos (cobro_id, monto, fecha, metodo, referencia, notas, creado_por)
+                       SELECT id, CASE WHEN estado='pagado' THEN total ELSE monto_abonado END,
+                              COALESCE(CASE WHEN estado='pagado' THEN fecha_pago ELSE fecha_abono END,
+                                       fecha_emision, date('now')),
+                              COALESCE(metodo_pago, 'Otro'), referencia, 'Registrado antes del historial de pagos', creado_por
+                       FROM cobros co
+                       WHERE NOT EXISTS (SELECT 1 FROM cobro_pagos p WHERE p.cobro_id=co.id)
+                         AND ((estado='pagado' AND total>0) OR (estado IN ('pendiente','abono','vencido') AND monto_abonado>0))""")
+        tdb.execute("""UPDATE cobros SET monto_abonado=COALESCE((SELECT SUM(monto) FROM cobro_pagos p WHERE p.cobro_id=cobros.id),0)
+                       WHERE estado != 'cancelado'""")
+        tdb.execute("UPDATE cobros SET estado='vencido' WHERE estado='pendiente' "
+                    "AND fecha_vencimiento IS NOT NULL AND date(fecha_vencimiento) < ?", (hoy,))
+        tdb.execute("UPDATE cobros SET estado='pendiente' WHERE estado='vencido' "
+                    "AND (fecha_vencimiento IS NULL OR date(fecha_vencimiento) >= ?)", (hoy,))
+        tdb.commit()
+    except Exception:
+        tdb.rollback()
+
+
+def _recalcular(tdb, cid: int) -> str | None:
+    """Estado del cobro a partir de lo pagado y su vencimiento."""
+    co = tdb.execute("SELECT * FROM cobros WHERE id=?", (cid,)).fetchone()
+    if not co or co["estado"] == "cancelado":
+        return co["estado"] if co else None
+    suma, ultima = tdb.execute("SELECT COALESCE(SUM(monto),0), MAX(fecha) FROM cobro_pagos WHERE cobro_id=?", (cid,)).fetchone()
+    total = float(co["total"] or co["monto"] or 0)
+    vence = _fecha(co["fecha_vencimiento"])
+    if total > 0 and suma >= total - 0.01:
+        estado = "pagado"
+    elif suma > 0:
+        estado = "abono"
+    elif vence and vence < _hoy():
+        estado = "vencido"
+    else:
+        estado = "pendiente"
+    tdb.execute("UPDATE cobros SET estado=?, monto_abonado=?, fecha_pago=?, fecha_abono=? WHERE id=?",
+                (estado, suma, ultima if estado == "pagado" else None, ultima if suma else None, cid))
+    return estado
+
+
+def cobrado_entre(tdb, desde: date, hasta: date, alcance: bool = True) -> float:
+    """Dinero que entró (pagos registrados) entre dos fechas, inclusive."""
+    alc, p = _alcance() if alcance else ("1", [])
+    return float(tdb.execute(
+        f"""SELECT COALESCE(SUM(pg.monto),0) FROM cobro_pagos pg JOIN cobros co ON co.id=pg.cobro_id
+            WHERE co.estado != 'cancelado' AND date(pg.fecha) BETWEEN ? AND ? AND {alc}""",
+        (desde.isoformat(), hasta.isoformat(), *p)).fetchone()[0])
+
+
+def _vence_info(estado: str, fv, saldo: float) -> dict | None:
+    if estado in ("pagado", "cancelado") or saldo <= 0:
+        return None
+    f = _fecha(fv)
+    if not f:
+        return {"texto": "Sin fecha de pago", "tono": "gris", "dias": None}
+    dias = (f - _hoy()).days
+    if dias < -1:
+        return {"texto": f"Venció hace {-dias} días", "tono": "rojo", "dias": dias}
+    if dias == -1:
+        return {"texto": "Venció ayer", "tono": "rojo", "dias": dias}
+    if dias == 0:
+        return {"texto": "Vence hoy", "tono": "rojo", "dias": dias}
+    if dias == 1:
+        return {"texto": "Vence mañana", "tono": "ambar", "dias": dias}
+    if dias <= 7:
+        return {"texto": f"Vence en {dias} días", "tono": "ambar", "dias": dias}
+    return {"texto": f"Vence el {_fecha_txt(f, anio=f.year != _hoy().year)}", "tono": "normal", "dias": dias}
+
+
+def _decorar(r) -> dict:
+    d = dict(r)
+    d["total_v"] = float(d.get("total_v") or 0)
+    d["saldo_v"] = float(d.get("saldo_v") or 0)
+    d["pagado_v"] = max(d["total_v"] - d["saldo_v"], 0) if d["estado"] != "cancelado" else float(d.get("monto_abonado") or 0)
+    d["pct"] = int(min(d["pagado_v"] / d["total_v"] * 100, 100)) if d["total_v"] else 0
+    d["estado_info"] = ESTADOS.get(d["estado"], ESTADOS["pendiente"])
+    d["vence"] = _vence_info(d["estado"], d.get("fecha_vencimiento"), d["saldo_v"])
+    d["folio"] = d.get("numero_factura") or f"#{d['id']}"
+    d["pagado_el"] = _fecha_txt(d.get("fecha_pago"))
+    return d
+
+
+def _clientes():
+    return [dict(r) for r in g.tenant_db.execute(
+        f"SELECT c.id, {CLIENTE} AS nombre FROM clientes c WHERE c.activo=1 ORDER BY nombre COLLATE NOCASE LIMIT 1000"
+    ).fetchall()]
+
+
+def _abogados():
+    try:
+        return [dict(r) for r in g.global_db.execute(
+            "SELECT id, nombre, apellidos FROM tenant_users WHERE tenant_id=? "
+            "AND rol IN ('abogado','admin','super_admin') AND activo=1 ORDER BY nombre",
+            (g.tenant["id"],)).fetchall()]
     except Exception:
         return []
 
 
-def _calcular_total(monto: float, iva_pct: float, descuento_tipo: str, descuento_valor: float) -> dict:
-    iva_monto   = round(monto * iva_pct / 100, 2)
-    subtotal    = monto + iva_monto
-    if descuento_tipo == "pct":
-        descuento_monto = round(subtotal * descuento_valor / 100, 2)
-    else:
-        descuento_monto = descuento_valor
-    total = round(subtotal - descuento_monto, 2)
-    return {"iva_monto": iva_monto, "descuento_monto": descuento_monto, "total": total}
+def _guardar_archivo(campo: str, sub: str, extensiones: set):
+    f = request.files.get(campo)
+    if not f or not f.filename:
+        return None, None
+    info = boveda.guardar(f, "cobranzas", sub, extensiones=extensiones)
+    if not info:
+        return None, "Ese tipo de archivo no se permite aquí"
+    return info["url"], None
 
 
-def _check_vencidos(tdb):
-    """Marca cobros pendientes con fecha vencida como 'vencido'."""
-    try:
-        tdb.execute(
-            "UPDATE cobros SET estado='vencido' "
-            "WHERE estado='pendiente' AND fecha_vencimiento IS NOT NULL "
-            "AND fecha_vencimiento < date('now')"
-        )
-        tdb.commit()
-    except Exception:
-        pass
-
-
-def _enrich(row: dict) -> dict:
-    row["estado_info"] = ESTADOS_COLOR.get(row.get("estado", "pendiente"), ("cbr-gris", row.get("estado","")))
-    return row
-
-
-def _dashboard_stats(tdb) -> dict:
-    r = tdb.execute("""
-        SELECT
-          COALESCE(SUM(CASE WHEN estado IN ('pendiente','abono') THEN COALESCE(total,monto) ELSE 0 END),0) as por_cobrar,
-          COALESCE(SUM(CASE WHEN estado='pagado'    THEN COALESCE(total,monto) ELSE 0 END),0) as cobrado,
-          COALESCE(SUM(CASE WHEN estado='vencido'   THEN COALESCE(total,monto) ELSE 0 END),0) as vencido,
-          COALESCE(SUM(COALESCE(total,monto)),0) as total_facturado
-        FROM cobros WHERE estado != 'cancelado'
-    """).fetchone()
-    stats = dict(r)
-
-    # Por vencer esta semana
-    today = date.today().isoformat()
-    fin_semana = (date.today() + timedelta(days=7)).isoformat()
-    pv = tdb.execute("""
-        SELECT COUNT(*) as cnt,
-               COALESCE(SUM(COALESCE(total,monto)),0) as monto
-        FROM cobros
-        WHERE estado IN ('pendiente','abono')
-          AND fecha_vencimiento IS NOT NULL
-          AND fecha_vencimiento >= ? AND fecha_vencimiento <= ?
-    """, (today, fin_semana)).fetchone()
-    stats["por_vencer_semana_cnt"] = pv["cnt"]
-    stats["por_vencer_semana_monto"] = float(pv["monto"])
-
-    # Proyección 30 días
-    fin_30 = (date.today() + timedelta(days=30)).isoformat()
-    proy = tdb.execute("""
-        SELECT COALESCE(SUM(COALESCE(total,monto)),0) as monto
-        FROM cobros
-        WHERE estado IN ('pendiente','abono','vencido')
-          AND (fecha_vencimiento IS NULL OR fecha_vencimiento <= ?)
-    """, (fin_30,)).fetchone()
-    stats["proyeccion_30d"] = float(proy["monto"])
-
-    # Tiempo promedio de pago (días entre emisión y pago, solo pagadas)
-    avg_row = tdb.execute("""
-        SELECT AVG(CAST(julianday(fecha_pago) - julianday(fecha_emision) AS REAL)) as avg_days
-        FROM cobros
-        WHERE estado='pagado' AND fecha_pago IS NOT NULL AND fecha_emision IS NOT NULL
-    """).fetchone()
-    stats["avg_dias_pago"] = round(float(avg_row["avg_days"] or 0))
-
-    # Cliente que más debe
-    top_cliente = tdb.execute("""
-        SELECT c.id, c.nombre, c.apellidos, c.razon_social, c.tipo,
-               COALESCE(SUM(COALESCE(co.total,co.monto) - COALESCE(co.monto_abonado,0)),0) as deuda
-        FROM cobros co
-        JOIN clientes c ON co.cliente_id=c.id
-        WHERE co.estado IN ('pendiente','abono','vencido')
-        GROUP BY co.cliente_id
-        ORDER BY deuda DESC LIMIT 1
-    """).fetchone()
-    if top_cliente and float(top_cliente["deuda"]) > 0:
-        nombre = top_cliente["razon_social"] if top_cliente["tipo"] == "moral" else \
-                 f"{top_cliente['nombre'] or ''} {top_cliente['apellidos'] or ''}".strip()
-        stats["top_deudor_nombre"] = nombre
-        stats["top_deudor_monto"] = float(top_cliente["deuda"])
-        stats["top_deudor_id"] = top_cliente["id"]
-    else:
-        stats["top_deudor_nombre"] = None
-        stats["top_deudor_monto"] = 0
-        stats["top_deudor_id"] = None
-
-    # Próximo vencimiento
-    prox = tdb.execute("""
-        SELECT id, numero_factura, fecha_vencimiento,
-               CAST(julianday(fecha_vencimiento) - julianday('now') AS INTEGER) as dias
-        FROM cobros
-        WHERE estado IN ('pendiente','abono')
-          AND fecha_vencimiento IS NOT NULL AND fecha_vencimiento >= ?
-        ORDER BY fecha_vencimiento ASC LIMIT 1
-    """, (today,)).fetchone()
-    if prox:
-        stats["prox_venc_folio"] = prox["numero_factura"] or f"#{prox['id']}"
-        stats["prox_venc_dias"] = prox["dias"]
-        stats["prox_venc_id"] = prox["id"]
-    else:
-        stats["prox_venc_folio"] = None
-        stats["prox_venc_dias"] = None
-        stats["prox_venc_id"] = None
-
-    return stats
-
-
-def _monthly_chart(tdb) -> list[dict]:
-    """Returns last 6 months of billed vs collected."""
-    today = date.today()
-    result = []
-    for i in range(5, -1, -1):
-        d  = today.replace(day=1) - timedelta(days=1)
-        # go back i months from current month start
-        m  = (today.month - i - 1) % 12 + 1
-        y  = today.year - ((today.month - i - 1) // 12)
-        label = f"{MESES_ES[m-1]} {str(y)[2:]}"
-        ym = f"{y:04d}-{m:02d}"
-        row = tdb.execute("""
-            SELECT
-              COALESCE(SUM(COALESCE(total,monto)),0) as facturado,
-              COALESCE(SUM(CASE WHEN estado='pagado' THEN COALESCE(total,monto) ELSE 0 END),0) as cobrado
-            FROM cobros
-            WHERE strftime('%Y-%m', fecha_emision) = ?
-              AND estado != 'cancelado'
-        """, (ym,)).fetchone()
-        result.append({
-            "label":      label,
-            "facturado":  float(row["facturado"]),
-            "cobrado":    float(row["cobrado"]),
-        })
-    return result
+@cobranzas_bp.before_request
+def _acceso_al_cobro():
+    cid = (request.view_args or {}).get("id")
+    tdb = getattr(g, "tenant_db", None)
+    if cid and tdb is not None and session.get("user_id") and not _puede_ver_cobro(tdb, cid):
+        abort(404)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  INDEX
+#  LISTA
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _filtros():
+    """Filtros de la lista (también los usa la exportación)."""
+    a = request.args
+    f = {
+        "grupo": a.get("grupo") if a.get("grupo") in GRUPOS else "abiertos",
+        "q": a.get("q", "").strip()[:100],
+        "cliente": _int(a.get("cliente")),
+        "asunto": _int(a.get("asunto")),
+        "abogado": _int(a.get("abogado")),
+        "semana": a.get("semana") == "1",
+    }
+    hoy = _hoy().isoformat()
+    alc, p = _alcance()
+    where, params = [alc], list(p)
+    if f["grupo"] == "abiertos":
+        where.append(ABIERTO_SQL)
+    elif f["grupo"] == "vencidos":
+        where.append(f"{ABIERTO_SQL} AND date(co.fecha_vencimiento) < ?")
+        params.append(hoy)
+    elif f["grupo"] == "pagados":
+        where.append("co.estado='pagado'")
+    elif f["grupo"] == "cancelados":
+        where.append("co.estado='cancelado'")
+    if f["semana"]:
+        where.append(f"{ABIERTO_SQL} AND date(co.fecha_vencimiento) BETWEEN ? AND ?")
+        params += [hoy, (_hoy() + timedelta(days=7)).isoformat()]
+    if f["q"]:
+        lk = f"%{f['q']}%"
+        where.append(f"({CLIENTE} LIKE ? OR co.concepto LIKE ? OR co.numero_factura LIKE ? OR a.titulo LIKE ? OR a.numero_expediente LIKE ?)")
+        params += [lk] * 5
+    for campo, col in (("cliente", "co.cliente_id"), ("asunto", "co.asunto_id"), ("abogado", "co.abogado_id")):
+        if f[campo]:
+            where.append(f"{col}=?")
+            params.append(f[campo])
+    return f, " AND ".join(where), params
+
+
+BASE_SQL = f"""
+    SELECT co.*, {TOTAL} AS total_v, {SALDO} AS saldo_v, {CLIENTE} AS cliente,
+           a.titulo AS asunto_titulo, a.numero_expediente
+    FROM cobros co
+    LEFT JOIN clientes c ON c.id = co.cliente_id
+    LEFT JOIN asuntos a ON a.id = co.asunto_id
+"""
+
 
 @cobranzas_bp.route("/")
 @login_required
 @tenant_required
 def index():
     tdb = g.tenant_db
-    _check_vencidos(tdb)
+    al_dia(tdb)
+    hoy = _hoy()
+    f, clause, params = _filtros()
+    alc, ap = _alcance()
 
-    # Moneda global
-    if "moneda" in request.args:
-        session["moneda_global"] = request.args["moneda"]
-    moneda_global = session.get("moneda_global", "MXN")
+    orden = {
+        "abiertos": "date(co.fecha_vencimiento) IS NULL, date(co.fecha_vencimiento), co.id DESC",
+        "vencidos": "date(co.fecha_vencimiento), co.id DESC",
+        "pagados":  "co.fecha_pago DESC, co.id DESC",
+    }.get(f["grupo"], "date(co.fecha_emision) DESC, co.id DESC")
 
-    # Filtros
-    tab        = request.args.get("tab", "pendientes")  # pendientes|pagadas|todas
-    q          = request.args.get("q", "").strip()
-    cliente_f  = request.args.get("cliente", "")
-    asunto_f   = request.args.get("asunto", "")
-    desde      = request.args.get("desde", "")
-    hasta      = request.args.get("hasta", "")
-    monto_min  = request.args.get("monto_min", "")
-    monto_max  = request.args.get("monto_max", "")
-    estado_f   = request.args.get("estado", "")
-    moneda_f   = request.args.get("moneda_f", "")
-    abogado_f  = request.args.get("abogado", "")
-    page       = max(1, _safe_int(request.args.get("page", 1), 1))
+    total = tdb.execute(f"SELECT COUNT(*) FROM ({BASE_SQL} WHERE {clause})", params).fetchone()[0]
+    total_pages = max(1, math.ceil(total / PER_PAGE))
+    page = min(max(1, _int(request.args.get("page"), 1)), total_pages)
+    cobros = [_decorar(r) for r in tdb.execute(
+        f"{BASE_SQL} WHERE {clause} ORDER BY {orden} LIMIT ? OFFSET ?",
+        params + [PER_PAGE, (page - 1) * PER_PAGE]).fetchall()]
+    suma_filtro = tdb.execute(f"SELECT COALESCE(SUM(saldo_v),0), COALESCE(SUM(total_v),0) FROM ({BASE_SQL} WHERE {clause})",
+                              params).fetchone()
 
-    where, params = ["1"], []
+    # ── Resumen ──────────────────────────────────────────────
+    r = tdb.execute(f"""
+        SELECT COALESCE(SUM({SALDO}),0) AS por_cobrar,
+               COUNT(*) AS abiertos,
+               COUNT(DISTINCT co.cliente_id) AS clientes,
+               COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) < :hoy THEN {SALDO} END),0) AS vencido,
+               COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) < :hoy THEN 1 END),0) AS n_vencidos,
+               MIN(CASE WHEN date(co.fecha_vencimiento) < :hoy THEN date(co.fecha_vencimiento) END) AS mas_viejo,
+               COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) BETWEEN :hoy AND :sem THEN {SALDO} END),0) AS semana,
+               COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) BETWEEN :hoy AND :sem THEN 1 END),0) AS n_semana
+        FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
+        WHERE {ABIERTO_SQL} AND {alc.replace('?', ':u')}
+    """, {"hoy": hoy.isoformat(), "sem": (hoy + timedelta(days=7)).isoformat(), "u": session.get("user_id")}).fetchone()
+    inicio_mes = hoy.replace(day=1)
+    fin_mes_pasado = inicio_mes - timedelta(days=1)
+    viejo = _fecha(r["mas_viejo"])
+    resumen = {
+        **dict(r),
+        "dias_viejo": (hoy - viejo).days if viejo else 0,
+        "cobrado_mes": cobrado_entre(tdb, inicio_mes, hoy),
+        "cobrado_mes_pasado": cobrado_entre(tdb, fin_mes_pasado.replace(day=1), fin_mes_pasado),
+        "mes": MESES_LARGOS[hoy.month - 1],
+        "mes_pasado": MESES_LARGOS[fin_mes_pasado.month - 1],
+    }
 
-    # Tab filters
-    if tab == "pendientes":
-        where.append("co.estado IN ('pendiente','abono','vencido')")
-    elif tab == "pagadas":
-        where.append("co.estado = 'pagado'")
-    elif tab == "vencidas":
-        where.append("co.estado = 'vencido'")
-    # 'todas' → no extra filter
+    # ── Quién nos debe ───────────────────────────────────────
+    deudores = []
+    for d in tdb.execute(f"""
+        SELECT co.cliente_id, {CLIENTE} AS cliente, SUM({SALDO}) AS debe, COUNT(*) AS n,
+               SUM(CASE WHEN date(co.fecha_vencimiento) < ? THEN {SALDO} ELSE 0 END) AS vencido,
+               MIN(date(co.fecha_vencimiento)) AS vence
+        FROM cobros co LEFT JOIN clientes c ON c.id=co.cliente_id LEFT JOIN asuntos a ON a.id=co.asunto_id
+        WHERE {ABIERTO_SQL} AND {alc}
+        GROUP BY co.cliente_id HAVING debe > 0 ORDER BY vencido DESC, debe DESC LIMIT 5
+    """, (hoy.isoformat(), *ap)).fetchall():
+        d = dict(d)
+        fv = _fecha(d["vence"])
+        if d["vencido"] > 0 and fv:
+            d["nota"], d["tono"] = f"{dinero(d['vencido'], decimales=False)} vencido desde hace {(hoy - fv).days} días", "rojo"
+        else:
+            d["nota"], d["tono"] = f"{d['n']} cobro{'s' if d['n'] != 1 else ''} · {'vence el ' + _fecha_txt(fv, False) if fv else 'sin fecha de pago'}", ""
+        deudores.append(d)
 
-    if q:
-        where.append("(c.nombre LIKE ? OR c.razon_social LIKE ? OR co.concepto LIKE ? OR co.numero_factura LIKE ?)")
-        lk = f"%{q}%"
-        params += [lk, lk, lk, lk]
-    if cliente_f:
-        where.append("co.cliente_id=?")
-        params.append(cliente_f)
-    if asunto_f:
-        where.append("co.asunto_id=?")
-        params.append(asunto_f)
-    if desde:
-        where.append("date(co.fecha_emision) >= ?")
-        params.append(desde)
-    if hasta:
-        where.append("date(co.fecha_emision) <= ?")
-        params.append(hasta)
-    if monto_min:
-        where.append("COALESCE(co.total, co.monto) >= ?")
-        params.append(_safe_float(monto_min))
-    if monto_max:
-        where.append("COALESCE(co.total, co.monto) <= ?")
-        params.append(_safe_float(monto_max))
-    if estado_f:
-        where.append("co.estado=?")
-        params.append(estado_f)
-    if moneda_f:
-        where.append("co.moneda=?")
-        params.append(moneda_f)
-    if abogado_f:
-        where.append("co.abogado_id=?")
-        params.append(abogado_f)
+    # ── Antigüedad del saldo ─────────────────────────────────
+    tramos = [("Al corriente", "#1D3FD6"), ("1 a 30 días", "#F59E0B"), ("31 a 90 días", "#EA580C"), ("Más de 90 días", "#DC2626")]
+    antig = [0.0, 0.0, 0.0, 0.0]
+    for s in tdb.execute(f"""SELECT {SALDO} AS saldo, co.fecha_vencimiento FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
+                             WHERE {ABIERTO_SQL} AND {alc}""", ap).fetchall():
+        fv = _fecha(s["fecha_vencimiento"])
+        dias = (hoy - fv).days if fv else 0
+        antig[0 if dias <= 0 else 1 if dias <= 30 else 2 if dias <= 90 else 3] += float(s["saldo"] or 0)
+    suma_ant = sum(antig)
+    antiguedad = [{"label": l, "color": c, "monto": m, "pct": round(m / suma_ant * 100, 1) if suma_ant else 0}
+                  for (l, c), m in zip(tramos, antig)]
 
-    clause = " AND ".join(where)
-    base_q = f"""
-        SELECT co.*,
-               c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre,
-               c.razon_social as cliente_razon, c.email as cliente_email,
-               a.titulo as asunto_titulo, a.numero_expediente
-        FROM cobros co
-        LEFT JOIN clientes c ON co.cliente_id=c.id
-        LEFT JOIN asuntos a  ON co.asunto_id=a.id
-        WHERE {clause}
-    """
-    total_count = tdb.execute(f"SELECT COUNT(*) FROM ({base_q})", params).fetchone()[0]
-    total_pages = max(1, math.ceil(total_count / PER_PAGE))
-    page = min(page, total_pages)
-    offset = (page - 1) * PER_PAGE
+    # ── Últimos 6 meses ──────────────────────────────────────
+    meses = []
+    for i in range(5, -1, -1):
+        y, m = divmod(hoy.year * 12 + hoy.month - 1 - i, 12)
+        ini = date(y, m + 1, 1)
+        fin = (date(y + (m + 1) // 12, (m + 1) % 12 + 1, 1) - timedelta(days=1))
+        facturado = tdb.execute(f"""SELECT COALESCE(SUM({TOTAL}),0) FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
+                                    WHERE co.estado != 'cancelado' AND date(co.fecha_emision) BETWEEN ? AND ? AND {alc}""",
+                                (ini.isoformat(), fin.isoformat(), *ap)).fetchone()[0]
+        meses.append({"label": MESES[ini.month - 1], "facturado": float(facturado),
+                      "cobrado": cobrado_entre(tdb, ini, min(fin, hoy)), "actual": i == 0})
+    tope = max([max(x["facturado"], x["cobrado"]) for x in meses] + [1])
+    for x in meses:
+        x["hf"], x["hc"] = round(x["facturado"] / tope * 100), round(x["cobrado"] / tope * 100)
 
-    rows = tdb.execute(
-        f"{base_q} ORDER BY co.fecha_alta DESC LIMIT ? OFFSET ?",
-        params + [PER_PAGE, offset],
-    ).fetchall()
-    cobros = [_enrich(dict(r)) for r in rows]
+    # ── Conteos por grupo ────────────────────────────────────
+    conteos = {k: 0 for k in GRUPOS}
+    for e, n, vencidos in tdb.execute(
+            f"""SELECT co.estado, COUNT(*), SUM(CASE WHEN date(co.fecha_vencimiento) < ? THEN 1 ELSE 0 END)
+                FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id WHERE {alc} GROUP BY co.estado""",
+            (hoy.isoformat(), *ap)).fetchall():
+        conteos["todos"] += n
+        if e in ABIERTOS:
+            conteos["abiertos"] += n
+            conteos["vencidos"] += vencidos or 0
+        elif e == "pagado":
+            conteos["pagados"] += n
+        elif e == "cancelado":
+            conteos["cancelados"] += n
 
-    # Tab counts
-    tab_counts = {}
-    for t_key, t_clause in [("pendientes","co.estado IN ('pendiente','abono','vencido')"),
-                              ("pagadas","co.estado='pagado'"),
-                              ("vencidas","co.estado='vencido'"),
-                              ("todas","1")]:
-        tab_counts[t_key] = tdb.execute(
-            f"SELECT COUNT(*) FROM cobros co LEFT JOIN clientes c ON co.cliente_id=c.id WHERE {t_clause}"
-        ).fetchone()[0]
+    # Horas registradas que aún no se cobran
+    alc_a = f"AND {_FILTRO_PROPIOS}" if _solo_lo_suyo() else ""
+    uid = session.get("user_id")
+    horas_pend = tdb.execute(
+        f"""SELECT COALESCE(SUM(h.horas),0), COUNT(DISTINCT h.asunto_id) FROM asunto_horas h JOIN asuntos a ON a.id=h.asunto_id
+            WHERE h.cobro_id IS NULL {alc_a}""", (uid, uid, uid) if alc_a else ()).fetchone()
 
-    stats    = _dashboard_stats(tdb)
-    monthly  = _monthly_chart(tdb)
-    abogados = _get_abogados()
+    nombres = {}
+    if f["cliente"]:
+        row = tdb.execute(f"SELECT {CLIENTE} FROM clientes c WHERE c.id=?", (f["cliente"],)).fetchone()
+        nombres["cliente"] = row[0] if row else "Cliente"
+    if f["asunto"]:
+        row = tdb.execute("SELECT titulo FROM asuntos WHERE id=?", (f["asunto"],)).fetchone()
+        nombres["asunto"] = row[0] if row else "Asunto"
 
-    clientes = [dict(r) for r in tdb.execute(
-        "SELECT id, tipo, nombre, apellidos, razon_social FROM clientes WHERE activo=1 ORDER BY nombre LIMIT 300"
-    ).fetchall()]
+    base_args = {k: v for k, v in request.args.items() if k not in ("page", "tenant")}
 
-    asuntos_list = [dict(r) for r in tdb.execute(
-        "SELECT id, titulo, numero_expediente FROM asuntos WHERE estado NOT IN ('archivado','cerrado') ORDER BY titulo LIMIT 300"
-    ).fetchall()]
+    def liga(**cambios):
+        args = {**base_args, **cambios}
+        return url_for("cobranzas.index", **{k: v for k, v in args.items() if v not in (None, "", False)})
+
+    usuarios = _usuarios()
+    for c in cobros:
+        c["abogado"] = usuarios.get(c.get("abogado_id"))
 
     return render_template(
         "cobranzas/index.html",
-        cobros=cobros,
-        tab=tab, tab_counts=tab_counts,
-        total_count=total_count, page=page, total_pages=total_pages, per_page=PER_PAGE,
-        q=q, cliente_f=cliente_f, asunto_f=asunto_f,
-        desde=desde, hasta=hasta, monto_min=monto_min, monto_max=monto_max,
-        estado_f=estado_f, moneda_f=moneda_f, abogado_f=abogado_f,
-        stats=stats, monthly=monthly,
-        moneda_global=moneda_global, monedas=MONEDAS,
-        metodos_pago=METODOS_PAGO, estados_color=ESTADOS_COLOR,
-        abogados=abogados, clientes=clientes,
-        asuntos_list=asuntos_list,
-        today_str=date.today().isoformat(),
+        cobros=cobros, total=total, page=page, total_pages=total_pages,
+        suma_filtro={"saldo": suma_filtro[0], "total": suma_filtro[1]},
+        f=f, nombres=nombres, liga=liga, grupos=GRUPOS, conteos=conteos,
+        resumen=resumen, deudores=deudores, antiguedad=antiguedad, suma_ant=suma_ant, meses=meses,
+        horas_pend={"horas": float(horas_pend[0]), "asuntos": horas_pend[1]},
+        clientes=_clientes(), abogados=_abogados(), conceptos=CONCEPTOS, metodos=METODOS_PAGO,
+        puede_crear=session.get("role") in ROLES_COBRANZA, es_admin=_es_admin(),
+        hoy=hoy.isoformat(), folio_sugerido=_auto_folio(tdb),
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  AJAX — crear cobro (modal)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@cobranzas_bp.route("/ajax/crear", methods=["POST"])
+@cobranzas_bp.route("/nuevo")
 @login_required
 @tenant_required
-@role_required("super_admin", "admin", "abogado")
-def ajax_crear():
-    tdb     = g.tenant_db
-    data    = request.form
+def nuevo():
+    return redirect(url_for("cobranzas.index") + "#nuevo")
 
-    concepto = (data.get("concepto") or "").strip()
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PANEL DE UN COBRO
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@cobranzas_bp.route("/<int:id>/panel")
+@login_required
+@tenant_required
+def panel(id: int):
+    tdb = g.tenant_db
+    row = tdb.execute(f"{BASE_SQL} WHERE co.id=?", (id,)).fetchone()
+    if not row:
+        abort(404)
+    co = _decorar(row)
+    cli = tdb.execute("SELECT * FROM clientes WHERE id=?", (co["cliente_id"],)).fetchone() if co["cliente_id"] else None
+    usuarios = _usuarios()
+    pagos = []
+    for p in tdb.execute("SELECT * FROM cobro_pagos WHERE cobro_id=? ORDER BY date(fecha) DESC, id DESC", (id,)).fetchall():
+        p = dict(p)
+        p["fecha_txt"] = _fecha_txt(p["fecha"])
+        p["autor"] = (usuarios.get(p["creado_por"]) or {}).get("corto")
+        pagos.append(p)
+
+    descuento = float(co.get("descuento_valor") or 0)
+    if co.get("descuento_tipo") == "pct":
+        descuento = round(float(co.get("monto") or 0) * descuento / 100, 2)
+    desglose = {"honorarios": float(co.get("monto") or 0), "descuento": descuento,
+                "iva_pct": float(co.get("iva_pct") or 0), "iva": float(co.get("iva_monto") or 0),
+                "ajuste": round(co["total_v"] - (float(co.get("monto") or 0) - descuento + float(co.get("iva_monto") or 0)), 2)}
+
+    whatsapp = None
+    tel = re.sub(r"\D", "", (cli["celular"] or cli["telefono"] or "") if cli else "")
+    if len(tel) >= 10 and co["saldo_v"] > 0:
+        tel = tel if len(tel) > 10 else "52" + tel
+        nombre = (cli["nombre"] or "").split(" ")[0] if cli["tipo"] == "persona_fisica" else (cli["contacto_principal"] or "")
+        vence = f", con vencimiento el {_fecha_txt(co['fecha_vencimiento'])}" if co.get("fecha_vencimiento") else ""
+        texto = (f"Hola{(' ' + nombre) if nombre else ''}, le escribimos de {g.tenant['nombre_despacho']}. "
+                 f"Le recordamos que tiene un saldo pendiente de {dinero(co['saldo_v'], co['moneda'])} "
+                 f"por «{co['concepto']}» (folio {co['folio']}){vence}. "
+                 f"Si ya realizó el pago, le agradeceremos enviarnos el comprobante. ¡Gracias!")
+        whatsapp = f"https://wa.me/{tel}?text={quote(texto)}"
+
+    actividad = []
+    for a in tdb.execute("SELECT accion, detalles, user_id, fecha FROM actividad_log WHERE entidad='cobro' AND entidad_id=? "
+                         "ORDER BY id DESC LIMIT 6", (id,)).fetchall():
+        if a["accion"] in ("enviar_recordatorio", "nota_credito_parcial", "editar_cobro"):
+            actividad.append({"accion": {"enviar_recordatorio": "Recordatorio enviado por correo",
+                                         "nota_credito_parcial": "Descuento aplicado",
+                                         "editar_cobro": "Cobro editado"}[a["accion"]],
+                              "quien": (usuarios.get(a["user_id"]) or {}).get("corto"),
+                              "fecha": _fecha_txt(a["fecha"])})
+
+    return render_template(
+        "cobranzas/_panel.html", co=co, cli=dict(cli) if cli else None, pagos=pagos, desglose=desglose,
+        abogado=usuarios.get(co.get("abogado_id")), whatsapp=whatsapp, actividad=actividad,
+        es_admin=_es_admin(), puede=session.get("role") in ROLES_COBRANZA,
+        emision=_fecha_txt(co.get("fecha_emision")), vencimiento=_fecha_txt(co.get("fecha_vencimiento")),
+    )
+
+
+@cobranzas_bp.route("/<int:id>/datos")
+@login_required
+@tenant_required
+def datos(id: int):
+    """Campos del cobro para editarlo."""
+    co = g.tenant_db.execute("SELECT * FROM cobros WHERE id=?", (id,)).fetchone()
+    if not co:
+        abort(404)
+    d = {k: co[k] for k in ("id", "cliente_id", "asunto_id", "concepto", "numero_factura", "monto", "moneda", "iva_pct",
+                             "fecha_emision", "fecha_vencimiento", "abogado_id", "notas", "estado")}
+    d["descuento"] = float(co["descuento_valor"] or 0) if co["descuento_tipo"] != "pct" else \
+        round(float(co["monto"] or 0) * float(co["descuento_valor"] or 0) / 100, 2)
+    d["pagado"] = float(co["monto_abonado"] or 0)
+    return jsonify(d)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ALTA Y EDICIÓN
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _leer_cobro(tdb):
+    """Valida el formulario de alta/edición. Regresa (valores, error)."""
+    d = request.form
+    concepto = (d.get("concepto") or "").strip()[:300]
+    cliente_id = _int(d.get("cliente_id"))
+    asunto_id = _int(d.get("asunto_id"))
+    monto = round(_num(d.get("monto")), 2)
+    if not cliente_id or not tdb.execute("SELECT 1 FROM clientes WHERE id=?", (cliente_id,)).fetchone():
+        return None, "Elige a qué cliente le vas a cobrar"
     if not concepto:
-        return jsonify(ok=False, error="La descripción es requerida"), 400
+        return None, "Escribe el concepto del cobro"
+    if monto <= 0:
+        return None, "Escribe el monto de los honorarios"
+    if asunto_id:
+        a = tdb.execute("SELECT cliente_id FROM asuntos WHERE id=?", (asunto_id,)).fetchone()
+        if not a or not puede_ver(tdb, asunto_id):
+            return None, "Ese asunto no existe"
+        if a["cliente_id"] and a["cliente_id"] != cliente_id:
+            return None, "Ese asunto es de otro cliente"
+    iva_pct = 16.0 if d.get("iva") != "0" else 0.0
+    descuento = min(max(round(_num(d.get("descuento")), 2), 0), monto)
+    emision = _fecha(d.get("fecha_emision")) or _hoy()
+    vence = _fecha(d.get("fecha_vencimiento"))
+    if vence and vence < emision:
+        return None, "La fecha de pago no puede ser anterior a la emisión"
+    moneda = d.get("moneda") if d.get("moneda") in MONEDAS else "MXN"
+    abogado_id = _int(d.get("abogado_id"))
+    if abogado_id and abogado_id not in {a["id"] for a in _abogados()}:
+        abogado_id = None
+    return {
+        "cliente_id": cliente_id, "asunto_id": asunto_id, "concepto": concepto,
+        "numero_factura": (d.get("numero_factura") or "").strip()[:40] or None,
+        "monto": monto, "moneda": moneda, "iva_pct": iva_pct, "descuento_tipo": "fijo", "descuento_valor": descuento,
+        **_calcular(monto, iva_pct, descuento),
+        "fecha_emision": emision.isoformat(), "fecha_vencimiento": vence.isoformat() if vence else None,
+        "abogado_id": abogado_id, "notas": (d.get("notas") or "").strip()[:3000] or None,
+    }, None
 
-    cliente_id = _safe_int(data.get("cliente_id"))
-    if not cliente_id:
-        return jsonify(ok=False, error="El cliente es requerido"), 400
 
-    monto          = _safe_float(data.get("monto"))
-    iva_pct        = _safe_float(data.get("iva_pct"), 16.0)
-    descuento_tipo = data.get("descuento_tipo", "fijo")
-    descuento_val  = _safe_float(data.get("descuento_valor"))
-    calc           = _calcular_total(monto, iva_pct, descuento_tipo, descuento_val)
+@cobranzas_bp.route("/crear", methods=["POST"])
+@login_required
+@tenant_required
+@role_required(*ROLES_COBRANZA)
+def crear():
+    tdb = g.tenant_db
+    v, err = _leer_cobro(tdb)
+    if err:
+        return jsonify(ok=False, error=err), 400
+    if not v["abogado_id"]:
+        resp = tdb.execute("SELECT abogado_responsable FROM asuntos WHERE id=?", (v["asunto_id"],)).fetchone() if v["asunto_id"] else None
+        v["abogado_id"] = (resp["abogado_responsable"] if resp else None) or \
+            (session.get("user_id") if session.get("role") != "asistente" else None)
+    v["numero_factura"] = v["numero_factura"] or _auto_folio(tdb)
+    pdf, err = _guardar_archivo("archivo_factura", "facturas", {"pdf", "png", "jpg", "jpeg"})
+    xml, err2 = _guardar_archivo("archivo_xml", "xml", {"xml"})
+    if err or err2:
+        return jsonify(ok=False, error="La factura debe ser PDF o imagen, y el CFDI un archivo .xml"), 400
 
-    numero_factura = (data.get("numero_factura") or "").strip() or _auto_folio(tdb)
-    estado         = data.get("estado", "pendiente")
-    if estado not in ESTADOS_COLOR:
-        estado = "pendiente"
-
-    monto_abonado = _safe_float(data.get("monto_abonado")) if estado == "abono" else 0.0
-    fecha_abono   = data.get("fecha_abono") or None if estado == "abono" else None
-
-    # File uploads
-    archivo_factura_url = archivo_xml_url = None
-    for field, subdir in [("archivo_factura", "facturas"), ("archivo_xml", "xml")]:
-        f = request.files.get(field)
-        if f and f.filename:
-            try:
-                from config import Config
-                udir = os.path.join(Config.UPLOAD_FOLDER, "cobranzas", subdir)
-                os.makedirs(udir, exist_ok=True)
-                ext  = os.path.splitext(f.filename)[1].lower()
-                safe = f"{uuid.uuid4().hex}{ext}"
-                f.save(os.path.join(udir, safe))
-                url  = f"/uploads/cobranzas/{subdir}/{safe}"
-                if field == "archivo_factura":
-                    archivo_factura_url = url
-                else:
-                    archivo_xml_url = url
-            except Exception:
-                pass
-
+    cols = ["cliente_id", "asunto_id", "concepto", "numero_factura", "monto", "moneda", "iva_pct", "iva_monto", "total",
+            "descuento_tipo", "descuento_valor", "fecha_emision", "fecha_vencimiento", "abogado_id", "notas"]
     cur = tdb.execute(
-        """INSERT INTO cobros
-           (cliente_id, asunto_id, concepto, numero_factura,
-            monto, moneda, iva_pct, iva_monto, total,
-            descuento_tipo, descuento_valor,
-            estado, fecha_emision, fecha_vencimiento, fecha_pago,
-            monto_abonado, fecha_abono,
-            abogado_id, archivo_factura_url, archivo_xml_url,
-            enviar_correo, notas, creado_por)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (
-            cliente_id,
-            _safe_int(data.get("asunto_id")),
-            concepto, numero_factura,
-            monto,
-            data.get("moneda", "MXN"),
-            iva_pct, calc["iva_monto"], calc["total"],
-            descuento_tipo, descuento_val,
-            estado,
-            data.get("fecha_emision") or date.today().isoformat(),
-            data.get("fecha_vencimiento") or None,
-            data.get("fecha_pago") or None,
-            monto_abonado, fecha_abono,
-            _safe_int(data.get("abogado_id")),
-            archivo_factura_url, archivo_xml_url,
-            1 if data.get("enviar_correo") else 0,
-            (data.get("notas") or "").strip() or None,
-            session.get("user_id"),
-        ),
-    )
+        f"INSERT INTO cobros ({', '.join(cols)}, estado, monto_abonado, archivo_factura_url, archivo_xml_url, creado_por) "
+        f"VALUES ({', '.join('?' * len(cols))}, 'pendiente', 0, ?, ?, ?)",
+        (*[v[c] for c in cols], pdf, xml, session.get("user_id")))
+    cid = cur.lastrowid
+
+    if request.form.get("ya_pagado"):
+        tdb.execute("INSERT INTO cobro_pagos (cobro_id, monto, fecha, metodo, notas, creado_por) VALUES (?,?,?,?,?,?)",
+                    (cid, v["total"], v["fecha_emision"],
+                     request.form.get("metodo") if request.form.get("metodo") in METODOS_PAGO else "Transferencia",
+                     "Pagado al registrar el cobro", session.get("user_id")))
+    estado = _recalcular(tdb, cid)
     tdb.commit()
-    new_id = cur.lastrowid
-    _log("crear_cobro", new_id, {"concepto": concepto, "monto": monto})
-    return jsonify(ok=True, id=new_id, folio=numero_factura)
+    _log("crear_cobro", cid, {"concepto": v["concepto"], "total": v["total"]})
+    return jsonify(ok=True, id=cid, folio=v["numero_factura"], estado=estado)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  AJAX — asuntos de un cliente
-# ─────────────────────────────────────────────────────────────────────────────
-
-@cobranzas_bp.route("/ajax/asuntos-cliente/<int:cid>")
+@cobranzas_bp.route("/<int:id>/editar", methods=["POST"])
 @login_required
 @tenant_required
-def ajax_asuntos_cliente(cid: int):
-    rows = g.tenant_db.execute(
-        "SELECT id, titulo, numero_expediente FROM asuntos WHERE cliente_id=? AND estado NOT IN ('archivado') ORDER BY fecha_alta DESC",
-        (cid,),
-    ).fetchall()
-    return jsonify([dict(r) for r in rows])
+@role_required(*ROLES_COBRANZA)
+def editar(id: int):
+    tdb = g.tenant_db
+    co = tdb.execute("SELECT * FROM cobros WHERE id=?", (id,)).fetchone()
+    if co["estado"] == "cancelado":
+        return jsonify(ok=False, error="El cobro está cancelado"), 400
+    v, err = _leer_cobro(tdb)
+    if err:
+        return jsonify(ok=False, error=err), 400
+    if v["total"] < float(co["monto_abonado"] or 0) - 0.01:
+        return jsonify(ok=False, error=f"Ya se pagaron {dinero(co['monto_abonado'], co['moneda'])}; el total no puede ser menor"), 400
+    v["numero_factura"] = v["numero_factura"] or co["numero_factura"] or _auto_folio(tdb)
+    pdf, err = _guardar_archivo("archivo_factura", "facturas", {"pdf", "png", "jpg", "jpeg"})
+    xml, err2 = _guardar_archivo("archivo_xml", "xml", {"xml"})
+    if err or err2:
+        return jsonify(ok=False, error="La factura debe ser PDF o imagen, y el CFDI un archivo .xml"), 400
+    v["archivo_factura_url"] = pdf or co["archivo_factura_url"]
+    v["archivo_xml_url"] = xml or co["archivo_xml_url"]
+    tdb.execute(f"UPDATE cobros SET {', '.join(k + '=?' for k in v)} WHERE id=?", (*v.values(), id))
+    estado = _recalcular(tdb, id)
+    tdb.commit()
+    _log("editar_cobro", id, {"total": v["total"]})
+    return jsonify(ok=True, estado=estado)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  AJAX — auto folio
-# ─────────────────────────────────────────────────────────────────────────────
-
-@cobranzas_bp.route("/ajax/auto-folio")
+@cobranzas_bp.route("/asuntos-de/<int:cid>")
 @login_required
 @tenant_required
-def ajax_auto_folio():
-    return jsonify({"folio": _auto_folio(g.tenant_db)})
+def asuntos_de(cid: int):
+    """Asuntos de un cliente, con lo pactado y lo ya cobrado, para el alta de cobros."""
+    tdb = g.tenant_db
+    filtro, p = ("", [])
+    if _solo_lo_suyo():
+        uid = session.get("user_id")
+        filtro, p = f"AND {_FILTRO_PROPIOS}", [uid, uid, uid]
+    filas = tdb.execute(f"""
+        SELECT a.id, a.titulo, a.numero_expediente, a.estado, a.honorarios_pactados, a.forma_cobro, a.abogado_responsable,
+               (SELECT COALESCE(SUM({TOTAL}),0) FROM cobros co WHERE co.asunto_id=a.id AND co.estado!='cancelado') AS facturado
+        FROM asuntos a WHERE a.cliente_id=? AND a.estado != 'archivado' {filtro}
+        ORDER BY a.estado IN ('cerrado','completado'), a.fecha_alta DESC""", (cid, *p)).fetchall()
+    return jsonify([dict(r) for r in filas])
+
+
+@cobranzas_bp.route("/cliente-de-asunto/<int:aid>")
+@login_required
+@tenant_required
+def cliente_de_asunto(aid: int):
+    tdb = g.tenant_db
+    a = tdb.execute("SELECT cliente_id FROM asuntos WHERE id=?", (aid,)).fetchone()
+    if not a or not puede_ver(tdb, aid):
+        return jsonify(cliente_id=None), 404
+    return jsonify(cliente_id=a["cliente_id"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  REGISTRO DE PAGO
+#  PAGOS
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @cobranzas_bp.route("/<int:id>/pago", methods=["POST"])
 @login_required
 @tenant_required
+@role_required(*ROLES_COBRANZA)
 def registrar_pago(id: int):
-    tdb  = g.tenant_db
-    cobro = tdb.execute("SELECT * FROM cobros WHERE id=?", (id,)).fetchone()
-    if not cobro:
-        return jsonify(ok=False, error="No encontrado"), 404
-
-    data     = request.form
-    monto_p  = _safe_float(data.get("monto_pagado"))
-    if not monto_p or monto_p <= 0:
-        return jsonify(ok=False, error="Monto inválido"), 400
-
-    fecha  = data.get("fecha_pago") or date.today().isoformat()
-    metodo = data.get("metodo", "Transferencia")
-    ref    = (data.get("referencia") or "").strip() or None
-    notas  = (data.get("notas") or "").strip() or None
-
-    # Comprobante upload
-    comprobante_url = None
-    f = request.files.get("comprobante")
-    if f and f.filename:
-        try:
-            from config import Config
-            udir = os.path.join(Config.UPLOAD_FOLDER, "cobranzas", "comprobantes")
-            os.makedirs(udir, exist_ok=True)
-            ext  = os.path.splitext(f.filename)[1].lower()
-            safe = f"{uuid.uuid4().hex}{ext}"
-            f.save(os.path.join(udir, safe))
-            comprobante_url = f"/uploads/cobranzas/comprobantes/{safe}"
-        except Exception:
-            pass
-
-    # Insertar en historial de pagos
+    tdb = g.tenant_db
+    co = tdb.execute(f"SELECT co.*, {SALDO} AS saldo FROM cobros co WHERE co.id=?", (id,)).fetchone()
+    if co["estado"] in ("cancelado", "pagado"):
+        return jsonify(ok=False, error="Este cobro ya no tiene saldo"), 400
+    monto = round(_num(request.form.get("monto")), 2)
+    if monto <= 0:
+        return jsonify(ok=False, error="Escribe cuánto pagó"), 400
+    if monto > float(co["saldo"]) + 0.01:
+        return jsonify(ok=False, error=f"El pago es mayor al saldo ({dinero(co['saldo'], co['moneda'])})"), 400
+    fecha = _fecha(request.form.get("fecha")) or _hoy()
+    if fecha > _hoy():
+        return jsonify(ok=False, error="La fecha del pago no puede ser futura"), 400
+    metodo = request.form.get("metodo") if request.form.get("metodo") in METODOS_PAGO else "Transferencia"
+    comprobante, err = _guardar_archivo("comprobante", "comprobantes", {"pdf", "png", "jpg", "jpeg", "webp", "heic"})
+    if err:
+        return jsonify(ok=False, error="El comprobante debe ser PDF o imagen"), 400
     tdb.execute(
-        """INSERT INTO cobro_pagos
-           (cobro_id, monto, fecha, metodo, referencia, comprobante_url, notas, creado_por)
-           VALUES (?,?,?,?,?,?,?,?)""",
-        (id, monto_p, fecha, metodo, ref, comprobante_url, notas, session.get("user_id")),
-    )
-
-    # Calcular total abonado
-    total_abonado = tdb.execute(
-        "SELECT COALESCE(SUM(monto),0) FROM cobro_pagos WHERE cobro_id=?", (id,)
-    ).fetchone()[0]
-    total_cobro = float(cobro["total"] or cobro["monto"] or 0)
-
-    # Determinar nuevo estado
-    if total_abonado >= total_cobro - 0.01:
-        nuevo_estado   = "pagado"
-        fecha_pago_col = fecha
-    elif total_abonado > 0:
-        nuevo_estado   = "abono"
-        fecha_pago_col = None
-    else:
-        nuevo_estado   = cobro["estado"]
-        fecha_pago_col = None
-
-    tdb.execute(
-        "UPDATE cobros SET estado=?, monto_abonado=?, fecha_pago=? WHERE id=?",
-        (nuevo_estado, total_abonado, fecha_pago_col, id),
-    )
+        "INSERT INTO cobro_pagos (cobro_id, monto, fecha, metodo, referencia, comprobante_url, notas, creado_por) VALUES (?,?,?,?,?,?,?,?)",
+        (id, monto, fecha.isoformat(), metodo, (request.form.get("referencia") or "").strip()[:80] or None,
+         comprobante, (request.form.get("notas") or "").strip()[:500] or None, session.get("user_id")))
+    estado = _recalcular(tdb, id)
     tdb.commit()
-    _log("registrar_pago", id, {"monto": monto_p, "estado": nuevo_estado})
-    return jsonify(ok=True, nuevo_estado=nuevo_estado, total_abonado=total_abonado)
+    _log("registrar_pago", id, {"monto": monto, "estado": estado})
+    return jsonify(ok=True, estado=estado, estado_label=ESTADOS[estado]["label"])
+
+
+@cobranzas_bp.route("/<int:id>/pagos/<int:pid>/borrar", methods=["POST"])
+@login_required
+@tenant_required
+@role_required("super_admin", "admin")
+def borrar_pago(id: int, pid: int):
+    tdb = g.tenant_db
+    p = tdb.execute("SELECT monto FROM cobro_pagos WHERE id=? AND cobro_id=?", (pid, id)).fetchone()
+    if not p:
+        return jsonify(ok=False, error="Pago no encontrado"), 404
+    tdb.execute("DELETE FROM cobro_pagos WHERE id=?", (pid,))
+    estado = _recalcular(tdb, id)
+    tdb.commit()
+    _log("borrar_pago", id, {"monto": p["monto"]})
+    return jsonify(ok=True, estado=estado)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  NOTA DE CRÉDITO (cancelar/parcial)
+#  DESCUENTOS, CANCELACIÓN Y NOTAS
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @cobranzas_bp.route("/<int:id>/nota-credito", methods=["POST"])
 @login_required
 @tenant_required
 @role_required("super_admin", "admin")
 def nota_credito(id: int):
-    tdb  = g.tenant_db
-    data = request.json or {}
-    tipo = data.get("tipo", "total")  # total | parcial
-    monto_nc = _safe_float(data.get("monto"))
-    motivo   = (data.get("motivo") or "Nota de crédito").strip()
-
-    cobro = tdb.execute("SELECT * FROM cobros WHERE id=?", (id,)).fetchone()
-    if not cobro:
-        return jsonify(ok=False, error="No encontrado"), 404
-
-    if tipo == "total":
-        tdb.execute("UPDATE cobros SET estado='cancelado' WHERE id=?", (id,))
+    """tipo=total cancela el cobro; tipo=parcial descuenta un monto del total."""
+    tdb = g.tenant_db
+    data = request.get_json(silent=True) or {}
+    motivo = (data.get("motivo") or "").strip()[:300]
+    co = tdb.execute(f"SELECT co.*, {TOTAL} AS total_v, {SALDO} AS saldo FROM cobros co WHERE co.id=?", (id,)).fetchone()
+    if co["estado"] == "cancelado":
+        return jsonify(ok=False, error="El cobro ya está cancelado"), 400
+    if data.get("tipo") == "total":
+        if float(co["monto_abonado"] or 0) > 0:
+            return jsonify(ok=False, error="Tiene pagos registrados. Bórralos antes de cancelarlo o aplica un descuento."), 400
+        nota = f"Cancelado: {motivo}" if motivo else "Cancelado"
+        tdb.execute("UPDATE cobros SET estado='cancelado', notas=TRIM(COALESCE(notas,'') || char(10) || ?) WHERE id=?", (nota, id))
         tdb.commit()
-        _log("nota_credito_total", id, {"motivo": motivo})
-        return jsonify(ok=True, nuevo_estado="cancelado")
-    else:
-        if not monto_nc or monto_nc <= 0:
-            return jsonify(ok=False, error="Monto inválido"), 400
-        total_actual = float(cobro["total"] or cobro["monto"] or 0)
-        nuevo_total  = round(total_actual - monto_nc, 2)
-        tdb.execute(
-            "UPDATE cobros SET total=?, notas=COALESCE(notas,'') || '\nNC: ' || ? WHERE id=?",
-            (nuevo_total, f"{motivo} -${monto_nc:,.2f}", id),
-        )
-        tdb.commit()
-        _log("nota_credito_parcial", id, {"monto": monto_nc, "motivo": motivo})
-        return jsonify(ok=True, nuevo_total=nuevo_total)
+        _log("cancelar_cobro", id, {"motivo": motivo})
+        return jsonify(ok=True, estado="cancelado")
+    monto = round(_num(data.get("monto")), 2)
+    if monto <= 0 or monto > float(co["saldo"]) + 0.01:
+        return jsonify(ok=False, error=f"El descuento debe ser mayor a cero y no pasar del saldo ({dinero(co['saldo'], co['moneda'])})"), 400
+    nota = f"Descuento de {dinero(monto, co['moneda'])}" + (f": {motivo}" if motivo else "")
+    tdb.execute("UPDATE cobros SET total=?, notas=TRIM(COALESCE(notas,'') || char(10) || ?) WHERE id=?",
+                (round(float(co["total_v"]) - monto, 2), nota, id))
+    estado = _recalcular(tdb, id)
+    tdb.commit()
+    _log("nota_credito_parcial", id, {"monto": monto, "motivo": motivo})
+    return jsonify(ok=True, estado=estado)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  ACTUALIZAR NOTAS
-# ─────────────────────────────────────────────────────────────────────────────
 
 @cobranzas_bp.route("/<int:id>/notas", methods=["POST"])
 @login_required
 @tenant_required
-@role_required("super_admin", "admin", "abogado")
+@role_required(*ROLES_COBRANZA)
 def actualizar_notas(id: int):
-    tdb  = g.tenant_db
-    data = request.json or {}
-    notas = (data.get("notas") or "").strip()
-    cobro = tdb.execute("SELECT id FROM cobros WHERE id=?", (id,)).fetchone()
-    if not cobro:
-        return jsonify(ok=False, error="No encontrado"), 404
-    tdb.execute("UPDATE cobros SET notas=? WHERE id=?", (notas or None, id))
-    tdb.commit()
+    notas = ((request.get_json(silent=True) or {}).get("notas") or "").strip()[:3000]
+    g.tenant_db.execute("UPDATE cobros SET notas=? WHERE id=?", (notas or None, id))
+    g.tenant_db.commit()
     return jsonify(ok=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  CANCELAR COBRO
+#  RECORDATORIO POR CORREO
 # ─────────────────────────────────────────────────────────────────────────────
 
-@cobranzas_bp.route("/<int:id>/cancelar", methods=["POST"])
+
+@cobranzas_bp.route("/<int:id>/recordatorio", methods=["POST"])
 @login_required
 @tenant_required
-@role_required("super_admin", "admin")
-def cancelar(id: int):
-    g.tenant_db.execute("UPDATE cobros SET estado='cancelado' WHERE id=?", (id,))
-    g.tenant_db.commit()
-    _log("cancelar_cobro", id)
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify(ok=True)
-    return redirect(url_for("cobranzas.index"))
+@role_required(*ROLES_COBRANZA)
+def recordatorio(id: int):
+    tdb = g.tenant_db
+    co = tdb.execute(f"""SELECT co.*, {SALDO} AS saldo, c.email, c.nombre, c.tipo, c.contacto_principal, {CLIENTE} AS cliente
+                         FROM cobros co LEFT JOIN clientes c ON c.id=co.cliente_id WHERE co.id=?""", (id,)).fetchone()
+    if float(co["saldo"] or 0) <= 0:
+        return jsonify(ok=False, error="Este cobro no tiene saldo pendiente"), 400
+    if not co["email"]:
+        return jsonify(ok=False, error="El cliente no tiene correo registrado"), 400
+
+    despacho = g.tenant["nombre_despacho"]
+    saludo = (co["nombre"] or "").split(" ")[0] if co["tipo"] == "persona_fisica" else (co["contacto_principal"] or "")
+    filas = [("Concepto", co["concepto"]), ("Folio", co["numero_factura"] or f"#{id}"),
+             ("Saldo pendiente", dinero(co["saldo"], co["moneda"]))]
+    if co["fecha_vencimiento"]:
+        filas.append(("Fecha de pago", _fecha_txt(co["fecha_vencimiento"])))
+    tabla = "".join(
+        f'<tr><td style="padding:10px 0;color:#64708A;font-size:13px">{html.escape(k)}</td>'
+        f'<td style="padding:10px 0;text-align:right;font-weight:600;color:#0A1A4A;font-size:14px">{html.escape(str(v))}</td></tr>'
+        for k, v in filas)
+    cuerpo = f"""
+    <div style="font-family:Inter,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border:1px solid #E5E8F0;border-radius:14px;overflow:hidden">
+      <div style="background:#0A1A4A;padding:22px 26px"><div style="font-size:17px;font-weight:700;color:#fff">{html.escape(despacho)}</div></div>
+      <div style="padding:26px">
+        <p style="font-size:15px;color:#0F172A;margin:0 0 12px">Hola{html.escape(' ' + saludo if saludo else '')},</p>
+        <p style="font-size:14px;color:#3A4560;line-height:1.6;margin:0 0 16px">Le compartimos un recordatorio amable del siguiente saldo pendiente:</p>
+        <table style="width:100%;border-collapse:collapse;border-top:1px solid #E5E8F0;border-bottom:1px solid #E5E8F0">{tabla}</table>
+        <p style="font-size:14px;color:#3A4560;line-height:1.6;margin:16px 0 0">Si ya realizó el pago, le agradeceremos responder este correo con el comprobante. Quedamos atentos a cualquier duda.</p>
+      </div>
+      <div style="background:#F6F7FB;padding:14px 26px;font-size:11px;color:#64708A">{html.escape(despacho)} · Enviado con Habeas Corpus</div>
+    </div>"""
+    try:
+        from flask_mail import Message
+        from app import mail
+        remitente = g.global_db.execute("SELECT email FROM tenant_users WHERE id=?", (session.get("user_id"),)).fetchone()
+        mail.send(Message(subject=f"Recordatorio de pago — {co['concepto']} | {despacho}",
+                          recipients=[co["email"]], html=cuerpo,
+                          reply_to=(remitente["email"] if remitente else None) or None))
+    except Exception:
+        return jsonify(ok=False, error="No se pudo enviar el correo. Revisa la configuración de correo del despacho."), 500
+    _log("enviar_recordatorio", id, {"email": co["email"]})
+    return jsonify(ok=True, email=co["email"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  HISTORIAL DE PAGOS (AJAX)
+#  HORAS POR FACTURAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-@cobranzas_bp.route("/<int:id>/pagos")
+
+@cobranzas_bp.route("/horas")
 @login_required
 @tenant_required
-def historial_pagos(id: int):
-    rows = g.tenant_db.execute(
-        "SELECT * FROM cobro_pagos WHERE cobro_id=? ORDER BY fecha DESC", (id,)
-    ).fetchall()
-    return jsonify([dict(r) for r in rows])
+def horas_por_facturar():
+    tdb = g.tenant_db
+    filtro, p = ("", [])
+    if _solo_lo_suyo():
+        uid = session.get("user_id")
+        filtro, p = f"AND {_FILTRO_PROPIOS}", [uid, uid, uid]
+    filas = tdb.execute(f"""
+        SELECT a.id, a.titulo, a.numero_expediente, a.cliente_id, {CLIENTE} AS cliente,
+               SUM(h.horas) AS horas, COUNT(*) AS registros, MIN(h.fecha) AS desde, MAX(h.fecha) AS hasta
+        FROM asunto_horas h JOIN asuntos a ON a.id=h.asunto_id LEFT JOIN clientes c ON c.id=a.cliente_id
+        WHERE h.cobro_id IS NULL {filtro}
+        GROUP BY a.id HAVING horas > 0 ORDER BY horas DESC""", p).fetchall()
+    return jsonify([{**dict(r), "periodo": f"{_fecha_txt(r['desde'], False)} – {_fecha_txt(r['hasta'], False)}"} for r in filas])
+
+
+@cobranzas_bp.route("/facturar-horas", methods=["POST"])
+@login_required
+@tenant_required
+@role_required(*ROLES_COBRANZA)
+def facturar_horas():
+    tdb = g.tenant_db
+    data = request.get_json(silent=True) or {}
+    asunto_id = _int(data.get("asunto_id"))
+    tarifa = round(_num(data.get("tarifa")), 2)
+    if not asunto_id or tarifa <= 0:
+        return jsonify(ok=False, error="Elige el asunto y escribe la tarifa por hora"), 400
+    if not puede_ver(tdb, asunto_id):
+        return jsonify(ok=False, error="Asunto no encontrado"), 404
+    a = tdb.execute("SELECT * FROM asuntos WHERE id=?", (asunto_id,)).fetchone()
+    if not a or not a["cliente_id"]:
+        return jsonify(ok=False, error="El asunto necesita un cliente para poder cobrarle"), 400
+    ids = [r["id"] for r in tdb.execute("SELECT id FROM asunto_horas WHERE asunto_id=? AND cobro_id IS NULL", (asunto_id,)).fetchall()]
+    horas = float(tdb.execute(f"SELECT COALESCE(SUM(horas),0) FROM asunto_horas WHERE id IN ({','.join('?' * len(ids)) or 'NULL'})",
+                              ids).fetchone()[0])
+    if horas <= 0:
+        return jsonify(ok=False, error="Ese asunto no tiene horas pendientes de cobrar"), 400
+
+    monto = round(horas * tarifa, 2)
+    iva_pct = 0.0 if str(data.get("iva")) == "0" else 16.0
+    calc = _calcular(monto, iva_pct, 0)
+    folio = _auto_folio(tdb)
+    dias = _int(data.get("dias"), 15)
+    cur = tdb.execute(
+        """INSERT INTO cobros (cliente_id, asunto_id, concepto, numero_factura, monto, moneda, iva_pct, iva_monto, total,
+                               estado, fecha_emision, fecha_vencimiento, abogado_id, notas, creado_por)
+           VALUES (?,?,?,?,?,'MXN',?,?,?,'pendiente',?,?,?,?,?)""",
+        (a["cliente_id"], asunto_id, f"Honorarios por hora — {horas:g} h", folio, monto, iva_pct, calc["iva_monto"], calc["total"],
+         _hoy().isoformat(), (_hoy() + timedelta(days=max(dias, 0))).isoformat(), a["abogado_responsable"],
+         f"{len(ids)} registros de horas a {dinero(tarifa)} por hora", session.get("user_id")))
+    cid = cur.lastrowid
+    tdb.execute(f"UPDATE asunto_horas SET cobro_id=? WHERE id IN ({','.join('?' * len(ids))})", (cid, *ids))
+    tdb.commit()
+    _log("facturar_horas", cid, {"asunto_id": asunto_id, "horas": horas, "tarifa": tarifa})
+    return jsonify(ok=True, id=cid, folio=folio, total=calc["total"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  EXPORTAR EXCEL
+#  EXPORTAR A EXCEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-@cobranzas_bp.route("/exportar-excel")
+
+@cobranzas_bp.route("/exportar")
 @login_required
 @tenant_required
 def exportar_excel():
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment
-        from openpyxl.utils import get_column_letter
-    except ImportError:
-        return "openpyxl no instalado", 500
+    import openpyxl
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
 
     tdb = g.tenant_db
-    rows = tdb.execute("""
-        SELECT co.numero_factura, c.nombre||' '||COALESCE(c.apellidos,'') as cliente,
-               c.razon_social, a.titulo as asunto,
-               co.concepto, co.fecha_emision, co.fecha_vencimiento,
-               co.moneda, co.monto, co.iva_pct, co.iva_monto, co.total,
-               co.monto_abonado, co.estado, co.metodo_pago
-        FROM cobros co
-        LEFT JOIN clientes c ON co.cliente_id=c.id
-        LEFT JOIN asuntos  a ON co.asunto_id=a.id
-        ORDER BY co.fecha_alta DESC LIMIT 5000
-    """).fetchall()
+    al_dia(tdb)
+    f, clause, params = _filtros()
+    rows = [_decorar(r) for r in tdb.execute(f"{BASE_SQL} WHERE {clause} ORDER BY date(co.fecha_emision) DESC LIMIT 10000", params)]
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Cobranzas"
-
-    HEADERS = ["Folio","Cliente","Razón Social","Asunto","Concepto",
-                "Fecha emisión","Fecha vencimiento","Moneda","Monto base",
-                "IVA %","IVA","Total","Abonado","Estado","Método pago"]
-    header_fill = PatternFill("solid", fgColor="6366F1")
-    header_font = Font(color="FFFFFF", bold=True, size=10)
-    for col, h in enumerate(HEADERS, 1):
-        cell = ws.cell(row=1, column=col, value=h)
-        cell.fill   = header_fill
-        cell.font   = header_font
-        cell.alignment = Alignment(horizontal="center")
-        ws.column_dimensions[get_column_letter(col)].width = max(12, len(h) + 2)
-
-    for r, row in enumerate(rows, 2):
-        ws.append(list(row))
-
+    ws.title = "Cobranza"
+    encabezados = ["Folio", "Cliente", "Asunto", "Expediente", "Concepto", "Emisión", "Fecha de pago", "Moneda",
+                   "Honorarios", "IVA", "Total", "Pagado", "Saldo", "Estado"]
+    ws.append(encabezados)
+    for c in ws[1]:
+        c.fill = PatternFill("solid", fgColor="1D3FD6")
+        c.font = Font(color="FFFFFF", bold=True)
+        c.alignment = Alignment(horizontal="center", vertical="center")
+    for r in rows:
+        ws.append([r["folio"], r["cliente"], r["asunto_titulo"], r["numero_expediente"], r["concepto"],
+                   _fecha(r["fecha_emision"]), _fecha(r["fecha_vencimiento"]), r["moneda"] or "MXN",
+                   float(r["monto"] or 0), float(r["iva_monto"] or 0), r["total_v"], r["pagado_v"], r["saldo_v"],
+                   r["estado_info"]["label"]])
+    for fila in ws.iter_rows(min_row=2):
+        for c in fila[5:7]:
+            c.number_format = "DD/MM/YYYY"
+        for c in fila[8:13]:
+            c.number_format = '"$"#,##0.00'
+    for i, ancho in enumerate([13, 30, 32, 14, 34, 12, 13, 8, 14, 12, 14, 14, 14, 13], 1):
+        ws.column_dimensions[get_column_letter(i)].width = ancho
     ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                     as_attachment=True, download_name=f"cobranzas_{date.today()}.xlsx")
+    return send_file(buf, as_attachment=True, download_name=f"cobranza_{_hoy().isoformat()}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  ESTADO DE CUENTA PDF (por cliente)
+#  ESTADO DE CUENTA (PDF por cliente)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @cobranzas_bp.route("/estado-cuenta/<int:cliente_id>")
 @login_required
 @tenant_required
 def estado_cuenta_pdf(cliente_id: int):
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import cm
-        from reportlab.lib import colors
-        from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable,
-        )
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-    except ImportError:
-        return "reportlab no instalado", 500
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_RIGHT
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-    tdb    = g.tenant_db
-    cliente = tdb.execute("SELECT * FROM clientes WHERE id=?", (cliente_id,)).fetchone()
-    if not cliente:
-        return redirect(url_for("cobranzas.index"))
+    tdb = g.tenant_db
+    al_dia(tdb)
+    cli = tdb.execute(f"SELECT c.*, {CLIENTE} AS nombre_v FROM clientes c WHERE c.id=?", (cliente_id,)).fetchone()
+    if not cli:
+        abort(404)
+    alc, ap = _alcance()
+    cobros = [_decorar(r) for r in tdb.execute(
+        f"{BASE_SQL} WHERE co.cliente_id=? AND co.estado != 'cancelado' AND {alc} ORDER BY date(co.fecha_emision)",
+        (cliente_id, *ap)).fetchall()]
+    if not cobros and _solo_lo_suyo():
+        abort(404)
+    facturado = sum(c["total_v"] for c in cobros)
+    pagado = sum(c["pagado_v"] for c in cobros)
+    saldo = sum(c["saldo_v"] for c in cobros)
+    vencido = sum(c["saldo_v"] for c in cobros if c["vence"] and (c["vence"]["dias"] or 0) < 0)
 
-    cobros = tdb.execute("""
-        SELECT co.*, a.titulo as asunto_titulo, a.numero_expediente
-        FROM cobros co LEFT JOIN asuntos a ON co.asunto_id=a.id
-        WHERE co.cliente_id=? ORDER BY co.fecha_emision DESC
-    """, (cliente_id,)).fetchall()
+    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#1D3FD6", "#0A1A4A", "#64708A", "#E5E8F0"))
+    st = lambda n, **k: ParagraphStyle(n, fontName=k.pop("font", "Helvetica"), **k)  # noqa: E731
+    s_titulo = st("t", font="Helvetica-Bold", fontSize=18, textColor=TINTA, leading=22)
+    s_sub = st("s", fontSize=9, textColor=GRIS, leading=13)
+    s_celda = st("c", fontSize=8.5, textColor=TINTA, leading=11)
+    s_der = st("d", fontSize=8.5, textColor=TINTA, leading=11, alignment=TA_RIGHT)
+    s_pie = st("p", fontSize=7.5, textColor=GRIS, leading=10)
+    e = lambda x: html.escape(str(x or ""))  # noqa: E731
 
-    total_facturado = sum(float(c["total"] or c["monto"] or 0) for c in cobros if c["estado"] != "cancelado")
-    total_cobrado   = sum(float(c["monto_abonado"] or 0) for c in cobros)
-    saldo_pendiente = total_facturado - total_cobrado
-
-    cliente_d = dict(cliente)
-    nombre = (cliente_d.get("razon_social") or
-              f"{cliente_d.get('nombre','')} {cliente_d.get('apellidos','')}").strip()
-    tenant = g.tenant
-
-    buf  = io.BytesIO()
-    doc  = SimpleDocTemplate(buf, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm,
-                              topMargin=2*cm, bottomMargin=2*cm)
-    st   = getSampleStyleSheet()
-    ACC  = colors.HexColor("#00DFA2")
-    MUTED= colors.HexColor("#9CA3AF")
-
-    title_s   = ParagraphStyle("t",  parent=st["Heading1"], fontSize=16, textColor=ACC, spaceAfter=4)
-    sub_s     = ParagraphStyle("s",  parent=st["Normal"],   fontSize=9,  textColor=MUTED, spaceAfter=8)
-    sec_s     = ParagraphStyle("sc", parent=st["Heading2"], fontSize=10, textColor=ACC, spaceBefore=12, spaceAfter=4)
-    body_s    = ParagraphStyle("b",  parent=st["Normal"],   fontSize=8,  leading=12)
-    footer_s  = ParagraphStyle("f",  parent=st["Normal"],   fontSize=7,  textColor=MUTED, alignment=TA_CENTER)
-    total_s   = ParagraphStyle("tt", parent=st["Normal"],   fontSize=10, textColor=ACC, alignment=TA_RIGHT, spaceAfter=4)
-
+    hoy = _hoy()
+    despacho = g.tenant["nombre_despacho"]
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, leftMargin=1.8 * cm, rightMargin=1.8 * cm, topMargin=1.6 * cm,
+                            bottomMargin=1.6 * cm, title=f"Estado de cuenta — {cli['nombre_v']}")
+    datos_cli = " · ".join(x for x in (cli["rfc"] and f"RFC {cli['rfc']}", cli["email"]) if x)
     story = [
-        Paragraph(f"Estado de Cuenta", title_s),
-        Paragraph(f"{nombre} · {date.today().strftime('%d/%m/%Y')} · {tenant['nombre_despacho'] if tenant else 'LexOS'}", sub_s),
-        HRFlowable(width="100%", color=ACC, thickness=1),
-        Spacer(1, 0.3*cm),
+        Paragraph(e(despacho), st("dsp", font="Helvetica-Bold", fontSize=10, textColor=AZUL)),
+        Spacer(1, 6),
+        Paragraph("Estado de cuenta", s_titulo),
+        Paragraph(f"{e(cli['nombre_v'])}{' · ' + e(datos_cli) if datos_cli else ''}<br/>Al {hoy.day} de {MESES_LARGOS[hoy.month - 1]} de {hoy.year}", s_sub),
+        Spacer(1, 14),
     ]
-
-    # Summary
-    summary_data = [
-        ["Total facturado", f"${total_facturado:,.2f}"],
-        ["Total cobrado",   f"${total_cobrado:,.2f}"],
-        ["Saldo pendiente", f"${saldo_pendiente:,.2f}"],
-    ]
-    st_tbl = Table(summary_data, colWidths=[5*cm, 5*cm])
-    st_tbl.setStyle(TableStyle([
-        ("FONTSIZE",(0,0),(-1,-1),9),
-        ("TEXTCOLOR",(0,0),(0,-1),MUTED),
-        ("FONTNAME",(0,0),(0,-1),"Helvetica-Bold"),
-        ("TEXTCOLOR",(1,-1),(1,-1),ACC),
-        ("FONTNAME",(1,-1),(1,-1),"Helvetica-Bold"),
-        ("GRID",(0,0),(-1,-1),.25,colors.HexColor("#E5E7EB")),
-        ("ROWBACKGROUNDS",(0,0),(-1,-1),[colors.white, colors.HexColor("#F9FAFB")]),
-        ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+    resumen = Table([["Facturado", "Pagado", "Saldo pendiente", "Vencido"],
+                     [dinero(facturado), dinero(pagado), dinero(saldo), dinero(vencido)]],
+                    colWidths=[4.4 * cm] * 4)
+    resumen.setStyle(TableStyle([
+        ("FONT", (0, 0), (-1, 0), "Helvetica", 8), ("TEXTCOLOR", (0, 0), (-1, 0), GRIS),
+        ("FONT", (0, 1), (-1, 1), "Helvetica-Bold", 13), ("TEXTCOLOR", (0, 1), (-1, 1), TINTA),
+        ("TEXTCOLOR", (2, 1), (2, 1), AZUL), ("TEXTCOLOR", (3, 1), (3, 1), colors.HexColor("#DC2626") if vencido else TINTA),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F7FB")), ("BOX", (0, 0), (-1, -1), .5, LINEA),
+        ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7), ("LEFTPADDING", (0, 0), (-1, -1), 10),
     ]))
-    story.append(st_tbl)
-    story.append(Spacer(1, 0.4*cm))
+    story += [resumen, Spacer(1, 16)]
 
-    # Cobros table
-    story.append(Paragraph("Detalle de facturas", sec_s))
-    rows_data = [["Folio","Concepto","Fecha","Vencimiento","Total","Abonado","Estado"]]
+    filas = [["Folio", "Concepto", "Emisión", "Fecha de pago", "Total", "Pagado", "Saldo"]]
     for c in cobros:
-        rows_data.append([
-            c["numero_factura"] or "—",
-            str(c["concepto"])[:35],
-            (c["fecha_emision"] or "—")[:10],
-            (c["fecha_vencimiento"] or "—")[:10],
-            f"${float(c['total'] or c['monto'] or 0):,.2f}",
-            f"${float(c['monto_abonado'] or 0):,.2f}",
-            (c["estado"] or "—").title(),
-        ])
-    tbl = Table(rows_data, colWidths=[2.5*cm, 5*cm, 2*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2*cm])
-    tbl.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,0),ACC),("TEXTCOLOR",(0,0),(-1,0),colors.white),
-        ("FONTSIZE",(0,0),(-1,-1),7),("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("GRID",(0,0),(-1,-1),.25,colors.HexColor("#E5E7EB")),
-        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#F9FAFB")]),
-        ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
+        concepto = e(c["concepto"]) + (f"<br/><font color='#64708A' size='7'>{e(c['asunto_titulo'])}</font>" if c["asunto_titulo"] else "")
+        filas.append([Paragraph(e(c["folio"]), s_celda), Paragraph(concepto, s_celda),
+                      _fecha_txt(c["fecha_emision"]), _fecha_txt(c["fecha_vencimiento"]),
+                      Paragraph(dinero(c["total_v"], c["moneda"]), s_der), Paragraph(dinero(c["pagado_v"], c["moneda"]), s_der),
+                      Paragraph(f"<b>{dinero(c['saldo_v'], c['moneda'])}</b>", s_der)])
+    if len(filas) == 1:
+        filas.append(["", Paragraph("Sin cobros registrados.", s_celda), "", "", "", "", ""])
+    tabla = Table(filas, colWidths=[2.2 * cm, 4.7 * cm, 2.1 * cm, 2.3 * cm, 2.2 * cm, 2.2 * cm, 2.2 * cm], repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 7.5), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("BACKGROUND", (0, 0), (-1, 0), TINTA), ("ALIGN", (4, 0), (-1, 0), "RIGHT"),
+        ("FONT", (2, 1), (3, -1), "Helvetica", 8), ("TEXTCOLOR", (2, 1), (3, -1), TINTA),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 1), (-1, -1), .5, LINEA),
+        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
-    story.append(tbl)
-    story.append(Spacer(1, .5*cm))
-    story.append(Paragraph(f"Generado el {date.today().strftime('%d/%m/%Y')} · LexOS", footer_s))
+    story += [tabla, Spacer(1, 18)]
+
+    pagos = tdb.execute(
+        """SELECT p.fecha, p.monto, p.metodo, p.referencia, co.numero_factura, co.id AS cid, co.moneda
+           FROM cobro_pagos p JOIN cobros co ON co.id=p.cobro_id
+           WHERE co.cliente_id=? AND co.estado!='cancelado' AND p.cobro_id IN (%s) ORDER BY date(p.fecha)"""
+        % (",".join(str(c["id"]) for c in cobros) or "NULL"), (cliente_id,)).fetchall()
+    if pagos:
+        story.append(Paragraph("Pagos recibidos", st("h", font="Helvetica-Bold", fontSize=10, textColor=TINTA, spaceAfter=6)))
+        filas_p = [["Fecha", "Folio", "Forma de pago", "Referencia", "Monto"]]
+        for p in pagos:
+            filas_p.append([_fecha_txt(p["fecha"]), p["numero_factura"] or f"#{p['cid']}", p["metodo"] or "—",
+                            Paragraph(e(p["referencia"] or "—"), s_celda), Paragraph(dinero(p["monto"], p["moneda"]), s_der)])
+        tp = Table(filas_p, colWidths=[2.6 * cm, 2.8 * cm, 3.4 * cm, 6.1 * cm, 3 * cm], repeatRows=1)
+        tp.setStyle(TableStyle([
+            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 7.5), ("TEXTCOLOR", (0, 0), (-1, 0), GRIS),
+            ("FONT", (0, 1), (2, -1), "Helvetica", 8), ("TEXTCOLOR", (0, 1), (-1, -1), TINTA),
+            ("ALIGN", (4, 0), (4, 0), "RIGHT"), ("LINEBELOW", (0, 0), (-1, -1), .5, LINEA), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story += [tp, Spacer(1, 18)]
+    story.append(Paragraph(f"{e(despacho)} · Documento informativo, no es un comprobante fiscal (CFDI). "
+                           f"Generado el {_fecha_txt(hoy)} con Habeas Corpus.", s_pie))
     doc.build(story)
     buf.seek(0)
-    safe = nombre.replace(" ","_")[:25]
+    seguro = re.sub(r"[^A-Za-z0-9]+", "_", cli["nombre_v"] or "cliente").strip("_")[:40]
     return send_file(buf, mimetype="application/pdf", as_attachment=True,
-                     download_name=f"estado_cuenta_{safe}.pdf")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  DASHBOARD DATA (JSON para gráfica)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@cobranzas_bp.route("/ajax/dashboard")
-@login_required
-@tenant_required
-def ajax_dashboard():
-    return jsonify({
-        "stats":   _dashboard_stats(g.tenant_db),
-        "monthly": _monthly_chart(g.tenant_db),
-    })
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  HONORARIOS POR HORA — generar factura desde horas registradas en asunto
-# ─────────────────────────────────────────────────────────────────────────────
-
-@cobranzas_bp.route("/ajax/facturar-horas", methods=["POST"])
-@login_required
-@tenant_required
-@role_required("super_admin", "admin", "abogado")
-def facturar_horas():
-    """Genera una factura a partir de las horas registradas en un asunto."""
-    tdb  = g.tenant_db
-    data = request.json or {}
-
-    asunto_id  = _safe_int(data.get("asunto_id"))
-    tarifa     = _safe_float(data.get("tarifa_hora"), 0)
-    if not asunto_id or tarifa <= 0:
-        return jsonify(ok=False, error="Asunto y tarifa/hora son requeridos"), 400
-
-    asunto = tdb.execute("SELECT * FROM asuntos WHERE id=?", (asunto_id,)).fetchone()
-    if not asunto:
-        return jsonify(ok=False, error="Asunto no encontrado"), 404
-
-    # Sumar horas no facturadas (horas sin cobro asociado en el periodo)
-    horas_rows = tdb.execute(
-        "SELECT SUM(horas) as total_horas, COUNT(*) as registros "
-        "FROM asunto_horas WHERE asunto_id=?",
-        (asunto_id,),
-    ).fetchone()
-    total_horas = float(horas_rows["total_horas"] or 0)
-    if total_horas <= 0:
-        return jsonify(ok=False, error="No hay horas registradas en este asunto"), 400
-
-    monto    = round(total_horas * tarifa, 2)
-    iva_pct  = _safe_float(data.get("iva_pct"), 16.0)
-    calc     = _calcular_total(monto, iva_pct, "fijo", 0)
-    folio    = _auto_folio(tdb)
-
-    cur = tdb.execute(
-        """INSERT INTO cobros
-           (cliente_id, asunto_id, concepto, numero_factura,
-            monto, moneda, iva_pct, iva_monto, total,
-            estado, fecha_emision, abogado_id, notas, creado_por)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (
-            asunto["cliente_id"], asunto_id,
-            f"Honorarios por hora — {total_horas:.1f}h × ${tarifa:,.2f}/h — {asunto['titulo'][:40]}",
-            folio, monto,
-            data.get("moneda", "MXN"),
-            iva_pct, calc["iva_monto"], calc["total"],
-            "pendiente", date.today().isoformat(),
-            _safe_int(data.get("abogado_id")) or asunto["abogado_responsable"],
-            f"Auto-generado desde {int(horas_rows['registros'])} registros de horas ({total_horas:.1f}h @ ${tarifa:,.2f}/h)",
-            session.get("user_id"),
-        ),
-    )
-    tdb.commit()
-    new_id = cur.lastrowid
-    _log("facturar_horas", new_id, {"asunto_id": asunto_id, "horas": total_horas, "tarifa": tarifa})
-    return jsonify(ok=True, id=new_id, folio=folio, horas=total_horas, monto=monto, total=calc["total"])
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  RECORDATORIOS AUTOMÁTICOS DE VENCIMIENTO
-# ─────────────────────────────────────────────────────────────────────────────
-
-def check_recordatorios(tdb, global_db=None, tenant=None):
-    """
-    Verifica cobros con vencimiento próximo y genera alertas.
-    Reglas:
-      - 7 días antes → aviso preventivo
-      - Día de vencimiento → aviso urgente
-      - 3 días después → cobro vencido, aviso de seguimiento
-    Retorna lista de alertas para mostrar en UI o enviar por correo.
-    """
-    hoy = date.today().isoformat()
-    d7  = (date.today() + timedelta(days=7)).isoformat()
-    d3  = (date.today() - timedelta(days=3)).isoformat()
-
-    alertas = []
-
-    # 7 días antes de vencimiento
-    proximos = tdb.execute("""
-        SELECT co.id, co.concepto, co.numero_factura, co.fecha_vencimiento,
-               co.total, co.monto, co.moneda,
-               c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre,
-               c.email as cliente_email
-        FROM cobros co
-        LEFT JOIN clientes c ON co.cliente_id=c.id
-        WHERE co.estado IN ('pendiente','abono')
-          AND co.fecha_vencimiento IS NOT NULL
-          AND co.fecha_vencimiento = ?
-    """, (d7,)).fetchall()
-    for r in proximos:
-        alertas.append({
-            "cobro_id":   r["id"],
-            "tipo":       "preventivo",
-            "dias":       7,
-            "mensaje":    f"La factura {r['numero_factura'] or r['concepto'][:30]} de {r['cliente_nombre']} vence en 7 días ({r['fecha_vencimiento']})",
-            "email":      r["cliente_email"],
-            "monto":      float(r["total"] or r["monto"] or 0),
-            "moneda":     r["moneda"],
-        })
-
-    # Día de vencimiento
-    hoy_vence = tdb.execute("""
-        SELECT co.id, co.concepto, co.numero_factura, co.fecha_vencimiento,
-               co.total, co.monto, co.moneda,
-               c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre,
-               c.email as cliente_email
-        FROM cobros co
-        LEFT JOIN clientes c ON co.cliente_id=c.id
-        WHERE co.estado IN ('pendiente','abono')
-          AND co.fecha_vencimiento = ?
-    """, (hoy,)).fetchall()
-    for r in hoy_vence:
-        alertas.append({
-            "cobro_id":   r["id"],
-            "tipo":       "urgente",
-            "dias":       0,
-            "mensaje":    f"La factura {r['numero_factura'] or r['concepto'][:30]} de {r['cliente_nombre']} VENCE HOY",
-            "email":      r["cliente_email"],
-            "monto":      float(r["total"] or r["monto"] or 0),
-            "moneda":     r["moneda"],
-        })
-
-    # 3 días después de vencimiento (ya vencidos)
-    vencidos_3d = tdb.execute("""
-        SELECT co.id, co.concepto, co.numero_factura, co.fecha_vencimiento,
-               co.total, co.monto, co.moneda,
-               c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre,
-               c.email as cliente_email
-        FROM cobros co
-        LEFT JOIN clientes c ON co.cliente_id=c.id
-        WHERE co.estado IN ('pendiente','abono','vencido')
-          AND co.fecha_vencimiento = ?
-    """, (d3,)).fetchall()
-    for r in vencidos_3d:
-        alertas.append({
-            "cobro_id":   r["id"],
-            "tipo":       "seguimiento",
-            "dias":       -3,
-            "mensaje":    f"La factura {r['numero_factura'] or r['concepto'][:30]} de {r['cliente_nombre']} está vencida desde hace 3 días",
-            "email":      r["cliente_email"],
-            "monto":      float(r["total"] or r["monto"] or 0),
-            "moneda":     r["moneda"],
-        })
-
-    return alertas
-
-
-@cobranzas_bp.route("/ajax/recordatorios")
-@login_required
-@tenant_required
-def ajax_recordatorios():
-    """Retorna las alertas de vencimiento para mostrar en la UI."""
-    alertas = check_recordatorios(g.tenant_db)
-    return jsonify(alertas=alertas, total=len(alertas))
-
-
-@cobranzas_bp.route("/ajax/enviar-recordatorio", methods=["POST"])
-@login_required
-@tenant_required
-@role_required("super_admin", "admin")
-def enviar_recordatorio():
-    """Envía recordatorio por correo al cliente de un cobro específico."""
-    data     = request.json or {}
-    cobro_id = _safe_int(data.get("cobro_id"))
-    if not cobro_id:
-        return jsonify(ok=False, error="cobro_id requerido"), 400
-
-    tdb   = g.tenant_db
-    cobro = tdb.execute("""
-        SELECT co.*, c.email as cliente_email,
-               c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre
-        FROM cobros co
-        LEFT JOIN clientes c ON co.cliente_id=c.id
-        WHERE co.id=?
-    """, (cobro_id,)).fetchone()
-    if not cobro:
-        return jsonify(ok=False, error="Cobro no encontrado"), 404
-    if not cobro["cliente_email"]:
-        return jsonify(ok=False, error="El cliente no tiene email registrado"), 400
-
-    # Send email via Flask-Mail or SMTP
-    try:
-        from flask import current_app
-        from flask_mail import Message, Mail
-        mail = Mail(current_app)
-        tenant = g.tenant
-        despacho = tenant["nombre_despacho"] if tenant else "LexOS"
-        total   = float(cobro["total"] or cobro["monto"] or 0)
-        moneda  = cobro["moneda"] or "MXN"
-        folio   = cobro["numero_factura"] or "S/N"
-        vence   = cobro["fecha_vencimiento"] or "—"
-
-        msg = Message(
-            subject=f"Recordatorio de pago — {folio} | {despacho}",
-            sender=current_app.config.get("MAIL_DEFAULT_SENDER", f"noreply@{despacho.lower().replace(' ','-')}.mx"),
-            recipients=[cobro["cliente_email"]],
-        )
-        msg.html = f"""
-        <div style="font-family:system-ui;max-width:600px;margin:0 auto;padding:24px">
-          <h2 style="color:#00DFA2">{despacho}</h2>
-          <p>Estimado/a <strong>{cobro['cliente_nombre']}</strong>,</p>
-          <p>Le recordamos que tiene una factura pendiente de pago:</p>
-          <table style="width:100%;border-collapse:collapse;margin:16px 0">
-            <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600">Folio</td>
-                <td style="padding:8px;border:1px solid #E5E7EB">{folio}</td></tr>
-            <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600">Concepto</td>
-                <td style="padding:8px;border:1px solid #E5E7EB">{cobro['concepto']}</td></tr>
-            <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600">Total</td>
-                <td style="padding:8px;border:1px solid #E5E7EB;font-weight:700;color:#00DFA2">{moneda} ${total:,.2f}</td></tr>
-            <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600">Vencimiento</td>
-                <td style="padding:8px;border:1px solid #E5E7EB">{vence}</td></tr>
-          </table>
-          <p>Agradecemos su pronta atención.</p>
-          <p style="color:#9CA3AF;font-size:12px;margin-top:24px">
-            Enviado desde {despacho} · LexOS
-          </p>
-        </div>"""
-        mail.send(msg)
-        _log("enviar_recordatorio", cobro_id, {"email": cobro["cliente_email"]})
-        return jsonify(ok=True, email=cobro["cliente_email"])
-    except ImportError:
-        return jsonify(ok=False, error="Flask-Mail no está configurado. Configure MAIL_SERVER en config.py"), 500
-    except Exception as e:
-        return jsonify(ok=False, error=f"Error al enviar correo: {str(e)}"), 500
+                     download_name=f"estado_de_cuenta_{seguro}_{hoy.isoformat()}.pdf")

@@ -1,1764 +1,696 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import icon_chart, icon_check_circle, icon_hourglass, icon_alert_triangle, icon_zap, icon_trending_up, icon_clock, icon_user, icon_calendar, icon_bell, icon_folder, icon_scale, icon_settings, icon_link, icon_archive, icon_mail, icon_users, icon_file_text, icon_file, icon_clipboard, icon_edit, icon_trash, icon_credit_card, icon_refresh, icon_download, icon_pin, icon_paperclip, icon_phone, icon_building %}
-{% block title %}Cobranzas{% endblock %}
-{% block page_title %}Cobranzas{% endblock %}
+{% block title %}Cobranza{% endblock %}
+{% block page_title %}Cobranza{% endblock %}
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/cobranzas.css') }}">
-<style>
-/* KPI stats rediseñados */
-.cbr-dash { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
-.cbr-stat { background:var(--c); border:1px solid var(--border); border-top:2px solid var(--e); border-radius:8px; padding:16px; cursor:pointer; transition:border-color .2s,box-shadow .2s; animation:fadeUp .35s ease both; animation-delay:calc(var(--i,0)*55ms); }
-.cbr-stat:hover { border-color:var(--border-m); box-shadow:0 4px 20px rgba(0,223,162,.06); }
-.cbr-stat-label { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.18em; text-transform:uppercase; color:var(--ash); margin-bottom:8px; display:block; }
-.cbr-stat-val { font-family:'Cormorant Garamond',serif; font-size:32px; font-weight:300; color:var(--fog); line-height:1; margin-bottom:5px; display:block; }
-.cbr-stat-sub { font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); display:block; }
-.val-cobrado { color:var(--e) !important; }
-.val-por-cobrar { color:#F59E0B !important; }
-.val-vencido { color:#EF4444 !important; }
-.val-proyeccion { color:#3B8BD4 !important; }
-.cbr-stat-icon { display:none; }
-
-/* Chart area */
-.cbr-dash-row { display:grid; grid-template-columns:1fr 320px; gap:16px; margin-bottom:20px; }
-@media(max-width:960px) { .cbr-dash-row { grid-template-columns:1fr; } }
-.cbr-chart-card { background:var(--c); border:1px solid var(--border); border-radius:8px; padding:18px; }
-.cbr-chart-title { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
-
-/* Insights */
-.cbr-insights { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
-.cbr-insight-chip { display:flex; align-items:center; gap:8px; background:var(--c); border:1px solid var(--border); border-radius:6px; padding:8px 14px; font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); transition:border-color .15s; }
-.cbr-insight-chip:hover { border-color:var(--border-m); }
-.cbr-insight-chip strong { color:var(--fog); font-weight:500; }
-.cbr-insight-icon { color:var(--e); flex-shrink:0; }
-
-/* Toolbar */
-.cbr-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
-.cbr-toolbar-right { margin-left:auto; display:flex; gap:8px; }
-.cbr-search-wrap { position:relative; flex:1; min-width:200px; max-width:380px; }
-.cbr-search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--ash); pointer-events:none; }
-.cbr-search-input { background:var(--n); border:1px solid var(--border); border-radius:6px; color:var(--fog); font-family:'DM Mono',monospace; font-size:11px; padding:8px 10px 8px 34px; width:100%; outline:none; }
-.cbr-search-input:focus { border-color:var(--e); }
-.cbr-search-input::placeholder { color:var(--ash); opacity:.5; font-size:10px; letter-spacing:.06em; }
-
-/* Tab bar */
-.cbr-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; gap:0; overflow-x:auto; scrollbar-width:none; }
-.cbr-tabs::-webkit-scrollbar { display:none; }
-.cbr-tab { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.15em; text-transform:uppercase; padding:10px 18px; color:var(--ash); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; background:none; border-top:none; border-left:none; border-right:none; white-space:nowrap; display:flex; align-items:center; gap:6px; text-decoration:none; }
-.cbr-tab:hover { color:var(--fog); }
-.cbr-tab.active { color:var(--e); border-bottom-color:var(--e); }
-.cbr-tab-count { font-family:'DM Mono',monospace; font-size:8px; font-weight:500; background:var(--edim); color:var(--e); padding:1px 5px; border-radius:3px; }
-
-/* Table */
-.cbr-table-wrap { background:var(--c); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
-.cbr-table { width:100%; border-collapse:collapse; }
-.cbr-table th { font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash); padding:10px 14px; border-bottom:1px solid var(--border); font-weight:400; text-align:left; white-space:nowrap; }
-.cbr-table td { padding:11px 14px; border-bottom:1px solid var(--border); font-family:'Libre Baskerville',serif; font-size:12px; color:var(--fog); vertical-align:middle; }
-.cbr-table tr:hover td { background:rgba(0,223,162,.025); }
-.cbr-table tr:last-child td { border-bottom:none; }
-.cbr-monto { font-family:'DM Mono',monospace; font-size:13px; color:var(--fog); font-weight:500; }
-.rec-badge { position:absolute; top:-4px; right:-4px; min-width:17px; height:17px; background:var(--danger); color:#fff; font-size:.5rem; font-weight:700; border-radius:2px; padding:0 3px; display:flex; align-items:center; justify-content:center; border:2px solid var(--c2); font-family:'DM Mono',monospace; }
-
-/* Pulse dot */
-.pulse-dot { width:7px; height:7px; border-radius:50%; background:var(--e); box-shadow:0 0 0 0 rgba(0,223,162,.4); animation:pulse-ring 2s ease-out infinite; flex-shrink:0; }
-@keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(0,223,162,.4)} 70%{box-shadow:0 0 0 6px rgba(0,223,162,0)} 100%{box-shadow:0 0 0 0 rgba(0,223,162,0)} }
-@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-</style>
 {% endblock %}
 
 {% block content %}
-<!-- ── Page header ── -->
-<div class="page-header">
-  <div class="page-eyebrow">Gestión · Códex</div>
-  <h1 class="page-title">Cobranza</h1>
-  <div class="page-meta-row">
-    <span class="page-count">{{ cobros|length }} registros</span>
-    <div class="page-actions"></div>
-  </div>
-</div>
-<div class="page-divider"></div>
-
-<!-- ══════════════════════════════════════════════
-     DASHBOARD — 6 KPI Cards + Chart
-     ══════════════════════════════════════════════ -->
-<div class="cbr-dash-row">
-  <!-- LEFT: 6 KPI cards -->
+<div class="as-head">
   <div>
-    <div class="cbr-dash">
-      <!-- 1) Total facturado -->
-      <div class="cbr-stat" style="--i:0" onclick="filterByStatus('')" title="Ver todas">
-        <div class="cbr-stat-icon" style="background:rgba(0,223,162,.1); color:var(--e)">{{ icon_chart(18, 18) }}</div>
-        <span class="cbr-stat-label">Total facturado</span>
-        <span class="cbr-stat-val">${{ '{:,.0f}'.format(stats.total_facturado) }}</span>
-        <span class="cbr-stat-sub">Todos los periodos</span>
-      </div>
-      <!-- 2) Cobrado -->
-      <div class="cbr-stat" style="--i:1" onclick="filterByStatus('pagado')" title="Ver pagadas">
-        <div class="cbr-stat-icon" style="background:rgba(16,185,129,.1); color:#10B981">{{ icon_check_circle(18, 18) }}</div>
-        <span class="cbr-stat-label">Cobrado</span>
-        <span class="cbr-stat-val val-cobrado">${{ '{:,.0f}'.format(stats.cobrado) }}</span>
-        <span class="cbr-stat-sub">Facturas pagadas</span>
-      </div>
-      <!-- 3) Por cobrar -->
-      <div class="cbr-stat" style="--i:2" onclick="filterByStatus('pendiente')" title="Filtrar pendientes">
-        <div class="cbr-stat-icon" style="background:rgba(245,158,11,.1); color:#F59E0B">{{ icon_hourglass(18, 18) }}</div>
-        <span class="cbr-stat-label">Por cobrar</span>
-        <span class="cbr-stat-val val-por-cobrar">${{ '{:,.0f}'.format(stats.por_cobrar) }}</span>
-        <span class="cbr-stat-sub">Pendientes + abonos</span>
-      </div>
-      <!-- 4) Vencido -->
-      <div class="cbr-stat" style="--i:3" onclick="filterByStatus('vencido')" title="Filtrar vencidas">
-        <div class="cbr-stat-icon" style="background:rgba(239,68,68,.1); color:#EF4444">{{ icon_alert_triangle(18, 18) }}</div>
-        <span class="cbr-stat-label">Vencido</span>
-        <span class="cbr-stat-val val-vencido">${{ '{:,.0f}'.format(stats.vencido) }}</span>
-        <span class="cbr-stat-sub">Requiere atención</span>
-      </div>
-      <!-- 5) Por vencer esta semana -->
-      <div class="cbr-stat" style="--i:4" onclick="filterByStatus('pendiente')" title="Vencen pronto">
-        <div class="cbr-stat-icon" style="background:{% if stats.por_vencer_semana_cnt > 0 %}rgba(245,158,11,.1){% else %}rgba(16,185,129,.1){% endif %}; color:{% if stats.por_vencer_semana_cnt > 0 %}#F59E0B{% else %}#10B981{% endif %}">{{ icon_zap(18, 18) }}</div>
-        <span class="cbr-stat-label">Por vencer esta semana</span>
-        <span class="cbr-stat-val" style="color:{% if stats.por_vencer_semana_cnt > 0 %}#F59E0B{% else %}#10B981{% endif %}">{{ stats.por_vencer_semana_cnt }}</span>
-        <span class="cbr-stat-sub">${{ '{:,.0f}'.format(stats.por_vencer_semana_monto) }} en riesgo</span>
-      </div>
-      <!-- 6) Proyección 30 días -->
-      <div class="cbr-stat" style="--i:5">
-        <div class="cbr-stat-icon" style="background:rgba(0,223,162,.1); color:var(--e)">{{ icon_trending_up(18, 18) }}</div>
-        <span class="cbr-stat-label">Proyección 30 días</span>
-        <span class="cbr-stat-val val-proyeccion">${{ '{:,.0f}'.format(stats.proyeccion_30d) }}</span>
-        <span class="cbr-stat-sub">Estimado a cobrar</span>
-      </div>
-    </div>
+    <h1 class="page-title">Cobranza</h1>
+    <p class="as-sub">
+      {% if resumen.abiertos %}{{ resumen.por_cobrar | dinero(decimales=False) }} por cobrar a {{ resumen.clientes }} cliente{{ 's' if resumen.clientes != 1 }}
+      {% else %}Nadie te debe nada en este momento{% endif %}
+    </p>
   </div>
-
-  <!-- RIGHT: Chart -->
-  <div class="cbr-chart-card">
-    <div class="cbr-chart-title">
-      <span class="pulse-dot"></span>
-      Facturado vs cobrado — últimos 6 meses
-    </div>
-    <div id="cbrChart" class="cbr-chart-wrap"></div>
-    <div class="cbr-bar-labels" id="cbrLabels"></div>
-    <div class="cbr-legend">
-      <div class="cbr-legend-item">
-        <div class="cbr-legend-dot" style="background:rgba(99,102,241,.4)"></div>Facturado
-      </div>
-      <div class="cbr-legend-item">
-        <div class="cbr-legend-dot" style="background:#10B981"></div>Cobrado
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     INSIGHTS ROW — 3 data chips
-     ══════════════════════════════════════════════ -->
-<div class="cbr-insights">
-  {% if stats.avg_dias_pago > 0 %}
-  <div class="cbr-insight-chip">
-    <span class="cbr-insight-icon">{{ icon_clock(14, 14) }}</span>
-    <span>Tiempo promedio de pago: <strong>{{ stats.avg_dias_pago }} días</strong></span>
-  </div>
-  {% endif %}
-  {% if stats.top_deudor_nombre %}
-  <div class="cbr-insight-chip" onclick="window.location='{{ url_for('cobranzas.index', tab='todas') }}&cliente={{ stats.top_deudor_id }}'" style="cursor:pointer">
-    <span class="cbr-insight-icon">{{ icon_user(14, 14) }}</span>
-    <span>Cliente que más debe: <strong>{{ stats.top_deudor_nombre }}</strong> — ${{ '{:,.0f}'.format(stats.top_deudor_monto) }}</span>
-  </div>
-  {% endif %}
-  {% if stats.prox_venc_folio %}
-  <div class="cbr-insight-chip" onclick="openPanel({{ stats.prox_venc_id }}, null)" style="cursor:pointer">
-    <span class="cbr-insight-icon">{{ icon_calendar(14, 14) }}</span>
-    <span>Próximo vencimiento: <strong>{{ stats.prox_venc_folio }}</strong> vence en {{ stats.prox_venc_dias }} días</span>
-  </div>
-  {% endif %}
-  {% if stats.vencido > 0 %}
-  <div class="cbr-insight-chip" onclick="filterByStatus('vencido')" style="cursor:pointer">
-    <span class="cbr-insight-icon">{{ icon_alert_triangle(14, 14) }}</span>
-    <span><strong>${{ '{:,.0f}'.format(stats.vencido) }}</strong> vencido — requiere seguimiento</span>
-  </div>
-  {% endif %}
-  {% if stats.cobrado > 0 and stats.total_facturado > 0 %}
-  <div class="cbr-insight-chip">
-    <span class="cbr-insight-icon">{{ icon_chart(14, 14) }}</span>
-    <span>Tasa de cobro: <strong>{{ '{:.0f}'.format((stats.cobrado / stats.total_facturado) * 100) }}%</strong></span>
-  </div>
-  {% endif %}
-</div>
-
-<!-- ══════════════════════════════════════════════
-     TOOLBAR — Búsqueda + Acciones
-     ══════════════════════════════════════════════ -->
-<div class="cbr-toolbar">
-  <form method="GET" id="filterForm" style="display:contents">
-    <input type="hidden" name="tab" value="{{ tab }}">
-    <div class="cbr-search-wrap">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input class="cbr-search-input" type="text" name="q"
-             value="{{ q }}" placeholder="Buscar por cliente, folio, descripción…"
-             id="searchQ" autocomplete="off">
-    </div>
-
-    <!-- Filters toggle -->
-    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleFilters()">
-      {{ icon_settings(14, 14) }} Filtros{% if desde or hasta or cliente_f or asunto_f or estado_f or abogado_f or monto_min or monto_max %}
-      <span style="color:var(--accent)"> •</span>{% endif %}
+  <div class="cb-acciones">
+    {% if horas_pend.horas and puede_crear %}
+    <button type="button" class="btn btn-secondary" id="cbHorasBtn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      {{ '%g' | format(horas_pend.horas | round(1)) }} h por cobrar
     </button>
+    {% endif %}
+    <a class="btn btn-secondary" href="{{ url_for('cobranzas.exportar_excel', **request.args) }}" title="Descarga en Excel lo que estás viendo">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>
+      Excel
+    </a>
+    {% if puede_crear %}
+    <button type="button" class="btn btn-primary" data-nuevo>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Nuevo cobro
+    </button>
+    {% endif %}
+  </div>
+</div>
 
-    <!-- Actions -->
-    <div class="cbr-toolbar-right">
-      <button type="button" class="btn btn-ghost btn-sm" id="btnRecordatorios"
-              onclick="toggleRecordatorios()" title="Recordatorios de vencimiento"
-              style="position:relative">
-        {{ icon_bell(14, 14) }} <span id="recordatorioBadge" class="rec-badge" style="display:none">0</span>
-      </button>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="abrirFacturarHoras()">{{ icon_clock(14, 14) }} Facturar horas</button>
-      <button type="button" class="btn btn-primary btn-sm" onclick="abrirCrear()">+ Nueva factura</button>
-      <div class="dropdown-wrap" style="position:relative">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleExportMenu()">↓ Exportar ▾</button>
-        <div id="exportMenu" style="display:none; position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:9px; overflow:hidden; z-index:100; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,.2);">
-          <a href="{{ url_for('cobranzas.exportar_excel') }}" class="cbr-ac-item" style="display:block">{{ icon_chart(14, 14) }} Excel — Listado con filtros</a>
-          <div class="cbr-ac-item" onclick="bulkExportZip()" style="cursor:pointer">{{ icon_folder(14, 14) }} ZIP — Facturas seleccionadas</div>
-          <div class="cbr-ac-item" style="color:var(--text-3); cursor:default; border:none" title="Próximamente">{{ icon_link(14, 14) }} SAT <span style="font-size:.68rem">(próximamente)</span></div>
-        </div>
+<section class="as-kpis" aria-label="Resumen">
+  <a class="as-kpi{% if f.grupo == 'abiertos' and not f.semana %} on{% endif %}" href="{{ liga(grupo='', semana='') }}">
+    <small>Por cobrar</small><b class="cb-monto">{{ resumen.por_cobrar | dinero(decimales=False) }}</b>
+    <span>{{ resumen.abiertos }} cobro{{ 's' if resumen.abiertos != 1 }} abierto{{ 's' if resumen.abiertos != 1 }}</span>
+  </a>
+  <a class="as-kpi{% if resumen.vencido %} alerta{% endif %}{% if f.grupo == 'vencidos' %} on{% endif %}" href="{{ liga(grupo='vencidos', semana='') }}">
+    <small>Vencido</small><b class="cb-monto">{{ resumen.vencido | dinero(decimales=False) }}</b>
+    <span>{% if resumen.n_vencidos %}{{ resumen.n_vencidos }} cobro{{ 's' if resumen.n_vencidos != 1 }} · el más antiguo hace {{ resumen.dias_viejo }} días{% else %}Todo al corriente{% endif %}</span>
+  </a>
+  <a class="as-kpi{% if resumen.semana %} aviso{% endif %}{% if f.semana %} on{% endif %}" href="{{ liga(semana='1', grupo='') }}">
+    <small>Vence en 7 días</small><b class="cb-monto">{{ resumen.semana | dinero(decimales=False) }}</b>
+    <span>{% if resumen.n_semana %}{{ resumen.n_semana }} cobro{{ 's' if resumen.n_semana != 1 }} por recordar{% else %}Nada vence esta semana{% endif %}</span>
+  </a>
+  <a class="as-kpi{% if resumen.cobrado_mes %} ok{% endif %}{% if f.grupo == 'pagados' %} on{% endif %}" href="{{ liga(grupo='pagados', semana='') }}">
+    <small>Cobrado en {{ resumen.mes }}</small><b class="cb-monto">{{ resumen.cobrado_mes | dinero(decimales=False) }}</b>
+    <span>En {{ resumen.mes_pasado }}: {{ resumen.cobrado_mes_pasado | dinero(decimales=False) }}</span>
+  </a>
+</section>
+
+<div class="cb-grid">
+  <div>
+    <div class="as-toolbar">
+      <form class="as-search" method="get" action="{{ url_for('cobranzas.index') }}" role="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" name="q" value="{{ f.q }}" placeholder="Buscar por cliente, concepto, folio o asunto" aria-label="Buscar cobros">
+        {% for k in ('grupo', 'cliente', 'asunto', 'abogado') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+        {% if f.semana %}<input type="hidden" name="semana" value="1">{% endif %}
+      </form>
+      <select class="as-select" aria-label="Cliente" onchange="location.href=this.value">
+        <option value="{{ liga(cliente='') }}">Todos los clientes</option>
+        {% for c in clientes %}<option value="{{ liga(cliente=c.id) }}"{% if f.cliente == c.id %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+      </select>
+      {% if abogados | length > 1 and session.get('role') != 'abogado' %}
+      <select class="as-select" aria-label="Responsable" onchange="location.href=this.value">
+        <option value="{{ liga(abogado='') }}">Todo el equipo</option>
+        {% for ab in abogados %}<option value="{{ liga(abogado=ab.id) }}"{% if f.abogado == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+      </select>
+      {% endif %}
+    </div>
+
+    <div class="as-toolbar" style="margin-top:12px">
+      <div class="as-seg" aria-label="Estado">
+        {% for k, label in grupos.items() %}
+        <a href="{{ liga(grupo=k if k != 'abiertos' else '', semana='') }}" class="{{ 'on' if f.grupo == k and not f.semana }}">{{ label }}<span>{{ conteos[k] }}</span></a>
+        {% endfor %}
       </div>
     </div>
-  </form>
-</div>
 
-<!-- Active filter chips -->
-{% if desde or hasta or cliente_f or asunto_f or estado_f or abogado_f or monto_min or monto_max %}
-<div class="cbr-active-filters">
-  {% if estado_f %}
-  <span class="cbr-filter-chip" onclick="removeFilter('estado')">
-    Estado: {{ estados_color[estado_f][1] if estado_f in estados_color else estado_f }} <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  {% if cliente_f %}
-  <span class="cbr-filter-chip" onclick="removeFilter('cliente')">
-    {{ icon_user(12, 12) }} Cliente filtrado <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  {% if asunto_f %}
-  <span class="cbr-filter-chip" onclick="removeFilter('asunto')">
-    {{ icon_folder(12, 12) }} Asunto filtrado <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  {% if desde %}
-  <span class="cbr-filter-chip" onclick="removeFilter('desde')">
-    {{ icon_calendar(12, 12) }} Desde: {{ desde }} <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  {% if hasta %}
-  <span class="cbr-filter-chip" onclick="removeFilter('hasta')">
-    {{ icon_calendar(12, 12) }} Hasta: {{ hasta }} <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  {% if abogado_f %}
-  <span class="cbr-filter-chip" onclick="removeFilter('abogado')">
-    {{ icon_scale(12, 12) }} Abogado filtrado <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  {% if monto_min %}
-  <span class="cbr-filter-chip" onclick="removeFilter('monto_min')">
-    Mín: ${{ monto_min }} <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  {% if monto_max %}
-  <span class="cbr-filter-chip" onclick="removeFilter('monto_max')">
-    Máx: ${{ monto_max }} <span class="cbr-filter-chip-x">✕</span>
-  </span>
-  {% endif %}
-  <a href="{{ url_for('cobranzas.index') }}" class="cbr-filter-chip" style="background:rgba(239,68,68,.1); color:#EF4444">
-    Limpiar todo <span class="cbr-filter-chip-x">✕</span>
-  </a>
-</div>
-{% endif %}
+    {% if f.semana or nombres %}
+    <div class="cb-filtros">
+      {% if f.semana %}<span class="as-filtro">Vencen en los próximos 7 días<a href="{{ liga(semana='') }}" aria-label="Quitar filtro">×</a></span>{% endif %}
+      {% if nombres.cliente %}<span class="as-filtro">{{ nombres.cliente }}<a href="{{ liga(cliente='') }}" aria-label="Quitar filtro de cliente">×</a></span>
+        <a class="as-filtro" style="text-decoration:none;background:#fff;border:1px solid var(--border)" href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=f.cliente) }}">Estado de cuenta (PDF)</a>{% endif %}
+      {% if nombres.asunto %}<span class="as-filtro">Asunto: {{ nombres.asunto }}<a href="{{ liga(asunto='') }}" aria-label="Quitar filtro de asunto">×</a></span>{% endif %}
+    </div>
+    {% endif %}
 
-<!-- Filters drawer -->
-<div class="cbr-filters" id="filtersPanel">
-  <div>
-    <label>Cliente</label>
-    <select name="cliente" form="filterForm" onchange="document.getElementById('filterForm').submit()">
-      <option value="">Todos</option>
-      {% for c in clientes %}
-      <option value="{{ c.id }}" {{ 'selected' if cliente_f|string == c.id|string }}>
-        {{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}
-      </option>
-      {% endfor %}
-    </select>
-  </div>
-  <div>
-    <label>Asunto</label>
-    <select name="asunto" form="filterForm" onchange="document.getElementById('filterForm').submit()">
-      <option value="">Todos</option>
-      {% for a in asuntos_list %}
-      <option value="{{ a.id }}" {{ 'selected' if asunto_f|string == a.id|string }}>
-        {{ a.numero_expediente or a.titulo | truncate(30, true, '…') }}
-      </option>
-      {% endfor %}
-    </select>
-  </div>
-  <div>
-    <label>Estado</label>
-    <select name="estado" form="filterForm" onchange="document.getElementById('filterForm').submit()">
-      <option value="">Todos</option>
-      {% for key, (cls, lbl) in estados_color.items() %}
-      <option value="{{ key }}" {{ 'selected' if estado_f == key }}>{{ lbl }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div>
-    <label>Abogado</label>
-    <select name="abogado" form="filterForm" onchange="document.getElementById('filterForm').submit()">
-      <option value="">Todos</option>
-      {% for ab in abogados %}
-      <option value="{{ ab.id }}" {{ 'selected' if abogado_f|string == ab.id|string }}>
-        {{ ab.nombre }} {{ ab.apellidos }}
-      </option>
-      {% endfor %}
-    </select>
-  </div>
-  <div>
-    <label>Desde</label>
-    <input type="date" name="desde" form="filterForm" value="{{ desde }}"
-           onchange="document.getElementById('filterForm').submit()">
-  </div>
-  <div>
-    <label>Hasta</label>
-    <input type="date" name="hasta" form="filterForm" value="{{ hasta }}"
-           onchange="document.getElementById('filterForm').submit()">
-  </div>
-  <div>
-    <label>Monto mín.</label>
-    <input type="number" name="monto_min" form="filterForm" value="{{ monto_min }}"
-           placeholder="0" step="0.01" onchange="document.getElementById('filterForm').submit()">
-  </div>
-  <div>
-    <label>Monto máx.</label>
-    <input type="number" name="monto_max" form="filterForm" value="{{ monto_max }}"
-           placeholder="Sin límite" step="0.01" onchange="document.getElementById('filterForm').submit()">
-  </div>
-  <div style="align-self:flex-end">
-    <a href="{{ url_for('cobranzas.index') }}" class="btn btn-ghost btn-sm" style="width:100%">Limpiar filtros</a>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     TABS — Pendientes | Pagadas | Vencidas | Todas
-     ══════════════════════════════════════════════ -->
-<div class="cbr-tabs">
-  <a class="cbr-tab {{ 'active' if tab == 'pendientes' }}"
-     href="{{ url_for('cobranzas.index', tab='pendientes', q=q) }}">
-    Pendientes y abonos
-    <span class="cbr-tab-count">{{ tab_counts.pendientes }}</span>
-  </a>
-  <a class="cbr-tab {{ 'active' if tab == 'pagadas' }}"
-     href="{{ url_for('cobranzas.index', tab='pagadas', q=q) }}">
-    Pagadas
-    <span class="cbr-tab-count">{{ tab_counts.pagadas }}</span>
-  </a>
-  <a class="cbr-tab {{ 'active' if tab == 'vencidas' }}"
-     href="{{ url_for('cobranzas.index', tab='vencidas', q=q) }}">
-    {{ icon_alert_triangle(12, 12) }} Vencidas
-    <span class="cbr-tab-count">{{ tab_counts.vencidas }}</span>
-  </a>
-  <a class="cbr-tab {{ 'active' if tab == 'todas' }}"
-     href="{{ url_for('cobranzas.index', tab='todas', q=q) }}">
-    Todas
-    <span class="cbr-tab-count">{{ tab_counts.todas }}</span>
-  </a>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     BULK ACTIONS BAR
-     ══════════════════════════════════════════════ -->
-<div class="cbr-bulk-bar" id="bulkBar">
-  <span class="cbr-bulk-count"><span id="bulkCount">0</span> facturas seleccionadas</span>
-  <div class="cbr-bulk-actions">
-    <button class="btn btn-secondary btn-sm" onclick="bulkExport()">{{ icon_chart(13, 13) }} Exportar Excel</button>
-    <button class="btn btn-secondary btn-sm" onclick="bulkExportZip()">{{ icon_archive(13, 13) }} Exportar ZIP</button>
-    <button class="btn btn-ghost btn-sm" onclick="bulkEmail()">{{ icon_mail(13, 13) }} Enviar por correo</button>
-    <button class="btn btn-ghost btn-sm" onclick="bulkClearSelection()">Deseleccionar</button>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     TABLE + SLIDE PANEL LAYOUT
-     ══════════════════════════════════════════════ -->
-{% if cobros %}
-<div class="cbr-layout">
-  <div class="cbr-table-section" id="tableSection">
-    <div class="cbr-table-wrap">
-      <table class="cbr-table">
-        <thead>
-          <tr>
-            <th class="td-check">
-              <input type="checkbox" id="checkAll" onchange="toggleCheckAll(this)">
-            </th>
-            <th>Cliente</th>
-            <th>Asunto</th>
-            <th>Folio</th>
-            <th>Fecha / Vence</th>
-            <th>Monto</th>
-            <th>Total</th>
-            <th>Estatus</th>
-            <th></th>
-          </tr>
-        </thead>
+    <div class="as-tabla-wrap">
+      {% if cobros %}
+      <table class="as-tabla cb-tabla">
+        <thead><tr>
+          <th>Cobro</th><th class="c-cli">Cliente</th><th class="num">Saldo</th>
+          <th>{{ 'Pagado el' if f.grupo == 'pagados' else 'Fecha de pago' }}</th><th class="c-acc"><span class="sr-only">Acciones</span></th>
+        </tr></thead>
         <tbody>
           {% for c in cobros %}
-          <tr id="cobro-row-{{ c.id }}" onclick="openPanel({{ c.id }}, event)"
-              data-id="{{ c.id }}"
-              data-cliente="{{ (c.cliente_razon or c.cliente_nombre or '—') | e }}"
-              data-cliente-email="{{ c.cliente_email or '' }}"
-              data-cliente-id="{{ c.cliente_id }}"
-              data-concepto="{{ c.concepto | e }}"
-              data-folio="{{ c.numero_factura or '—' }}"
-              data-moneda="{{ c.moneda }}"
-              data-monto="{{ c.monto or 0 }}"
-              data-iva-pct="{{ c.iva_pct or 0 }}"
-              data-iva-monto="{{ c.iva_monto or 0 }}"
-              data-total="{{ c.total or c.monto or 0 }}"
-              data-abonado="{{ c.monto_abonado or 0 }}"
-              data-estado="{{ c.estado }}"
-              data-fecha-emision="{{ c.fecha_emision or '' }}"
-              data-fecha-vencimiento="{{ c.fecha_vencimiento or '' }}"
-              data-fecha-pago="{{ c.fecha_pago or '' }}"
-              data-notas="{{ c.notas or '' }}"
-              data-asunto-titulo="{{ c.asunto_titulo or '' }}"
-              data-asunto-id="{{ c.asunto_id or '' }}"
-              data-expediente="{{ c.numero_expediente or '' }}"
-              data-abogado-id="{{ c.abogado_id or '' }}"
-              data-factura-url="{{ c.archivo_factura_url or '' }}"
-              data-xml-url="{{ c.archivo_xml_url or '' }}">
-            <!-- Checkbox -->
-            <td class="td-check" onclick="event.stopPropagation()">
-              <input type="checkbox" class="row-check" value="{{ c.id }}" onchange="updateBulkBar()">
-            </td>
-            <!-- Cliente -->
-            <td>
-              <a href="{{ url_for('clientes.detalle', id=c.cliente_id) }}" class="client-link"
-                 onclick="event.stopPropagation()">
-                {{ (c.cliente_razon or c.cliente_nombre or '—').strip() | truncate(22, true, '…') }}
-              </a>
-              {% if c.cliente_email %}
-              <div class="td-sub">{{ c.cliente_email }}</div>
-              {% endif %}
-            </td>
-            <!-- Asunto -->
-            <td>
-              {% if c.asunto_titulo %}
-              <a href="{{ url_for('asuntos.detalle', id=c.asunto_id) }}" class="client-link"
-                 style="font-size:.78rem" onclick="event.stopPropagation()">
-                {{ c.numero_expediente or c.asunto_titulo | truncate(18, true, '…') }}
-              </a>
-              {% else %}
-              <span style="color:var(--text-3)">—</span>
-              {% endif %}
-            </td>
-            <!-- Folio -->
-            <td>
-              <span style="font-family:'SF Mono',monospace; font-size:.78rem; color:var(--accent)">{{ c.numero_factura or '—' }}</span>
-            </td>
-            <!-- Fecha / Vence -->
-            <td style="white-space:nowrap">
-              <div style="font-size:.78rem; color:var(--text-2)">{{ c.fecha_emision[:10] if c.fecha_emision else '—' }}</div>
-              {% if c.fecha_vencimiento %}
-              {% set venc = c.fecha_vencimiento[:10] %}
-              {% if c.estado not in ('pagado','cancelado') %}
-                {% if venc < today_str %}
-                <span class="date-badge date-badge-red">VENCIDA {{ venc }}</span>
-                {% elif venc <= (today_str[:8] + '07') %}
-                <span class="date-badge date-badge-yellow">Vence {{ venc }}</span>
-                {% else %}
-                <span class="date-badge date-badge-green">Vence {{ venc }}</span>
-                {% endif %}
-              {% else %}
-              <div class="td-sub">Vence {{ venc }}</div>
-              {% endif %}
-              {% endif %}
-            </td>
-            <!-- Monto base -->
-            <td class="td-monto">
-              {{ monedas[c.moneda].simbolo if c.moneda in monedas else '$' }}{{ '{:,.2f}'.format(c.monto or 0) }}
-              <div class="td-sub">{{ c.moneda }}</div>
-            </td>
-            <!-- Total -->
-            <td class="td-monto td-total">
-              {{ monedas[c.moneda].simbolo if c.moneda in monedas else '$' }}{{ '{:,.2f}'.format(c.total or c.monto or 0) }}
-              {% if c.estado == 'abono' and c.monto_abonado %}
-              <div class="abono-bar-wrap" title="Abonado {{ '{:,.2f}'.format(c.monto_abonado) }} / {{ '{:,.2f}'.format(c.total or c.monto or 1) }}">
-                <div class="abono-bar" style="width:{{ [((c.monto_abonado / (c.total or c.monto or 1)) * 100)|round(0)|int, 100]|min }}%"></div>
-              </div>
-              {% endif %}
-            </td>
-            <!-- Estatus -->
-            <td>
-              {% set estado_info = c.estado_info %}
-              <span class="badge badge-{{ c.estado }}">{{ estado_info[1] }}</span>
-              {% if c.archivo_factura_url %}
-              <a href="{{ c.archivo_factura_url }}" target="_blank" title="Ver factura PDF"
-                 style="color:var(--text-3); font-size:.78rem; margin-left:4px" onclick="event.stopPropagation()">{{ icon_paperclip(12, 12) }}</a>
-              {% endif %}
-            </td>
-            <!-- Hover actions -->
-            <td onclick="event.stopPropagation()">
-              <div class="row-actions">
-                {% if c.estado in ('pendiente','abono','vencido') %}
-                <button class="row-act-btn"
-                        onclick="abrirPago({{ c.id }}, {{ c.total or c.monto or 0 }}, {{ c.monto_abonado or 0 }}, '{{ (c.cliente_razon or c.cliente_nombre or '') | replace("'","\\'")|truncate(20,true) }}', '{{ (c.concepto or '')|replace("'","\\'")|truncate(25,true) }}', '{{ c.moneda }}')">
-                  {{ icon_credit_card(12, 12) }} Pagar
-                </button>
-                {% endif %}
-                {% if c.estado != 'cancelado' %}
-                <button class="row-act-btn"
-                        onclick="abrirNotaCredito({{ c.id }}, {{ c.total or c.monto or 0 }}, '{{ c.moneda }}')">{{ icon_refresh(12, 12) }} NC</button>
-                {% endif %}
-                <button class="row-act-btn"
-                        onclick="panelEmailFor({{ c.id }})">{{ icon_mail(12, 12) }}</button>
-                <a href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=c.cliente_id) }}"
-                   class="row-act-btn" title="Estado de cuenta PDF" target="_blank">{{ icon_clipboard(12, 12) }}</a>
+          <tr data-cobro="{{ c.id }}" tabindex="0" aria-label="Ver cobro {{ c.folio }}">
+            <td class="c-tit">
+              <div class="as-tit" style="display:block">
+                <a href="#cobro-{{ c.id }}">{{ c.concepto }}</a>
+                <small>{% if c.estado in ('abono', 'cancelado') %}<span class="as-chip cb-chip" style="--c-c:{{ c.estado_info.color }};--c-f:{{ c.estado_info.fondo }}">{{ c.estado_info.label }}</span> {% endif %}{{ c.folio }}{% if c.asunto_titulo %} · {{ c.asunto_titulo }}{% endif %}<span class="cb-solo-movil"> · {{ c.cliente or 'Sin cliente' }}</span></small>
               </div>
             </td>
+            <td class="c-cli">{{ c.cliente or '—' }}</td>
+            <td class="num c-saldo">
+              <div class="cb-saldo-c{{ ' cero' if not c.saldo_v }}">
+                {% if c.estado == 'cancelado' %}<b>—</b><small>era {{ c.total_v | dinero(c.moneda) }}</small>
+                {% elif c.saldo_v %}<b>{{ c.saldo_v | dinero(c.moneda) }}</b><small>{% if c.pagado_v %}de {{ c.total_v | dinero(c.moneda, False) }}{% else %}total{% endif %}</small>
+                  {% if c.pagado_v %}<div class="cb-mini" title="{{ c.pct }}% pagado"><i style="width:{{ c.pct }}%"></i></div>{% endif %}
+                {% else %}<b>{{ c.total_v | dinero(c.moneda) }}</b><small>pagado</small>{% endif %}
+              </div>
+            </td>
+            <td class="c-vence">
+              {% if c.vence %}<span class="cb-vence {{ c.vence.tono }}">{{ c.vence.texto }}</span>
+              {% elif c.estado == 'pagado' %}<span class="cb-vence gris">{{ c.pagado_el }}</span>
+              {% else %}<span class="cb-vence gris">—</span>{% endif %}
+            </td>
+            <td class="c-acc">{% if c.saldo_v and puede_crear %}<button type="button" class="btn btn-secondary btn-sm cb-cobrar" data-pago="{{ c.id }}" title="Registrar pago">Cobrar</button>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-
-      <!-- Pagination -->
+      <div class="cb-suma">
+        <span>{{ total }} cobro{{ 's' if total != 1 }}{% if total_pages > 1 %} · página {{ page }} de {{ total_pages }}{% endif %}</span>
+        <span>{% if f.grupo in ('pagados', 'cancelados') %}Total <b>{{ suma_filtro.total | dinero }}</b>{% else %}Saldo <b>{{ suma_filtro.saldo | dinero }}</b>{% endif %}</span>
+      </div>
       {% if total_pages > 1 %}
-      <div class="cbr-pag">
-        {% if page > 1 %}
-        <a href="{{ url_for('cobranzas.index', tab=tab, q=q, page=page-1) }}">← Anterior</a>
-        {% endif %}
-        {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
-        {% if p == page %}
-        <span class="pag-active">{{ p }}</span>
+      <div class="as-pag">
+        <span></span>
+        <div>
+          {% if page > 1 %}<a class="btn btn-secondary btn-sm" href="{{ liga(page=page - 1) }}">← Anterior</a>{% endif %}
+          {% if page < total_pages %}<a class="btn btn-secondary btn-sm" href="{{ liga(page=page + 1) }}">Siguiente →</a>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="as-vacio">
+        {% if f.q or f.cliente or f.asunto or f.abogado or f.semana %}
+          <h3>Nada coincide con esos filtros</h3>
+          <p>Prueba con otra búsqueda o quita los filtros.</p>
+          <a class="btn btn-secondary" href="{{ url_for('cobranzas.index') }}">Ver todo lo pendiente</a>
+        {% elif f.grupo == 'abiertos' %}
+          <h3>Nadie te debe nada</h3>
+          <p>Cuando registres un cobro aparecerá aquí con su fecha de pago, y te avisaremos cuando se venza.</p>
+          {% if puede_crear %}<button type="button" class="btn btn-primary" data-nuevo>Registrar un cobro</button>{% endif %}
+        {% elif f.grupo == 'vencidos' %}
+          <h3>No hay cobros vencidos</h3>
+          <p>Todo lo pendiente está dentro de su fecha de pago.</p>
         {% else %}
-        <a href="{{ url_for('cobranzas.index', tab=tab, q=q, page=p) }}">{{ p }}</a>
-        {% endif %}
-        {% endfor %}
-        {% if page < total_pages %}
-        <a href="{{ url_for('cobranzas.index', tab=tab, q=q, page=page+1) }}">Siguiente →</a>
+          <h3>No hay cobros aquí</h3>
+          <p>Cuando haya cobros en este estado, aparecerán en esta lista.</p>
         {% endif %}
       </div>
       {% endif %}
     </div>
   </div>
-</div>
-{% else %}
-<div class="cbr-table-wrap">
-  <div class="cbr-empty">
-    <div class="cbr-empty-icon">{{ icon_file_text(32, 32) }}</div>
-    <p>No hay cobros en esta vista.</p>
-    <button class="btn btn-primary btn-sm" onclick="abrirCrear()" style="margin-top:8px">+ Nueva factura</button>
-  </div>
-</div>
-{% endif %}
 
-<!-- ══════════════════════════════════════════════
-     SLIDE PANEL — Detalle de factura (40% derecha)
-     ══════════════════════════════════════════════ -->
-<div class="cbr-panel" id="detailPanel">
-  <div class="cbr-panel-header">
-    <span class="cbr-panel-folio" id="panelFolio">—</span>
-    <div style="display:flex; gap:6px; align-items:center">
-      <span id="panelBadge"></span>
-      <button class="cbr-panel-close" onclick="closePanel()">✕</button>
-    </div>
-  </div>
-  <div class="cbr-panel-body">
-    <!-- Client & Asunto -->
-    <div class="cbr-panel-section">
-      <div class="cbr-panel-section-title">Cliente y asunto</div>
-      <div class="cbr-panel-client">
-        <div class="cbr-panel-avatar" id="panelAvatar">—</div>
+  <aside class="cb-aside" aria-label="Panorama de la cartera">
+    <section class="as-card">
+      <div class="as-card-h"><h3>Quién nos debe</h3>{% if deudores %}<span class="as-muted" style="font-size:12px">saldo</span>{% endif %}</div>
+      <div class="as-card-b">
+        {% for d in deudores %}
+        <a class="cb-deudor" href="{{ liga(cliente=d.cliente_id, grupo='', semana='', q='') }}">
+          <b>{{ d.cliente or 'Sin cliente' }}</b><span class="m">{{ d.debe | dinero(decimales=False) }}</span>
+          <small class="{{ d.tono }}">{{ d.nota }}</small>
+        </a>
+        {% else %}<p class="as-empty">Ningún cliente tiene saldo pendiente.</p>{% endfor %}
+      </div>
+    </section>
+
+    {% if suma_ant %}
+    <section class="as-card">
+      <div class="as-card-h"><h3>Antigüedad del saldo</h3></div>
+      <div class="as-card-b">
+        <div class="cb-ant-barra" role="img" aria-label="Distribución del saldo por antigüedad">
+          {% for t in antiguedad %}{% if t.monto %}<i style="width:{{ t.pct }}%;background:{{ t.color }}" title="{{ t.label }}: {{ t.pct }}%"></i>{% endif %}{% endfor %}
+        </div>
+        {% for t in antiguedad %}
+        <div class="cb-ant"><span class="as-dot" style="--d:{{ t.color }}"></span><span>{{ t.label }}</span><b>{{ t.monto | dinero(decimales=False) }}</b></div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="as-card">
+      <div class="as-card-h"><h3>Últimos 6 meses</h3></div>
+      <div class="as-card-b">
+        <div class="cb-meses" role="img" aria-label="Facturado contra cobrado por mes">
+          {% for m in meses %}
+          <div class="cb-mes{{ ' actual' if m.actual }}">
+            <div class="barras">
+              <i class="f" style="height:{{ m.hf }}%" title="Facturado en {{ m.label }}: {{ m.facturado | dinero }}"></i>
+              <i class="c" style="height:{{ m.hc }}%" title="Cobrado en {{ m.label }}: {{ m.cobrado | dinero }}"></i>
+            </div>
+            <small>{{ m.label }}</small>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="cb-leyenda"><span><i style="background:#C7D2FE"></i>Facturado</span><span><i style="background:var(--e)"></i>Cobrado</span></div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+{# ── Panel lateral del cobro ─────────────────────────────────────────────── #}
+<div class="cb-velo" id="cbVelo"></div>
+<aside class="cb-drawer" id="cbDrawer" role="dialog" aria-modal="true" aria-label="Detalle del cobro"></aside>
+
+{# ── Nuevo / editar cobro ────────────────────────────────────────────────── #}
+<div class="as-modal" id="cbNuevo" role="dialog" aria-modal="true" aria-labelledby="cbNuevoT">
+  <form class="as-modal-c ancho" id="cbForm" novalidate>
+    <div class="as-modal-h"><h3 id="cbNuevoT">Nuevo cobro</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <div class="cb-form">
         <div>
-          <div class="cbr-panel-client-name" id="panelClientName">—</div>
-          <div class="cbr-panel-client-email" id="panelClientEmail"></div>
-        </div>
-      </div>
-      <div id="panelAsuntoLink" style="margin-top:6px"></div>
-      <div id="panelAbogado" style="margin-top:4px; font-size:.78rem; color:var(--text-3)"></div>
-    </div>
-
-    <!-- Amounts -->
-    <div class="cbr-panel-section">
-      <div class="cbr-panel-section-title">Montos</div>
-      <div class="cbr-panel-amounts">
-        <div class="cbr-panel-amount-row">
-          <span>Descripción</span>
-          <span id="panelConcepto" style="font-weight:600; color:var(--text); max-width:240px; text-align:right">—</span>
-        </div>
-        <div class="cbr-panel-amount-row">
-          <span>Monto base</span>
-          <span class="cbr-panel-amount-val" id="panelMonto">—</span>
-        </div>
-        <div class="cbr-panel-amount-row">
-          <span>IVA</span>
-          <span class="cbr-panel-amount-val" id="panelIva">—</span>
-        </div>
-        <div class="cbr-panel-amount-row">
-          <span>Descuento</span>
-          <span class="cbr-panel-amount-val" id="panelDescuento" style="color:var(--text-3)">$0.00</span>
-        </div>
-        <div class="cbr-panel-amount-row total">
-          <span>Total final</span>
-          <span class="cbr-panel-amount-val" id="panelTotal">—</span>
-        </div>
-      </div>
-
-      <!-- Progress bar for abonos -->
-      <div id="panelProgressWrap" style="display:none; margin-top:12px">
-        <div class="cbr-panel-progress">
-          <div class="cbr-panel-progress-fill" id="panelProgressBar" style="width:0%"></div>
-        </div>
-        <div class="cbr-panel-progress-text">
-          <span id="panelAbonado">$0</span>
-          <span id="panelSaldo">Saldo: $0</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Dates -->
-    <div class="cbr-panel-section">
-      <div class="cbr-panel-section-title">Fechas</div>
-      <div class="cbr-panel-dates">
-        <div class="cbr-panel-date-row">
-          <span class="cbr-panel-date-label">Fecha de factura</span>
-          <span class="cbr-panel-date-val" id="panelFechaEmision">—</span>
-        </div>
-        <div class="cbr-panel-date-row">
-          <span class="cbr-panel-date-label">Fecha límite pago</span>
-          <span id="panelFechaVencWrap">
-            <span class="cbr-panel-date-val" id="panelFechaVenc">—</span>
-            <span id="panelFechaVencBadge" style="margin-left:6px"></span>
-          </span>
-        </div>
-        <div class="cbr-panel-date-row" id="panelFechaPagoRow" style="display:none">
-          <span class="cbr-panel-date-label">Fecha de pago real</span>
-          <span class="cbr-panel-date-val" id="panelFechaPago" style="color:#10B981">—</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Payment history timeline -->
-    <div class="cbr-panel-section" id="panelPaymentsSection" style="display:none">
-      <div class="cbr-panel-section-title">Historial de pagos</div>
-      <div class="cbr-panel-payments" id="panelPayments"></div>
-    </div>
-
-    <!-- Attachments -->
-    <div class="cbr-panel-section" id="panelFilesSection" style="display:none">
-      <div class="cbr-panel-section-title">Archivos adjuntos</div>
-      <div id="panelFiles"></div>
-    </div>
-
-    <!-- Notes -->
-    <div class="cbr-panel-section">
-      <div class="cbr-panel-section-title">Notas internas</div>
-      <textarea class="cbr-panel-notes" id="panelNotas" placeholder="Agregar notas…" rows="3"></textarea>
-      <button class="btn btn-ghost btn-sm" onclick="saveNotes()" style="margin-top:6px">Guardar notas</button>
-    </div>
-  </div>
-
-  <!-- Panel actions -->
-  <div class="cbr-panel-actions" id="panelActions">
-    <button class="cbr-panel-act primary" id="panelPayBtn" onclick="panelPay()">{{ icon_credit_card(14, 14) }} Registrar pago</button>
-    <button class="cbr-panel-act" onclick="panelEmail()">{{ icon_mail(14, 14) }} Enviar al cliente</button>
-    <a class="cbr-panel-act" id="panelEstadoCuenta" href="#" target="_blank">{{ icon_download(14, 14) }} Estado de cuenta</a>
-    <button class="cbr-panel-act" onclick="panelNC()">{{ icon_refresh(14, 14) }} Crear NC</button>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     MODAL: CREAR FACTURA
-     ══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="crearModal" onclick="if(event.target===this)cerrarModal('crearModal')">
-  <div class="modal-box">
-    <div class="modal-header">
-      <span class="modal-title">{{ icon_file_text(14, 14) }} Nueva factura</span>
-      <button class="modal-close" onclick="cerrarModal('crearModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <form id="crearForm" enctype="multipart/form-data">
-
-        <!-- Cliente + Asunto -->
-        <div class="cbr-section-divider">{{ icon_users(13, 13) }} Partes</div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg" style="flex:2">
-            <label>Cliente <span class="req">*</span></label>
-            <div class="cbr-ac-wrap">
-              <input type="text" id="crearClienteSearch" placeholder="Buscar cliente…"
-                     oninput="buscarClienteCrear(this.value)" autocomplete="off">
-              <div class="cbr-ac-results" id="crearClienteResults"></div>
-            </div>
-            <input type="hidden" name="cliente_id" id="crearClienteId">
-          </div>
-          <div class="cbr-fg" style="flex:2">
-            <label>Asunto vinculado (opcional)</label>
-            <select name="asunto_id" id="crearAsuntoSel">
-              <option value="">— Selecciona un cliente primero —</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Factura -->
-        <div class="cbr-section-divider">{{ icon_file_text(13, 13) }} Factura</div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg" style="flex:3">
-            <label>Descripción <span class="req">*</span></label>
-            <input type="text" name="concepto" placeholder="Concepto del cobro" required>
-          </div>
-          <div class="cbr-fg cbr-fg-md">
-            <label>
-              No. de factura
-              <button type="button" class="iva-exento-btn" onclick="autoFolio()">⟳ Auto</button>
-            </label>
-            <input type="text" name="numero_factura" id="crearFolio" placeholder="FAC-2026-0001">
-          </div>
-        </div>
-
-        <!-- Montos -->
-        <div class="cbr-section-divider">{{ icon_credit_card(13, 13) }} Montos</div>
-        <div class="cbr-form-row">
-          <input type="hidden" name="moneda" value="MXN">
-          <div class="cbr-fg">
-            <label>Monto base <span class="req">*</span></label>
-            <input type="number" name="monto" id="crearMonto" placeholder="0.00" step="0.01" min="0" oninput="recalcular()" required>
-          </div>
-          <div class="cbr-fg cbr-fg-sm">
-            <label>
-              IVA %
-              <button type="button" class="iva-exento-btn" onclick="toggleIvaExento()">Exento</button>
-            </label>
-            <input type="number" name="iva_pct" id="crearIvaPct" value="16" step="0.01" min="0" max="100" oninput="recalcular()">
-          </div>
-          <div class="cbr-fg cbr-fg-sm">
-            <label>IVA calculado</label>
-            <input type="text" id="crearIvaCalc" readonly placeholder="0.00">
-          </div>
-          <div class="cbr-fg cbr-fg-sm">
-            <label>Total con IVA</label>
-            <input type="text" id="crearTotal" readonly placeholder="0.00" style="font-weight:800">
-          </div>
-        </div>
-
-        <div class="cbr-form-row">
-          <div class="cbr-fg cbr-fg-sm">
-            <label>Descuento</label>
-            <select name="descuento_tipo" id="crearDctoTipo" onchange="recalcular()">
-              <option value="fijo">$ Monto fijo</option>
-              <option value="pct">% Porcentaje</option>
-            </select>
-          </div>
-          <div class="cbr-fg cbr-fg-sm">
-            <label>&nbsp;</label>
-            <input type="number" name="descuento_valor" id="crearDctoVal" value="0" min="0" step="0.01" oninput="recalcular()">
-          </div>
-          <div class="cbr-fg"></div>
-        </div>
-
-        <!-- Fechas + Estado -->
-        <div class="cbr-section-divider">{{ icon_calendar(13, 13) }} Fechas y estado</div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg">
-            <label>Fecha de factura <span class="req">*</span></label>
-            <input type="date" name="fecha_emision" id="crearFechaEmision" value="{{ today_str }}" required>
-          </div>
-          <div class="cbr-fg">
-            <label>Fecha límite de pago</label>
-            <input type="date" name="fecha_vencimiento">
-          </div>
-          <div class="cbr-fg">
-            <label>Estado <span class="req">*</span></label>
-            <select name="estado" id="crearEstado" onchange="toggleAbonoFields()">
-              <option value="pendiente">Pendiente</option>
-              <option value="abono">Abono</option>
-              <option value="pagado">Pagada</option>
-              <option value="cancelado">Cancelada</option>
-            </select>
-          </div>
-          <div class="cbr-fg" id="abonoFields" style="display:none">
-            <label>Monto abonado</label>
-            <input type="number" name="monto_abonado" placeholder="0.00" step="0.01" min="0">
-          </div>
-          <div class="cbr-fg" id="abonoFechaField" style="display:none">
-            <label>Fecha del abono</label>
-            <input type="date" name="fecha_abono" value="{{ today_str }}">
-          </div>
-          <div class="cbr-fg" id="fechaPagoField" style="display:none">
-            <label>Fecha de pago</label>
-            <input type="date" name="fecha_pago" value="{{ today_str }}">
-          </div>
-        </div>
-
-        <!-- Abogado -->
-        <div class="cbr-form-row">
-          <div class="cbr-fg">
-            <label>Abogado responsable</label>
-            <select name="abogado_id">
-              <option value="">— Sin asignar —</option>
-              {% for ab in abogados %}
-              <option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-
-        <!-- Archivos -->
-        <div class="cbr-section-divider">{{ icon_paperclip(13, 13) }} Documentos</div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg">
-            <label>Factura PDF</label>
-            <div class="cbr-drop-zone" id="dzFactura"
-                 ondragover="event.preventDefault(); this.classList.add('dz-over')"
-                 ondragleave="this.classList.remove('dz-over')"
-                 ondrop="handleDzDrop(event, 'archivo_factura', 'dzFactura')"
-                 onclick="document.getElementById('inputFactura').click()">
-              <div class="dz-icon">{{ icon_file_text(24, 24) }}</div>
-              <div>Arrastra o haz clic</div>
-              <div class="dz-name" id="dzFacturaName"></div>
-            </div>
-            <input type="file" id="inputFactura" name="archivo_factura" accept=".pdf" style="display:none"
-                   onchange="showDzName('dzFacturaName', this)">
-          </div>
-          <div class="cbr-fg">
-            <label>XML del SAT</label>
-            <div class="cbr-drop-zone" id="dzXml"
-                 ondragover="event.preventDefault(); this.classList.add('dz-over')"
-                 ondragleave="this.classList.remove('dz-over')"
-                 ondrop="handleDzDrop(event, 'archivo_xml', 'dzXml')"
-                 onclick="document.getElementById('inputXml').click()">
-              <div class="dz-icon">{{ icon_file(24, 24) }}</div>
-              <div>Arrastra o haz clic</div>
-              <div class="dz-name" id="dzXmlName"></div>
-            </div>
-            <input type="file" id="inputXml" name="archivo_xml" accept=".xml" style="display:none"
-                   onchange="showDzName('dzXmlName', this)">
-          </div>
-        </div>
-
-        <!-- Extra -->
-        <div class="cbr-section-divider">{{ icon_edit(13, 13) }} Extra</div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg">
-            <label>Notas internas</label>
-            <textarea name="notas" rows="2" placeholder="Solo visible para el equipo…"></textarea>
-          </div>
-        </div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg" style="flex-direction:row; align-items:center; gap:8px">
-            <input type="checkbox" name="enviar_correo" id="crearEnviarCorreo" style="width:16px; height:16px; accent-color:var(--accent)">
-            <label for="crearEnviarCorreo" style="font-size:.84rem; color:var(--text-2); text-transform:none; letter-spacing:0; font-weight:500">
-              {{ icon_mail(13, 13) }} Enviar factura por correo al cliente
-            </label>
-            <span title="Próximamente: integración SAT y CFDI" style="cursor:help; color:var(--text-3); font-size:.78rem">
-              {{ icon_link(12, 12) }} SAT (próximamente)
-            </span>
-          </div>
-        </div>
-
-      </form>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="cerrarModal('crearModal')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitCrear()">Crear factura</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     MODAL: REGISTRAR PAGO
-     ══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="pagoModal" onclick="if(event.target===this)cerrarModal('pagoModal')">
-  <div class="modal-box modal-box-lg">
-    <div class="modal-header">
-      <span class="modal-title">{{ icon_credit_card(14, 14) }} Registrar pago</span>
-      <button class="modal-close" onclick="cerrarModal('pagoModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="pago-header">
-        <div class="pago-concepto" id="pagoConcepto">—</div>
-        <div class="pago-monto" id="pagoTotal">$0.00</div>
-        <div class="pago-saldo" id="pagoSaldo"></div>
-      </div>
-
-      <form id="pagoForm" enctype="multipart/form-data">
-        <input type="hidden" name="cobro_id" id="pagoCobId">
-        <div class="cbr-form-row">
-          <div class="cbr-fg">
-            <label>Monto a abonar <span class="req">*</span></label>
-            <input type="number" name="monto_pagado" id="pagoMonto" placeholder="0.00" step="0.01" min="0.01" required>
-            <div id="pagoSaldoHint" style="font-size:.72rem; color:var(--text-3); margin-top:2px"></div>
-          </div>
-          <div class="cbr-fg">
-            <label>Fecha de pago <span class="req">*</span></label>
-            <input type="date" name="fecha_pago" value="{{ today_str }}" required>
-          </div>
-          <div class="cbr-fg">
-            <label>Método</label>
-            <select name="metodo">
-              {% for m in metodos_pago %}
-              <option value="{{ m }}">{{ m }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg">
-            <label>Referencia / No. operación</label>
-            <input type="text" name="referencia" placeholder="Ej. SPEI-123456">
-          </div>
-          <div class="cbr-fg">
-            <label>Comprobante (imagen/PDF)</label>
-            <input type="file" name="comprobante" accept=".pdf,.jpg,.png,.jpeg">
-          </div>
-        </div>
-        <div class="cbr-form-row">
-          <div class="cbr-fg">
-            <label>Notas</label>
-            <input type="text" name="notas" placeholder="Observaciones del pago…">
-          </div>
-        </div>
-      </form>
-
-      <!-- Historial de pagos previos -->
-      <div class="pago-historial" id="pagoHistorial" style="display:none">
-        <div class="pago-hist-title">Historial de pagos anteriores</div>
-        <div id="pagoHistItems"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="cerrarModal('pagoModal')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitPago()">Registrar pago</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     PANEL: RECORDATORIOS
-     ══════════════════════════════════════════════ -->
-<div class="rec-panel" id="recPanel" style="display:none">
-  <div class="rec-panel-header">
-    <span style="font-weight:700; font-size:.9rem">{{ icon_bell(14, 14) }} Recordatorios de vencimiento</span>
-    <button class="modal-close" onclick="document.getElementById('recPanel').style.display='none'">×</button>
-  </div>
-  <div class="rec-panel-body" id="recPanelBody">
-    <div style="text-align:center; color:var(--text-3); padding:20px">Cargando...</div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     MODAL: FACTURAR HORAS
-     ══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="horasModal" onclick="if(event.target===this)cerrarModal('horasModal')">
-  <div class="modal-box modal-box-lg">
-    <div class="modal-header">
-      <span class="modal-title">{{ icon_clock(14, 14) }} Facturar horas trabajadas</span>
-      <button class="modal-close" onclick="cerrarModal('horasModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:.84rem; color:var(--text-2); margin-bottom:14px">
-        Genera una factura automática a partir de las horas registradas en un asunto.
-      </p>
-      <div class="cbr-form-row">
-        <div class="cbr-fg" style="flex:2">
-          <label>Asunto <span class="req">*</span></label>
-          <select id="horasAsunto">
-            <option value="">— Seleccionar asunto —</option>
-            {% for a in asuntos_list %}
-            <option value="{{ a.id }}">{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
-            {% endfor %}
+          <label class="as-label" for="cbCliente">Cliente</label>
+          <select class="as-select" id="cbCliente" name="cliente_id" required>
+            <option value="">Elige un cliente</option>
+            {% for c in clientes %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}
           </select>
         </div>
-        <div class="cbr-fg">
-          <label>Tarifa / hora <span class="req">*</span></label>
-          <input type="number" id="horasTarifa" placeholder="1,500.00" step="0.01" min="0.01">
+        <div>
+          <label class="as-label" for="cbAsunto">Asunto <small>(opcional)</small></label>
+          <select class="as-select" id="cbAsunto" name="asunto_id" disabled><option value="">Primero elige el cliente</option></select>
         </div>
-      </div>
-      <div class="cbr-form-row">
-        <div class="cbr-fg cbr-fg-sm">
-          <label>IVA %</label>
-          <input type="number" id="horasIva" value="16" step="0.01" min="0" max="100">
+        <p class="cb-hint full" id="cbPactado" hidden></p>
+        <div class="full">
+          <label class="as-label" for="cbConcepto">Concepto</label>
+          <input class="as-input" id="cbConcepto" name="concepto" maxlength="300" required placeholder="¿Qué le estás cobrando?">
+          <div class="cb-chips" id="cbConceptos">{% for c in conceptos %}<button type="button">{{ c }}</button>{% endfor %}</div>
         </div>
-        <input type="hidden" id="horasMoneda" value="MXN">
-      </div>
-      <div id="horasPreview" style="display:none; background:var(--sidebar); border:1px solid var(--border); border-radius:9px; padding:12px 14px; margin-top:8px;">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="cerrarModal('horasModal')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitFacturarHoras()">Generar factura</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     MODAL: NOTA DE CRÉDITO
-     ══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="ncModal" onclick="if(event.target===this)cerrarModal('ncModal')">
-  <div class="modal-box modal-box-lg">
-    <div class="modal-header">
-      <span class="modal-title">{{ icon_refresh(14, 14) }} Nueva nota de crédito</span>
-      <button class="modal-close" onclick="cerrarModal('ncModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:var(--sidebar); border:1px solid var(--border); border-radius:9px; padding:10px 14px; margin-bottom:14px; font-size:.84rem">
-        <span style="color:var(--text-3)">Factura original:</span>
-        <strong id="ncFolioRef" style="color:var(--accent); font-family:monospace">—</strong>
-      </div>
-
-      <div class="nc-tipo-row">
-        <button class="nc-tipo-btn active" id="ncTotal" onclick="setNcTipo('total')">
-          <div style="margin-bottom:4px">{{ icon_trash(18, 18) }}</div>
-          Cancelación total
-        </button>
-        <button class="nc-tipo-btn" id="ncParcial" onclick="setNcTipo('parcial')">
-          <div style="margin-bottom:4px">{{ icon_edit(18, 18) }}</div>
-          Ajuste parcial
-        </button>
-      </div>
-
-      <div class="cbr-form-row">
-        <div class="cbr-fg" id="ncMontoRow" style="display:none">
-          <label>Monto a descontar <span class="req">*</span></label>
-          <input type="number" id="ncMonto" placeholder="0.00" step="0.01" min="0">
+        <div>
+          <label class="as-label" for="cbMonto">Honorarios <small>(antes de IVA)</small></label>
+          <div class="cb-dinero"><span>$</span><input class="as-input" id="cbMonto" name="monto" type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></div>
         </div>
-        <div class="cbr-fg">
-          <label>Motivo <span class="req">*</span></label>
-          <select id="ncMotivoSel" onchange="document.getElementById('ncMotivo').value = this.value === 'otro' ? '' : this.value; document.getElementById('ncMotivoCustom').style.display = this.value === 'otro' ? 'flex' : 'none'">
-            <option value="Error en monto">Error en monto</option>
-            <option value="Descuento acordado">Descuento acordado</option>
-            <option value="Servicio no prestado">Servicio no prestado</option>
-            <option value="Devolución">Devolución</option>
-            <option value="otro">Otro (especificar)</option>
+        <div>
+          <span class="as-label">IVA</span>
+          <div class="cb-seg">
+            <label><input type="radio" name="iva" value="16" checked><span>Más IVA 16%</span></label>
+            <label><input type="radio" name="iva" value="0"><span>Sin IVA</span></label>
+          </div>
+        </div>
+        <div>
+          <label class="as-label" for="cbEmision">Fecha del cobro</label>
+          <input class="as-input" type="date" id="cbEmision" name="fecha_emision" value="{{ hoy }}">
+        </div>
+        <div>
+          <label class="as-label" for="cbVence">Fecha límite de pago</label>
+          <input class="as-input" type="date" id="cbVence" name="fecha_vencimiento">
+          <div class="cb-chips" id="cbPlazos"><button type="button" data-dias="0">De contado</button><button type="button" data-dias="15">15 días</button><button type="button" data-dias="30">30 días</button></div>
+        </div>
+        <div class="full cb-resumen" aria-live="polite">
+          <div class="cb-kv"><span>Honorarios</span><b id="rHon">$0.00</b></div>
+          <div class="cb-kv" id="rDescF" hidden><span>Descuento</span><b id="rDesc">−$0.00</b></div>
+          <div class="cb-kv"><span id="rIvaL">IVA 16%</span><b id="rIva">$0.00</b></div>
+          <div class="cb-kv total"><span>Total a cobrar</span><b id="rTotal">$0.00</b></div>
+        </div>
+        <label class="cb-check full" id="cbYaF">
+          <input type="checkbox" name="ya_pagado" value="1" id="cbYa">
+          <span><b>Ya me lo pagaron</b><small>Se registra el pago completo con la fecha del cobro.</small></span>
+          <select class="as-select" name="metodo" id="cbYaMetodo" style="width:auto;margin-left:auto" hidden>
+            {% for m in metodos %}<option>{{ m }}</option>{% endfor %}
           </select>
-          <input type="hidden" id="ncMotivo" value="Error en monto">
-        </div>
+        </label>
       </div>
-      <div class="cbr-form-row" id="ncMotivoCustom" style="display:none">
-        <div class="cbr-fg">
-          <label>Descripción adicional</label>
-          <textarea id="ncDescripcion" rows="2" placeholder="Describe el motivo de la nota de crédito…"
-                    oninput="document.getElementById('ncMotivo').value = this.value"></textarea>
+      <details class="cb-mas">
+        <summary>Factura, descuento y más datos</summary>
+        <div class="cb-form">
+          <div>
+            <label class="as-label" for="cbFolio">Folio</label>
+            <input class="as-input" id="cbFolio" name="numero_factura" maxlength="40" placeholder="{{ folio_sugerido }}">
+            <p class="cb-hint">Usa el folio de tu factura. Si lo dejas vacío se asigna uno.</p>
+          </div>
+          <div>
+            <label class="as-label" for="cbDescuento">Descuento</label>
+            <div class="cb-dinero"><span>$</span><input class="as-input" id="cbDescuento" name="descuento" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></div>
+          </div>
+          <div>
+            <label class="as-label" for="cbMoneda">Moneda</label>
+            <select class="as-select" id="cbMoneda" name="moneda"><option value="MXN">Pesos (MXN)</option><option value="USD">Dólares (USD)</option></select>
+          </div>
+          <div>
+            <label class="as-label" for="cbAbogado">Responsable</label>
+            <select class="as-select" id="cbAbogado" name="abogado_id">
+              <option value="">El del asunto</option>
+              {% for ab in abogados %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+            </select>
+          </div>
+          <label class="cb-archivo"><input type="file" name="archivo_factura" accept=".pdf,.png,.jpg,.jpeg">📄 <span>Factura en PDF</span></label>
+          <label class="cb-archivo"><input type="file" name="archivo_xml" accept=".xml">🧾 <span>CFDI (.xml)</span></label>
+          <div class="full">
+            <label class="as-label" for="cbNotas">Notas internas</label>
+            <textarea class="as-textarea" id="cbNotas" name="notas" rows="2" maxlength="3000" placeholder="Ej. Acordado en la junta del lunes; paga contra entrega del escrito."></textarea>
+          </div>
         </div>
-      </div>
-
-      <p style="font-size:.78rem; color:var(--text-3); margin-top:8px; padding:10px; background:var(--sidebar); border-radius:8px">
-        La <strong>cancelación total</strong> marcará la factura como Cancelada y registrará un folio NC-xxxx.<br>
-        El <strong>ajuste parcial</strong> reducirá el total de la factura original.
-      </p>
+      </details>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="cerrarModal('ncModal')">Cancelar</button>
-      <button class="btn btn-danger" onclick="submitNc()">Aplicar nota de crédito</button>
+    <div class="as-modal-f">
+      <button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button>
+      <button class="btn btn-primary" id="cbGuardar">Guardar cobro</button>
     </div>
-  </div>
+  </form>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     TOAST
-     ══════════════════════════════════════════════ -->
-<div class="cbr-toast" id="cbrToast"></div>
-
-<!-- ══════════════════════════════════════════════
-     JAVASCRIPT
-     ══════════════════════════════════════════════ -->
-<script>
-/* ── Data ───────────────────────────────────────── */
-const CLIENTES   = {{ clientes | tojson }};
-const MONTHLY    = {{ monthly | tojson }};
-const MONEDA_SYM = {{ monedas | tojson }};
-const ESTADOS_COLOR = {{ estados_color | tojson }};
-const ABOGADOS   = {{ abogados | tojson }};
-const TODAY      = "{{ today_str }}";
-
-/* ── Toast system ──────────────────────────────── */
-function showToast(msg, type = "success", duration = 3500) {
-  const el = document.getElementById("cbrToast");
-  el.textContent = (type === "success" ? "✓ " : type === "error" ? "✗ " : "⚠ ") + msg;
-  el.className = "cbr-toast " + type;
-  requestAnimationFrame(() => el.classList.add("show"));
-  clearTimeout(el._tid);
-  el._tid = setTimeout(() => el.classList.remove("show"), duration);
-}
-
-/* ── Custom confirm ──────────────────────────────── */
-function cbrConfirm(msg) {
-  return new Promise(resolve => {
-    const overlay = document.createElement("div");
-    overlay.className = "modal-overlay open";
-    overlay.style.zIndex = "2000";
-    overlay.innerHTML = `
-      <div class="modal-box" style="max-width:420px">
-        <div class="modal-header">
-          <span class="modal-title">Confirmar acción</span>
+{# ── Registrar pago ──────────────────────────────────────────────────────── #}
+<div class="as-modal" id="cbPago" role="dialog" aria-modal="true" aria-labelledby="cbPagoT">
+  <form class="as-modal-c" id="cbPagoForm" novalidate>
+    <div class="as-modal-h"><h3 id="cbPagoT">Registrar pago</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <div class="cb-quien" id="cbPagoQuien"></div>
+      <div class="as-fila2">
+        <div>
+          <label class="as-label" for="pgMonto">¿Cuánto pagó?</label>
+          <div class="cb-dinero"><span>$</span><input class="as-input" id="pgMonto" name="monto" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
         </div>
-        <div class="modal-body">
-          <p style="font-size:.9rem; color:var(--text); line-height:1.5">${msg}</p>
+        <div>
+          <label class="as-label" for="pgFecha">¿Cuándo?</label>
+          <input class="as-input" type="date" id="pgFecha" name="fecha" value="{{ hoy }}" max="{{ hoy }}">
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-ghost" id="cbrConfirmNo">Cancelar</button>
-          <button class="btn btn-primary" id="cbrConfirmYes">Confirmar</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    overlay.querySelector("#cbrConfirmYes").onclick = () => { overlay.remove(); resolve(true); };
-    overlay.querySelector("#cbrConfirmNo").onclick  = () => { overlay.remove(); resolve(false); };
-    overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
-  });
-}
+      </div>
+      <p class="cb-despues" id="pgDespues"></p>
+      <div>
+        <span class="as-label">Forma de pago</span>
+        <div class="cb-chips" id="pgMetodos" style="margin-top:0">{% for m in metodos %}<button type="button" data-metodo="{{ m }}" class="{{ 'on' if loop.first }}">{{ m }}</button>{% endfor %}</div>
+        <input type="hidden" name="metodo" id="pgMetodo" value="{{ metodos[0] }}">
+      </div>
+      <div>
+        <label class="as-label" for="pgRef">Referencia <small>(opcional)</small></label>
+        <input class="as-input" id="pgRef" name="referencia" maxlength="80" placeholder="Clave de rastreo SPEI, núm. de cheque…">
+      </div>
+      <label class="cb-archivo"><input type="file" name="comprobante" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic">📎 <span>Adjuntar comprobante</span></label>
+    </div>
+    <div class="as-modal-f">
+      <button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button>
+      <button class="btn btn-primary" id="pgGuardar">Registrar pago</button>
+    </div>
+  </form>
+</div>
 
-/* ── Bar chart ──────────────────────────────────── */
-(function renderChart() {
-  const wrap = document.getElementById("cbrChart");
-  const lbls = document.getElementById("cbrLabels");
-  if (!wrap || !MONTHLY.length) return;
-  const maxVal = Math.max(...MONTHLY.map(d => Math.max(d.facturado, d.cobrado)), 1);
-  wrap.innerHTML = '<div class="cbr-bar-group" id="cbrBarGroup"></div>';
-  const grp = document.getElementById("cbrBarGroup");
-  MONTHLY.forEach(d => {
-    const pairEl = document.createElement("div");
-    pairEl.className = "cbr-bar-pair";
-    const hFac = Math.max(3, Math.round((d.facturado / maxVal) * 110));
-    const hCob = Math.max(3, Math.round((d.cobrado   / maxVal) * 110));
-    pairEl.innerHTML = `
-      <div class="cbr-bar cbr-bar-facturado" style="height:${hFac}px"
-           title="${d.label}: $${d.facturado.toLocaleString()} facturado"></div>
-      <div class="cbr-bar cbr-bar-cobrado"   style="height:${hCob}px"
-           title="${d.label}: $${d.cobrado.toLocaleString()} cobrado"></div>`;
-    grp.appendChild(pairEl);
-  });
-  lbls.innerHTML = MONTHLY.map(d => `<span class="cbr-bar-lbl">${d.label}</span>`).join("");
-})();
-
-/* ── Filters ────────────────────────────────────── */
-function toggleFilters() {
-  document.getElementById("filtersPanel").classList.toggle("open");
-}
-{% if desde or hasta or cliente_f or asunto_f or estado_f or abogado_f or monto_min or monto_max %}
-document.getElementById("filtersPanel").classList.add("open");
+{# ── Descuento o cancelación ─────────────────────────────────────────────── #}
+{% if es_admin %}
+<div class="as-modal" id="cbNC" role="dialog" aria-modal="true" aria-labelledby="cbNCT">
+  <form class="as-modal-c" id="cbNCForm" novalidate>
+    <div class="as-modal-h"><h3 id="cbNCT">Descuento o cancelación</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <div class="cb-seg">
+        <label><input type="radio" name="tipo" value="parcial" checked><span>Aplicar un descuento</span></label>
+        <label><input type="radio" name="tipo" value="total"><span>Cancelar el cobro</span></label>
+      </div>
+      <div id="ncMontoF">
+        <label class="as-label" for="ncMonto">Monto a descontar</label>
+        <div class="cb-dinero"><span>$</span><input class="as-input" id="ncMonto" name="monto" type="number" min="0.01" step="0.01" inputmode="decimal"></div>
+        <p class="cb-hint" id="ncSaldo"></p>
+      </div>
+      <div>
+        <label class="as-label" for="ncMotivo">Motivo</label>
+        <input class="as-input" id="ncMotivo" name="motivo" maxlength="300" placeholder="Ej. Descuento por pronto pago">
+      </div>
+      <p id="ncAviso" hidden style="font-size:12.5px">Si ya emitiste el CFDI, recuerda cancelarlo también ante el SAT o emitir la nota de crédito desde tu sistema de facturación.</p>
+    </div>
+    <div class="as-modal-f">
+      <button type="button" class="btn btn-ghost" data-cerrar>Volver</button>
+      <button class="btn btn-primary" id="ncGuardar">Aplicar descuento</button>
+    </div>
+  </form>
+</div>
 {% endif %}
 
-function filterByStatus(status) {
-  const base = location.pathname;
-  if (status) {
-    window.location = `${base}?estado=${status}&tab=todas`;
-  } else {
-    window.location = `${base}?tab=todas`;
-  }
-}
-
-function removeFilter(name) {
-  const url = new URL(window.location);
-  url.searchParams.delete(name);
-  window.location = url.toString();
-}
-
-/* ── Export menu ────────────────────────────────── */
-function toggleExportMenu() {
-  const m = document.getElementById("exportMenu");
-  m.style.display = m.style.display === "none" ? "block" : "none";
-}
-document.addEventListener("click", e => {
-  if (!e.target.closest(".dropdown-wrap")) {
-    const m = document.getElementById("exportMenu");
-    if (m) m.style.display = "none";
-  }
-});
-
-/* ── Modals ─────────────────────────────────────── */
-function abrirCrear() {
-  document.getElementById("crearModal").classList.add("open");
-  autoFolio();
-}
-function cerrarModal(id) {
-  document.getElementById(id).classList.remove("open");
-}
-
-/* ── Checkbox / Bulk actions ───────────────────── */
-function toggleCheckAll(master) {
-  document.querySelectorAll(".row-check").forEach(cb => cb.checked = master.checked);
-  updateBulkBar();
-}
-function updateBulkBar() {
-  const checked = document.querySelectorAll(".row-check:checked");
-  const bar = document.getElementById("bulkBar");
-  document.getElementById("bulkCount").textContent = checked.length;
-  bar.classList.toggle("show", checked.length > 0);
-}
-function bulkClearSelection() {
-  document.querySelectorAll(".row-check").forEach(cb => cb.checked = false);
-  document.getElementById("checkAll").checked = false;
-  updateBulkBar();
-}
-function bulkExport() {
-  const ids = Array.from(document.querySelectorAll(".row-check:checked")).map(cb => cb.value);
-  if (!ids.length) { showToast("Selecciona al menos una factura", "warning"); return; }
-  showToast(`Exportando ${ids.length} registros…`);
-  window.open("{{ url_for('cobranzas.exportar_excel') }}?ids=" + ids.join(","), "_blank");
-}
-function bulkExportZip() {
-  const ids = Array.from(document.querySelectorAll(".row-check:checked")).map(cb => cb.value);
-  if (!ids.length) { showToast("Selecciona al menos una factura", "warning"); return; }
-  showToast(`Generando ZIP con ${ids.length} facturas…`);
-  // ZIP export placeholder — server needs to support it
-  window.open("{{ url_for('cobranzas.exportar_excel') }}?format=zip&ids=" + ids.join(","), "_blank");
-}
-function bulkEmail() {
-  const ids = Array.from(document.querySelectorAll(".row-check:checked")).map(cb => cb.value);
-  if (!ids.length) { showToast("Selecciona al menos una factura", "warning"); return; }
-  showToast(`Preparando envío de ${ids.length} facturas…`);
-  if (typeof openEmailComposer === "function") {
-    openEmailComposer({ subject: `Facturas seleccionadas (${ids.length})` });
-  }
-}
-
-/* ── Slide-in Panel ────────────────────────────── */
-let currentPanelId = null;
-function openPanel(id, event) {
-  if (event && (event.target.tagName === "A" || event.target.tagName === "BUTTON" || event.target.tagName === "INPUT")) return;
-  const row = document.querySelector(`tr[data-id="${id}"]`);
-  if (!row) return;
-
-  currentPanelId = id;
-
-  // Highlight active row
-  document.querySelectorAll(".cbr-table tr.row-active").forEach(r => r.classList.remove("row-active"));
-  row.classList.add("row-active");
-
-  const d = row.dataset;
-  const sym = (MONEDA_SYM[d.moneda] || {simbolo: "$"}).simbolo;
-  const monto = parseFloat(d.monto) || 0;
-  const ivaMonto = parseFloat(d.ivaMonto) || 0;
-  const ivaPct = parseFloat(d.ivaPct) || 0;
-  const total = parseFloat(d.total) || 0;
-  const abonado = parseFloat(d.abonado) || 0;
-  const saldo = total - abonado;
-
-  // Header
-  document.getElementById("panelFolio").textContent = d.folio;
-  const estadoInfo = ESTADOS_COLOR[d.estado] || ["cbr-gris","—"];
-  document.getElementById("panelBadge").innerHTML = `<span class="cbr-badge ${estadoInfo[0]}">${estadoInfo[1]}</span>`;
-
-  // Client
-  const initials = (d.cliente || "—").substring(0, 2).toUpperCase();
-  document.getElementById("panelAvatar").textContent = initials;
-  document.getElementById("panelClientName").textContent = d.cliente;
-  document.getElementById("panelClientEmail").textContent = d.clienteEmail || "";
-
-  // Asunto link
-  const asuntoLink = document.getElementById("panelAsuntoLink");
-  if (d.asuntoTitulo) {
-    asuntoLink.innerHTML = `<span style="font-size:.78rem; color:var(--text-3)">Asunto:</span> <a href="/asuntos/${d.asuntoId}" style="font-size:.78rem; color:var(--accent); text-decoration:none; font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> ${d.expediente || d.asuntoTitulo}</a>`;
-  } else {
-    asuntoLink.innerHTML = "";
-  }
-
-  // Abogado
-  const abogadoEl = document.getElementById("panelAbogado");
-  if (d.abogadoId) {
-    const ab = ABOGADOS.find(a => String(a.id) === d.abogadoId);
-    abogadoEl.innerHTML = ab ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 8 5 12 9 8"/><polyline points="15 8 19 12 23 8"/><line x1="1" y1="8" x2="23" y2="8"/></svg> Abogado: <strong>${ab.nombre} ${ab.apellidos || ""}</strong>` : "";
-  } else {
-    abogadoEl.innerHTML = "";
-  }
-
-  // Amounts
-  document.getElementById("panelConcepto").textContent = d.concepto;
-  document.getElementById("panelMonto").textContent = `${sym}${monto.toLocaleString("es-MX",{minimumFractionDigits:2})} ${d.moneda}`;
-  document.getElementById("panelIva").textContent = ivaPct > 0 ? `${ivaPct}% → ${sym}${ivaMonto.toLocaleString("es-MX",{minimumFractionDigits:2})}` : "Exento";
-  document.getElementById("panelDescuento").textContent = "$0.00";
-  document.getElementById("panelTotal").textContent = `${sym}${total.toLocaleString("es-MX",{minimumFractionDigits:2})} ${d.moneda}`;
-
-  // Progress bar
-  const progWrap = document.getElementById("panelProgressWrap");
-  if (abonado > 0 && d.estado !== "pagado") {
-    progWrap.style.display = "block";
-    const pct = Math.min(100, Math.round((abonado / total) * 100));
-    document.getElementById("panelProgressBar").style.width = pct + "%";
-    document.getElementById("panelAbonado").textContent = `Abonado: ${sym}${abonado.toLocaleString("es-MX",{minimumFractionDigits:2})} (${pct}%)`;
-    document.getElementById("panelSaldo").textContent = `Saldo: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
-  } else if (d.estado === "pagado") {
-    progWrap.style.display = "block";
-    document.getElementById("panelProgressBar").style.width = "100%";
-    document.getElementById("panelAbonado").textContent = `Pagado completo`;
-    document.getElementById("panelSaldo").textContent = `${sym}${total.toLocaleString("es-MX",{minimumFractionDigits:2})} / ${sym}${total.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
-  } else {
-    progWrap.style.display = "none";
-  }
-
-  // Dates
-  document.getElementById("panelFechaEmision").textContent = d.fechaEmision ? d.fechaEmision.substring(0, 10) : "—";
-  const vencStr = d.fechaVencimiento ? d.fechaVencimiento.substring(0, 10) : "—";
-  document.getElementById("panelFechaVenc").textContent = vencStr;
-
-  // Vencimiento badge
-  const vencBadge = document.getElementById("panelFechaVencBadge");
-  if (d.fechaVencimiento && !["pagado","cancelado"].includes(d.estado)) {
-    const diffDays = Math.round((new Date(d.fechaVencimiento) - new Date()) / 86400000);
-    if (diffDays < 0) {
-      vencBadge.innerHTML = `<span class="date-badge date-badge-red">VENCIDA hace ${Math.abs(diffDays)}d</span>`;
-    } else if (diffDays <= 7) {
-      vencBadge.innerHTML = `<span class="date-badge date-badge-yellow">${diffDays}d</span>`;
-    } else {
-      vencBadge.innerHTML = `<span class="date-badge date-badge-green">${diffDays} días</span>`;
-    }
-  } else {
-    vencBadge.innerHTML = "";
-  }
-
-  const fechaPagoRow = document.getElementById("panelFechaPagoRow");
-  if (d.fechaPago) {
-    fechaPagoRow.style.display = "flex";
-    document.getElementById("panelFechaPago").textContent = d.fechaPago.substring(0, 10);
-  } else {
-    fechaPagoRow.style.display = "none";
-  }
-
-  // Notes
-  document.getElementById("panelNotas").value = d.notas || "";
-
-  // Files
-  const filesSection = document.getElementById("panelFilesSection");
-  const filesEl = document.getElementById("panelFiles");
-  filesEl.innerHTML = "";
-  let hasFiles = false;
-  if (d.facturaUrl) {
-    hasFiles = true;
-    filesEl.innerHTML += `<div class="cbr-panel-file"><span class="cbr-panel-file-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="cbr-panel-file-name">Factura PDF</span><a href="${d.facturaUrl}" target="_blank" class="cbr-panel-file-dl">Descargar</a></div>`;
-  }
-  if (d.xmlUrl) {
-    hasFiles = true;
-    filesEl.innerHTML += `<div class="cbr-panel-file"><span class="cbr-panel-file-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="cbr-panel-file-name">XML SAT</span><a href="${d.xmlUrl}" target="_blank" class="cbr-panel-file-dl">Descargar</a></div>`;
-  }
-  filesSection.style.display = hasFiles ? "block" : "none";
-
-  // Panel action buttons
-  const payBtn = document.getElementById("panelPayBtn");
-  payBtn.style.display = ["pendiente","abono","vencido"].includes(d.estado) ? "flex" : "none";
-
-  // Estado de cuenta link
-  document.getElementById("panelEstadoCuenta").href = `/cobranzas/estado-cuenta/${d.clienteId}/pdf`;
-
-  // Load payment history
-  loadPanelPayments(id, sym);
-
-  // Open panel
-  document.getElementById("detailPanel").classList.add("open");
-  document.getElementById("tableSection")?.classList.add("with-panel");
-}
-
-async function loadPanelPayments(id, sym) {
-  const section = document.getElementById("panelPaymentsSection");
-  const container = document.getElementById("panelPayments");
-  try {
-    const r = await fetch(`/cobranzas/${id}/pagos`);
-    const payments = await r.json();
-    if (payments.length) {
-      container.innerHTML = payments.map((p, i) => {
-        const isLast = i === payments.length - 1;
-        return `<div class="cbr-panel-payment">
-          <div class="cbr-panel-payment-dot" style="${isLast ? 'background:#10B981' : ''}"></div>
-          <span class="cbr-panel-payment-date">${(p.fecha||"—").substring(0,10)}</span>
-          <span class="cbr-panel-payment-monto">${sym}${parseFloat(p.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
-          <span class="cbr-panel-payment-metodo">${p.metodo||""}</span>
-        </div>`;
-      }).join("");
-      section.style.display = "block";
-    } else {
-      section.style.display = "none";
-    }
-  } catch (e) {
-    section.style.display = "none";
-  }
-}
-
-function closePanel() {
-  document.getElementById("detailPanel").classList.remove("open");
-  document.getElementById("tableSection")?.classList.remove("with-panel");
-  document.querySelectorAll(".cbr-table tr.row-active").forEach(r => r.classList.remove("row-active"));
-  currentPanelId = null;
-}
-
-function panelPay() {
-  if (!currentPanelId) return;
-  const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
-  if (!row) return;
-  const d = row.dataset;
-  abrirPago(currentPanelId, parseFloat(d.total)||0, parseFloat(d.abonado)||0, d.cliente, d.concepto, d.moneda);
-}
-
-function panelNC() {
-  if (!currentPanelId) return;
-  const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
-  if (!row) return;
-  abrirNotaCredito(currentPanelId, parseFloat(row.dataset.total)||0, row.dataset.moneda);
-}
-
-function panelEmail() {
-  if (!currentPanelId) return;
-  const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
-  if (!row) return;
-  if (typeof openEmailComposer === "function") {
-    openEmailComposer({
-      to: row.dataset.clienteEmail || "",
-      subject: `Factura ${row.dataset.folio} — ${row.dataset.concepto}`
-    });
-  } else {
-    showToast("Módulo de correo no disponible", "warning");
-  }
-}
-
-function panelEmailFor(id) {
-  const row = document.querySelector(`tr[data-id="${id}"]`);
-  if (!row) return;
-  if (typeof openEmailComposer === "function") {
-    openEmailComposer({
-      to: row.dataset.clienteEmail || "",
-      subject: `Factura ${row.dataset.folio} — ${row.dataset.concepto}`
-    });
-  } else {
-    showToast("Módulo de correo no disponible", "warning");
-  }
-}
-
-async function saveNotes() {
-  if (!currentPanelId) return;
-  const notas = document.getElementById("panelNotas").value;
-  try {
-    const r = await fetch(`/cobranzas/${currentPanelId}/notas`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({notas})
-    });
-    const j = await r.json();
-    if (j.ok) {
-      showToast("Notas guardadas");
-      // Update the data attribute on the row too
-      const row = document.querySelector(`tr[data-id="${currentPanelId}"]`);
-      if (row) row.dataset.notas = notas;
-    }
-    else showToast(j.error || "Error al guardar", "error");
-  } catch (e) {
-    showToast("Error de conexión", "error");
-  }
-}
-
-// Close panel on ESC
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") {
-    if (document.querySelector(".modal-overlay.open")) return;
-    closePanel();
-  }
-});
-
-/* ── Crear form: autocomplete cliente ───────────── */
-function buscarClienteCrear(q) {
-  const box = document.getElementById("crearClienteResults");
-  if (!q || q.length < 2) { box.classList.remove("open"); return; }
-  const ql = q.toLowerCase();
-  const hits = CLIENTES.filter(c => {
-    const n = ((c.nombre||"")+" "+(c.apellidos||"")+" "+(c.razon_social||"")).toLowerCase();
-    return n.includes(ql);
-  }).slice(0, 8);
-  if (!hits.length) { box.classList.remove("open"); return; }
-  box.innerHTML = hits.map(c => {
-    const lbl = c.tipo === "moral"
-      ? c.razon_social
-      : ((c.nombre||"")+" "+(c.apellidos||"")).trim();
-    return `<div class="cbr-ac-item" onmousedown="pickClienteCrear(${c.id}, '${lbl.replace(/'/g,"\\'")}')">
-      ${c.tipo === "moral" ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><path d="M9 22v-4h6v4"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'} ${lbl}</div>`;
-  }).join("");
-  box.classList.add("open");
-}
-function pickClienteCrear(id, name) {
-  document.getElementById("crearClienteId").value = id;
-  document.getElementById("crearClienteSearch").value = name;
-  document.getElementById("crearClienteResults").classList.remove("open");
-  fetch(`/cobranzas/ajax/asuntos-cliente/${id}`)
-    .then(r => r.json())
-    .then(list => {
-      const sel = document.getElementById("crearAsuntoSel");
-      sel.innerHTML = '<option value="">— Sin asunto —</option>' +
-        list.map(a => `<option value="${a.id}">${a.numero_expediente||""} ${a.titulo}</option>`).join("");
-    });
-}
-document.addEventListener("click", e => {
-  if (!e.target.closest("#crearClienteSearch") && !e.target.closest("#crearClienteResults")) {
-    document.getElementById("crearClienteResults").classList.remove("open");
-  }
-});
-
-/* ── Crear form: cálculos ───────────────────────── */
-function recalcular() {
-  const monto   = parseFloat(document.getElementById("crearMonto").value) || 0;
-  const ivaPct  = parseFloat(document.getElementById("crearIvaPct").value) || 0;
-  const dTipo   = document.getElementById("crearDctoTipo").value;
-  const dVal    = parseFloat(document.getElementById("crearDctoVal").value) || 0;
-  const ivaMon  = monto * ivaPct / 100;
-  const subtotal= monto + ivaMon;
-  const dcto    = dTipo === "pct" ? subtotal * dVal / 100 : dVal;
-  const total   = subtotal - dcto;
-  document.getElementById("crearIvaCalc").value = ivaMon.toFixed(2);
-  document.getElementById("crearTotal").value   = total.toFixed(2);
-}
-
-function toggleIvaExento() {
-  const inp = document.getElementById("crearIvaPct");
-  inp.value = inp.value == "0" ? "16" : "0";
-  recalcular();
-}
-
-async function autoFolio() {
-  const r = await fetch("/cobranzas/ajax/auto-folio");
-  const j = await r.json();
-  document.getElementById("crearFolio").value = j.folio;
-}
-
-function toggleAbonoFields() {
-  const est = document.getElementById("crearEstado").value;
-  document.getElementById("abonoFields").style.display   = est === "abono" ? "flex" : "none";
-  document.getElementById("abonoFechaField").style.display= est === "abono" ? "flex" : "none";
-  document.getElementById("fechaPagoField").style.display = est === "pagado"? "flex" : "none";
-}
-
-/* ── Drag-drop zones ────────────────────────────── */
-function handleDzDrop(e, inputName, zoneId) {
-  e.preventDefault();
-  document.getElementById(zoneId).classList.remove("dz-over");
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  const inp = document.querySelector(`input[name="${inputName}"]`);
-  if (inp) {
-    inp.files = dt.files;
-    document.getElementById(zoneId + "Name").textContent = file.name;
-  }
-}
-function showDzName(nameElId, inp) {
-  document.getElementById(nameElId).textContent = inp.files[0]?.name || "";
-}
-
-/* ── Submit crear ───────────────────────────────── */
-async function submitCrear() {
-  const form = document.getElementById("crearForm");
-  const cid  = document.getElementById("crearClienteId").value;
-  if (!cid) { showToast("Selecciona un cliente", "warning"); return; }
-  if (!form.querySelector('[name="concepto"]').value.trim()) {
-    showToast("La descripción es requerida", "warning"); return;
-  }
-  const fd = new FormData(form);
-  const r  = await fetch("/cobranzas/ajax/crear", {method: "POST", body: fd});
-  const j  = await r.json();
-  if (!j.ok) { showToast(j.error || "Error al crear", "error"); return; }
-  cerrarModal("crearModal");
-  showToast("Factura creada exitosamente");
-  setTimeout(() => location.reload(), 800);
-}
-
-/* ── Pago modal ─────────────────────────────────── */
-let pagoCurrentId = null;
-let pagoSaldoPendiente = 0;
-async function abrirPago(id, total, abonado, cliente, concepto, moneda) {
-  pagoCurrentId = id;
-  const sym   = (MONEDA_SYM[moneda] || {simbolo: "$"}).simbolo;
-  const saldo = total - abonado;
-  pagoSaldoPendiente = saldo;
-
-  document.getElementById("pagoCobId").value  = id;
-  document.getElementById("pagoConcepto").textContent = `${cliente} — ${concepto}`;
-  document.getElementById("pagoTotal").textContent    = `${sym}${total.toLocaleString("es-MX", {minimumFractionDigits:2})} ${moneda}`;
-  document.getElementById("pagoSaldo").textContent    = abonado > 0
-    ? `Abonado: ${sym}${abonado.toLocaleString("es-MX",{minimumFractionDigits:2})} · Saldo pendiente: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`
-    : `Saldo pendiente: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
-  document.getElementById("pagoMonto").value = saldo.toFixed(2);
-  document.getElementById("pagoSaldoHint").textContent = `Saldo pendiente: ${sym}${saldo.toLocaleString("es-MX",{minimumFractionDigits:2})}`;
-
-  // Historial
-  const hist = await fetch(`/cobranzas/${id}/pagos`).then(r => r.json());
-  const histEl = document.getElementById("pagoHistorial");
-  if (hist.length) {
-    document.getElementById("pagoHistItems").innerHTML = hist.map(p =>
-      `<div class="pago-hist-item">
-        <span class="pago-hist-fecha">${(p.fecha||"—").substring(0,10)}</span>
-        <span class="pago-hist-monto">${sym}${parseFloat(p.monto||0).toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
-        <span class="pago-hist-metodo">${p.metodo||""}</span>
-        <span style="color:var(--text-3);font-size:.72rem">${p.referencia||""}</span>
-      </div>`
-    ).join("");
-    histEl.style.display = "block";
-  } else {
-    histEl.style.display = "none";
-  }
-
-  document.getElementById("pagoModal").classList.add("open");
-}
-
-async function submitPago() {
-  const id = pagoCurrentId;
-  if (!id) return;
-  const form = document.getElementById("pagoForm");
-  const monto = parseFloat(document.getElementById("pagoMonto").value);
-  if (!monto || monto <= 0) { showToast("Ingresa un monto válido", "warning"); return; }
-  if (monto > pagoSaldoPendiente * 1.01) {
-    showToast("El monto excede el saldo pendiente", "warning"); return;
-  }
-  const fd = new FormData(form);
-  const r  = await fetch(`/cobranzas/${id}/pago`, {method:"POST", body:fd});
-  const j  = await r.json();
-  if (!j.ok) { showToast(j.error || "Error al registrar pago", "error"); return; }
-  cerrarModal("pagoModal");
-  showToast("Pago registrado exitosamente");
-  setTimeout(() => location.reload(), 800);
-}
-
-/* ── Nota de crédito ────────────────────────────── */
-let ncCurrentId = null, ncMoneda = "MXN", ncTotal = 0;
-function abrirNotaCredito(id, total, moneda) {
-  ncCurrentId = id; ncMoneda = moneda; ncTotal = total;
-  // Pre-fill folio reference
-  const row = document.querySelector(`tr[data-id="${id}"]`);
-  const folio = row ? row.dataset.folio : `#${id}`;
-  document.getElementById("ncFolioRef").textContent = folio;
-  document.getElementById("ncModal").classList.add("open");
-  setNcTipo("total");
-  // Reset fields
-  document.getElementById("ncMonto").value = "";
-  document.getElementById("ncMotivoSel").value = "Error en monto";
-  document.getElementById("ncMotivo").value = "Error en monto";
-  document.getElementById("ncMotivoCustom").style.display = "none";
-}
-function setNcTipo(tipo) {
-  const isTotal = tipo === "total";
-  document.getElementById("ncTotal").classList.toggle("active", isTotal);
-  document.getElementById("ncParcial").classList.toggle("active", !isTotal);
-  document.getElementById("ncMontoRow").style.display = isTotal ? "none" : "flex";
-  document.getElementById("ncModal").dataset.ncTipo = tipo;
-}
-async function submitNc() {
-  const id    = ncCurrentId;
-  const tipo  = document.getElementById("ncModal").dataset.ncTipo || "total";
-  const monto = parseFloat(document.getElementById("ncMonto").value) || null;
-  const motivo= document.getElementById("ncMotivo").value.trim();
-  if (!motivo) { showToast("Ingresa un motivo", "warning"); return; }
-  if (tipo === "parcial" && (!monto || monto <= 0)) { showToast("Ingresa el monto a descontar", "warning"); return; }
-  if (tipo === "parcial" && monto > ncTotal) { showToast("El monto excede el total de la factura", "warning"); return; }
-
-  const ok = await cbrConfirm(tipo === "total"
-    ? `¿Cancelar completamente la factura? Se marcará como cancelada.`
-    : `¿Aplicar nota de crédito por $${monto.toLocaleString("es-MX",{minimumFractionDigits:2})} ${ncMoneda}?`
-  );
-  if (!ok) return;
-
-  const r = await fetch(`/cobranzas/${id}/nota-credito`, {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({tipo, monto, motivo}),
-  });
-  const j = await r.json();
-  if (!j.ok) { showToast(j.error || "Error", "error"); return; }
-  cerrarModal("ncModal");
-  showToast("Nota de crédito aplicada");
-  setTimeout(() => location.reload(), 800);
-}
-
-/* ── Search debounce ────────────────────────────── */
-let _st;
-document.getElementById("searchQ")?.addEventListener("input", () => {
-  clearTimeout(_st);
-  _st = setTimeout(() => document.getElementById("filterForm").submit(), 350);
-});
-
-/* ── Recordatorios ─────────────────────────────── */
-let recLoaded = false;
-async function toggleRecordatorios() {
-  const panel = document.getElementById("recPanel");
-  if (panel.style.display === "block") { panel.style.display = "none"; return; }
-  panel.style.display = "block";
-  if (recLoaded) return;
-  try {
-    const r = await fetch("/cobranzas/ajax/recordatorios");
-    const j = await r.json();
-    recLoaded = true;
-    const body = document.getElementById("recPanelBody");
-    if (!j.alertas || !j.alertas.length) {
-      body.innerHTML = '<div style="text-align:center; color:var(--text-3); padding:20px">✓ Sin alertas pendientes</div>';
-      return;
-    }
-    body.innerHTML = j.alertas.map(a => {
-      const cls = a.tipo === "urgente" ? "rec-urgente" : a.tipo === "seguimiento" ? "rec-seguimiento" : "rec-preventivo";
-      return `<div class="rec-item ${cls}">
-        <div class="rec-msg">${a.mensaje}</div>
-        <div class="rec-actions">
-          <span class="rec-monto">${a.moneda} $${a.monto.toLocaleString("es-MX",{minimumFractionDigits:2})}</span>
-          ${a.email ? `<button class="btn btn-ghost btn-sm" onclick="enviarRecordatorio(${a.cobro_id})" title="Enviar correo al cliente">✉ Enviar</button>` : ""}
+{# ── Facturar horas ──────────────────────────────────────────────────────── #}
+<div class="as-modal" id="cbHoras" role="dialog" aria-modal="true" aria-labelledby="cbHorasT">
+  <form class="as-modal-c" id="cbHorasForm" novalidate>
+    <div class="as-modal-h"><h3 id="cbHorasT">Cobrar horas trabajadas</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <p>Horas registradas en los asuntos que todavía no se le cobran al cliente.</p>
+      <div class="cb-horas-lista" id="hrLista"><p class="as-empty">Cargando…</p></div>
+      <div class="as-fila2">
+        <div>
+          <label class="as-label" for="hrTarifa">Tarifa por hora</label>
+          <div class="cb-dinero"><span>$</span><input class="as-input" id="hrTarifa" type="number" min="0" step="50" inputmode="decimal" placeholder="2,500"></div>
         </div>
-      </div>`;
-    }).join("");
-  } catch(e) {
-    document.getElementById("recPanelBody").innerHTML = '<div style="color:var(--danger);padding:12px">Error al cargar recordatorios</div>';
+        <div>
+          <label class="as-label" for="hrDias">Plazo de pago</label>
+          <select class="as-select" id="hrDias"><option value="0">De contado</option><option value="15" selected>15 días</option><option value="30">30 días</option></select>
+        </div>
+      </div>
+      <div class="cb-seg">
+        <label><input type="radio" name="hr_iva" value="16" checked><span>Más IVA 16%</span></label>
+        <label><input type="radio" name="hr_iva" value="0"><span>Sin IVA</span></label>
+      </div>
+      <div class="cb-resumen"><div class="cb-kv total"><span id="hrCalc">Elige un asunto</span><b id="hrTotal">$0.00</b></div></div>
+    </div>
+    <div class="as-modal-f">
+      <button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button>
+      <button class="btn btn-primary" id="hrGuardar">Crear cobro</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const HOY = '{{ hoy }}';
+  const XHR = { 'X-Requested-With': 'XMLHttpRequest' };
+  const JSONH = { ...XHR, 'Content-Type': 'application/json' };
+  const $ = s => document.querySelector(s);
+  const fmt = (n, m = 'MXN') => (m === 'USD' ? 'US$' : '$') + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Los campos de fecha usan flatpickr: hay que actualizar también la fecha visible.
+  const fecha = (el, v) => { if (el._flatpickr) el._flatpickr.setDate(v || null, false); else el.value = v || ''; };
+  const sumarDias = (iso, d) => { const f = new Date(iso + 'T12:00:00'); f.setDate(f.getDate() + d); return f.toISOString().slice(0, 10); };
+
+  // Aviso que sobrevive a la recarga
+  try { const t = sessionStorage.getItem('cbToast'); if (t) { sessionStorage.removeItem('cbToast'); showToast(t); } } catch (e) {}
+  function recargar(msg, hash) {
+    try { if (msg) sessionStorage.setItem('cbToast', msg); } catch (e) {}
+    if (hash !== undefined) history.replaceState(null, '', location.pathname + location.search + (hash ? '#' + hash : ''));
+    location.reload();
   }
-}
-async function enviarRecordatorio(cobroId) {
-  const ok = await cbrConfirm("¿Enviar recordatorio de pago por correo al cliente?");
-  if (!ok) return;
-  const r = await fetch("/cobranzas/ajax/enviar-recordatorio", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({cobro_id: cobroId}),
+  async function enviar(url, opts) {
+    try {
+      const r = await fetch(url, { method: 'POST', ...opts });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.ok === false) { showToast(d.error || 'No se pudo guardar', 'error'); return null; }
+      return d;
+    } catch (e) { showToast('Sin conexión con el servidor', 'error'); return null; }
+  }
+
+  // ── Modales ────────────────────────────────────────────────
+  const abrir = m => { m.classList.add('open'); setTimeout(() => m.querySelector('input:not([type=hidden]):not([type=radio]):not([type=checkbox]),select')?.focus(), 30); };
+  const cerrar = m => m.classList.remove('open');
+  document.querySelectorAll('.as-modal').forEach(m => m.addEventListener('click', e => {
+    if (e.target === m || e.target.closest('[data-cerrar]')) cerrar(m);
+  }));
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const m = [...document.querySelectorAll('.as-modal.open')].pop();
+    if (m) cerrar(m); else if (drawer.classList.contains('open')) cerrarPanel();
   });
-  const j = await r.json();
-  if (j.ok) showToast(`Recordatorio enviado a ${j.email}`);
-  else showToast(j.error || "Error al enviar", "error");
-}
-// Load recordatorios count on page load
-(async function loadRecCount() {
-  try {
-    const r = await fetch("/cobranzas/ajax/recordatorios");
-    const j = await r.json();
-    if (j.total > 0) {
-      const badge = document.getElementById("recordatorioBadge");
-      badge.textContent = j.total;
-      badge.style.display = "inline-flex";
+  document.querySelectorAll('.cb-archivo input').forEach(i => i.addEventListener('change', () => {
+    const s = i.parentElement.querySelector('span');
+    s.dataset.txt ??= s.textContent;
+    s.innerHTML = i.files[0] ? `<b></b>` : s.dataset.txt;
+    if (i.files[0]) s.querySelector('b').textContent = i.files[0].name;
+  }));
+
+  // ── Panel lateral ──────────────────────────────────────────
+  const drawer = $('#cbDrawer'), velo = $('#cbVelo');
+  let panelId = null;
+  async function abrirPanel(id) {
+    panelId = id;
+    drawer.innerHTML = '<div class="cb-cargando">Cargando…</div>';
+    drawer.classList.add('open'); velo.classList.add('open');
+    if (location.hash !== '#cobro-' + id) history.replaceState(null, '', '#cobro-' + id);
+    const r = await fetch(`/cobranzas/${id}/panel`, { headers: XHR });
+    if (!r.ok) { cerrarPanel(); showToast('No se encontró ese cobro', 'error'); return; }
+    drawer.innerHTML = await r.text();
+    drawer.querySelector('.cerrar')?.focus();
+  }
+  function cerrarPanel() {
+    drawer.classList.remove('open'); velo.classList.remove('open'); panelId = null;
+    if (location.hash.startsWith('#cobro-')) history.replaceState(null, '', location.pathname + location.search);
+  }
+  velo.addEventListener('click', cerrarPanel);
+  document.querySelectorAll('tr[data-cobro]').forEach(tr => {
+    tr.addEventListener('click', e => { if (e.target.closest('[data-pago]')) return; e.preventDefault(); abrirPanel(tr.dataset.cobro); });
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter') abrirPanel(tr.dataset.cobro); });
+  });
+
+  drawer.addEventListener('click', async e => {
+    const b = e.target.closest('[data-acc]'); if (!b) { if (e.target.closest('.cerrar')) cerrarPanel(); return; }
+    const acc = b.dataset.acc, info = drawer.querySelector('[data-info]')?.dataset || {};
+    if (acc === 'pago') abrirPago(info);
+    else if (acc === 'editar') abrirEditar(panelId);
+    else if (acc === 'nc') abrirNC(info);
+    else if (acc === 'correo') {
+      b.disabled = true;
+      const d = await enviar(`/cobranzas/${panelId}/recordatorio`, { headers: XHR });
+      b.disabled = false;
+      if (d) showToast(`Recordatorio enviado a ${d.email}`);
+    } else if (acc === 'borrar-pago') {
+      if (!confirm('¿Borrar este pago? El saldo del cobro se recalcula.')) return;
+      const d = await enviar(`/cobranzas/${panelId}/pagos/${b.dataset.pid}/borrar`, { headers: XHR });
+      if (d) recargar('Pago borrado', 'cobro-' + panelId);
+    } else if (acc === 'notas') {
+      const d = await enviar(`/cobranzas/${panelId}/notas`, { headers: JSONH, body: JSON.stringify({ notas: drawer.querySelector('#drNotas').value }) });
+      if (d) { showToast('Notas guardadas'); b.hidden = true; }
     }
-  } catch(e) {}
-})();
-
-/* ── Facturar horas ────────────────────────────── */
-function abrirFacturarHoras() {
-  document.getElementById("horasModal").classList.add("open");
-  document.getElementById("horasPreview").style.display = "none";
-}
-
-async function submitFacturarHoras() {
-  const asuntoId = document.getElementById("horasAsunto").value;
-  const tarifa   = parseFloat(document.getElementById("horasTarifa").value);
-  const ivaPct   = parseFloat(document.getElementById("horasIva").value) || 16;
-  const moneda   = document.getElementById("horasMoneda").value;
-
-  if (!asuntoId) { showToast("Selecciona un asunto", "warning"); return; }
-  if (!tarifa || tarifa <= 0) { showToast("Ingresa una tarifa por hora válida", "warning"); return; }
-
-  const r = await fetch("/cobranzas/ajax/facturar-horas", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({asunto_id: asuntoId, tarifa_hora: tarifa, iva_pct: ivaPct, moneda}),
   });
-  const j = await r.json();
-  if (!j.ok) { showToast(j.error || "Error", "error"); return; }
+  drawer.addEventListener('input', e => { if (e.target.id === 'drNotas') drawer.querySelector('[data-acc=notas]').hidden = false; });
 
-  const prev = document.getElementById("horasPreview");
-  prev.style.display = "block";
-  prev.innerHTML = `
-    <div style="font-weight:700;color:var(--success);margin-bottom:6px">✓ Factura generada exitosamente</div>
-    <div style="font-size:.84rem">Folio: <strong>${j.folio}</strong></div>
-    <div style="font-size:.84rem">Horas: ${j.horas.toFixed(1)}h × $${tarifa.toLocaleString("es-MX",{minimumFractionDigits:2})}/h</div>
-    <div style="font-size:.84rem">Monto base: $${j.monto.toLocaleString("es-MX",{minimumFractionDigits:2})}</div>
-    <div style="font-size:.84rem;font-weight:700">Total con IVA: $${j.total.toLocaleString("es-MX",{minimumFractionDigits:2})} ${moneda}</div>
-  `;
-  showToast("Factura generada exitosamente");
-  setTimeout(() => { cerrarModal("horasModal"); location.reload(); }, 2500);
-}
+  // ── Nuevo / editar cobro ───────────────────────────────────
+  const mNuevo = $('#cbNuevo'), form = $('#cbForm'), selCli = $('#cbCliente'), selAs = $('#cbAsunto');
+  let editando = null, asuntos = [];
+  async function cargarAsuntos(cid, elegido = '') {
+    selAs.innerHTML = '<option value="">Sin asunto</option>'; selAs.disabled = !cid; asuntos = [];
+    $('#cbPactado').hidden = true;
+    if (!cid) { selAs.innerHTML = '<option value="">Primero elige el cliente</option>'; return; }
+    const r = await fetch(`/cobranzas/asuntos-de/${cid}`, { headers: XHR });
+    asuntos = r.ok ? await r.json() : [];
+    asuntos.forEach(a => selAs.add(new Option(a.titulo + (a.numero_expediente ? ` · ${a.numero_expediente}` : ''), a.id)));
+    if (!elegido && asuntos.length === 1) elegido = asuntos[0].id;
+    selAs.value = elegido || ''; pactado();
+  }
+  function pactado() {
+    const a = asuntos.find(x => String(x.id) === selAs.value), p = $('#cbPactado');
+    if (!a || !a.honorarios_pactados) { p.hidden = true; return; }
+    const resta = a.honorarios_pactados - a.facturado;
+    p.innerHTML = `Honorarios pactados en el asunto: <b>${fmt(a.honorarios_pactados)}</b> · ya facturado: <b>${fmt(a.facturado)}</b>` +
+      (resta > 0 ? ` · faltan <b>${fmt(resta)}</b>` : '');
+    p.hidden = false;
+  }
+  selCli.addEventListener('change', () => cargarAsuntos(selCli.value));
+  selAs.addEventListener('change', pactado);
+  $('#cbConceptos').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('#cbConcepto').value = b.textContent; $('#cbConcepto').focus();
+  });
+  $('#cbPlazos').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    fecha($('#cbVence'), sumarDias($('#cbEmision').value || HOY, +b.dataset.dias));
+    marcarPlazo();
+  });
+  function marcarPlazo() {
+    const em = $('#cbEmision').value || HOY;
+    document.querySelectorAll('#cbPlazos button').forEach(b => b.classList.toggle('on', $('#cbVence').value === sumarDias(em, +b.dataset.dias)));
+  }
+  $('#cbVence').addEventListener('change', marcarPlazo);
+  $('#cbEmision').addEventListener('change', marcarPlazo);
+  function recalcular() {
+    const m = $('#cbMoneda').value, hon = +$('#cbMonto').value || 0, desc = Math.min(+$('#cbDescuento').value || 0, hon);
+    const iva = form.iva.value === '16' ? Math.round((hon - desc) * 16) / 100 : 0;
+    $('#rHon').textContent = fmt(hon, m); $('#rDesc').textContent = '−' + fmt(desc, m); $('#rDescF').hidden = !desc;
+    $('#rIvaL').textContent = form.iva.value === '16' ? 'IVA 16%' : 'Sin IVA'; $('#rIva').textContent = fmt(iva, m);
+    $('#rTotal').textContent = fmt(hon - desc + iva, m);
+  }
+  form.addEventListener('input', recalcular);
+  $('#cbYa').addEventListener('change', e => $('#cbYaMetodo').hidden = !e.target.checked);
+
+  async function abrirNuevo({ cliente = '', asunto = '' } = {}) {
+    editando = null; form.reset(); fecha($('#cbEmision'), HOY); fecha($('#cbVence'), '');
+    $('#cbNuevoT').textContent = 'Nuevo cobro'; $('#cbGuardar').textContent = 'Guardar cobro';
+    $('#cbYaF').hidden = false; $('#cbYaMetodo').hidden = true; form.querySelector('.cb-mas').open = false;
+    form.querySelectorAll('.cb-archivo input').forEach(i => i.dispatchEvent(new Event('change')));
+    selCli.value = cliente; await cargarAsuntos(cliente, asunto);
+    recalcular(); marcarPlazo(); abrir(mNuevo);
+  }
+  async function abrirEditar(id) {
+    const r = await fetch(`/cobranzas/${id}/datos`, { headers: XHR }); if (!r.ok) return;
+    const d = await r.json();
+    form.reset(); editando = id;
+    $('#cbNuevoT').textContent = 'Editar cobro'; $('#cbGuardar').textContent = 'Guardar cambios'; $('#cbYaF').hidden = true;
+    selCli.value = d.cliente_id || ''; await cargarAsuntos(d.cliente_id, d.asunto_id || '');
+    $('#cbConcepto').value = d.concepto || ''; $('#cbMonto').value = d.monto || '';
+    form.iva.value = d.iva_pct > 0 ? '16' : '0';
+    fecha($('#cbEmision'), (d.fecha_emision || HOY).slice(0, 10)); fecha($('#cbVence'), (d.fecha_vencimiento || '').slice(0, 10));
+    $('#cbFolio').value = d.numero_factura || ''; $('#cbDescuento').value = d.descuento || '';
+    $('#cbMoneda').value = d.moneda || 'MXN'; $('#cbAbogado').value = d.abogado_id || ''; $('#cbNotas').value = d.notas || '';
+    form.querySelector('.cb-mas').open = !!(d.descuento || d.notas);
+    recalcular(); marcarPlazo(); abrir(mNuevo);
+  }
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!selCli.value) { showToast('Elige a qué cliente le vas a cobrar', 'error'); selCli.focus(); return; }
+    if (!$('#cbConcepto').value.trim()) { showToast('Escribe el concepto del cobro', 'error'); $('#cbConcepto').focus(); return; }
+    if (!(+$('#cbMonto').value > 0)) { showToast('Escribe el monto de los honorarios', 'error'); $('#cbMonto').focus(); return; }
+    const btn = $('#cbGuardar'); btn.disabled = true;
+    const d = await enviar(editando ? `/cobranzas/${editando}/editar` : '/cobranzas/crear', { headers: XHR, body: new FormData(form) });
+    btn.disabled = false;
+    if (d) recargar(editando ? 'Cobro actualizado' : `Cobro ${d.folio} registrado`, 'cobro-' + (editando || d.id));
+  });
+  document.querySelectorAll('[data-nuevo]').forEach(b => b.addEventListener('click', () => abrirNuevo()));
+
+  // ── Registrar pago ─────────────────────────────────────────
+  const mPago = $('#cbPago'), fPago = $('#cbPagoForm');
+  let pagoInfo = null;
+  function abrirPago(info) {
+    pagoInfo = info; fPago.reset(); $('#pgFecha')._flatpickr?.set('maxDate', HOY); fecha($('#pgFecha'), HOY);
+    fPago.querySelectorAll('.cb-archivo input').forEach(i => i.dispatchEvent(new Event('change')));
+    $('#cbPagoQuien').innerHTML = '<b></b><br><span></span>';
+    $('#cbPagoQuien b').textContent = info.concepto;
+    $('#cbPagoQuien span').textContent = `${info.cliente} · saldo ${fmt(info.saldo, info.moneda)}`;
+    $('#pgMonto').value = (+info.saldo).toFixed(2); $('#pgMonto').max = info.saldo;
+    elegirMetodo(document.querySelector('#pgMetodos button')); despues(); abrir(mPago);
+    setTimeout(() => $('#pgMonto').select(), 40);
+  }
+  function despues() {
+    const resta = Math.round(((+pagoInfo.saldo) - (+$('#pgMonto').value || 0)) * 100) / 100, p = $('#pgDespues');
+    p.className = 'cb-despues' + (resta <= 0 ? ' ok' : '');
+    p.innerHTML = resta < 0 ? '<b style="color:#DC2626">Es más que el saldo pendiente</b>' :
+      resta === 0 ? '<b>Con este pago queda liquidado ✓</b>' : `Después de este pago quedará un saldo de <b>${fmt(resta, pagoInfo.moneda)}</b>`;
+  }
+  $('#pgMonto').addEventListener('input', despues);
+  function elegirMetodo(b) { document.querySelectorAll('#pgMetodos button').forEach(x => x.classList.toggle('on', x === b)); $('#pgMetodo').value = b.dataset.metodo; }
+  $('#pgMetodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) elegirMetodo(b); });
+  fPago.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!(+$('#pgMonto').value > 0)) { showToast('Escribe cuánto pagó', 'error'); return; }
+    const btn = $('#pgGuardar'); btn.disabled = true;
+    const d = await enviar(`/cobranzas/${pagoInfo.id}/pago`, { headers: XHR, body: new FormData(fPago) });
+    btn.disabled = false;
+    if (d) recargar(d.estado === 'pagado' ? 'Pago registrado · cobro liquidado' : 'Pago registrado', drawer.classList.contains('open') ? 'cobro-' + pagoInfo.id : '');
+  });
+  document.querySelectorAll('[data-pago]').forEach(b => b.addEventListener('click', async e => {
+    e.stopPropagation();
+    const r = await fetch(`/cobranzas/${b.dataset.pago}/panel`, { headers: XHR }); if (!r.ok) return;
+    const tmp = document.createElement('div'); tmp.innerHTML = await r.text();
+    abrirPago(tmp.querySelector('[data-info]').dataset);
+  }));
+
+  // ── Descuento o cancelación ────────────────────────────────
+  const mNC = $('#cbNC'), fNC = $('#cbNCForm');
+  let ncInfo = null;
+  function abrirNC(info) {
+    ncInfo = info; fNC.reset(); tipoNC();
+    $('#ncSaldo').textContent = `Saldo actual: ${fmt(info.saldo, info.moneda)}`;
+    abrir(mNC);
+  }
+  function tipoNC() {
+    const total = fNC.tipo.value === 'total';
+    $('#ncMontoF').hidden = total; $('#ncAviso').hidden = !total;
+    $('#ncGuardar').textContent = total ? 'Cancelar cobro' : 'Aplicar descuento';
+    $('#ncGuardar').classList.toggle('btn-danger', total); $('#ncGuardar').classList.toggle('btn-primary', !total);
+  }
+  fNC?.addEventListener('change', tipoNC);
+  fNC?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const tipo = fNC.tipo.value;
+    if (tipo === 'total' && !confirm('¿Cancelar este cobro? Dejará de contar como saldo pendiente.')) return;
+    const d = await enviar(`/cobranzas/${ncInfo.id}/nota-credito`, { headers: JSONH,
+      body: JSON.stringify({ tipo, monto: $('#ncMonto').value, motivo: $('#ncMotivo').value }) });
+    if (d) recargar(tipo === 'total' ? 'Cobro cancelado' : 'Descuento aplicado', 'cobro-' + ncInfo.id);
+  });
+
+  // ── Cobrar horas ───────────────────────────────────────────
+  const mHoras = $('#cbHoras'), fHoras = $('#cbHorasForm');
+  let horas = [];
+  $('#cbHorasBtn')?.addEventListener('click', async () => {
+    abrir(mHoras);
+    const r = await fetch('/cobranzas/horas', { headers: XHR }); horas = r.ok ? await r.json() : [];
+    const lista = $('#hrLista'); lista.innerHTML = '';
+    if (!horas.length) { lista.innerHTML = '<p class="as-empty">No hay horas pendientes de cobrar.</p>'; return; }
+    horas.forEach((h, i) => {
+      const l = document.createElement('label'); l.className = 'cb-hora';
+      l.innerHTML = `<input type="radio" name="hr_asunto" value="${h.id}"${i ? '' : ' checked'}><b></b><span class="h">${(+h.horas).toLocaleString('es-MX')} h</span><small></small>`;
+      l.querySelector('b').textContent = h.titulo;
+      l.querySelector('small').textContent = `${h.cliente || 'Sin cliente'} · ${h.registros} registro${h.registros === 1 ? '' : 's'} · ${h.periodo}`;
+      lista.append(l);
+    });
+    calcHoras(); $('#hrTarifa').focus();
+  });
+  function calcHoras() {
+    const h = horas.find(x => String(x.id) === fHoras.hr_asunto?.value), t = +$('#hrTarifa').value || 0;
+    if (!h) return;
+    const base = h.horas * t, total = fHoras.hr_iva.value === '16' ? base * 1.16 : base;
+    $('#hrCalc').textContent = `${(+h.horas).toLocaleString('es-MX')} h × ${fmt(t)}${fHoras.hr_iva.value === '16' ? ' + IVA' : ''}`;
+    $('#hrTotal').textContent = fmt(total);
+  }
+  fHoras.addEventListener('input', calcHoras); fHoras.addEventListener('change', calcHoras);
+  fHoras.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!fHoras.hr_asunto?.value) { showToast('Elige el asunto', 'error'); return; }
+    if (!(+$('#hrTarifa').value > 0)) { showToast('Escribe la tarifa por hora', 'error'); $('#hrTarifa').focus(); return; }
+    const d = await enviar('/cobranzas/facturar-horas', { headers: JSONH, body: JSON.stringify({
+      asunto_id: fHoras.hr_asunto.value, tarifa: $('#hrTarifa').value, dias: $('#hrDias').value, iva: fHoras.hr_iva.value }) });
+    if (d) recargar(`Cobro ${d.folio} creado por ${fmt(d.total)}`, 'cobro-' + d.id);
+  });
+
+  // ── Ligas directas: #nuevo, #nuevo-asunto-ID, #cobro-ID ────
+  async function porHash() {
+    const h = location.hash;
+    if (h.startsWith('#nuevo') && drawer.classList.contains('open')) cerrarPanel();
+    if (h === '#nuevo') { history.replaceState(null, '', location.pathname + location.search); if ({{ 'true' if puede_crear else 'false' }}) abrirNuevo(); }
+    else if (h.startsWith('#nuevo-asunto-')) {
+      const aid = h.split('-').pop(); history.replaceState(null, '', location.pathname + location.search);
+      const r = await fetch(`/cobranzas/cliente-de-asunto/${aid}`, { headers: XHR });
+      const d = r.ok ? await r.json() : {};
+      abrirNuevo({ cliente: d.cliente_id || '', asunto: d.cliente_id ? aid : '' });
+    } else if (h.startsWith('#nuevo-cliente-')) {
+      const cid = h.split('-').pop(); history.replaceState(null, '', location.pathname + location.search);
+      abrirNuevo({ cliente: cid });
+    } else if (h.startsWith('#cobro-')) {
+      const id = h.slice(7); if (id && id !== String(panelId)) abrirPanel(id);
+    }
+  }
+  window.addEventListener('hashchange', porHash);
+  porHash();
+})();
 </script>
 {% endblock %}

@@ -1,20 +1,21 @@
 """
-LexOS — modules/asuntos.py
-Módulo de asuntos/expedientes: listado 3 vistas (cards/tabla/kanban),
-creación con plantillas, ficha detallada 7 tabs, Gantt, semáforo, horas.
+Habeas Corpus — modules/asuntos.py
+Asuntos (expedientes): lista y tablero, alta, ficha del asunto con su actividad,
+documentos, horas, estrategia, equipo y precedentes.
 """
 
 from __future__ import annotations
 
+import html
 import io
 import json
 import math
-import os
-import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import (
     Blueprint,
+    abort,
     g,
     jsonify,
     redirect,
@@ -25,92 +26,97 @@ from flask import (
     url_for,
 )
 
+from modules import boveda
+from modules import lector
+from modules.insights import casos as precedentes
 from modules.auth import login_required, role_required, tenant_required
 
 asuntos_bp = Blueprint("asuntos", __name__)
+ZONA = ZoneInfo("America/Mexico_City")
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Constantes
 # ─────────────────────────────────────────────────────────────────────────────
 
 TIPOS_DERECHO = {
-    "civil":          {"label": "Civil",           "color": "#00DFA2", "icon": "scale",
-                       "subtypes": ["Divorcio","Sucesión","Responsabilidad civil","Obligaciones","Contratos","Otro"]},
-    "mercantil":      {"label": "Mercantil",       "color": "#0EA5E9", "icon": "building",
-                       "subtypes": ["Contratos mercantiles","Sociedades","Concurso mercantil","Títulos de crédito","Otro"]},
-    "laboral":        {"label": "Laboral",         "color": "#F59E0B", "icon": "hard_hat",
-                       "subtypes": ["Despido injustificado","Reinstalación","Prestaciones","Seguridad social","Otro"]},
-    "penal":          {"label": "Penal",           "color": "#EF4444", "icon": "lock",
-                       "subtypes": ["Defensa","Querella","Delitos patrimoniales","Delitos contra la persona","Otro"]},
-    "familiar":       {"label": "Familiar",        "color": "#EC4899", "icon": "heart",
-                       "subtypes": ["Divorcio","Custodia","Pensión alimenticia","Adopción","Otro"]},
-    "administrativo": {"label": "Administrativo",  "color": "#8B5CF6", "icon": "landmark",
-                       "subtypes": ["IMSS","ISSSTE","SAT","Permisos y licencias","Otro"]},
-    "fiscal":         {"label": "Fiscal",          "color": "#10B981", "icon": "chart",
-                       "subtypes": ["Controversia fiscal","Devoluciones","Resoluciones SAT","Otro"]},
-    "amparo":         {"label": "Amparo",          "color": "#F97316", "icon": "shield",
-                       "subtypes": ["Amparo directo","Amparo indirecto","Amparo en revisión","Otro"]},
-    "inmobiliario":   {"label": "Inmobiliario",    "color": "#14B8A6", "icon": "home",
-                       "subtypes": ["Compraventa","Arrendamiento","Usucapión","Fraccionamiento","Otro"]},
-    "constitucional": {"label": "Constitucional",  "color": "#A78BFA", "icon": "scroll",
-                       "subtypes": ["Acción de inconstitucionalidad","Controversia constitucional","Otro"]},
-    "internacional":  {"label": "Internacional",   "color": "#06B6D4", "icon": "globe",
-                       "subtypes": ["Arbitraje","Contratos internacionales","Otro"]},
-    "otro":           {"label": "Otro",            "color": "#6B7280", "icon": "folder", "subtypes": []},
+    "civil":          {"label": "Civil",          "color": "#2563EB",
+                       "subtypes": ["Arrendamiento", "Sucesión", "Responsabilidad civil", "Obligaciones", "Contratos", "Otro"]},
+    "mercantil":      {"label": "Mercantil",      "color": "#0284C7",
+                       "subtypes": ["Cobro", "Contratos mercantiles", "Sociedades", "Concurso mercantil", "Títulos de crédito", "Otro"]},
+    "laboral":        {"label": "Laboral",        "color": "#D97706",
+                       "subtypes": ["Despido injustificado", "Reinstalación", "Prestaciones", "Seguridad social", "Otro"]},
+    "penal":          {"label": "Penal",          "color": "#DC2626",
+                       "subtypes": ["Defensa", "Querella", "Delitos patrimoniales", "Delitos contra la persona", "Otro"]},
+    "familiar":       {"label": "Familiar",       "color": "#DB2777",
+                       "subtypes": ["Divorcio", "Custodia", "Pensión alimenticia", "Adopción", "Otro"]},
+    "administrativo": {"label": "Administrativo", "color": "#7C3AED",
+                       "subtypes": ["IMSS", "ISSSTE", "SAT", "Permisos y licencias", "Otro"]},
+    "fiscal":         {"label": "Fiscal",         "color": "#059669",
+                       "subtypes": ["Controversia fiscal", "Devoluciones", "Resoluciones SAT", "Otro"]},
+    "amparo":         {"label": "Amparo",         "color": "#EA580C",
+                       "subtypes": ["Amparo indirecto", "Amparo directo", "Amparo en revisión", "Otro"]},
+    "inmobiliario":   {"label": "Inmobiliario",   "color": "#0D9488",
+                       "subtypes": ["Compraventa", "Arrendamiento", "Usucapión", "Fraccionamiento", "Otro"]},
+    "constitucional": {"label": "Constitucional", "color": "#6D28D9",
+                       "subtypes": ["Acción de inconstitucionalidad", "Controversia constitucional", "Otro"]},
+    "internacional":  {"label": "Internacional",  "color": "#0891B2",
+                       "subtypes": ["Arbitraje", "Contratos internacionales", "Otro"]},
+    "otro":           {"label": "Otro",           "color": "#64748B", "subtypes": []},
 }
 
-KANBAN_COLS = [
-    {"key": "por_iniciar", "label": "Por Iniciar",  "color": "#6B7280"},
-    {"key": "activo",      "label": "Activo",       "color": "#00DFA2"},
-    {"key": "en_espera",   "label": "En Espera",    "color": "#F59E0B"},
-    {"key": "completado",  "label": "Completado",   "color": "#10B981"},
-    {"key": "archivado",   "label": "Archivado",    "color": "#374151"},
+ESTADOS = {
+    "por_iniciar": {"label": "Por iniciar", "color": "#64708A", "fondo": "#F1F5F9"},
+    "activo":      {"label": "Activo",      "color": "#1D3FD6", "fondo": "#EEF2FF"},
+    "en_espera":   {"label": "En espera",   "color": "#B45309", "fondo": "#FFFBEB"},
+    "suspendido":  {"label": "Suspendido",  "color": "#9333EA", "fondo": "#FAF5FF"},
+    "completado":  {"label": "Concluido",   "color": "#047857", "fondo": "#ECFDF5"},
+    "cerrado":     {"label": "Concluido",   "color": "#047857", "fondo": "#ECFDF5"},
+    "archivado":   {"label": "Archivado",   "color": "#64748B", "fondo": "#F1F5F9"},
+}
+ABIERTOS = ("por_iniciar", "activo", "en_espera", "suspendido")
+CONCLUIDOS = ("completado", "cerrado")
+# Estados que se ofrecen al usuario (completado queda como sinónimo heredado de cerrado)
+ESTADOS_MENU = ("por_iniciar", "activo", "en_espera", "suspendido", "cerrado", "archivado")
+GRUPOS = {
+    "abiertos":   ("En curso", ABIERTOS),
+    "concluidos": ("Concluidos", CONCLUIDOS),
+    "archivados": ("Archivados", ("archivado",)),
+    "todos":      ("Todos", tuple(ESTADOS)),
+}
+TABLERO = [
+    {"key": "por_iniciar", "label": "Por iniciar", "estados": ("por_iniciar",)},
+    {"key": "activo",      "label": "Activo",      "estados": ("activo",)},
+    {"key": "en_espera",   "label": "En espera",   "estados": ("en_espera", "suspendido")},
+    {"key": "cerrado",     "label": "Concluido",   "estados": CONCLUIDOS},
 ]
 
 TIPOS_ACTIVIDAD = ["audiencia", "acuerdo", "diligencia", "vencimiento", "reunion", "nota", "otro"]
+ACTIVIDAD_LABEL = {"audiencia": "Audiencia", "acuerdo": "Acuerdo", "diligencia": "Diligencia",
+                   "vencimiento": "Término", "reunion": "Reunión", "nota": "Pendiente", "otro": "Otro"}
 TIPOS_SENTENCIA = ["sentencia", "resolucion", "auto", "acuerdo", "otro"]
+SENTENCIA_LABEL = {"sentencia": "Sentencia", "resolucion": "Resolución", "auto": "Auto",
+                   "acuerdo": "Acuerdo", "otro": "Otro"}
+EVENTO_LABEL = {"audiencia": "Audiencia", "vencimiento": "Término", "plazo": "Término",
+                "fecha_limite": "Fecha límite", "diligencia": "Diligencia", "reunion": "Reunión",
+                "tarea": "Tarea", "recordatorio": "Recordatorio", "otro": "Evento"}
 
-# Plantillas predefinidas por tipo
+# Texto sugerido al elegir la materia en el alta
 PLANTILLAS = {
-    "civil": {
-        "titulo_ejemplo": "Juicio de divorcio — [Apellidos]",
-        "prioridad": "media",
-        "estado": "activo",
-        "descripcion": "Juicio de divorcio contencioso. Hechos:\n\n",
-    },
-    "mercantil": {
-        "titulo_ejemplo": "Demanda mercantil — [Empresa vs Empresa]",
-        "prioridad": "alta",
-        "estado": "activo",
-        "descripcion": "Reclamación por incumplimiento de contrato. Hechos:\n\n",
-    },
-    "laboral": {
-        "titulo_ejemplo": "Demanda laboral — [Trabajador vs Empresa]",
-        "prioridad": "alta",
-        "estado": "activo",
-        "descripcion": "Juicio laboral por despido injustificado. Hechos:\n\n",
-    },
-    "penal": {
-        "titulo_ejemplo": "Causa penal — [Nombre]",
-        "prioridad": "alta",
-        "estado": "activo",
-        "descripcion": "Proceso penal. Delito imputado:\n\n",
-    },
-    "amparo": {
-        "titulo_ejemplo": "Amparo — [Nombre] vs [Autoridad]",
-        "prioridad": "alta",
-        "estado": "activo",
-        "descripcion": "Juicio de amparo contra acto de autoridad. Acto reclamado:\n\n",
-    },
-    "familiar": {
-        "titulo_ejemplo": "Divorcio / Custodia — [Apellidos]",
-        "prioridad": "media",
-        "estado": "activo",
-        "descripcion": "Asunto de derecho familiar. Hechos:\n\n",
-    },
+    "civil":     {"titulo_ejemplo": "Juicio ordinario civil — [Actor] vs [Demandado]",
+                  "descripcion": "Hechos principales:\n\n"},
+    "mercantil": {"titulo_ejemplo": "Juicio mercantil — [Empresa] vs [Empresa]",
+                  "descripcion": "Reclamación por incumplimiento de contrato. Hechos:\n\n"},
+    "laboral":   {"titulo_ejemplo": "Demanda laboral — [Trabajador] vs [Empresa]",
+                  "descripcion": "Juicio laboral por despido injustificado. Hechos:\n\n"},
+    "penal":     {"titulo_ejemplo": "Carpeta de investigación — [Nombre]",
+                  "descripcion": "Delito que se imputa y hechos:\n\n"},
+    "amparo":    {"titulo_ejemplo": "Amparo — [Quejoso] vs [Autoridad]",
+                  "descripcion": "Acto reclamado:\n\n"},
+    "familiar":  {"titulo_ejemplo": "Divorcio / custodia — [Apellidos]",
+                  "descripcion": "Hechos y pretensiones del cliente:\n\n"},
 }
 
-PER_PAGE = 18
+PER_PAGE = 25
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Helpers
@@ -128,24 +134,6 @@ def _log(accion: str, entidad_id: int | None = None, detalles: dict | None = Non
         pass
 
 
-def _semaforo(fecha_limite_str: str | None) -> dict:
-    if not fecha_limite_str:
-        return {"clase": "sem-none", "label": "Sin fecha límite", "dias": None}
-    try:
-        fl   = date.fromisoformat(fecha_limite_str[:10])
-        dias = (fl - date.today()).days
-        if dias < 0:
-            return {"clase": "sem-rojo", "label": f"Vencido hace {abs(dias)}d", "dias": dias}
-        elif dias <= 7:
-            return {"clase": "sem-rojo", "label": f"Vence en {dias}d", "dias": dias}
-        elif dias <= 30:
-            return {"clase": "sem-amarillo", "label": f"Vence en {dias}d", "dias": dias}
-        else:
-            return {"clase": "sem-verde", "label": f"Vence en {dias}d", "dias": dias}
-    except Exception:
-        return {"clase": "sem-none", "label": "—", "dias": None}
-
-
 def _auto_numero(tdb) -> str:
     year = date.today().year
     count = tdb.execute(
@@ -157,12 +145,32 @@ def _auto_numero(tdb) -> str:
 def _get_abogados() -> list[dict]:
     try:
         rows = g.global_db.execute(
-            "SELECT id, nombre, apellidos, cargo FROM tenant_users WHERE tenant_id=? AND rol IN ('abogado','admin','super_admin') AND activo=1 ORDER BY nombre",
+            "SELECT id, nombre, apellidos, cargo FROM tenant_users WHERE tenant_id=? "
+            "AND rol IN ('abogado','admin','super_admin') AND activo=1 ORDER BY nombre",
             (g.tenant["id"],),
         ).fetchall()
         return [dict(r) for r in rows]
     except Exception:
         return []
+
+
+def _usuarios() -> dict[int, dict]:
+    """Todos los usuarios del despacho por id, con nombre e iniciales."""
+    try:
+        rows = g.global_db.execute(
+            "SELECT id, nombre, apellidos FROM tenant_users WHERE tenant_id=?", (g.tenant["id"],)
+        ).fetchall()
+    except Exception:
+        return {}
+    return {r["id"]: _persona(r) for r in rows}
+
+
+def _persona(r) -> dict:
+    nombre = f"{r['nombre']} {r['apellidos'] or ''}".strip()
+    partes = nombre.split()
+    iniciales = (partes[0][0] + partes[-1][0]) if len(partes) > 1 else nombre[:2]
+    return {"id": r["id"], "nombre": nombre, "corto": f"{r['nombre']} {(r['apellidos'] or '').split(' ')[0]}".strip(),
+            "iniciales": iniciales.upper(), "color": f"hsl({r['id'] * 47 % 360}, 55%, 42%)"}
 
 
 def _safe_float(v, default=0.0):
@@ -179,142 +187,296 @@ def _safe_int(v, default=None):
         return default
 
 
-def _user_name(gdb, tid, uid) -> str:
-    """Get user display name from tenant_users."""
-    if not uid:
-        return "Sistema"
+def _fecha(v) -> date | None:
     try:
-        u = gdb.execute(
-            "SELECT nombre, apellidos FROM tenant_users WHERE id=? AND tenant_id=?",
-            (uid, tid),
-        ).fetchone()
-        if u:
-            return f"{u['nombre']} {u['apellidos'] or ''}".strip()
-    except Exception:
-        pass
-    return f"Usuario #{uid}"
+        return date.fromisoformat(str(v)[:10])
+    except (TypeError, ValueError):
+        return None
 
 
-def _enrich(row: dict, tdb) -> dict:
-    """Add semáforo, tipo_info, horas_total to an asunto dict."""
-    row["semaforo"] = _semaforo(row.get("fecha_limite"))
-    row["tipo_info"] = TIPOS_DERECHO.get(row.get("tipo_asunto", "otro"), TIPOS_DERECHO["otro"])
-    row["horas_total"] = tdb.execute(
-        "SELECT COALESCE(SUM(horas),0) FROM asunto_horas WHERE asunto_id=?", (row["id"],)
-    ).fetchone()[0]
-    return row
+def _local(v) -> datetime | None:
+    """Fechas guardadas por SQLite (CURRENT_TIMESTAMP, UTC) a hora de México."""
+    try:
+        dt = datetime.fromisoformat(str(v)[:19])
+    except (TypeError, ValueError):
+        return None
+    return dt.replace(tzinfo=timezone.utc).astimezone(ZONA).replace(tzinfo=None)
+
+
+def _hoy() -> date:
+    return datetime.now(ZONA).date()
+
+
+def _cliente_nombre(row) -> str:
+    return (row["cliente_razon"] or row["cliente_nombre"] or "").strip()
+
+
+def _solo_lo_suyo() -> bool:
+    """Los abogados solo ven los asuntos donde son responsables, colaboradores o que crearon."""
+    return session.get("role") == "abogado"
+
+
+_FILTRO_PROPIOS = ("(a.abogado_responsable=? OR a.creado_por=? OR "
+                   "a.id IN (SELECT asunto_id FROM asunto_colaboradores WHERE user_id=?))")
+
+
+def puede_ver(tdb, asunto_id: int) -> bool:
+    if not _solo_lo_suyo():
+        return True
+    uid = session.get("user_id")
+    return bool(tdb.execute(f"SELECT 1 FROM asuntos a WHERE a.id=? AND {_FILTRO_PROPIOS}",
+                            (asunto_id, uid, uid, uid)).fetchone())
+
+
+@asuntos_bp.before_request
+def _acceso_al_asunto():
+    aid = (request.view_args or {}).get("id")
+    tdb = getattr(g, "tenant_db", None)
+    if aid and tdb is not None and session.get("user_id") and not puede_ver(tdb, aid):
+        abort(404)
+
+
+def _semaforo(dias: int | None) -> str:
+    if dias is None:
+        return "gris"
+    if dias < 0 or dias <= 3:
+        return "rojo"
+    if dias <= 10:
+        return "ambar"
+    return "normal"
+
+
+def _cuando(dias: int) -> str:
+    if dias < -1:
+        return f"Venció hace {abs(dias)} días"
+    if dias == -1:
+        return "Venció ayer"
+    if dias == 0:
+        return "Hoy"
+    if dias == 1:
+        return "Mañana"
+    return f"En {dias} días"
+
+
+def _proximos(tdb, ids: list[int], limites: dict[int, str | None]) -> dict[int, dict]:
+    """Lo siguiente que vence en cada asunto: evento de calendario, actividad pendiente o fecha límite."""
+    if not ids:
+        return {}
+    marcas = ",".join("?" * len(ids))
+    candidatos: dict[int, list[tuple]] = {i: [] for i in ids}
+    for r in tdb.execute(
+        f"SELECT asunto_id, titulo, tipo, fecha_inicio FROM eventos_calendario WHERE estado='pendiente' "
+        f"AND asunto_id IN ({marcas}) AND date(fecha_inicio) >= date('now','-1 day') ORDER BY fecha_inicio", ids
+    ).fetchall():
+        f = _fecha(r["fecha_inicio"])
+        if f:
+            candidatos[r["asunto_id"]].append((f, EVENTO_LABEL.get(r["tipo"], "Evento"), r["titulo"]))
+    for r in tdb.execute(
+        f"SELECT asunto_id, titulo, tipo, fecha FROM asunto_actividades WHERE realizado=0 "
+        f"AND asunto_id IN ({marcas}) ORDER BY fecha", ids
+    ).fetchall():
+        f = _fecha(r["fecha"])
+        if f:
+            candidatos[r["asunto_id"]].append((f, ACTIVIDAD_LABEL.get(r["tipo"], "Pendiente"), r["titulo"]))
+    for aid, limite in limites.items():
+        f = _fecha(limite)
+        if f:
+            candidatos[aid].append((f, "Fecha límite", "Fecha límite del asunto"))
+    hoy, salida = _hoy(), {}
+    for aid, lista in candidatos.items():
+        if lista:
+            f, tipo, titulo = min(lista, key=lambda c: c[0])
+            dias = (f - hoy).days
+            salida[aid] = {"fecha": f.isoformat(), "tipo": tipo, "titulo": titulo, "dias": dias,
+                           "cuando": _cuando(dias), "semaforo": _semaforo(dias),
+                           "corta": f"{f.day} {_MESES[f.month - 1][:3]}"}
+    return salida
+
+
+def _ultimos_movimientos(tdb, ids: list[int]) -> dict[int, date]:
+    if not ids:
+        return {}
+    marcas = ",".join("?" * len(ids))
+    filas = tdb.execute(
+        f"""SELECT asunto_id, MAX(f) AS ultima FROM (
+              SELECT id AS asunto_id, fecha_alta AS f FROM asuntos WHERE id IN ({marcas})
+              UNION ALL SELECT asunto_id, fecha FROM asunto_notas WHERE asunto_id IN ({marcas})
+              UNION ALL SELECT asunto_id, fecha_alta FROM asunto_actividades WHERE asunto_id IN ({marcas})
+              UNION ALL SELECT asunto_id, fecha_subida FROM documentos WHERE asunto_id IN ({marcas})
+              UNION ALL SELECT asunto_id, fecha_alta FROM asunto_sentencias WHERE asunto_id IN ({marcas})
+              UNION ALL SELECT entidad_id, fecha FROM actividad_log WHERE entidad='asunto' AND entidad_id IN ({marcas})
+            ) GROUP BY asunto_id""",
+        ids * 6,
+    ).fetchall()
+    return {r["asunto_id"]: (_local(r["ultima"]) or datetime.now()).date() for r in filas}
+
+
+_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+          "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def _fecha_corta(v) -> str:
+    """'2026-10-29T10:00' → '29 oct 2026 · 10:00'."""
+    f = _fecha(v)
+    if not f:
+        return ""
+    hora = str(v)[11:16]
+    return f"{f.day} {_MESES[f.month - 1][:3]} {f.year}" + (f" · {hora}" if hora and hora != "00:00" else "")
+
+
+def _hace(d: date | None) -> str:
+    if not d:
+        return "—"
+    dias = (_hoy() - d).days
+    if dias <= 0:
+        return "Hoy"
+    if dias == 1:
+        return "Ayer"
+    if dias < 30:
+        return f"Hace {dias} días"
+    if dias < 365:
+        meses = dias // 30
+        return f"Hace {meses} mes{'es' if meses > 1 else ''}"
+    return f"{d.day} {_MESES[d.month - 1][:3]} {d.year}"
+
+
+def _decorar(rows, tdb, usuarios) -> list[dict]:
+    """Datos que necesitan la lista y el tablero."""
+    asuntos = [dict(r) for r in rows]
+    abiertos = [a for a in asuntos if a["estado"] in ABIERTOS]
+    proximos = _proximos(tdb, [a["id"] for a in abiertos], {a["id"]: a["fecha_limite"] for a in abiertos})
+    movimientos = _ultimos_movimientos(tdb, [a["id"] for a in asuntos])
+    for a in asuntos:
+        a["cliente"] = _cliente_nombre(a)
+        a["tipo_info"] = TIPOS_DERECHO.get(a.get("tipo_asunto") or "otro", TIPOS_DERECHO["otro"])
+        a["estado_info"] = ESTADOS.get(a["estado"], ESTADOS["activo"])
+        a["responsable"] = usuarios.get(a.get("abogado_responsable"))
+        a["proximo"] = proximos.get(a["id"])
+        a["movimiento"] = _hace(movimientos.get(a["id"]))
+        a["resultado_info"] = precedentes.RESULTADOS.get(a.get("resultado") or "")
+    return asuntos
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  INDEX — 3 vistas
+#  LISTA Y TABLERO
 # ─────────────────────────────────────────────────────────────────────────────
 
 @asuntos_bp.route("/")
 @login_required
 @tenant_required
 def index():
-    tdb  = g.tenant_db
-    role = session.get("role")
-    uid  = session.get("user_id")
+    tdb = g.tenant_db
+    uid = session.get("user_id")
+    precedentes.asegurar(tdb)
 
-    q         = request.args.get("q", "").strip()
-    estados   = request.args.getlist("estado")
-    tipos     = request.args.getlist("tipo")
-    abogado   = request.args.get("abogado", "")
-    cliente_q = request.args.get("cliente", "")
-    desde     = request.args.get("desde", "")
-    hasta     = request.args.get("hasta", "")
-    vencidos  = request.args.get("vencidos", "")
-    page      = max(1, _safe_int(request.args.get("page", 1), 1))
-    vista     = request.args.get("vista", "")   # cards|tabla|kanban
+    q        = request.args.get("q", "").strip()
+    grupo    = request.args.get("grupo", "abiertos")
+    tipo     = request.args.get("tipo", "")
+    abogado  = _safe_int(request.args.get("abogado"))
+    atencion = request.args.get("atencion", "")
+    vista    = "tablero" if request.args.get("vista") == "tablero" else "lista"
+    page     = max(1, _safe_int(request.args.get("page"), 1))
+    if grupo not in GRUPOS:
+        grupo = "abiertos"
 
-    where, params = ["1"], []
+    # Alcance: lo que esta persona puede ver
+    alcance, alcance_p = ["1"], []
+    if _solo_lo_suyo():
+        alcance.append(_FILTRO_PROPIOS)
+        alcance_p += [uid, uid, uid]
+    base = ("FROM asuntos a LEFT JOIN clientes c ON a.cliente_id=c.id WHERE " + " AND ".join(alcance))
+    columnas = ("SELECT a.*, c.nombre || ' ' || COALESCE(c.apellidos,'') AS cliente_nombre, "
+                "c.razon_social AS cliente_razon ")
 
+    # Resumen (siempre sobre los asuntos en curso del alcance)
+    abiertos = tdb.execute(
+        f"SELECT a.id, a.fecha_limite {base} AND a.estado IN ({','.join('?' * len(ABIERTOS))})",
+        alcance_p + list(ABIERTOS),
+    ).fetchall()
+    ids_abiertos = [r["id"] for r in abiertos]
+    proximos = _proximos(tdb, ids_abiertos, {r["id"]: r["fecha_limite"] for r in abiertos})
+    movimientos = _ultimos_movimientos(tdb, ids_abiertos)
+    con_termino = [i for i, p in proximos.items() if p["dias"] <= 7]
+    sin_mov = [i for i in ids_abiertos if (_hoy() - movimientos.get(i, _hoy())).days > 30]
+    concluidos_anio = tdb.execute(
+        f"SELECT COUNT(*) {base} AND a.estado IN ('completado','cerrado') "
+        "AND strftime('%Y', COALESCE(a.fecha_cierre, a.fecha_alta)) = strftime('%Y','now')",
+        alcance_p,
+    ).fetchone()[0]
+    resumen = {"abiertos": len(ids_abiertos), "termino": len(con_termino), "sin_mov": len(sin_mov),
+               "concluidos": concluidos_anio}
+
+    # Filtros
+    where, params = [], []
     if q:
-        where.append("(a.titulo LIKE ? OR a.numero_expediente LIKE ? OR c.nombre LIKE ? OR c.razon_social LIKE ?)")
         like = f"%{q}%"
-        params += [like, like, like, like]
-    if estados:
-        placeholders = ",".join("?" * len(estados))
-        where.append(f"a.estado IN ({placeholders})")
-        params += estados
-    if tipos:
-        placeholders = ",".join("?" * len(tipos))
-        where.append(f"a.tipo_asunto IN ({placeholders})")
-        params += tipos
+        where.append("(a.titulo LIKE ? OR a.numero_expediente LIKE ? OR a.numero_juicio LIKE ? "
+                     "OR c.nombre LIKE ? OR c.apellidos LIKE ? OR c.razon_social LIKE ? OR a.contrario_nombre LIKE ?)")
+        params += [like] * 7
+    if tipo:
+        where.append("a.tipo_asunto=?")
+        params.append(tipo)
     if abogado:
         where.append("a.abogado_responsable=?")
         params.append(abogado)
-    if cliente_q:
-        where.append("(c.nombre LIKE ? OR c.razon_social LIKE ?)")
-        like = f"%{cliente_q}%"
-        params += [like, like]
-    if desde:
-        where.append("date(a.fecha_alta) >= ?")
-        params.append(desde)
-    if hasta:
-        where.append("date(a.fecha_alta) <= ?")
-        params.append(hasta)
-    if vencidos == "1":
-        where.append("a.fecha_limite IS NOT NULL AND a.fecha_limite < date('now')")
-    if vencidos == "0":
-        where.append("(a.fecha_limite IS NULL OR a.fecha_limite >= date('now'))")
+    if atencion in ("termino", "sin_mov"):
+        ids = con_termino if atencion == "termino" else sin_mov
+        where.append(f"a.id IN ({','.join('?' * len(ids)) or 'NULL'})")
+        params += ids
+    filtro = (" AND " + " AND ".join(where)) if where else ""
 
-    # Abogados solo ven los suyos
-    if role == "abogado":
-        where.append("(a.abogado_responsable=? OR a.id IN (SELECT asunto_id FROM asunto_colaboradores WHERE user_id=?))")
-        params += [uid, uid]
-
-    clause = " AND ".join(where)
-    base_q = f"""SELECT a.*, c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre,
-                        c.razon_social as cliente_razon, c.id as cid
-                 FROM asuntos a LEFT JOIN clientes c ON a.cliente_id=c.id
-                 WHERE {clause}"""
-
-    total = tdb.execute(f"SELECT COUNT(*) FROM ({base_q})", params).fetchone()[0]
-    total_pages = max(1, math.ceil(total / PER_PAGE))
-    page = min(page, total_pages)
-    offset = (page - 1) * PER_PAGE
-
-    rows = tdb.execute(
-        f"{base_q} ORDER BY a.fecha_alta DESC LIMIT ? OFFSET ?",
-        params + [PER_PAGE, offset],
-    ).fetchall()
-
-    asuntos = [_enrich(dict(r), tdb) for r in rows]
-
-    # Kanban — load all (not paginated) for drag-drop
-    kanban_data = {}
-    if not vista or vista == "kanban":
-        for col in KANBAN_COLS:
-            krows = tdb.execute(
-                f"""SELECT a.*, c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre,
-                           c.razon_social as cliente_razon
-                    FROM asuntos a LEFT JOIN clientes c ON a.cliente_id=c.id
-                    WHERE a.estado=? ORDER BY a.fecha_alta DESC LIMIT 50""",
-                (col["key"],),
+    usuarios = _usuarios()
+    asuntos, columnas_tablero, total, total_pages = [], [], 0, 1
+    if vista == "tablero":
+        for col in TABLERO:
+            marcas = ",".join("?" * len(col["estados"]))
+            limite = 30 if col["key"] == "cerrado" else 80
+            filas = tdb.execute(
+                f"{columnas}{base}{filtro} AND a.estado IN ({marcas}) "
+                f"ORDER BY COALESCE(a.fecha_cierre, a.fecha_alta) DESC LIMIT {limite}",
+                alcance_p + params + list(col["estados"]),
             ).fetchall()
-            kanban_data[col["key"]] = [_enrich(dict(r), tdb) for r in krows]
+            columnas_tablero.append({**col, "asuntos": _decorar(filas, tdb, usuarios)})
+    else:
+        estados = GRUPOS[grupo][1]
+        cond = f" AND a.estado IN ({','.join('?' * len(estados))})"
+        total = tdb.execute(f"SELECT COUNT(*) {base}{filtro}{cond}", alcance_p + params + list(estados)).fetchone()[0]
+        total_pages = max(1, math.ceil(total / PER_PAGE))
+        page = min(page, total_pages)
+        orden = ("COALESCE(a.fecha_cierre, a.fecha_alta) DESC" if grupo != "abiertos" else
+                 "CASE a.prioridad WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END, a.fecha_alta DESC")
+        filas = tdb.execute(
+            f"{columnas}{base}{filtro}{cond} ORDER BY {orden} LIMIT ? OFFSET ?",
+            alcance_p + params + list(estados) + [PER_PAGE, (page - 1) * PER_PAGE],
+        ).fetchall()
+        asuntos = _decorar(filas, tdb, usuarios)
+        if grupo == "abiertos":
+            # Lo que vence primero, arriba
+            asuntos.sort(key=lambda a: (a["proximo"]["dias"] if a["proximo"] else 10**6))
 
-    abogados = _get_abogados()
+    conteos = {k: tdb.execute(
+        f"SELECT COUNT(*) {base} AND a.estado IN ({','.join('?' * len(v[1]))})", alcance_p + list(v[1])
+    ).fetchone()[0] for k, v in GRUPOS.items()}
+
+    actuales = {"q": q, "grupo": "" if grupo == "abiertos" else grupo, "tipo": tipo, "abogado": abogado,
+                "atencion": atencion, "vista": "" if vista == "lista" else vista}
+
+    def liga(**cambios):
+        datos = {**actuales, **cambios}
+        return url_for("asuntos.index", **{k: v for k, v in datos.items() if v not in (None, "", 0)})
 
     return render_template(
-        "asuntos/index.html",
-        asuntos=asuntos,
-        kanban_data=kanban_data,
-        kanban_cols=KANBAN_COLS,
-        tipos_derecho=TIPOS_DERECHO,
-        total=total, page=page, total_pages=total_pages, per_page=PER_PAGE,
-        q=q, estados=estados, tipos=tipos,
-        abogado=abogado, cliente_q=cliente_q,
-        desde=desde, hasta=hasta, vencidos=vencidos,
-        abogados=abogados,
-        vista=vista,
+        "asuntos/index.html", liga=liga,
+        asuntos=asuntos, tablero=columnas_tablero, resumen=resumen, conteos=conteos,
+        grupos=GRUPOS, grupo=grupo, vista=vista, q=q, tipo=tipo, abogado=abogado, atencion=atencion,
+        total=total, page=page, total_pages=total_pages,
+        tipos_derecho=TIPOS_DERECHO, abogados=_get_abogados() if not _solo_lo_suyo() else [],
+        resultados=precedentes.RESULTADOS, estados=ESTADOS,
     )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  NUEVO — form con selector de plantilla
+#  NUEVO
 # ─────────────────────────────────────────────────────────────────────────────
 
 @asuntos_bp.route("/nuevo", methods=["GET", "POST"])
@@ -324,96 +486,66 @@ def index():
 def nuevo():
     tdb      = g.tenant_db
     abogados = _get_abogados()
-
     clientes = [dict(r) for r in tdb.execute(
         """SELECT id, tipo, nombre, apellidos, razon_social
-           FROM clientes WHERE activo=1 ORDER BY nombre LIMIT 200"""
+           FROM clientes WHERE activo=1 ORDER BY COALESCE(razon_social, nombre) LIMIT 500"""
     ).fetchall()]
 
-    if request.method == "POST":
-        titulo = (request.form.get("titulo") or "").strip()
-        if not titulo:
-            return render_template("asuntos/nuevo.html",
-                err="El título es requerido.",
-                tipos_derecho=TIPOS_DERECHO, abogados=abogados,
-                clientes=clientes, plantillas=PLANTILLAS,
-                form=request.form, auto_num=_auto_numero(tdb),
-                today_str=date.today().isoformat())
-
-        num_exp = (request.form.get("numero_expediente") or "").strip() or _auto_numero(tdb)
-
-        cur = tdb.execute(
-            """INSERT INTO asuntos
-               (numero_expediente, titulo, descripcion, tipo_asunto, sub_tipo,
-                estado, prioridad, cliente_id, abogado_responsable,
-                juzgado, numero_juicio, fecha_inicio, fecha_limite, fecha_cierre,
-                monto_estimado, honorarios_pactados, forma_cobro,
-                contrario_nombre, contrario_abogado, contrario_despacho,
-                notas, creado_por)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (
-                num_exp, titulo,
-                (request.form.get("descripcion") or "").strip() or None,
-                request.form.get("tipo_asunto", "civil"),
-                (request.form.get("sub_tipo") or "").strip() or None,
-                request.form.get("estado", "activo"),
-                request.form.get("prioridad", "media"),
-                _safe_int(request.form.get("cliente_id")),
-                _safe_int(request.form.get("abogado_responsable")),
-                (request.form.get("juzgado") or "").strip() or None,
-                (request.form.get("numero_juicio") or "").strip() or None,
-                request.form.get("fecha_inicio") or None,
-                request.form.get("fecha_limite") or None,
-                request.form.get("fecha_cierre") or None,
-                _safe_float(request.form.get("monto_estimado")),
-                _safe_float(request.form.get("honorarios_pactados")),
-                request.form.get("forma_cobro", "fijo"),
-                (request.form.get("contrario_nombre") or "").strip() or None,
-                (request.form.get("contrario_abogado") or "").strip() or None,
-                (request.form.get("contrario_despacho") or "").strip() or None,
-                (request.form.get("notas") or "").strip() or None,
-                session.get("user_id"),
-            ),
+    def pantalla(err=None, form=None):
+        return render_template(
+            "asuntos/nuevo.html", err=err, form=form or {},
+            tipos_derecho=TIPOS_DERECHO, abogados=abogados, clientes=clientes, plantillas=PLANTILLAS,
+            auto_num=_auto_numero(tdb), today_str=_hoy().isoformat(),
+            cliente_inicial=_safe_int(request.args.get("cliente_id") or request.args.get("cliente")),
         )
-        tdb.commit()
-        new_id = cur.lastrowid
 
-        # Colaboradores adicionales
-        cols_raw = request.form.get("colaboradores", "")
-        for cid_str in cols_raw.split(","):
-            cid = _safe_int(cid_str.strip())
-            if cid:
-                tdb.execute(
-                    "INSERT OR IGNORE INTO asunto_colaboradores (asunto_id, user_id) VALUES (?,?)",
-                    (new_id, cid),
-                )
-        tdb.commit()
-        _log("crear_asunto", new_id, {"titulo": titulo})
-        return redirect(url_for("asuntos.detalle", id=new_id))
+    if request.method == "GET":
+        return pantalla()
 
-    return render_template(
-        "asuntos/nuevo.html",
-        tipos_derecho=TIPOS_DERECHO, abogados=abogados,
-        clientes=clientes, plantillas=PLANTILLAS,
-        form={}, auto_num=_auto_numero(tdb), err=None,
-        today_str=date.today().isoformat(),
+    f = request.form
+    titulo = (f.get("titulo") or "").strip()
+    if not titulo:
+        return pantalla("Escribe un título para el asunto.", f)
+    tipo = f.get("tipo_asunto") if f.get("tipo_asunto") in TIPOS_DERECHO else "otro"
+    estado = f.get("estado") if f.get("estado") in ("por_iniciar", "activo") else "activo"
+    prioridad = f.get("prioridad") if f.get("prioridad") in ("alta", "media", "baja") else "media"
+    forma = f.get("forma_cobro") if f.get("forma_cobro") in ("fijo", "por_hora", "por_evento") else "fijo"
+    texto = lambda k: (f.get(k) or "").strip() or None  # noqa: E731
+
+    cur = tdb.execute(
+        """INSERT INTO asuntos
+           (numero_expediente, titulo, descripcion, tipo_asunto, sub_tipo,
+            estado, prioridad, cliente_id, abogado_responsable,
+            juzgado, numero_juicio, fecha_inicio, fecha_limite,
+            monto_estimado, honorarios_pactados, forma_cobro,
+            contrario_nombre, contrario_abogado, contrario_despacho, privado, creado_por)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            texto("numero_expediente") or _auto_numero(tdb), titulo, texto("descripcion"), tipo,
+            texto("sub_tipo"), estado, prioridad,
+            _safe_int(f.get("cliente_id")), _safe_int(f.get("abogado_responsable")) or session.get("user_id"),
+            texto("juzgado"), texto("numero_juicio"), texto("fecha_inicio") or _hoy().isoformat(),
+            texto("fecha_limite"), _safe_float(f.get("monto_estimado")), _safe_float(f.get("honorarios_pactados")),
+            forma, texto("contrario_nombre"), texto("contrario_abogado"), texto("contrario_despacho"),
+            1 if f.get("privado") else 0, session.get("user_id"),
+        ),
     )
+    new_id = cur.lastrowid
+    validos = {a["id"] for a in abogados}
+    for cid in {_safe_int(x) for x in f.getlist("colaboradores")}:
+        if cid in validos:
+            tdb.execute("INSERT OR IGNORE INTO asunto_colaboradores (asunto_id, user_id) VALUES (?,?)", (new_id, cid))
+    tdb.commit()
+    _log("crear_asunto", new_id, {"titulo": titulo})
+    return redirect(url_for("asuntos.detalle", id=new_id, nuevo=1))
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  AJAX — datos de plantilla por tipo
-# ─────────────────────────────────────────────────────────────────────────────
 
 @asuntos_bp.route("/ajax/plantilla/<tipo>")
 @login_required
 @tenant_required
 def ajax_plantilla(tipo: str):
-    p = PLANTILLAS.get(tipo, {})
-    t = TIPOS_DERECHO.get(tipo, {})
-    return jsonify({
-        "subtypes": t.get("subtypes", []),
-        "plantilla": p,
-    })
+    return jsonify({"subtypes": TIPOS_DERECHO.get(tipo, {}).get("subtypes", []),
+                    "plantilla": PLANTILLAS.get(tipo, {})})
 
 
 @asuntos_bp.route("/ajax/auto-num")
@@ -424,518 +556,203 @@ def ajax_auto_num():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  DETALLE
+#  FICHA DEL ASUNTO
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _bitacora(tdb, id: int, asunto: dict, usuarios: dict) -> list[dict]:
+    """Todo lo que ha pasado en el asunto, agrupado por día (hora de México)."""
+    items = []
+
+    def autor(uid):
+        return usuarios.get(uid) or {"nombre": "Sistema", "iniciales": "HC", "color": "#64708A"}
+
+    for a in tdb.execute("SELECT * FROM asunto_actividades WHERE asunto_id=?", (id,)).fetchall():
+        items.append({"id": a["id"], "tipo": "actividad", "etiqueta": ACTIVIDAD_LABEL.get(a["tipo"], "Actividad"),
+                      "titulo": a["titulo"], "texto": a["descripcion"] or "", "autor": autor(a["creado_por"]),
+                      "momento": _local(a["fecha_alta"]), "fecha_evento": _fecha_corta(a["fecha"]),
+                      "realizado": bool(a["realizado"])})
+    for n in tdb.execute("SELECT * FROM asunto_notas WHERE asunto_id=?", (id,)).fetchall():
+        items.append({"id": n["id"], "tipo": "nota", "etiqueta": "Nota", "titulo": "", "texto": n["contenido"],
+                      "autor": autor(n["creado_por"]), "momento": _local(n["fecha"])})
+    for d in tdb.execute("SELECT * FROM documentos WHERE asunto_id=?", (id,)).fetchall():
+        items.append({"id": d["id"], "tipo": "documento", "etiqueta": "Documento",
+                      "titulo": d["nombre"] or d["archivo_nombre"] or "Documento", "texto": "",
+                      "autor": autor(d["subido_por"]), "momento": _local(d["fecha_subida"]),
+                      "url": d["archivo_url"] if boveda.es_de_boveda(d["archivo_url"]) else None})
+    for s in tdb.execute("SELECT * FROM asunto_sentencias WHERE asunto_id=?", (id,)).fetchall():
+        items.append({"id": s["id"], "tipo": "sentencia", "etiqueta": SENTENCIA_LABEL.get(s["tipo"], "Resolución"),
+                      "titulo": s["titulo"], "texto": s["contenido"] or "", "autor": autor(s["creado_por"]),
+                      "momento": _local(s["fecha_alta"]), "sentido": precedentes.SENTIDOS.get(s["sentido"] or ""),
+                      "url": s["archivo_url"] if boveda.es_de_boveda(s["archivo_url"]) else None})
+    for h in tdb.execute(
+        "SELECT * FROM actividad_log WHERE entidad='asunto' AND entidad_id=? AND accion IN "
+        "('cambiar_estado_asunto','crear_asunto','archivar_asunto','resultado_asunto') ORDER BY fecha DESC LIMIT 40",
+        (id,),
+    ).fetchall():
+        try:
+            det = json.loads(h["detalles"] or "{}")
+        except Exception:
+            det = {}
+        if h["accion"] == "crear_asunto":
+            titulo = "Abrió el asunto"
+        elif h["accion"] == "archivar_asunto":
+            titulo = "Archivó el asunto"
+        elif h["accion"] == "resultado_asunto":
+            info = precedentes.RESULTADOS.get(det.get("resultado") or "")
+            titulo = f"Registró el resultado: {info['label']}" if info else "Quitó el resultado"
+        else:
+            de = ESTADOS.get(det.get("de"), {}).get("label", det.get("de", "?"))
+            a_ = ESTADOS.get(det.get("a") or det.get("estado"), {}).get("label", "?")
+            titulo = f"Cambió el estado de {de} a {a_}"
+        items.append({"id": h["id"], "tipo": "sistema", "etiqueta": "", "titulo": titulo, "texto": "",
+                      "autor": autor(h["user_id"]), "momento": _local(h["fecha"])})
+
+    items.sort(key=lambda x: x["momento"] or datetime.min, reverse=True)
+    hoy, grupos, indice = _hoy(), [], {}
+    for it in items:
+        dia = it["momento"].date() if it["momento"] else hoy
+        it["hora"] = it["momento"].strftime("%H:%M") if it["momento"] else ""
+        if dia not in indice:
+            diff = (hoy - dia).days
+            nombre = f"{dia.day} de {_MESES[dia.month - 1]} de {dia.year}"
+            etiqueta = "Hoy" if diff == 0 else "Ayer" if diff == 1 else nombre
+            indice[dia] = {"etiqueta": etiqueta, "items": []}
+            grupos.append(indice[dia])
+        indice[dia]["items"].append(it)
+    return grupos
+
 
 @asuntos_bp.route("/<int:id>")
 @login_required
 @tenant_required
 def detalle(id: int):
     tdb = g.tenant_db
-    gdb = g.global_db
-    tid = g.tenant["id"]
-
+    precedentes.asegurar(tdb)
     row = tdb.execute(
-        """SELECT a.*,
-                  c.nombre || ' ' || COALESCE(c.apellidos,'') as cliente_nombre,
-                  c.razon_social as cliente_razon, c.id as cid,
-                  c.email as cliente_email, c.celular as cliente_celular,
-                  c.rfc as cliente_rfc, c.tipo as cliente_tipo,
-                  c.telefono as cliente_telefono
-           FROM asuntos a LEFT JOIN clientes c ON a.cliente_id=c.id
-           WHERE a.id=?""",
+        """SELECT a.*, c.nombre || ' ' || COALESCE(c.apellidos,'') AS cliente_nombre,
+                  c.razon_social AS cliente_razon, c.email AS cliente_email,
+                  COALESCE(c.celular, c.telefono) AS cliente_tel, c.tipo AS cliente_tipo
+           FROM asuntos a LEFT JOIN clientes c ON a.cliente_id=c.id WHERE a.id=?""",
         (id,),
     ).fetchone()
     if not row:
-        return redirect(url_for("asuntos.index"))
+        abort(404)
+    asunto = dict(row)
+    asunto["cliente"] = _cliente_nombre(row)
+    asunto["tipo_info"] = TIPOS_DERECHO.get(asunto.get("tipo_asunto") or "otro", TIPOS_DERECHO["otro"])
+    asunto["estado_info"] = ESTADOS.get(asunto["estado"], ESTADOS["activo"])
 
-    asunto = _enrich(dict(row), tdb)
-
-    # Abogado responsable
+    uid, rol = session.get("user_id"), session.get("role")
+    usuarios = _usuarios()
     abogados = _get_abogados()
-    abogado_resp = None
-    for a in abogados:
-        if a["id"] == asunto.get("abogado_responsable"):
-            abogado_resp = dict(a)
-            abogado_resp["color"] = f"hsl({a['id'] * 47 % 360}, 50%, 45%)"
-            break
-    abogado_nombre = f"{abogado_resp['nombre']} {abogado_resp['apellidos']}" if abogado_resp else None
+    responsable = usuarios.get(asunto.get("abogado_responsable"))
+    col_ids = [r["user_id"] for r in tdb.execute(
+        "SELECT user_id FROM asunto_colaboradores WHERE asunto_id=?", (id,)).fetchall()]
+    colaboradores = [usuarios[c] for c in col_ids if c in usuarios and c != asunto.get("abogado_responsable")]
 
-    # Colaboradores (exclude responsable to avoid duplicates — Fix #8)
-    resp_id = asunto.get("abogado_responsable")
-    cols = tdb.execute(
-        "SELECT user_id FROM asunto_colaboradores WHERE asunto_id=?", (id,)
-    ).fetchall()
-    col_ids = [c["user_id"] for c in cols if c["user_id"] != resp_id]
-    colaboradores = []
-    for a in abogados:
-        if a["id"] in col_ids:
-            d = dict(a)
-            d["color"] = f"hsl({a['id'] * 47 % 360}, 50%, 45%)"
-            colaboradores.append(d)
+    abierto = asunto["estado"] in ABIERTOS
+    proximo = _proximos(tdb, [id], {id: asunto["fecha_limite"]}).get(id) if abierto else None
+    eventos = [dict(e) for e in tdb.execute(
+        "SELECT id, titulo, tipo, fecha_inicio, lugar FROM eventos_calendario WHERE asunto_id=? "
+        "AND estado='pendiente' AND date(fecha_inicio) >= date('now','-1 day') ORDER BY fecha_inicio LIMIT 5", (id,)
+    ).fetchall()]
+    for e in eventos:
+        f = _fecha(e["fecha_inicio"])
+        e["etiqueta"] = EVENTO_LABEL.get(e["tipo"], "Evento")
+        e["dia"] = f"{f.day} {_MESES[f.month - 1][:3]}" if f else ""
+        e["hora"] = (e["fecha_inicio"] or "")[11:16]
+    pendientes = [dict(t) for t in tdb.execute(
+        "SELECT id, titulo, tipo, fecha FROM asunto_actividades WHERE asunto_id=? AND realizado=0 "
+        "ORDER BY fecha LIMIT 8", (id,)).fetchall()]
+    # Una actividad que también se agendó en el calendario se muestra una sola vez.
+    agendados = {(e["titulo"], (e["fecha_inicio"] or "")[:10]) for e in eventos}
+    pendientes = [t for t in pendientes if (t["titulo"], (t["fecha"] or "")[:10]) not in agendados]
+    for t in pendientes:
+        f = _fecha(t["fecha"])
+        t["etiqueta"] = ACTIVIDAD_LABEL.get(t["tipo"], "Pendiente")
+        t["dias"] = (f - _hoy()).days if f else None
+        t["cuando"] = _cuando(t["dias"]) if f else ""
+        t["semaforo"] = _semaforo(t["dias"])
 
-    # ── Unified timeline ──
-    # Gather ALL activity types and merge into a single feed
-    timeline = []
+    documentos = [dict(d) for d in tdb.execute(
+        "SELECT id, nombre, archivo_url, archivo_nombre, mime_type, tamanio, fecha_subida, subido_por "
+        "FROM documentos WHERE asunto_id=? ORDER BY fecha_subida DESC", (id,)).fetchall()]
+    sentencias = [dict(s) for s in tdb.execute(
+        "SELECT * FROM asunto_sentencias WHERE asunto_id=? ORDER BY COALESCE(fecha_emision, fecha_alta) DESC",
+        (id,)).fetchall()]
+    for d in documentos:
+        d["ext"] = (d["archivo_nombre"] or d["archivo_url"] or "").rsplit(".", 1)[-1].lower()[:4]
+        d["dia"] = (_local(d["fecha_subida"]) or datetime.now()).strftime("%d/%m/%Y")
+        d["autor"] = (usuarios.get(d["subido_por"]) or {}).get("corto", "")
+    for s in sentencias:
+        s["etiqueta"] = SENTENCIA_LABEL.get(s["tipo"], "Resolución")
+        s["sentido_label"] = precedentes.SENTIDOS.get(s["sentido"] or "")
 
-    # 1. Actividades (audiencia, diligencia, etc.)
-    for act in tdb.execute(
-        "SELECT * FROM asunto_actividades WHERE asunto_id=? ORDER BY fecha DESC", (id,)
-    ).fetchall():
-        a = dict(act)
-        uname = _user_name(gdb, tid, a.get("creado_por"))
-        timeline.append({
-            "id": a["id"], "table": "asunto_actividades",
-            "tipo": "actividad",
-            "subtipo": a["tipo"],
-            "titulo": a["titulo"],
-            "contenido": a.get("descripcion") or "",
-            "fecha": a.get("fecha") or a.get("fecha_alta") or "",
-            "autor_id": a.get("creado_por"),
-            "autor_nombre": uname,
-            "realizado": a.get("realizado", 0),
-            "metadata": {},
-        })
+    horas = [dict(h) for h in tdb.execute(
+        "SELECT * FROM asunto_horas WHERE asunto_id=? ORDER BY fecha DESC, id DESC", (id,)).fetchall()]
+    for h in horas:
+        h["autor"] = (usuarios.get(h["user_id"]) or {}).get("corto", "")
+    horas_total = sum(_safe_float(h["horas"]) for h in horas)
 
-    # 2. Notas internas
-    for n in tdb.execute(
-        "SELECT * FROM asunto_notas WHERE asunto_id=? ORDER BY fecha DESC", (id,)
-    ).fetchall():
-        n = dict(n)
-        uname = _user_name(gdb, tid, n.get("creado_por"))
-        menciones = []
-        try:
-            menciones = json.loads(n.get("menciones") or "[]")
-        except Exception:
-            pass
-        timeline.append({
-            "id": n["id"], "table": "asunto_notas",
-            "tipo": "nota",
-            "subtipo": "nota",
-            "titulo": "Nota interna",
-            "contenido": n["contenido"],
-            "fecha": n.get("fecha") or "",
-            "autor_id": n.get("creado_por"),
-            "autor_nombre": uname,
-            "realizado": 0,
-            "metadata": {"menciones": menciones},
-        })
-
-    # 3. Documentos
-    for d in tdb.execute(
-        "SELECT * FROM documentos WHERE asunto_id=? ORDER BY fecha_subida DESC", (id,)
-    ).fetchall():
-        d = dict(d)
-        uname = _user_name(gdb, tid, d.get("subido_por"))
-        timeline.append({
-            "id": d["id"], "table": "documentos",
-            "tipo": "documento",
-            "subtipo": (d.get("mime_type") or "").split("/")[-1][:10],
-            "titulo": d.get("nombre") or d.get("archivo_nombre") or "Documento",
-            "contenido": "",
-            "fecha": d.get("fecha_subida") or "",
-            "autor_id": d.get("subido_por"),
-            "autor_nombre": uname,
-            "realizado": 0,
-            "metadata": {
-                "url": d.get("archivo_url"),
-                "archivo_nombre": d.get("archivo_nombre"),
-                "mime_type": d.get("mime_type") or "",
-                "tamanio": d.get("tamanio") or 0,
-            },
-        })
-
-    # 4. Sentencias
-    for s in tdb.execute(
-        "SELECT * FROM asunto_sentencias WHERE asunto_id=? ORDER BY fecha_alta DESC", (id,)
-    ).fetchall():
-        s = dict(s)
-        uname = _user_name(gdb, tid, s.get("creado_por"))
-        timeline.append({
-            "id": s["id"], "table": "asunto_sentencias",
-            "tipo": "sentencia",
-            "subtipo": s.get("tipo") or "sentencia",
-            "titulo": s["titulo"],
-            "contenido": s.get("contenido") or "",
-            "fecha": s.get("fecha_emision") or s.get("fecha_alta") or "",
-            "autor_id": s.get("creado_por"),
-            "autor_nombre": uname,
-            "realizado": 0,
-            "metadata": {
-                "archivo_url": s.get("archivo_url"),
-                "archivo_nombre": s.get("archivo_nombre"),
-            },
-        })
-
-    # 5. Status changes from actividad_log
-    for h in tdb.execute(
-        "SELECT * FROM actividad_log WHERE entidad='asunto' AND entidad_id=? "
-        "AND accion IN ('cambiar_estado_asunto','crear_asunto','archivar_asunto') "
-        "ORDER BY fecha DESC LIMIT 20",
-        (id,),
-    ).fetchall():
-        h = dict(h)
-        uname = _user_name(gdb, tid, h.get("user_id"))
-        detalles = {}
-        try:
-            detalles = json.loads(h.get("detalles") or "{}")
-        except Exception:
-            pass
-        # Build descriptive title (point 4)
-        accion = h.get("accion", "")
-        if accion == "crear_asunto":
-            titulo_tl = f"Creó el asunto {asunto.get('numero_expediente', '')}"
-        elif accion == "cambiar_estado_asunto":
-            de = detalles.get("de", "?").replace("_", " ").upper()
-            a_est = detalles.get("a", detalles.get("estado", "?")).replace("_", " ").upper()
-            titulo_tl = f"Cambió el estatus de {de} → {a_est}"
-        elif accion == "archivar_asunto":
-            titulo_tl = "Archivó el asunto"
-        else:
-            titulo_tl = accion.replace("_", " ").title()
-        timeline.append({
-            "id": h["id"], "table": "actividad_log",
-            "tipo": "cambio_estatus",
-            "subtipo": accion,
-            "titulo": titulo_tl,
-            "contenido": "",
-            "fecha": h.get("fecha") or "",
-            "autor_id": h.get("user_id"),
-            "autor_nombre": uname,
-            "realizado": 0,
-            "metadata": detalles,
-        })
-
-    # Sort timeline by date descending
-    def _sort_key(item):
-        f = item.get("fecha") or ""
-        return f[:19] if f else "0"
-    timeline.sort(key=_sort_key, reverse=True)
-
-    # ── Sidebar data ──
-    # Cobros
     cobros = [dict(c) for c in tdb.execute(
-        "SELECT * FROM cobros WHERE asunto_id=? ORDER BY fecha_emision DESC", (id,)
+        "SELECT * FROM cobros WHERE asunto_id=? AND estado != 'cancelado' ORDER BY fecha_emision DESC", (id,)
     ).fetchall()]
-    cobros_resumen = {
-        "total":     sum(_safe_float(c.get("monto")) for c in cobros),
-        "pagado":    sum(_safe_float(c.get("monto")) for c in cobros if c.get("estado") == "pagado"),
-        "pendiente": sum(_safe_float(c.get("monto")) for c in cobros if c.get("estado") == "pendiente"),
-    }
+    facturado = sum(_safe_float(c.get("total")) or _safe_float(c.get("monto")) for c in cobros)
+    cobrado = sum((_safe_float(c.get("total")) or _safe_float(c.get("monto"))) if c["estado"] == "pagado"
+                  else _safe_float(c.get("monto_abonado")) for c in cobros)
+    pactados = _safe_float(asunto.get("honorarios_pactados"))
+    base_cobro = pactados or facturado
+    dinero = {"pactados": pactados, "facturado": facturado, "cobrado": cobrado,
+              "pendiente": max(base_cobro - cobrado, 0),
+              "pct": int(min(cobrado / base_cobro * 100, 100)) if base_cobro else 0}
 
-    # Eventos próximos
-    eventos_prox = [dict(e) for e in tdb.execute(
-        """SELECT id, titulo, tipo, fecha_inicio, fecha_fin, lugar, estado
-           FROM eventos_calendario
-           WHERE asunto_id=? AND estado='pendiente' AND fecha_inicio >= datetime('now')
-           ORDER BY fecha_inicio ASC LIMIT 5""",
-        (id,),
-    ).fetchall()]
-
-    # Documentos recientes (for sidebar)
-    docs_recientes = [dict(d) for d in tdb.execute(
-        "SELECT id, nombre, archivo_url, archivo_nombre, mime_type, tamanio, fecha_subida "
-        "FROM documentos WHERE asunto_id=? ORDER BY fecha_subida DESC LIMIT 4",
-        (id,),
-    ).fetchall()]
-
-    # Horas
-    horas_rows = [dict(h) for h in tdb.execute(
-        "SELECT * FROM asunto_horas WHERE asunto_id=? ORDER BY fecha DESC", (id,)
-    ).fetchall()]
-    horas_total = sum(_safe_float(h.get("horas")) for h in horas_rows)
-
-    # Tareas/actividades pendientes (for sidebar)
-    tareas_pend = [dict(t) for t in tdb.execute(
-        "SELECT id, titulo, tipo, fecha FROM asunto_actividades "
-        "WHERE asunto_id=? AND realizado=0 ORDER BY fecha ASC LIMIT 6",
-        (id,),
-    ).fetchall()]
-
-    # Timeline counters (point 3)
-    tl_counts = {"all": len(timeline)}
-    for key in ("nota", "actividad", "documento", "sentencia", "llamada", "cambio_estatus"):
-        tl_counts[key] = sum(1 for t in timeline if t["tipo"] == key)
-
-    # User role for admin-only UI
-    user_role = session.get("role", "abogado")
-
-    # ── Column A computed variables ──────────────────────────────────────
-    from datetime import datetime as _dt
-
-    # dias_activo — days since fecha_inicio
-    _fi = asunto.get("fecha_inicio") or ""
-    try:
-        dias_activo = (date.today() - date.fromisoformat(_fi[:10])).days if _fi else None
-    except Exception:
-        dias_activo = None
-
-    # ultima_actividad — most recent timeline entry date
-    ultima_actividad = timeline[0]["fecha"][:10] if timeline else None
-
-    # proxima_audiencia — next future actividad of type audiencia/diligencia
-    _hoy = date.today().isoformat()
-    proxima_audiencia = None
-    for act in tdb.execute(
-        "SELECT titulo, fecha FROM asunto_actividades "
-        "WHERE asunto_id=? AND realizado=0 AND fecha>=? "
-        "ORDER BY fecha ASC LIMIT 1",
-        (id, _hoy),
-    ).fetchall():
-        proxima_audiencia = {"titulo": act["titulo"], "fecha": act["fecha"][:10] if act["fecha"] else ""}
-
-    # audiencias_realizadas — count of completed activities
-    audiencias_realizadas = tdb.execute(
-        "SELECT COUNT(*) as c FROM asunto_actividades WHERE asunto_id=? AND realizado=1", (id,)
-    ).fetchone()["c"]
-
-    # documentos_count
-    documentos_count = tdb.execute(
-        "SELECT COUNT(*) as c FROM documentos WHERE asunto_id=?", (id,)
-    ).fetchone()["c"]
-
-    # notas_count
-    notas_count = tdb.execute(
-        "SELECT COUNT(*) as c FROM asunto_notas WHERE asunto_id=?", (id,)
-    ).fetchone()["c"]
-
-    # facturas_count (cobros)
-    facturas_count = len(cobros)
-
-    # dias_pago_promedio — avg days between fecha_emision and fecha_pago for paid cobros
-    dias_pago_promedio = None
-    try:
-        _paid = [dict(c) for c in tdb.execute(
-            "SELECT fecha_emision, fecha_pago FROM cobros "
-            "WHERE asunto_id=? AND estado='pagado' AND fecha_emision IS NOT NULL AND fecha_pago IS NOT NULL",
-            (id,),
-        ).fetchall()]
-        if _paid:
-            _days = []
-            for p in _paid:
-                try:
-                    d1 = date.fromisoformat(p["fecha_emision"][:10])
-                    d2 = date.fromisoformat(p["fecha_pago"][:10])
-                    _days.append((d2 - d1).days)
-                except Exception:
-                    pass
-            if _days:
-                dias_pago_promedio = round(sum(_days) / len(_days))
-    except Exception:
-        pass
-
-    # gastos_total for this asunto (table may not exist yet)
-    gastos_total = 0
-    try:
-        _gt = tdb.execute(
-            "SELECT COALESCE(SUM(monto),0) as t FROM gastos_asunto WHERE asunto_id=?", (id,)
-        ).fetchone()
-        if _gt:
-            gastos_total = _gt["t"]
-    except Exception:
-        gastos_total = 0
-
-    col_a_stats = {
-        "dias_activo": dias_activo,
-        "ultima_actividad": ultima_actividad,
-        "proxima_audiencia": proxima_audiencia,
-        "audiencias_realizadas": audiencias_realizadas,
-        "documentos_count": documentos_count,
-        "notas_count": notas_count,
-        "facturas_count": facturas_count,
-        "dias_pago_promedio": dias_pago_promedio,
-        "gastos_total": gastos_total,
-    }
-
-    # ── Ficha Técnica (Nota 9) ───────────────────────────────────────────
-    ficha_row = None
-    try:
-        ficha_row = tdb.execute(
-            "SELECT * FROM ficha_tecnica WHERE asunto_id=?", (id,)
-        ).fetchone()
-    except Exception:
-        pass
-    ficha = dict(ficha_row) if ficha_row else None
-    if ficha:
-        import json as _json
-        for k in ("argumentos_clave", "riesgos", "insights"):
-            try:
-                ficha[k] = _json.loads(ficha.get(k) or "[]")
-            except Exception:
-                ficha[k] = []
-
-    # ── Etiquetas del asunto (Nota 4) ────────────────────────────────────
-    etiquetas = []
+    etiquetas, todas_etiquetas = [], []
     try:
         etiquetas = [dict(r) for r in tdb.execute(
-            """SELECT e.* FROM etiquetas e
-               JOIN asunto_etiquetas ae ON ae.etiqueta_id = e.id
-               WHERE ae.asunto_id = ?
-               ORDER BY e.nombre""",
-            (id,),
-        ).fetchall()]
+            "SELECT e.* FROM etiquetas e JOIN asunto_etiquetas ae ON ae.etiqueta_id=e.id "
+            "WHERE ae.asunto_id=? ORDER BY e.nombre", (id,)).fetchall()]
+        todas_etiquetas = [dict(r) for r in tdb.execute("SELECT * FROM etiquetas ORDER BY nombre").fetchall()]
     except Exception:
         pass
 
-    # All available etiquetas for the tag picker
-    all_etiquetas = []
+    ficha = None
     try:
-        all_etiquetas = [dict(r) for r in tdb.execute(
-            "SELECT * FROM etiquetas ORDER BY nombre"
-        ).fetchall()]
+        fila = tdb.execute("SELECT * FROM ficha_tecnica WHERE asunto_id=?", (id,)).fetchone()
+        if fila:
+            ficha = dict(fila)
+            for k in ("argumentos_clave", "riesgos", "insights"):
+                try:
+                    ficha[k] = json.loads(ficha.get(k) or "[]")
+                except Exception:
+                    ficha[k] = []
     except Exception:
         pass
 
-    # ── Timeline enrichment & date grouping ──────────────────────────────
-    _MESES_ES = ['enero','febrero','marzo','abril','mayo','junio',
-                 'julio','agosto','septiembre','octubre','noviembre','diciembre']
+    inicio = _fecha(asunto.get("fecha_inicio"))
+    fin = _fecha(asunto.get("fecha_cierre")) if not abierto else None
+    dias_llevamos = ((fin or _hoy()) - inicio).days if inicio else None
 
-    # Enrich each timeline item with display metadata
-    for _it in timeline:
-        # Initials
-        _nombre = _it.get('autor_nombre') or ''
-        _partes = _nombre.strip().split()
-        if not _partes:
-            _it['iniciales'] = 'SIS'
-        elif len(_partes) >= 2:
-            _it['iniciales'] = (_partes[0][0] + _partes[-1][0]).upper()
-        else:
-            _it['iniciales'] = _partes[0][:2].upper()
+    clientes = [dict(r) for r in tdb.execute(
+        "SELECT id, COALESCE(razon_social, nombre || ' ' || COALESCE(apellidos,'')) AS nombre FROM clientes "
+        "WHERE activo=1 OR id=? ORDER BY 2 LIMIT 500", (asunto.get("cliente_id") or 0,)).fetchall()]
 
-        # Color / badge based on type
-        _tipo    = _it.get('tipo', 'sistema')
-        _subtipo = _it.get('subtipo', '')
-        _meta    = _it.get('metadata')
-        _a_est   = (_meta.get('a', '') if isinstance(_meta, dict) else '') if _meta else ''
-
-        if _tipo == 'nota':
-            _it['tl_cls']      = 'nota'
-            _it['tl_color']    = '#00DFA2'
-            _it['tl_av_bg']    = 'rgba(0,223,162,0.12)'
-            _it['tl_badge_bg'] = 'rgba(0,223,162,0.1)'
-            _it['tl_badge']    = 'Nota'
-        elif _tipo in ('documento', 'sentencia'):
-            _it['tl_cls']      = 'doc'
-            _it['tl_color']    = '#3B8BD4'
-            _it['tl_av_bg']    = 'rgba(59,139,212,0.1)'
-            _it['tl_badge_bg'] = 'rgba(59,139,212,0.1)'
-            _it['tl_badge']    = 'Documento' if _tipo == 'documento' else 'Sentencia'
-        elif _tipo == 'actividad':
-            _it['tl_cls']      = 'actividad'
-            _it['tl_color']    = '#F97316'
-            _it['tl_av_bg']    = 'rgba(249,115,22,0.1)'
-            _it['tl_badge_bg'] = 'rgba(249,115,22,0.1)'
-            _it['tl_badge']    = 'Actividad'
-        elif _tipo in ('llamada', 'correo'):
-            _it['tl_cls']      = 'llamada'
-            _it['tl_color']    = '#8B5CF6'
-            _it['tl_av_bg']    = 'rgba(139,92,246,0.1)'
-            _it['tl_badge_bg'] = 'rgba(139,92,246,0.1)'
-            _it['tl_badge']    = 'Llamada' if _tipo == 'llamada' else 'Correo'
-        elif _tipo == 'cambio_estatus':
-            if _subtipo == 'archivar_asunto' or _a_est == 'archivado':
-                _it['tl_cls']      = 'estado-arch'
-                _it['tl_color']    = '#EF4444'
-                _it['tl_av_bg']    = 'rgba(239,68,68,0.1)'
-                _it['tl_badge_bg'] = 'rgba(239,68,68,0.1)'
-                _it['tl_badge']    = '→ Archivado'
-            elif _a_est == 'activo':
-                _it['tl_cls']      = 'estado-activo'
-                _it['tl_color']    = '#00DFA2'
-                _it['tl_av_bg']    = 'rgba(0,223,162,0.1)'
-                _it['tl_badge_bg'] = 'rgba(0,223,162,0.1)'
-                _it['tl_badge']    = '→ Activo'
-            elif _subtipo == 'crear_asunto':
-                _it['tl_cls']      = 'sistema'
-                _it['tl_color']    = '#8A9BA8'
-                _it['tl_av_bg']    = 'rgba(138,155,168,0.08)'
-                _it['tl_badge_bg'] = 'rgba(138,155,168,0.08)'
-                _it['tl_badge']    = 'Sistema'
-            else:
-                _lbl = ('→ ' + _a_est.replace('_', ' ').title()) if _a_est else 'Cambio'
-                _it['tl_cls']      = 'estado-cambio'
-                _it['tl_color']    = '#B8922A'
-                _it['tl_av_bg']    = 'rgba(184,146,42,0.1)'
-                _it['tl_badge_bg'] = 'rgba(184,146,42,0.1)'
-                _it['tl_badge']    = _lbl
-        else:
-            _it['tl_cls']      = 'sistema'
-            _it['tl_color']    = '#8A9BA8'
-            _it['tl_av_bg']    = 'rgba(138,155,168,0.08)'
-            _it['tl_badge_bg'] = 'rgba(138,155,168,0.08)'
-            _it['tl_badge']    = 'Sistema'
-
-        # ── Timezone: UTC → México (UTC-6) ──
-        from datetime import datetime as _datetime_cls, timedelta as _td
-        _MX = _td(hours=-6)
-        _fecha_str = _it.get('fecha') or ''
-        try:
-            _dt_mx = _datetime_cls.fromisoformat(_fecha_str[:19]) + _MX
-            _it['tl_hora']    = _dt_mx.strftime('%H:%M')
-            _it['_fecha_mx']  = _dt_mx.date()
-        except Exception:
-            _it['tl_hora']   = _fecha_str[11:16] if len(_fecha_str) > 10 else _fecha_str
-            _it['_fecha_mx'] = None
-
-    # Hoy en México (UTC-6)
-    from datetime import datetime as _datetime_cls, timedelta as _td, timezone as _tz
-    _hoy_mx = (_datetime_cls.now(_tz.utc) + _td(hours=-6)).date()
-
-    # Group by Mexico date (timeline already sorted descending)
-    grupos = []
-    _seen_dates = []
-    _date_map = {}
-    for _it in timeline:
-        _mx_date = _it.get('_fecha_mx')
-        if _mx_date is None:
-            try:
-                _mx_date = date.fromisoformat((_it.get('fecha') or '')[:10])
-            except Exception:
-                _mx_date = _hoy_mx
-        _fkey = str(_mx_date)
-        if _fkey not in _date_map:
-            _diff = (_hoy_mx - _mx_date).days
-            _mes  = _MESES_ES[_mx_date.month - 1]
-            _dl   = f"{_mx_date.day} de {_mes} {_mx_date.year}"
-            if _diff == 0:
-                _label = 'Hoy · ' + _dl
-            elif _diff == 1:
-                _label = 'Ayer · ' + _dl
-            else:
-                _label = _dl
-            _date_map[_fkey] = {'label': _label, 'registros': []}
-            _seen_dates.append(_fkey)
-        _date_map[_fkey]['registros'].append(_it)
-    grupos = [_date_map[d] for d in _seen_dates]
-
+    es_admin = rol in ("super_admin", "admin")
     return render_template(
         "asuntos/detalle.html",
-        asunto=asunto,
-        abogado_resp=abogado_resp,
-        abogado_nombre=abogado_nombre,
-        colaboradores=colaboradores,
-        timeline=timeline,
-        grupos=grupos,
-        tl_counts=tl_counts,
-        cobros=cobros,
-        cobros_resumen=cobros_resumen,
-        eventos_prox=eventos_prox,
-        docs_recientes=docs_recientes,
-        horas_rows=horas_rows,
-        horas_total=horas_total,
-        tareas_pend=tareas_pend,
-        abogados=abogados,
-        tipos_derecho=TIPOS_DERECHO,
-        tipos_actividad=TIPOS_ACTIVIDAD,
-        tipos_sentencia=TIPOS_SENTENCIA,
-        kanban_cols=KANBAN_COLS,
-        today_str=date.today().isoformat(),
-        user_role=user_role,
-        col_a_stats=col_a_stats,
-        ficha=ficha,
-        etiquetas=etiquetas,
-        all_etiquetas=all_etiquetas,
-        es_responsable=(asunto.get("abogado_responsable") == session.get("user_id")),
+        asunto=asunto, responsable=responsable, colaboradores=colaboradores, abogados=abogados,
+        bitacora=_bitacora(tdb, id, asunto, usuarios), proximo=proximo, eventos=eventos, pendientes=pendientes,
+        documentos=documentos, sentencias=sentencias, horas=horas, horas_total=horas_total,
+        cobros=cobros[:4], dinero=dinero, etiquetas=etiquetas, todas_etiquetas=todas_etiquetas, ficha=ficha,
+        dias_llevamos=dias_llevamos, abierto=abierto, clientes=clientes,
+        estados=ESTADOS, estados_menu=ESTADOS_MENU, tipos_derecho=TIPOS_DERECHO,
+        tipos_actividad=TIPOS_ACTIVIDAD, actividad_label=ACTIVIDAD_LABEL,
+        tipos_sentencia=TIPOS_SENTENCIA, sentencia_label=SENTENCIA_LABEL,
+        resultados=precedentes.RESULTADOS, sentidos=precedentes.SENTIDOS,
+        es_admin=es_admin,
+        puede_editar=es_admin or uid == asunto.get("abogado_responsable") or uid in col_ids
+                     or uid == asunto.get("creado_por"),
+        recien_creado=request.args.get("nuevo") == "1",
+        today_str=_hoy().isoformat(),
     )
 
 
@@ -1004,7 +821,9 @@ def agregar_etiqueta(id):
     tdb = g.tenant_db
     data = request.get_json(force=True)
     nombre = (data.get("nombre") or "").strip()
-    color = data.get("color", "#6C5CE7")
+    color = data.get("color") or "#1D3FD6"
+    if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
+        color = "#1D3FD6"
     etiqueta_id = data.get("etiqueta_id")
 
     if not etiqueta_id and not nombre:
@@ -1122,10 +941,10 @@ def editar_campo(id: int):
 #  CAMBIAR ESTADO (Kanban drag & drop)
 # ─────────────────────────────────────────────────────────────────────────────
 
-VALID_STATES = {c["key"] for c in KANBAN_COLS}
+VALID_STATES = set(ESTADOS_MENU) | {"completado"}
 
 
-@asuntos_bp.route("/<int:id>/estado", methods=["POST"])
+@asuntos_bp.route("/<int:id>/estado", methods=["POST", "PATCH"])
 @login_required
 @tenant_required
 def cambiar_estado(id: int):
@@ -1133,15 +952,24 @@ def cambiar_estado(id: int):
     if nuevo_estado not in VALID_STATES:
         return jsonify(ok=False, error="Estado inválido"), 400
     old = g.tenant_db.execute("SELECT estado FROM asuntos WHERE id=?", (id,)).fetchone()
-    old_estado = old["estado"] if old else "?"
+    if not old:
+        return jsonify(ok=False, error="No encontrado"), 404
+    old_estado = old["estado"]
+    if nuevo_estado == old_estado:
+        return jsonify(ok=True, estado=nuevo_estado, info=ESTADOS[nuevo_estado])
     g.tenant_db.execute("UPDATE asuntos SET estado=? WHERE id=?", (nuevo_estado, id))
+    if nuevo_estado in CONCLUIDOS:
+        g.tenant_db.execute("UPDATE asuntos SET fecha_cierre=COALESCE(fecha_cierre, ?) WHERE id=?",
+                            (_hoy().isoformat(), id))
+    elif nuevo_estado in ABIERTOS:
+        g.tenant_db.execute("UPDATE asuntos SET fecha_cierre=NULL WHERE id=?", (id,))
     g.tenant_db.commit()
     _log("cambiar_estado_asunto", id, {
         "de": old_estado,
         "a": nuevo_estado,
         "estado": nuevo_estado,
     })
-    return jsonify(ok=True)
+    return jsonify(ok=True, estado=nuevo_estado, info=ESTADOS[nuevo_estado])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1294,29 +1122,29 @@ def agregar_sentencia(id: int):
     tipo = request.form.get("tipo", "sentencia")
     if tipo not in TIPOS_SENTENCIA:
         tipo = "sentencia"
+    sentido = request.form.get("sentido") if request.form.get("sentido") in precedentes.SENTIDOS else None
 
     archivo_url = archivo_nombre = None
     f = request.files.get("archivo")
     if f and f.filename:
-        from config import Config
-        upload_dir = os.path.join(Config.UPLOAD_FOLDER, "asuntos", str(id), "sentencias")
-        os.makedirs(upload_dir, exist_ok=True)
-        ext = os.path.splitext(f.filename)[1].lower()
-        safe_name = f"{uuid.uuid4().hex}{ext}"
-        f.save(os.path.join(upload_dir, safe_name))
-        archivo_nombre = f.filename
-        archivo_url    = f"/uploads/asuntos/{id}/sentencias/{safe_name}"
+        info = boveda.guardar(f, "asuntos", id, "sentencias")
+        if not info:
+            return jsonify(ok=False, error="Tipo de archivo no permitido"), 400
+        archivo_nombre = info["nombre"]
+        archivo_url    = info["url"]
 
     cur = g.tenant_db.execute(
         """INSERT INTO asunto_sentencias
-           (asunto_id, titulo, tipo, contenido, fecha_emision, archivo_url, archivo_nombre, creado_por)
-           VALUES (?,?,?,?,?,?,?,?)""",
-        (id, titulo, tipo,
+           (asunto_id, titulo, tipo, sentido, contenido, fecha_emision, archivo_url, archivo_nombre, creado_por)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (id, titulo, tipo, sentido,
          (request.form.get("contenido") or "").strip() or None,
          request.form.get("fecha_emision") or None,
          archivo_url, archivo_nombre, session.get("user_id")),
     )
     g.tenant_db.commit()
+    if archivo_url:
+        lector.encolar(archivo_url, titulo, "sentencia", cur.lastrowid, asunto_id=id)
     return jsonify(ok=True, id=cur.lastrowid)
 
 
@@ -1382,23 +1210,19 @@ def subir_documento(id: int):
     if not f or not f.filename:
         return jsonify(ok=False, error="Archivo requerido"), 400
 
-    from config import Config
-    upload_dir = os.path.join(Config.UPLOAD_FOLDER, "asuntos", str(id))
-    os.makedirs(upload_dir, exist_ok=True)
-    ext       = os.path.splitext(f.filename)[1].lower()
-    safe_name = f"{uuid.uuid4().hex}{ext}"
-    dest      = os.path.join(upload_dir, safe_name)
-    f.save(dest)
+    info = boveda.guardar(f, "asuntos", id)
+    if not info:
+        return jsonify(ok=False, error="Tipo de archivo no permitido"), 400
 
     cur = tdb.execute(
         """INSERT INTO documentos
            (asunto_id, nombre, archivo_url, archivo_nombre, tamanio, mime_type, subido_por)
            VALUES (?,?,?,?,?,?,?)""",
-        (id, nombre or f.filename,
-         f"/uploads/asuntos/{id}/{safe_name}", f.filename,
-         os.path.getsize(dest), f.mimetype, session.get("user_id")),
+        (id, nombre or info["nombre"], info["url"], info["nombre"],
+         info["tamanio"], info["mime"], session.get("user_id")),
     )
     tdb.commit()
+    lector.encolar(info["url"], nombre or info["nombre"], "documento", cur.lastrowid, asunto_id=id)
     _log("subir_documento", id, {"nombre": nombre or f.filename})
     return jsonify(ok=True, id=cur.lastrowid)
 
@@ -1427,28 +1251,28 @@ def enviar_correo_asunto(id: int):
         "SELECT nombre, apellidos, email FROM tenant_users WHERE id=?",
         (session.get("user_id"),),
     ).fetchone()
-    sender_name = f"{sender['nombre']} {sender['apellidos'] or ''}" if sender else "LexOS"
+    sender_name = f"{sender['nombre']} {sender['apellidos'] or ''}".strip() if sender else ""
     sender_email = sender["email"] if sender else ""
-
-    tenant = gdb.execute("SELECT nombre FROM tenants WHERE id=?", (tid,)).fetchone()
-    despacho = tenant["nombre"] if tenant else "LexOS"
+    despacho = g.tenant["nombre_despacho"]
 
     asunto_row = g.tenant_db.execute("SELECT titulo FROM asuntos WHERE id=?", (id,)).fetchone()
     asunto_titulo = asunto_row["titulo"] if asunto_row else ""
 
+    despacho_h, titulo_h, asunto_h = html.escape(despacho), html.escape(asunto_titulo), html.escape(asunto_correo)
+    cuerpo_h, sender_h = html.escape(cuerpo), html.escape(sender_name)
     html_body = f"""
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
       <div style="background:linear-gradient(135deg,#1e293b,#334155);padding:24px 28px">
-        <div style="font-size:18px;font-weight:800;color:#fff">{despacho}</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:3px">Ref: {asunto_titulo}</div>
+        <div style="font-size:18px;font-weight:800;color:#fff">{despacho_h}</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:3px">Ref: {titulo_h}</div>
       </div>
       <div style="padding:28px">
-        <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:16px">{asunto_correo}</div>
-        <div style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap">{cuerpo}</div>
+        <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:16px">{asunto_h}</div>
+        <div style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap">{cuerpo_h}</div>
       </div>
       <div style="background:#f8fafc;padding:16px 28px;border-top:1px solid #e5e7eb">
-        <div style="font-size:12px;color:#64748b">Enviado por <strong>{sender_name}</strong></div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px">LexOS · {date.today().strftime('%d/%m/%Y')}</div>
+        <div style="font-size:12px;color:#64748b">Enviado por <strong>{sender_h}</strong></div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Habeas Corpus · {date.today().strftime('%d/%m/%Y')}</div>
       </div>
     </div>"""
 
@@ -1469,7 +1293,7 @@ def enviar_correo_asunto(id: int):
     except Exception as exc:
         import traceback
         traceback.print_exc()
-        return jsonify(ok=False, error=str(exc)), 500
+        return jsonify(ok=False, error="No se pudo enviar el correo. Revisa la configuración de correo."), 500
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1509,8 +1333,7 @@ def exportar_pdf(id: int):
         (f"{ab['nombre']} {ab['apellidos']}" for ab in abogados if ab["id"] == a.get("abogado_responsable")),
         "—"
     )
-    tipo_info = TIPOS_DERECHO.get(a.get("tipo_asunto", "otro"), TIPOS_DERECHO["otro"])
-    semaforo  = _semaforo(a.get("fecha_limite"))
+    tipo_info = TIPOS_DERECHO.get(a.get("tipo_asunto") or "otro", TIPOS_DERECHO["otro"])
     actividades = tdb.execute(
         "SELECT * FROM asunto_actividades WHERE asunto_id=? ORDER BY fecha ASC LIMIT 20", (id,)
     ).fetchall()
@@ -1529,7 +1352,7 @@ def exportar_pdf(id: int):
 
     story = [
         Paragraph(a["titulo"], title_s),
-        Paragraph(f"{tipo_info['label']} · {a.get('numero_expediente','—')} · {tenant['nombre_despacho'] if tenant else 'LexOS'}", sub_s),
+        Paragraph(f"{tipo_info['label']} · {a.get('numero_expediente','—')} · {tenant['nombre_despacho'] if tenant else 'Habeas Corpus'}", sub_s),
         HRFlowable(width="100%", color=ACCENT, thickness=1),
         Spacer(1, 0.3*cm),
     ]
@@ -1550,14 +1373,14 @@ def exportar_pdf(id: int):
     kv([
         ["Expediente",  a.get("numero_expediente") or "—"],
         ["Tipo",        tipo_info["label"]],
-        ["Estado",      a.get("estado","—").replace("_"," ").title()],
+        ["Estado",      ESTADOS.get(a.get("estado"), {}).get("label", "—")],
         ["Prioridad",   a.get("prioridad","—").title()],
         ["Cliente",     (a.get("razon_social") or a.get("cliente_nombre") or "—").strip()],
         ["Abogado",     abogado_nombre],
         ["Juzgado",     a.get("juzgado") or "—"],
         ["No. juicio",  a.get("numero_juicio") or "—"],
         ["Inicio",      (a.get("fecha_inicio") or "—")[:10]],
-        ["Fecha límite", f"{(a.get('fecha_limite') or '—')[:10]}  ({semaforo['label']})"],
+        ["Fecha límite", (a.get("fecha_limite") or "—")[:10]],
         ["Honorarios",  f"${(a.get('honorarios_pactados') or 0):,.0f} MXN"],
         ["Valor litigio", f"${(a.get('monto_estimado') or 0):,.0f} MXN"],
     ])
@@ -1591,7 +1414,7 @@ def exportar_pdf(id: int):
         story.append(t)
 
     story.append(Spacer(1, 0.5*cm))
-    story.append(Paragraph(f"Generado el {date.today().strftime('%d/%m/%Y')} · LexOS", footer_s))
+    story.append(Paragraph(f"Generado el {date.today().strftime('%d/%m/%Y')} · Habeas Corpus", footer_s))
     doc.build(story)
     buf.seek(0)
     safe = a["titulo"].replace(" ","_")[:30]

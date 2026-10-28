@@ -52,13 +52,16 @@ def portal_login_required(f):
     def wrapped(*args, **kwargs):
         if not session.get("portal_cliente_id"):
             return redirect(url_for("portal.cliente_login"))
+        # La sesión del portal solo vale en el despacho donde se inició
+        if session.get("portal_tenant") != getattr(g, "tenant_slug", None):
+            return redirect(url_for("portal.cliente_login"))
         # Verify client still active
         tdb = getattr(g, "tenant_db", None)
         if not tdb:
             return redirect(url_for("portal.cliente_login"))
         pc = tdb.execute(
-            "SELECT id FROM portal_clientes WHERE cliente_id=? AND activo=1",
-            (session["portal_cliente_id"],)
+            "SELECT id FROM portal_clientes WHERE id=? AND cliente_id=? AND activo=1",
+            (session.get("portal_pc_id"), session["portal_cliente_id"])
         ).fetchone()
         if not pc:
             session.pop("portal_cliente_id", None)
@@ -226,7 +229,7 @@ def compartir_doc(cliente_id):
 
 @portal_bp.route("/cliente")
 def cliente_login():
-    if session.get("portal_cliente_id"):
+    if session.get("portal_cliente_id") and session.get("portal_tenant") == getattr(g, "tenant_slug", None):
         return redirect(url_for("portal.cliente_inicio"))
     return render_template("portal/login.html")
 
@@ -326,6 +329,7 @@ def _do_portal_login(tdb, pc):
     session["portal_cliente_id"] = pc["cliente_id"]
     session["portal_cliente_nombre"] = f"{pc['nombre']} {pc['apellidos'] or ''}".strip()
     session["portal_pc_id"] = pc["id"]
+    session["portal_tenant"] = g.tenant_slug
     tdb.execute(
         "UPDATE portal_clientes SET ultimo_login=CURRENT_TIMESTAMP, intentos_login=0, bloqueado_hasta=NULL WHERE id=?",
         (pc["id"],),
@@ -338,6 +342,7 @@ def cliente_logout():
     session.pop("portal_cliente_id", None)
     session.pop("portal_cliente_nombre", None)
     session.pop("portal_pc_id", None)
+    session.pop("portal_tenant", None)
     return redirect(url_for("portal.cliente_login"))
 
 

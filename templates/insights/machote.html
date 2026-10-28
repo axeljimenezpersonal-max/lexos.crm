@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{{ plantilla.nombre }}{% endblock %}
+{% block page_title %}Llenar machote{% endblock %}
+
+{% block head %}
+<style>
+.mf-back{font-size:13px;color:var(--ash);text-decoration:none;font-weight:500}
+.mf-back:hover{color:var(--e)}
+.mf-sub{color:var(--ash);font-size:14px;margin-top:4px}
+.mf-grid{display:grid;grid-template-columns:1fr 320px;gap:14px;margin-top:18px;align-items:start}
+.mf-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px}
+.mf-card h2{font:600 15px 'Sora',sans-serif;color:var(--tinta)}
+.mf-card > p{font-size:12.5px;color:var(--ash);margin-top:3px}
+.mf-sel{width:100%;margin-top:12px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;font:500 14px 'Inter',sans-serif;color:var(--fog);background:#fff}
+.mf-campos{margin-top:6px}
+.mf-campo{display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+.mf-campo:first-child{border-top:0}
+.mf-campo label{font-size:13px;font-weight:600;color:var(--fog)}
+.mf-campo label small{display:block;font:500 11.5px ui-monospace,Menlo,monospace;color:var(--ash);margin-top:2px}
+.mf-campo input{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:9px;font:400 14px 'Inter',sans-serif;color:var(--fog);outline:none}
+.mf-campo input:focus{border-color:var(--e);box-shadow:0 0 0 3px var(--edim)}
+.mf-campo.vacio input{border-color:#FCD34D;background:#FFFBEB}
+.mf-campo.libre label::after{content:'Llénalo tú';display:inline-block;margin-left:6px;font:600 10.5px 'Inter',sans-serif;color:#B45309;background:#FEF3C7;padding:1px 6px;border-radius:99px;vertical-align:1px}
+.mf-acciones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.mf-acciones .btn{justify-content:center;width:100%}
+.mf-nota{font-size:12.5px;color:var(--ash);line-height:1.5;margin-top:12px}
+.mf-lock{display:flex;gap:8px;align-items:flex-start;background:var(--edim);color:#1E3A8A;border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin-top:14px}
+.mf-lock svg{flex:none;margin-top:2px}
+.mf-resumen{font-size:13px;color:#3A4560;margin-top:10px}
+.mf-resumen b{color:var(--tinta)}
+.mf-error{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:12px;padding:14px;margin-top:18px;font-size:14px}
+@media(max-width:900px){.mf-grid{grid-template-columns:1fr}.mf-campo{grid-template-columns:1fr;gap:6px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<a class="mf-back" href="{{ url_for('insights.index', seccion='machotes') }}">← Machotes</a>
+<h1 class="page-title" style="margin-top:6px">{{ plantilla.nombre }}</h1>
+<p class="mf-sub">{{ plantilla.categoria or 'Machote' }}{% if plantilla.tipo_derecho and plantilla.tipo_derecho != 'Otro' %} · {{ plantilla.tipo_derecho }}{% endif %} · {{ plantilla.archivo_nombre }}</p>
+
+{% if campos is none %}
+<div class="mf-error">No se pudo leer este archivo como Word (.docx). Vuelve a guardarlo desde Word y súbelo de nuevo.</div>
+{% else %}
+<div class="mf-grid">
+  <section class="mf-card">
+    <h2>1. Elige el asunto</h2>
+    <p>Los datos del asunto, del cliente y del despacho se llenan solos. Puedes ajustar cualquiera antes de generar.</p>
+    <select class="mf-sel" id="mfAsunto">
+      <option value="">Sin asunto (solo datos del despacho)</option>
+      {% for a in asuntos %}<option value="{{ a.id }}"{% if a.id == asunto_inicial %} selected{% endif %}>{{ a.numero_expediente ~ ' · ' if a.numero_expediente }}{{ a.titulo }}{{ ' — ' ~ a.cliente if a.cliente and a.cliente.strip() }}</option>{% endfor %}
+    </select>
+
+    <h2 style="margin-top:22px">2. Revisa los campos</h2>
+    {% if campos %}
+    <p>{{ campos | length }} campo{{ 's' if campos | length != 1 }} en el machote. Los que queden vacíos saldrán como línea para llenar a mano.</p>
+    <div class="mf-campos" id="mfCampos">
+      {% for c in campos %}
+      <div class="mf-campo{% if not c.conocido %} libre{% endif %}" data-clave="{{ c.clave }}">
+        <label for="c-{{ c.clave }}">{{ c.etiqueta }}<small>{{ '{{' ~ c.clave ~ '}}' }}</small></label>
+        <input id="c-{{ c.clave }}" type="text" maxlength="2000" autocomplete="off">
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p>Este Word no tiene campos <code>{{ '{{así}}' }}</code>. Se generará tal cual; agrega campos al documento para que se llene solo.</p>
+    {% endif %}
+  </section>
+
+  <aside class="mf-card">
+    <h2>3. Genera el documento</h2>
+    <div class="mf-resumen" id="mfResumen"></div>
+    <div class="mf-acciones">
+      <button class="btn btn-primary" data-accion="descargar">Descargar Word</button>
+      <button class="btn btn-secondary" data-accion="expediente" id="mfExp">Guardar en el expediente</button>
+      <button class="btn btn-secondary" data-accion="editor">Abrir en el editor</button>
+    </div>
+    <p class="mf-nota">“Guardar en el expediente” lo deja cifrado en los documentos del asunto y lo agrega a la memoria del despacho.</p>
+    <div class="mf-lock">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span>Se llena dentro del servidor del despacho. Nada de este machote se envía a servicios externos.</span>
+    </div>
+  </aside>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if campos is not none %}
+<script>
+(() => {
+  const URLS = {
+    valores: {{ url_for('insights.machote_valores', pid=plantilla.id) | tojson }},
+    generar: {{ url_for('insights.machote_generar', pid=plantilla.id) | tojson }},
+  };
+  const sel = document.getElementById('mfAsunto');
+  const filas = [...document.querySelectorAll('.mf-campo')];
+  const resumen = document.getElementById('mfResumen');
+  const editados = new Set();
+
+  function pintarResumen() {
+    const vacios = filas.filter(f => !f.querySelector('input').value.trim()).length;
+    filas.forEach(f => f.classList.toggle('vacio', !f.querySelector('input').value.trim()));
+    resumen.innerHTML = filas.length
+      ? (vacios ? `<b>${filas.length - vacios} de ${filas.length}</b> campos llenos · ${vacios} ${vacios === 1 ? 'quedará' : 'quedarán'} en blanco` : `<b>Todos los campos</b> están llenos`)
+      : '';
+    document.getElementById('mfExp').disabled = !sel.value;
+  }
+
+  async function cargar() {
+    const u = new URL(URLS.valores, location.origin);
+    if (sel.value) u.searchParams.set('asunto', sel.value);
+    const r = await fetch(u);
+    if (!r.ok) { showToast('No se pudieron cargar los datos del asunto', 'error'); return; }
+    const { valores } = await r.json();
+    filas.forEach(f => {
+      const clave = f.dataset.clave, input = f.querySelector('input');
+      if (!editados.has(clave) && clave in valores) input.value = valores[clave] || '';
+    });
+    pintarResumen();
+  }
+
+  filas.forEach(f => f.querySelector('input').addEventListener('input', () => { editados.add(f.dataset.clave); pintarResumen(); }));
+  sel.addEventListener('change', () => { editados.clear(); cargar(); });
+
+  document.querySelectorAll('[data-accion]').forEach(b => b.addEventListener('click', async () => {
+    const accion = b.dataset.accion;
+    const valores = Object.fromEntries(filas.map(f => [f.dataset.clave, f.querySelector('input').value]));
+    b.disabled = true;
+    try {
+      const r = await fetch(URLS.generar, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ accion, asunto_id: sel.value || null, valores }),
+      });
+      if (accion === 'descargar' && r.ok) {
+        const blob = await r.blob();
+        const cd = r.headers.get('Content-Disposition') || '';
+        const nombre = decodeURIComponent(cd.match(/filename\*=UTF-8''([^;]+)/i)?.[1] || cd.match(/filename="?([^";]+)/i)?.[1] || 'documento.docx');
+        const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: nombre });
+        a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        showToast('Documento generado');
+        return;
+      }
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { showToast(j.error || 'No se pudo generar el documento', 'error'); return; }
+      if (accion === 'expediente') { showToast('Guardado en el expediente'); setTimeout(() => location.href = j.url, 700); }
+      else location.href = j.url;
+    } finally { b.disabled = false; pintarResumen(); }
+  }));
+
+  cargar();
+})();
+</script>
+{% endif %}
+{% endblock %}

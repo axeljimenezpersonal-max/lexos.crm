@@ -1,0 +1,137 @@
+{# Alta y edición de cliente. Se incluye en la lista y en la ficha.
+   Expone window.abrirCliente(id?) — sin id abre el alta. #}
+<div class="as-modal" id="clModal" role="dialog" aria-modal="true" aria-labelledby="clModalT">
+  <form class="as-modal-c ancho" id="clForm" novalidate>
+    <input type="hidden" name="forzar" value="">
+    <input type="hidden" name="volver" value="{{ volver or '' }}">
+    <div class="as-modal-h"><h3 id="clModalT">Nuevo cliente</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <div class="cb-seg" role="radiogroup" aria-label="Tipo de cliente">
+        <label><input type="radio" name="tipo" value="persona_fisica" checked><span>Persona física</span></label>
+        <label><input type="radio" name="tipo" value="persona_moral"><span>Empresa</span></label>
+      </div>
+      <div class="cb-form">
+        <div data-fisica><label class="as-label" for="clNombre">Nombre(s)</label><input class="as-input" id="clNombre" name="nombre" maxlength="120" autocomplete="off"></div>
+        <div data-fisica><label class="as-label" for="clApellidos">Apellidos</label><input class="as-input" id="clApellidos" name="apellidos" maxlength="120" autocomplete="off"></div>
+        <div class="full" data-moral hidden><label class="as-label" for="clRazon">Razón social</label><input class="as-input" id="clRazon" name="razon_social" maxlength="200" placeholder="Ej. Constructora Omega S.A. de C.V." autocomplete="off"></div>
+        <div class="full" data-moral hidden><label class="as-label" for="clContacto">¿Con quién hablamos? <small>(contacto)</small></label><input class="as-input" id="clContacto" name="contacto_principal" maxlength="160" placeholder="Nombre y puesto"></div>
+        <div><label class="as-label" for="clCel">Celular <small>(WhatsApp)</small></label><input class="as-input" id="clCel" name="celular" type="tel" maxlength="30" inputmode="tel" placeholder="55 1234 5678"></div>
+        <div><label class="as-label" for="clEmail">Correo</label><input class="as-input" id="clEmail" name="email" type="email" maxlength="160" placeholder="nombre@correo.com"></div>
+        <div><label class="as-label" for="clRfc">RFC <small>(opcional)</small></label><input class="as-input" id="clRfc" name="rfc" maxlength="13" style="text-transform:uppercase" autocomplete="off"></div>
+        <div>
+          <span class="as-label">Es…</span>
+          <div class="cb-seg">
+            <label><input type="radio" name="estatus" value="activo" checked><span>Cliente</span></label>
+            <label><input type="radio" name="estatus" value="prospecto"><span>Prospecto</span></label>
+            <label data-solo-editar hidden><input type="radio" name="estatus" value="inactivo"><span>Inactivo</span></label>
+          </div>
+        </div>
+        <div><label class="as-label" for="clAbogado">Responsable</label>
+          <select class="as-select" id="clAbogado" name="abogado_id"><option value="">Sin asignar</option>
+            {% for ab in abogados %}<option value="{{ ab.id }}"{% if ab.id == session.get('user_id') %} data-yo{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}</select></div>
+        <div><label class="as-label" for="clOrigen">¿Cómo llegó?</label>
+          <select class="as-select" id="clOrigen" name="origen_cliente"><option value="">—</option>{% for o in origenes %}<option>{{ o }}</option>{% endfor %}</select></div>
+        <div class="full cl-dup" id="clDup" hidden></div>
+      </div>
+      <details class="cb-mas" id="clMas">
+        <summary>Domicilio, identificación y más datos</summary>
+        <div class="cb-form">
+          <div data-fisica><label class="as-label" for="clCurp">CURP</label><input class="as-input" id="clCurp" name="curp" maxlength="18" style="text-transform:uppercase" autocomplete="off"></div>
+          <div data-fisica><label class="as-label" for="clNac">Fecha de nacimiento</label><input class="as-input" type="date" id="clNac" name="fecha_nacimiento"></div>
+          <div data-moral hidden><label class="as-label" for="clRep">Representante legal</label><input class="as-input" id="clRep" name="representante_legal" maxlength="160"></div>
+          <div data-moral hidden><label class="as-label" for="clGiro">Giro</label><input class="as-input" id="clGiro" name="giro_comercial" maxlength="120" placeholder="Ej. Construcción"></div>
+          <div><label class="as-label" for="clTel">Otro teléfono</label><input class="as-input" id="clTel" name="telefono" type="tel" maxlength="30" inputmode="tel"></div>
+          <div><label class="as-label" for="clEtiq">Etiquetas <small>(separadas por coma)</small></label><input class="as-input" id="clEtiq" name="etiquetas" maxlength="300" placeholder="vip, corporativo"></div>
+          <div class="full"><label class="as-label" for="clCalle">Calle</label><input class="as-input" id="clCalle" name="direccion" maxlength="200"></div>
+          <div class="as-fila2"><div><label class="as-label" for="clExt">Núm. ext.</label><input class="as-input" id="clExt" name="num_ext" maxlength="20"></div>
+            <div><label class="as-label" for="clInt">Núm. int.</label><input class="as-input" id="clInt" name="num_int" maxlength="20"></div></div>
+          <div><label class="as-label" for="clCol">Colonia</label><input class="as-input" id="clCol" name="colonia" maxlength="120"></div>
+          <div><label class="as-label" for="clMun">Municipio o alcaldía</label><input class="as-input" id="clMun" name="municipio" maxlength="120"></div>
+          <div class="as-fila2"><div><label class="as-label" for="clCp">C.P.</label><input class="as-input" id="clCp" name="cp" maxlength="5" inputmode="numeric"></div>
+            <div><label class="as-label" for="clCiudad">Ciudad</label><input class="as-input" id="clCiudad" name="ciudad" maxlength="120"></div></div>
+          <div><label class="as-label" for="clEstado">Estado</label>
+            <select class="as-select" id="clEstado" name="estado"><option value="">—</option>{% for e in estados_mx %}<option>{{ e }}</option>{% endfor %}</select></div>
+          <div class="full"><label class="as-label" for="clNotas">Notas internas</label><textarea class="as-textarea" id="clNotas" name="notas" rows="2" maxlength="3000" placeholder="Lo que el equipo debe saber de este cliente"></textarea></div>
+        </div>
+      </details>
+    </div>
+    <div class="as-modal-f">
+      <button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button>
+      <button class="btn btn-primary" id="clGuardar">Guardar cliente</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(() => {
+  const XHR = { 'X-Requested-With': 'XMLHttpRequest' };
+  const modal = document.getElementById('clModal'), form = document.getElementById('clForm');
+  const dup = document.getElementById('clDup'), btn = document.getElementById('clGuardar');
+  let editando = null;
+  const fecha = (el, v) => { if (el._flatpickr) el._flatpickr.setDate(v || null, false); else el.value = v || ''; };
+
+  function tipo() {
+    const moral = form.tipo.value === 'persona_moral';
+    form.querySelectorAll('[data-moral]').forEach(e => e.hidden = !moral);
+    form.querySelectorAll('[data-fisica]').forEach(e => e.hidden = moral);
+    form.rfc.placeholder = moral ? '12 caracteres' : '13 caracteres';
+    form.rfc.maxLength = moral ? 12 : 13;
+  }
+  form.addEventListener('change', e => { if (e.target.name === 'tipo') tipo(); });
+  form.addEventListener('input', e => { if (['rfc', 'email', 'celular'].includes(e.target.name)) { dup.hidden = true; form.forzar.value = ''; } });
+  modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-cerrar]')) modal.classList.remove('open'); });
+
+  window.abrirCliente = async (id) => {
+    form.reset(); editando = id || null; dup.hidden = true; form.forzar.value = '';
+    fecha(form.fecha_nacimiento, '');
+    form.querySelectorAll('[data-solo-editar]').forEach(e => e.hidden = !editando);
+    document.getElementById('clModalT').textContent = editando ? 'Editar datos del cliente' : 'Nuevo cliente';
+    btn.textContent = editando ? 'Guardar cambios' : 'Guardar cliente';
+    document.getElementById('clMas').open = false;
+    if (editando) {
+      const r = await fetch(`/clientes/${id}/datos`, { headers: XHR }); if (!r.ok) return;
+      const d = await r.json();
+      for (const el of form.elements) {
+        if (!el.name || ['forzar', 'volver'].includes(el.name)) continue;
+        if (el.type === 'radio') el.checked = (d[el.name] || (el.name === 'estatus' ? 'activo' : 'persona_fisica')) === el.value;
+        else if (el.name === 'fecha_nacimiento') fecha(el, (d.fecha_nacimiento || '').slice(0, 10));
+        else if (el.name in d) el.value = d[el.name] ?? '';
+      }
+      document.getElementById('clMas').open = !!(d.direccion || d.curp || d.representante_legal || d.notas);
+    } else {
+      const yo = form.abogado_id.querySelector('[data-yo]'); if (yo) yo.selected = true;
+    }
+    tipo(); modal.classList.add('open');
+    setTimeout(() => (form.tipo.value === 'persona_moral' ? form.razon_social : form.nombre).focus(), 40);
+  };
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const moral = form.tipo.value === 'persona_moral';
+    const req = moral ? form.razon_social : form.nombre;
+    if (!req.value.trim()) { showToast(moral ? 'Escribe la razón social' : 'Escribe el nombre del cliente', 'error'); req.focus(); return; }
+    btn.disabled = true;
+    try {
+      const r = await fetch(editando ? `/clientes/${editando}/editar` : '/clientes/crear', { method: 'POST', headers: XHR, body: new FormData(form) });
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 409 && d.duplicados) {
+        dup.innerHTML = '<b>¿Ya lo tienes registrado?</b> ';
+        d.duplicados.forEach((x, i) => {
+          const a = document.createElement('a'); a.href = x.url; a.textContent = x.nombre; a.target = '_blank';
+          dup.append(i ? ', ' : '', a, ` tiene ${x.motivo}`);
+        });
+        dup.append('. Si es otra persona, vuelve a guardar.');
+        dup.hidden = false; form.forzar.value = '1'; dup.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      if (!r.ok || !d.ok) { showToast(d.error || 'No se pudo guardar', 'error'); return; }
+      if (editando) { try { sessionStorage.setItem('clToast', 'Datos actualizados'); } catch (_) {} location.reload(); }
+      else location.href = d.redirect;
+    } catch (_) { showToast('Sin conexión con el servidor', 'error'); }
+    finally { btn.disabled = false; }
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    try { const t = sessionStorage.getItem('clToast'); if (t) { sessionStorage.removeItem('clToast'); showToast(t); } } catch (_) {}
+  });
+})();
+</script>

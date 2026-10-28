@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Habeas Corpus · R1 y dos versiones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--azul:#1D3FD6;--tinta:#0A1A4A;--cielo:#5BC0FF;--gris:#5B6478;--borde:rgba(10,26,74,.10)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:400 15px/1.55 Inter,system-ui,sans-serif;color:var(--tinta);background:#F6F8FC;padding:40px 16px 64px;--m1:var(--azul);--m2:#fff;--m3:var(--cielo)}
+.wrap{max-width:1180px;margin:0 auto}
+header h1{font:600 28px/1.2 Inter,sans-serif;letter-spacing:-.02em}
+header p{color:var(--gris);margin-top:6px;max-width:74ch}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:24px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid var(--borde);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.card.yours{box-shadow:0 0 0 2px var(--azul)}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:16px 20px;border-bottom:1px solid var(--borde)}
+.card-h b{font-size:16px;font-weight:600}
+.card-h span{font-size:12px;color:var(--gris)}
+.idea{padding:12px 20px 0;color:var(--gris);font-size:14px;min-height:76px}
+.big{margin:16px 20px 0;height:200px;border-radius:10px;border:1px solid var(--borde);display:grid;place-items:center}
+.big svg{width:150px;height:150px}
+.panel{margin:12px 20px 0;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:22px 14px}
+.light{background:#fff;border:1px solid var(--borde)}
+.dark{background:var(--tinta);--m1:#fff;--m2:var(--tinta)}
+.lockup{display:flex;align-items:center;gap:12px}
+.lockup svg{width:46px;height:46px;flex:0 0 auto}
+.wm{line-height:1;font-family:Sora,sans-serif}
+.wm .n{font-size:21px;letter-spacing:-.02em;white-space:nowrap}
+.wm .n b{font-weight:600}.wm .n i{font-style:normal;font-weight:300}
+.wm .t{font-size:9px;letter-spacing:.26em;text-transform:uppercase;margin-top:7px;opacity:.6}
+.dark .wm{color:#fff}
+.sizes{display:flex;align-items:flex-end;gap:16px;padding:16px 20px 20px;margin-top:auto}
+.sizes figure{display:flex;flex-direction:column;align-items:center;gap:6px}
+.sizes figcaption{font-size:11px;color:var(--gris)}
+.app-ic{display:grid;place-items:center;border-radius:22%;background:var(--azul);--m1:#fff;--m2:var(--azul)}
+.tab{display:flex;align-items:center;gap:8px;background:#E7EBF3;border-radius:8px 8px 0 0;padding:8px 12px;font-size:12px;margin-left:auto}
+.tab svg{width:16px;height:16px}
+.p{fill:var(--m1)} .i{fill:var(--m2)} .a{fill:var(--m3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>R1 y dos versiones</h1>
+  <p>La R1 tal cual a la izquierda, para comparar. La A le suma arquitectura: un arco interior, doble escalón, más estrías y una clave más grande. La B va al revés: columnas más gruesas y sin estrías, para que se vea igual de fuerte en el ícono chico.</p>
+</header>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="r1" viewBox="0 0 64 64">
+      <path class="p" d="M10 56V31a22 22 0 0 1 44 0v25Z"/>
+      <rect class="p" x="6" y="57.5" width="52" height="3" rx="1"/>
+      <path class="a" d="M28.5 8.6h7l-1.2 8h-4.6Z"/>
+      <g class="i">
+        <rect x="17" y="27.5" width="12" height="2.4" rx=".5"/><rect x="18.8" y="29.9" width="8.4" height="1.6"/>
+        <rect x="20" y="31.5" width="6" height="16.5"/>
+        <rect x="18.8" y="48" width="8.4" height="1.6"/><rect x="17" y="49.6" width="12" height="2.6" rx=".5"/>
+        <rect x="35" y="27.5" width="12" height="2.4" rx=".5"/><rect x="36.8" y="29.9" width="8.4" height="1.6"/>
+        <rect x="38" y="31.5" width="6" height="16.5"/>
+        <rect x="36.8" y="48" width="8.4" height="1.6"/><rect x="35" y="49.6" width="12" height="2.6" rx=".5"/>
+      </g>
+      <rect class="p" x="22.1" y="32.5" width=".9" height="14.5"/><rect class="p" x="23.9" y="32.5" width=".9" height="14.5"/>
+      <rect class="p" x="40.1" y="32.5" width=".9" height="14.5"/><rect class="p" x="41.9" y="32.5" width=".9" height="14.5"/>
+      <rect class="a" x="26" y="37.5" width="12" height="4"/>
+    </symbol>
+
+    <symbol id="ra" viewBox="0 0 64 64">
+      <path class="p" d="M10 54.5V31a22 22 0 0 1 44 0v23.5Z"/>
+      <path d="M14.5 31a17.5 17.5 0 0 1 35 0" style="fill:none;stroke:var(--m2)" stroke-width="1.3" opacity=".9"/>
+      <rect class="p" x="7" y="55.8" width="50" height="2.6" rx=".8"/>
+      <rect class="p" x="3.5" y="59.6" width="57" height="2.6" rx=".8"/>
+      <path class="a" d="M28 7.6h8l-1.5 10h-5Z"/>
+      <g class="i">
+        <rect x="17" y="27.5" width="12" height="2.4" rx=".5"/><rect x="18.8" y="29.9" width="8.4" height="1.6"/>
+        <rect x="20" y="31.5" width="6" height="16"/>
+        <rect x="18.8" y="47.5" width="8.4" height="1.6"/><rect x="17" y="49.1" width="12" height="2.6" rx=".5"/>
+        <rect x="35" y="27.5" width="12" height="2.4" rx=".5"/><rect x="36.8" y="29.9" width="8.4" height="1.6"/>
+        <rect x="38" y="31.5" width="6" height="16"/>
+        <rect x="36.8" y="47.5" width="8.4" height="1.6"/><rect x="35" y="49.1" width="12" height="2.6" rx=".5"/>
+      </g>
+      <g class="p">
+        <rect x="21.3" y="32.4" width=".7" height="14.2"/><rect x="22.65" y="32.4" width=".7" height="14.2"/><rect x="24" y="32.4" width=".7" height="14.2"/>
+        <rect x="39.3" y="32.4" width=".7" height="14.2"/><rect x="40.65" y="32.4" width=".7" height="14.2"/><rect x="42" y="32.4" width=".7" height="14.2"/>
+      </g>
+      <rect class="a" x="26" y="37.3" width="12" height="4"/>
+    </symbol>
+
+    <symbol id="rb" viewBox="0 0 64 64">
+      <path class="p" d="M10 56V31a22 22 0 0 1 44 0v25Z"/>
+      <rect class="p" x="6" y="57.5" width="52" height="3.2" rx="1"/>
+      <path class="a" d="M28.5 8.4h7l-1.2 8.2h-4.6Z"/>
+      <g class="i">
+        <rect x="15.5" y="26" width="15" height="3.4" rx=".8"/>
+        <rect x="19" y="29.4" width="8" height="19.4"/>
+        <rect x="15.5" y="48.8" width="15" height="3.6" rx=".8"/>
+        <rect x="33.5" y="26" width="15" height="3.4" rx=".8"/>
+        <rect x="37" y="29.4" width="8" height="19.4"/>
+        <rect x="33.5" y="48.8" width="15" height="3.6" rx=".8"/>
+      </g>
+      <rect class="a" x="27" y="36.6" width="10" height="5.2"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="grid" id="grid"></div>
+</div>
+
+<template id="tpl">
+  <section class="card">
+    <div class="card-h"><b></b><span></span></div>
+    <p class="idea"></p>
+    <div class="big"><svg><use/></svg></div>
+    <div class="panel light"><div class="lockup"><svg><use/></svg><div class="wm"><div class="n"><b>Habeas</b> <i>Corpus</i></div><div class="t">Sistema legal</div></div></div></div>
+    <div class="panel dark"><div class="lockup"><svg><use/></svg><div class="wm"><div class="n"><b>Habeas</b> <i>Corpus</i></div><div class="t">Sistema legal</div></div></div></div>
+    <div class="sizes">
+      <figure><span class="app-ic" style="width:56px;height:56px"><svg width="38" height="38"><use/></svg></span><figcaption>App</figcaption></figure>
+      <figure><svg width="32" height="32"><use/></svg><figcaption>32 px</figcaption></figure>
+      <figure><svg width="16" height="16"><use/></svg><figcaption>16 px</figcaption></figure>
+      <span class="tab"><svg><use/></svg>Habeas Corpus</span>
+    </div>
+  </section>
+</template>
+
+<script>
+const V = [
+  ['r1', 'R1 · La tuya', 'Original', 'Tal cual la elegiste: columnas con capitel, estrías y base, clave en cuña y un escalón.', true],
+  ['ra', 'R1 · A', 'Más arquitectura', 'Agrega un arco interior en línea, doble escalón como escalinata, tres estrías por columna y una clave más grande. Más detalle, más tribunal.'],
+  ['rb', 'R1 · B', 'Más sólida', 'Columnas más gruesas, capitel y base más marcados, sin estrías. Se ve igual de fuerte en 16 px y en la app.'],
+];
+const grid = document.getElementById('grid'), tpl = document.getElementById('tpl');
+V.forEach(([id, t, tag, idea, yours]) => {
+  const c = tpl.content.cloneNode(true);
+  if (yours) c.querySelector('.card').classList.add('yours');
+  c.querySelector('.card-h b').textContent = t;
+  c.querySelector('.card-h span').textContent = tag;
+  c.querySelector('.idea').textContent = idea;
+  c.querySelectorAll('use').forEach(u => u.setAttribute('href', '#' + id));
+  grid.append(c);
+});
+</script>
+</body>
+</html>

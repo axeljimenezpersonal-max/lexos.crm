@@ -212,7 +212,8 @@
       </div>
       <div class="bib-pl-actions">
         <a href="{{ url_for('biblioteca.plantilla_descargar', id=p.id) }}" class="btn btn-secondary btn-sm">⬇ Descargar</a>
-        <a href="{{ url_for('biblioteca.editor', plantilla=p.id) }}" class="btn btn-primary btn-sm">{{ icon_edit(12, 12) }} Usar en editor</a>
+        {% if p.archivo_url and p.archivo_url.endswith('.docx') %}<a href="{{ url_for('insights.machote', pid=p.id) }}" class="btn btn-primary btn-sm">Llenar con un asunto</a>{% endif %}
+        <a href="{{ url_for('biblioteca.editor', plantilla=p.id) }}" class="btn btn-secondary btn-sm">{{ icon_edit(12, 12) }} Usar en editor</a>
         <button class="btn btn-ghost btn-sm" onclick="eliminarPlantilla({{ p.id }})">{{ icon_trash(12, 12) }}</button>
       </div>
     </div>

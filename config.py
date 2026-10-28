@@ -16,6 +16,19 @@ class Config:
     BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "lexos.mx")
     DEFAULT_TENANT_SLUG = os.environ.get("DEFAULT_TENANT_SLUG", "")
     ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg", "gif", "txt"}
+
+    # ─── Bóveda de documentos ────────────────────────────────────────────────
+    # Carpeta privada (fuera de /static): nunca se sirve directo, solo por /archivos/ con sesión.
+    BOVEDA_DIR = os.path.join(BASE_DIR, os.environ.get("BOVEDA_DIR", "storage"))
+    # Llave maestra (base64 urlsafe, 32 bytes). En producción es obligatoria y debe respaldarse:
+    # si se pierde, los documentos cifrados no se pueden recuperar.
+    BOVEDA_MASTER_KEY = os.environ.get("BOVEDA_MASTER_KEY", "")
+
+    # ─── Asistente jurídico ─────────────────────────────────────────────────
+    ASISTENTE_NOMBRE = os.environ.get("ASISTENTE_NOMBRE", "Tribuno")
+    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+    ASISTENTE_MODELO = os.environ.get("ASISTENTE_MODELO", "claude-sonnet-5-5")
+    ASISTENTE_MODELO_RAPIDO = os.environ.get("ASISTENTE_MODELO_RAPIDO", "claude-haiku-5-5")
     WTF_CSRF_ENABLED = True
 
     # ─── Sesión ───────────────────────────────────────────────────────────────
@@ -32,6 +45,7 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get(
         "MAIL_DEFAULT_SENDER", "LexOS <noreply@lexos.mx>"
     )
+    CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
 
     # ─── Google Calendar OAuth ──────────────────────────────────────────────────
     GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")

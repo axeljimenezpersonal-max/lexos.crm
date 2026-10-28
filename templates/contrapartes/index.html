@@ -2,7 +2,7 @@
 {% block page_title %}Contrapartes{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/clientes.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/contrapartes-base.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/contrapartes.css') }}">
 <style>
 .cl-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
@@ -26,7 +26,7 @@
 {% block content %}
 
 <div class="page-header">
-  <div class="page-eyebrow">Gestión · Códex</div>
+  <div class="page-eyebrow">Gestión · Habeas Corpus</div>
   <h1 class="page-title">Contrapartes</h1>
   <div class="page-meta-row">
     <span class="page-count">{{ total }} contraparte{{ 's' if total != 1 else '' }}</span>
