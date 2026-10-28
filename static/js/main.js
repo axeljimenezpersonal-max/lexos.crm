@@ -300,8 +300,8 @@ window.initCalendar = function(tenantSlug) {
 // ── Chart.js wrappers ─────────────────────────────────────────────────────────
 window.LexCharts = {
   colors: {
-    accent: "#00DFA2", success: "#10B981", warning: "#F59E0B",
-    danger: "#EF4444", info: "#3B82F6", muted: "#1C2630",
+    accent: "#AD9060", success: "#4F6D8A", warning: "#B08A4A",
+    danger: "#B5483F", info: "#3D5A80", muted: "#1C2630",
     text: "#8A9BA8", grid: "#1C2630",
   },
   defaults() {

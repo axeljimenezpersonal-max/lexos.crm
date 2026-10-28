@@ -9,48 +9,53 @@
   <title>Registrar despacho — Habeas Corpus</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+  .hc-left{position:relative;overflow:hidden;background:#132238;background-image:radial-gradient(700px 420px at 50% -10%,rgba(173,144,96,.16),transparent 60%);border-right:0;color:#fff;align-items:flex-start}
+  .hc-left-in{position:relative;max-width:420px;margin:0 auto;width:100%}
+  .hc-arco{position:absolute;right:-30px;bottom:-20px;width:360px;height:360px;color:#AD9060;opacity:.35}
+  .hc-left .al-logo{margin-bottom:56px}
+  .hc-marca{font:600 20px/1 Sora,sans-serif;color:#fff;letter-spacing:-.02em}
+  .hc-marca span{font-weight:300}
+  .hc-marca-sub{font:600 10.5px Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#C1A574;margin-top:5px}
+  .hc-desp{display:flex;align-items:center;gap:12px;margin-bottom:34px}
+  .hc-desp span{width:44px;height:44px;border-radius:12px;border:1px solid rgba(193,165,116,.6);color:#C1A574;display:grid;place-items:center;font:600 18px Sora,sans-serif}
+  .hc-desp b{display:block;font:600 15px Inter,sans-serif;color:#fff}
+  .hc-desp small{font-size:12.5px;color:#9AA4B5}
+  .hc-left h2{font:600 clamp(30px,3vw,40px)/1.1 Sora,sans-serif;letter-spacing:-.03em;color:#fff;margin:0 0 14px}
+  .hc-left p{font-size:16px;line-height:1.6;color:#C9D0DC;max-width:380px}
+  .hc-lista{list-style:none;margin:30px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
+  .hc-lista li{display:flex;gap:12px;align-items:flex-start;font-size:15px;color:#E9E4D8}
+  .hc-lista li::before{content:"";flex:none;width:18px;height:18px;margin-top:1px;border-radius:50%;background:#AD9060 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23132238' stroke-width='3.2'%3E%3Cpath d='m6 12 4 4 8-9'/%3E%3C/svg%3E") center/12px no-repeat}
+  .ar-inner .ar-header h1{font:600 32px/1.1 Sora,sans-serif;letter-spacing:-.03em;color:#132238}
+  </style>
+  <style>.hc-left .hc-acceso{margin-top:34px;font-size:14px;color:#9AA4B5}.hc-left .hc-acceso a{color:#C1A574;font-weight:600;text-decoration:none}</style>
 </head>
 <body>
 <div class="auth-split" style="grid-template-columns: 1fr 1.4fr;">
 
   <!-- Left panel -->
-  <div class="auth-left">
-    <div class="al-logo">
-      {{ logo_mark(30) }}
-      <div>
-        <div style="font-weight:700;font-size:1.15rem;color:#0A1A4A;letter-spacing:-0.01em;">Habeas <span style="font-weight:400;">Corpus</span></div>
-        <div style="font-size:.65rem;color:#64748B;text-transform:uppercase;letter-spacing:.8px;">Sistema Legal</div>
+  <div class="auth-left hc-left">
+    <svg class="hc-arco" viewBox="0 0 220 220" aria-hidden="true"><path d="M30 220V108a80 80 0 0 1 160 0v112" fill="none" stroke="currentColor" stroke-width="1"/><path d="M50 220V110a60 60 0 0 1 120 0v110" fill="none" stroke="currentColor" stroke-width=".6" opacity=".6"/><path d="M100 14h20l-4 22h-12z" fill="currentColor"/></svg>
+    <div class="hc-left-in">
+      <div class="al-logo">
+        {{ logo_mark(34, 'dark', '#132238') }}
+        <div>
+          <div class="hc-marca">Habeas <span>Corpus</span></div>
+          <div class="hc-marca-sub">Sistema Legal</div>
+        </div>
       </div>
-    </div>
-
-    <h2>Tu despacho digital comienza hoy</h2>
-    <p>Miles de abogados en México ya gestionan sus clientes, asuntos y cobranza desde Habeas Corpus. Únete en menos de 2 minutos.</p>
-
-    <div style="margin-top:32px;display:flex;flex-direction:column;gap:14px;">
-      {% for icon, texto in [
-        (icon_check_circle(16,16), 'Expedientes digitales con historial completo'),
-        (icon_check_circle(16,16), 'Portal de clientes incluido en todos los planes'),
-        (icon_check_circle(16,16), 'Cobranza automatizada y recordatorios'),
-        (icon_check_circle(16,16), 'Calendario legal con alertas de plazos'),
-        (icon_check_circle(16,16), 'Datos seguros, respaldo automático'),
-      ] %}
-      <div style="display:flex;gap:10px;align-items:flex-start;font-size:.83rem;color:var(--text-2);">
-        <span style="color:var(--success);font-size:.9rem;">{{ icon }}</span>
-        {{ texto }}
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="auth-testimonial" style="margin-top:36px;">
-      <div class="quote">"En dos semanas migramos 3 años de expedientes a Habeas Corpus. El onboarding guiado hizo todo muy fácil."</div>
-      <div class="author">— Lic. M. Solís · Solís & Peña Litigantes</div>
-    </div>
-
-    <div style="margin-top:24px;text-align:center;">
-      <p class="text-xs text-muted">
-        ¿Ya tienes cuenta?
-        <a href="{{ url_for('auth.login') }}" class="text-accent">Iniciar sesión →</a>
-      </p>
+      <h2>Tu despacho, en orden desde hoy</h2>
+      <p>Crea tu cuenta en un par de minutos y prueba todo durante 10 días, sin tarjeta.</p>
+      <ul class="hc-lista">
+        <li>Expedientes con su historia, documentos y partes</li>
+        <li>Agenda de audiencias y términos del despacho</li>
+        <li>Documentos cifrados con llave propia del despacho</li>
+        <li>Portal para que tus clientes vean su avance</li>
+        <li>Cobranza con abonos y estado de cuenta</li>
+      </ul>
+      <p class="hc-acceso">¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}">Iniciar sesión →</a></p>
     </div>
   </div>
 

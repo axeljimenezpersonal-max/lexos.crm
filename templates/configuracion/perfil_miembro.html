@@ -51,12 +51,12 @@
 .prf-table a { color: var(--accent); text-decoration: none; }
 .prf-table a:hover { text-decoration: underline; }
 .prf-estado { padding: 3px 8px; border-radius: 4px; font-size: .7rem; font-weight: 600; text-transform: uppercase; }
-.prf-estado-activo { background: #10B98118; color: #10B981; }
-.prf-estado-completado { background: #3B82F618; color: #3B82F6; }
-.prf-estado-archivado { background: #6B728018; color: #6B7280; }
-.prf-prioridad-alta { color: #EF4444; font-weight: 700; }
-.prf-prioridad-media { color: #F59E0B; }
-.prf-prioridad-baja { color: #10B981; }
+.prf-estado-activo { background: #10B98118; color: #4F6D8A; }
+.prf-estado-completado { background: #3B82F618; color: #3D5A80; }
+.prf-estado-archivado { background: #6B728018; color: #60718D; }
+.prf-prioridad-alta { color: #B5483F; font-weight: 700; }
+.prf-prioridad-media { color: #B08A4A; }
+.prf-prioridad-baja { color: #4F6D8A; }
 
 /* Events */
 .prf-evt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
@@ -246,7 +246,7 @@
         <span class="prf-badge" style="background:{{ member.cargo_color }}22; color:{{ member.cargo_color }}">
           {{ member.cargo|upper }}
         </span>
-        <span class="prf-badge" style="background:{{ '#10B981' if member.estatus == 'activo' else '#EF4444' }}18; color:{{ '#10B981' if member.estatus == 'activo' else '#EF4444' }}">
+        <span class="prf-badge" style="background:{{ '#4F6D8A' if member.estatus == 'activo' else '#B5483F' }}18; color:{{ '#4F6D8A' if member.estatus == 'activo' else '#B5483F' }}">
           {{ member.estatus|upper }}
         </span>
         {% for esp in member.especialidades_list %}
@@ -295,11 +295,11 @@
   <!-- ═══ STATS ═══ -->
   <div class="prf-stats">
     <div class="prf-stat">
-      <div class="prf-stat-num" style="color:#3B82F6">{{ stats.asuntos_activos }}</div>
+      <div class="prf-stat-num" style="color:#3D5A80">{{ stats.asuntos_activos }}</div>
       <div class="prf-stat-label">Activos</div>
     </div>
     <div class="prf-stat">
-      <div class="prf-stat-num" style="color:#10B981">{{ stats.asuntos_completados }}</div>
+      <div class="prf-stat-num" style="color:#4F6D8A">{{ stats.asuntos_completados }}</div>
       <div class="prf-stat-label">Completados</div>
     </div>
     <div class="prf-stat">
@@ -307,15 +307,15 @@
       <div class="prf-stat-label">Total asuntos</div>
     </div>
     <div class="prf-stat">
-      <div class="prf-stat-num" style="color:#8B5CF6">{{ stats.eventos_proximos }}</div>
+      <div class="prf-stat-num" style="color:#8C7A5B">{{ stats.eventos_proximos }}</div>
       <div class="prf-stat-label">Eventos prox.</div>
     </div>
     <div class="prf-stat">
-      <div class="prf-stat-num" style="color:#F59E0B">{{ stats.documentos }}</div>
+      <div class="prf-stat-num" style="color:#B08A4A">{{ stats.documentos }}</div>
       <div class="prf-stat-label">Documentos</div>
     </div>
     <div class="prf-stat">
-      <div class="prf-stat-num" style="color:#EC4899">{{ stats.clientes_asignados }}</div>
+      <div class="prf-stat-num" style="color:#8E6F4A">{{ stats.clientes_asignados }}</div>
       <div class="prf-stat-label">Clientes</div>
     </div>
   </div>
@@ -392,7 +392,7 @@
     {% if eventos %}
       {% for e in eventos %}
       <div class="prf-evt">
-        <div class="prf-evt-dot" style="background:{{ {'audiencia':'#3B82F6','reunion':'#8B5CF6','vencimiento':'#F59E0B','tarea':'#10B981'}.get(e.tipo, '#6B7280') }}"></div>
+        <div class="prf-evt-dot" style="background:{{ {'audiencia':'#3D5A80','reunion':'#8C7A5B','vencimiento':'#B08A4A','tarea':'#4F6D8A'}.get(e.tipo, '#60718D') }}"></div>
         <div class="prf-evt-info">
           <div class="prf-evt-title">{{ e.titulo }}</div>
           <div class="prf-evt-meta">

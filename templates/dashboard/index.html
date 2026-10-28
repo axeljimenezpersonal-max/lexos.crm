@@ -1,303 +1,110 @@
 {% extends "base.html" %}
 {% block title %}Inicio{% endblock %}
-{% block page_title %}Inicio{% endblock %}
-
 {% block head %}
-<style>
-.dsh-hello h1{font:600 26px/1.2 'Sora',sans-serif;letter-spacing:-.02em;color:var(--tinta)}
-.dsh-hello p{color:var(--ash);margin-top:4px;font-size:15px}
-.dsh-hello p b{color:var(--fog);font-weight:600}
-
-.dsh-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px}
-.dsh-kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px;text-decoration:none;color:inherit;transition:border-color .15s}
-.dsh-kpi:hover{border-color:var(--border-m)}
-.dsh-kpi-h{display:flex;align-items:center;gap:8px;color:var(--ash);font-weight:500;font-size:13px}
-.dsh-ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}
-.dsh-ic svg{width:18px;height:18px}
-.dsh-kpi-v{font:600 30px/1 'Sora',sans-serif;letter-spacing:-.02em;color:var(--tinta)}
-.dsh-kpi-d{font-size:12.5px;color:var(--ash)}
-.dsh-kpi-d b{font-weight:600}
-.t-red{color:var(--danger)} .t-amb{color:var(--warn)} .t-grn{color:var(--ok)}
-.bg-red{background:#FEF2F2;color:var(--danger)} .bg-amb{background:#FFFBEB;color:var(--warn)} .bg-grn{background:#ECFDF5;color:var(--ok)} .bg-azul{background:var(--edim);color:var(--e)} .bg-gris{background:#F1F5F9;color:var(--tinta)}
-
-.dsh-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-top:14px}
-.dsh-stack{display:flex;flex-direction:column;gap:14px;min-width:0}
-.dsh-card{background:#fff;border:1px solid var(--border);border-radius:14px}
-.dsh-card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 6px}
-.dsh-card-h h2{font:600 15px/1.3 'Sora',sans-serif;color:var(--tinta)}
-.dsh-card-h a{font-size:12.5px;color:var(--e);font-weight:600;text-decoration:none}
-.dsh-empty{color:var(--ash);text-align:center;padding:28px 16px;font-size:13.5px}
-
-.urg{padding:6px 10px 10px}
-.urg-row{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:12px 8px;border-radius:10px;text-decoration:none;color:inherit}
-.urg-row:hover{background:#F7F8FC}
-.when{width:54px;text-align:center;border-radius:10px;padding:6px 0;line-height:1.1}
-.when b{display:block;font:600 18px 'Sora',sans-serif}
-.when small{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.urg-t{min-width:0}
-.urg-t b{font-weight:600;display:block}
-.urg-t small{color:var(--ash);font-size:12.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip{font:600 11.5px/1.4 'Inter',sans-serif;letter-spacing:normal;text-transform:none;padding:3px 9px;border-radius:99px;white-space:nowrap;border:0}
-
-.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:8px 18px 4px}
-.day{border:1px solid var(--border);border-radius:10px;padding:8px 0 10px;text-align:center;background:#fff;cursor:pointer;font:inherit;color:inherit;transition:border-color .15s,background .15s}
-.day:hover{border-color:var(--border-m)}
-.day small{display:block;font-size:11px;color:var(--ash);font-weight:600;text-transform:uppercase}
-.day b{display:block;font:600 18px 'Sora',sans-serif;color:var(--tinta);margin-top:2px}
-.day .dots{display:flex;justify-content:center;gap:3px;height:6px;margin-top:6px}
-.day .dots i{width:6px;height:6px;border-radius:50%}
-.day.today b{color:var(--e)}
-.day.sel{background:var(--e);border-color:var(--e)}
-.day.sel small,.day.sel b{color:#fff}
-.k-aud{background:var(--e)} .k-plz{background:var(--danger)} .k-reu{background:var(--cielo)}
-.day.sel .k-aud{background:#fff}
-.legend{display:flex;gap:14px;padding:0 18px 4px;font-size:12px;color:var(--ash);flex-wrap:wrap}
-.legend span{display:flex;align-items:center;gap:6px}
-.legend i{width:8px;height:8px;border-radius:50%}
-.agenda{padding:8px 18px 16px;min-height:140px}
-.ev{display:grid;grid-template-columns:76px 4px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
-.ev:first-child{border-top:0}
-.ev time{font:600 13px 'Sora',sans-serif;color:var(--tinta)}
-.ev .bar{height:34px;border-radius:2px}
-.ev b{font-weight:600;display:block}
-.ev small{color:var(--ash);font-size:12.5px}
-
-.cob{padding:6px 18px 18px}
-.cob-nums{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
-.cob-nums b{font:600 24px 'Sora',sans-serif;color:var(--tinta);letter-spacing:-.02em}
-.cob-nums small{display:block;color:var(--ash);font-size:12px}
-.prog{height:10px;border-radius:99px;background:#EEF0F6;overflow:hidden;margin:12px 0 6px;display:flex}
-.prog i{display:block;height:100%}
-.prog-l{display:flex;justify-content:space-between;font-size:12px;color:var(--ash);gap:10px}
-.debt{margin-top:14px;border-top:1px solid var(--border)}
-.debt-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);text-decoration:none;color:inherit}
-.debt-row:last-child{border-bottom:0}
-.debt-row b{font-weight:600}
-.debt-row small{display:block;color:var(--ash);font-size:12px}
-.debt-row .m{font:600 14px 'Sora',sans-serif;white-space:nowrap}
-
-.todo{padding:4px 12px 12px}
-.task{display:flex;gap:12px;align-items:flex-start;padding:10px 6px;border-radius:8px;cursor:pointer}
-.task:hover{background:#F7F8FC}
-.task input{appearance:none;-webkit-appearance:none;width:18px;height:18px;border:1.8px solid #B9C1D6;border-radius:5px;margin-top:2px;flex:0 0 auto;display:grid;place-items:center;cursor:pointer}
-.task input:checked{background:var(--e);border-color:var(--e)}
-.task input:checked::after{content:'';width:8px;height:4px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
-.task input:focus-visible{outline:2px solid var(--e);outline-offset:2px}
-.task.done b{text-decoration:line-through;color:var(--ash)}
-.task b{font-weight:500;display:block}
-.task small{color:var(--ash);font-size:12px}
-
-.stages{padding:6px 18px 18px}
-.st-bar{display:flex;height:14px;border-radius:99px;overflow:hidden;gap:3px;margin-top:8px;background:#EEF0F6}
-.st-bar i{display:block;height:100%}
-.st-leg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
-.st-leg a{border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-decoration:none;color:inherit}
-.st-leg a:hover{border-color:var(--border-m)}
-.st-leg small{display:flex;align-items:center;gap:6px;color:var(--ash);font-size:12px;font-weight:500}
-.st-leg small i{width:8px;height:8px;border-radius:2px}
-.st-leg b{font:600 20px 'Sora',sans-serif;color:var(--tinta);display:block;margin-top:4px}
-
-@media(max-width:1100px){.dsh-kpis{grid-template-columns:repeat(2,1fr)}.dsh-grid{grid-template-columns:1fr}}
-@media(max-width:860px){.st-leg{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:480px){.dsh-kpi-v{font-size:24px}.week{gap:4px;padding:8px 10px 4px}.day b{font-size:15px}.ev{grid-template-columns:62px 4px 1fr}.ev .chip{display:none}}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inicio.css') }}">
 {% endblock %}
-
 
 {% block content %}
-{% macro svg(name) -%}
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-{%- if name == 'alert' %}<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/>
-{%- elif name == 'cal' %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
-{%- elif name == 'case' %}<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>
-{%- elif name == 'money' %}<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/>
-{%- endif %}</svg>
-{%- endmacro %}
-{% set pesos = '${:,.0f}' %}
-<section class="dsh-hello">
-  <h1 id="saludo">Hola, {{ current_user.nombre if current_user else '' }}</h1>
-  <p>{{ fecha_larga }} ·
-    {% if resumen %}Tienes {% for p in resumen %}<b>{{ p }}</b>{% if not loop.last %}{{ ' y ' if loop.revindex == 2 else ', ' }}{% endif %}{% endfor %}.
-    {% else %}No tienes nada urgente. Buen día para avanzar asuntos.{% endif %}
-  </p>
+<section class="in-hero">
+  <div class="in-hero-tx">
+    <p class="in-eyebrow">{% if nombre %}Bienvenido, {{ nombre }}{% else %}Bienvenido{% endif %}</p>
+    <h1>¿Con qué expediente quieres trabajar?</h1>
+    <p class="in-sub">Consulta, crea y da seguimiento a tus expedientes jurídicos y notariales desde un solo lugar.</p>
+  </div>
+  <svg class="in-arco" viewBox="0 0 220 220" aria-hidden="true">
+    <path d="M30 210V108a80 80 0 0 1 160 0v102" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <path d="M48 210V110a62 62 0 0 1 124 0v100" fill="none" stroke="currentColor" stroke-width=".8" opacity=".6"/>
+    <path d="M100 14h20l-4 22h-12z" fill="currentColor" opacity=".9"/>
+  </svg>
 </section>
 
-<section class="dsh-kpis" aria-label="Resumen">
-  <a class="dsh-kpi" href="{{ url_for('calendario.index') }}">
-    <span class="dsh-kpi-h"><span class="dsh-ic bg-red">{{ svg('alert') }}</span>Términos esta semana</span>
-    <span class="dsh-kpi-v">{{ terminos_semana }}</span>
-    <span class="dsh-kpi-d">
-      {% if terminos_vencidos %}<b class="t-red">{{ terminos_vencidos }} vencido{{ 's' if terminos_vencidos != 1 }}</b>{% endif %}
-      {% if terminos_vencidos and terminos_pronto %} · {% endif %}
-      {% if terminos_pronto %}<b class="t-red">{{ terminos_pronto }} hoy o mañana</b>{% elif not terminos_vencidos %}Ninguno para hoy o mañana{% endif %}
+<section class="in-acciones" aria-label="Acciones principales">
+  <a class="in-accion oscura" href="{{ url_for('asuntos.index') }}">
+    <span class="in-ico" aria-hidden="true">
+      <svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 9h14l8 8v22a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z"/><path d="M28 9v8h8M17 24h14M17 29h14M17 34h9"/><path d="M8 14v26a3 3 0 0 0 3 3h19" opacity=".55"/></svg>
     </span>
+    <span class="in-acc-tx">
+      <small>Tus expedientes</small>
+      <b>Consultar expedientes</b>
+      <span>Busca y revisa expedientes, documentos y actuaciones.</span>
+      <em>{{ en_curso }} en curso{% if archivados %} · {{ archivados }} archivado{{ 's' if archivados != 1 }}{% endif %}</em>
+    </span>
+    <span class="in-flecha" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
   </a>
-  <a class="dsh-kpi" href="{{ url_for('calendario.index') }}">
-    <span class="dsh-kpi-h"><span class="dsh-ic bg-azul">{{ svg('cal') }}</span>Hoy en tu agenda</span>
-    <span class="dsh-kpi-v">{{ agenda_hoy }}</span>
-    <span class="dsh-kpi-d">{{ agenda_nota or 'Sin audiencias ni citas hoy' }}</span>
-  </a>
-  <a class="dsh-kpi" href="{{ url_for('asuntos.index') }}">
-    <span class="dsh-kpi-h"><span class="dsh-ic bg-gris">{{ svg('case') }}</span>Asuntos activos</span>
-    <span class="dsh-kpi-v">{{ asuntos_activos }}</span>
-    <span class="dsh-kpi-d">{% if sin_movimiento %}<b class="t-amb">{{ sin_movimiento }} sin movimiento</b> en 30 días{% else %}Todos con movimiento reciente{% endif %}</span>
-  </a>
-  <a class="dsh-kpi" href="{{ url_for('cobranzas.index') }}">
-    <span class="dsh-kpi-h"><span class="dsh-ic bg-grn">{{ svg('money') }}</span>Por cobrar</span>
-    <span class="dsh-kpi-v">{{ pesos.format(por_cobrar) }}</span>
-    <span class="dsh-kpi-d">Cobrado este mes <b class="t-grn">{{ pesos.format(cobrado_mes) }}</b></span>
+  <a class="in-accion clara" href="{{ url_for('asuntos.nuevo') }}">
+    <span class="in-ico" aria-hidden="true">
+      <svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 9h14l8 8v22a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z"/><path d="M28 9v8h8M17 24h14M17 29h9"/></svg>
+      <i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg></i>
+    </span>
+    <span class="in-acc-tx">
+      <small>Nuevo expediente</small>
+      <b>Crear expediente</b>
+      <span>Registra un nuevo asunto y comienza a integrarlo.</span>
+    </span>
+    <span class="in-flecha" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
   </a>
 </section>
 
-<div class="dsh-grid">
-  <div class="dsh-stack">
-    <section class="dsh-card">
-      <div class="dsh-card-h"><h2>Lo urgente</h2><a href="{{ url_for('calendario.index') }}">Ver calendario</a></div>
-      {% if urgentes %}
-      <div class="urg">
-        {% for u in urgentes %}
-        <a class="urg-row" href="{{ u.url }}">
-          <span class="when bg-{{ u.tono }}"><b>{{ '%02d' % u.dia }}</b><small>{{ u.mes }}</small></span>
-          <span class="urg-t"><b>{{ u.titulo }}</b><small>{{ u.detalle }}</small></span>
-          <span class="chip bg-{{ 'azul' if u.cuando == 'Audiencia' else u.tono }}">{{ u.cuando }}</span>
-        </a>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="dsh-empty">Sin términos ni audiencias en las próximas dos semanas.</p>
-      {% endif %}
-    </section>
+<form class="in-buscar" action="{{ url_for('asuntos.index') }}" method="get" role="search">
+  <input type="hidden" name="grupo" value="todos">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+  <label class="sr" for="inBuscar">Buscar expedientes</label>
+  <input id="inBuscar" name="q" type="search" placeholder="Buscar por número de expediente, nombre, cliente o palabra clave…" autocomplete="off">
+  <a class="in-filtros" href="{{ url_for('asuntos.index') }}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>Filtros
+  </a>
+</form>
 
-    <section class="dsh-card">
-      <div class="dsh-card-h"><h2>Tu semana</h2><a href="{{ url_for('calendario.index') }}">Abrir calendario</a></div>
-      <div class="week" id="week"></div>
-      <div class="legend"><span><i class="k-aud"></i>Audiencia</span><span><i class="k-plz"></i>Término</span><span><i class="k-reu"></i>Reunión y otros</span></div>
-      <div class="agenda" id="agenda" aria-live="polite"></div>
-    </section>
-  </div>
-
-  <div class="dsh-stack">
-    <section class="dsh-card">
-      <div class="dsh-card-h"><h2>Cobranza de {{ mes_nombre }}</h2><a href="{{ url_for('cobranzas.index') }}">Ir a cobranza</a></div>
-      <div class="cob">
-        <div class="cob-nums">
-          <span><small>Cobrado</small><b>{{ pesos.format(cobrado_mes) }}</b></span>
-          <span style="text-align:right"><small>Pendiente</small><b>{{ pesos.format(por_cobrar) }}</b></span>
-        </div>
-        <div class="prog" role="img" aria-label="{{ pct_cobrado }}% cobrado">
-          <i style="width:{{ pct_cobrado }}%;background:var(--ok)"></i><i style="width:{{ pct_vencido }}%;background:var(--danger)"></i>
-        </div>
-        <div class="prog-l"><span>{{ pct_cobrado }}% cobrado</span>{% if vencido %}<span class="t-red">{{ pesos.format(vencido) }} vencido</span>{% endif %}</div>
-        {% if deudores %}
-        <div class="debt">
-          {% for d in deudores %}
-          <a class="debt-row" href="{{ url_for('clientes.detalle', id=d.cliente_id) if d.cliente_id else url_for('cobranzas.index') }}">
-            <span><b>{{ d.cliente }}</b><small>{{ d.nota }}</small></span>
-            <span class="m{{ ' t-red' if d.tarde }}">{{ pesos.format(d.debe) }}</span>
-          </a>
-          {% endfor %}
-        </div>
-        {% else %}
-        <p class="dsh-empty" style="padding-bottom:6px">Nadie te debe. Todo al corriente.</p>
-        {% endif %}
-      </div>
-    </section>
-
-    <section class="dsh-card">
-      <div class="dsh-card-h"><h2>Tus pendientes</h2></div>
-      {% if tareas %}
-      <div class="todo">
-        {% for t in tareas %}
-        <label class="task">
-          <input type="checkbox" data-url="{{ url_for('dashboard.tarea_estado', tarea_id=t.id) }}" aria-label="Marcar como hecha: {{ t.titulo }}">
-          <span><b>{{ t.titulo }}</b><small><span class="{{ 't-red' if t.atrasada }}">{{ t.cuando }}</span>{% if t.asunto %} · {{ t.asunto }}{% endif %}</small></span>
-        </label>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="dsh-empty">No tienes pendientes asignados.</p>
-      {% endif %}
-    </section>
-  </div>
+{% if terminos_pronto or sin_movimiento %}
+<div class="in-avisos" role="status">
+  {% if terminos_pronto %}<a href="{{ url_for('asuntos.index', atencion='termino') }}"><i class="pt rojo" aria-hidden="true"></i>{{ terminos_pronto }} término{{ 's' if terminos_pronto != 1 }} vencido{{ 's' if terminos_pronto != 1 }} o por vencer hoy y mañana</a>{% endif %}
+  {% if sin_movimiento %}<a href="{{ url_for('asuntos.index', atencion='sin_mov') }}"><i class="pt" aria-hidden="true"></i>{{ sin_movimiento }} expediente{{ 's' if sin_movimiento != 1 }} sin movimiento en 30 días</a>{% endif %}
 </div>
+{% endif %}
 
-<section class="dsh-card" style="margin-top:14px">
-  <div class="dsh-card-h"><h2>Asuntos por etapa</h2><a href="{{ url_for('asuntos.index') }}">Ver tablero</a></div>
-  <div class="stages">
-    <div class="st-bar">
-      {% for e in etapas if e.n %}<i style="flex:{{ e.n }};background:{{ e.color }}"></i>{% endfor %}
+<div class="in-paneles">
+  <section class="in-panel" aria-labelledby="inRecientes">
+    <header>
+      <h2 id="inRecientes">Expedientes recientes</h2>
+      <a href="{{ url_for('asuntos.index') }}">Ver todos <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </header>
+    {% for r in recientes %}
+    <a class="in-exp" href="{{ url_for('asuntos.detalle', id=r.id) }}">
+      <span class="in-exp-tx"><b>{{ r.titulo }}</b>{% if r.detalle %}<small>{{ r.detalle }}</small>{% endif %}</span>
+      <span class="in-exp-num">{{ r.numero }}</span>
+      <span class="in-chip e-{{ r.clave }}">{{ r.estado }}</span>
+      <span class="in-exp-fecha">{{ r.ultima }}</span>
+    </a>
+    {% else %}
+    <div class="in-vacio">
+      <b>Aún no hay expedientes</b>
+      <p>Crea el primero o importa los archivos que ya tienes.</p>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('asuntos.nuevo') }}">Crear expediente</a>
     </div>
-    <div class="st-leg">
-      {% for e in etapas %}
-      <a href="{{ url_for('asuntos.index') }}"><small><i style="background:{{ e.color }}"></i>{{ e.nombre }}</small><b>{{ e.n }}</b></a>
-      {% endfor %}
+    {% endfor %}
+    <footer>
+      <a href="{{ url_for('biblioteca.index') }}">¿Tienes expedientes en carpetas o escaneados? <b>Importar archivos existentes</b></a>
+    </footer>
+  </section>
+
+  <section class="in-panel" aria-labelledby="inVence">
+    <header>
+      <h2 id="inVence">Próximos vencimientos</h2>
+      <a href="{{ url_for('calendario.index') }}">Ver calendario <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </header>
+    {% for v in vencimientos %}
+    <a class="in-vence{{ ' vencido' if v.vencido }}" href="{{ v.url }}">
+      <span class="in-dia"><b>{{ v.dia }}</b><small>{{ v.mes }}</small></span>
+      <span class="in-exp-tx"><b>{{ v.titulo }}</b>{% if v.detalle %}<small>{{ v.detalle }}</small>{% endif %}</span>
+      <span class="in-cuando"><i class="pt{{ ' rojo' if v.vencido }}" aria-hidden="true"></i>{{ v.cuando }}</span>
+    </a>
+    {% else %}
+    <div class="in-vacio">
+      <b>Nada en los próximos 30 días</b>
+      <p>Cuando registres audiencias, términos o firmas aparecerán aquí.</p>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('calendario.index') }}#nuevo">Agendar</a>
     </div>
-  </div>
-</section>
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  const SEMANA = {{ semana | tojson }};
-  const HOY = {{ hoy_idx }};
-  const COLORES = { aud: 'var(--e)', plz: 'var(--danger)', reu: 'var(--cielo)' };
-  const week = document.getElementById('week'), agenda = document.getElementById('agenda');
-
-  function el(tag, cls, txt) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (txt != null) e.textContent = txt;
-    return e;
-  }
-  function show(i) {
-    [...week.children].forEach((c, j) => { c.classList.toggle('sel', j === i); c.setAttribute('aria-pressed', j === i); });
-    agenda.replaceChildren();
-    const evs = SEMANA[i].ev;
-    if (!evs.length) { agenda.append(el('p', 'dsh-empty', 'Día libre. Nada agendado.')); return; }
-    evs.forEach(ev => {
-      const row = el('div', 'ev');
-      row.append(el('time', '', ev.t));
-      const bar = el('i', 'bar'); bar.style.background = COLORES[ev.k]; row.append(bar);
-      const tx = el('span'); tx.append(el('b', '', ev.b)); if (ev.s) tx.append(el('small', '', ev.s)); row.append(tx);
-      row.append(ev.chip ? el('span', 'chip ' + (ev.k === 'plz' ? 'bg-red' : 'bg-azul'), ev.chip) : el('span'));
-      agenda.append(row);
-    });
-  }
-  SEMANA.forEach((day, i) => {
-    const b = el('button', 'day' + (day.hoy ? ' today' : ''));
-    b.type = 'button';
-    b.append(el('small', '', day.d), el('b', '', day.n));
-    const dots = el('span', 'dots');
-    day.ev.slice(0, 4).forEach(ev => dots.append(el('i', 'k-' + ev.k)));
-    b.append(dots);
-    b.setAttribute('aria-label', `${day.d} ${day.n}: ${day.ev.length} ${day.ev.length === 1 ? 'evento' : 'eventos'}`);
-    b.addEventListener('click', () => show(i));
-    week.append(b);
-  });
-  show(HOY);
-
-  document.querySelectorAll('.task input').forEach(c => c.addEventListener('change', async () => {
-    const task = c.closest('.task');
-    task.classList.toggle('done', c.checked);
-    try {
-      const r = await fetch(c.dataset.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ hecha: c.checked }),
-      });
-      if (!r.ok) throw new Error();
-      if (c.checked) showToast('Pendiente terminado');
-    } catch (_) {
-      c.checked = !c.checked;
-      task.classList.toggle('done', c.checked);
-      showToast('No se pudo guardar. Intenta de nuevo.', 'error');
-    }
-  }));
-
-  const h = new Date().getHours();
-  const s = document.getElementById('saludo');
-  s.textContent = s.textContent.replace('Hola', h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches');
-})();
-</script>
+    {% endfor %}
+  </section>
+</div>
 {% endblock %}

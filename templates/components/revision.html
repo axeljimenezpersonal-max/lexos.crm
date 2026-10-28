@@ -1,32 +1,32 @@
 {# Modo revisión: botón "Comentar" flotante. Se incluye solo si REVISION_ACTIVA. #}
 <style>
-.hcr-btn{position:fixed;right:18px;bottom:18px;z-index:9000;display:flex;align-items:center;gap:8px;height:44px;padding:0 16px 0 13px;border:0;border-radius:99px;background:#0A1A4A;color:#fff;font:600 14px Inter,system-ui,sans-serif;box-shadow:0 12px 30px -8px rgba(10,26,74,.55),0 0 0 1px rgba(255,255,255,.12);cursor:pointer}
-.hcr-btn:hover{background:#1D3FD6}
-.hcr-btn i{width:8px;height:8px;border-radius:50%;background:#5BC0FF;box-shadow:0 0 0 4px rgba(91,192,255,.25)}
-.hcr-panel{position:fixed;right:18px;bottom:72px;z-index:9001;width:min(360px,calc(100vw - 32px));background:#fff;border-radius:18px;box-shadow:0 30px 70px -20px rgba(10,26,74,.45),0 0 0 1px #E5E8F0;padding:18px;font:400 14px/1.5 Inter,system-ui,sans-serif;color:#0F172A;display:none}
+.hcr-btn{position:fixed;right:18px;bottom:18px;z-index:9000;display:flex;align-items:center;gap:8px;height:44px;padding:0 16px 0 13px;border:0;border-radius:99px;background:#132238;color:#fff;font:600 14px Inter,system-ui,sans-serif;box-shadow:0 12px 30px -8px rgba(19,34,56,.55),0 0 0 1px rgba(255,255,255,.12);cursor:pointer}
+.hcr-btn:hover{background:#22385A}
+.hcr-btn i{width:8px;height:8px;border-radius:50%;background:#AD9060;box-shadow:0 0 0 4px rgba(173,144,96,.25)}
+.hcr-panel{position:fixed;right:18px;bottom:72px;z-index:9001;width:min(360px,calc(100vw - 32px));background:var(--c);border-radius:18px;box-shadow:0 30px 70px -20px rgba(19,34,56,.45),0 0 0 1px #E5E2DB;padding:18px;font:400 14px/1.5 Inter,system-ui,sans-serif;color:#132238;display:none}
 .hcr-panel.open{display:block}
-.hcr-panel h4{font:600 15.5px Sora,Inter,sans-serif;color:#0A1A4A;margin:0}
-.hcr-panel p{font-size:12.5px;color:#64708A;margin:3px 0 12px}
+.hcr-panel h4{font:600 15.5px Sora,Inter,sans-serif;color:#132238;margin:0}
+.hcr-panel p{font-size:12.5px;color:#60718D;margin:3px 0 12px}
 .hcr-tipos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.hcr-tipos button{border:1px solid #E5E8F0;background:#fff;border-radius:99px;padding:5px 11px;font:600 12.5px Inter,sans-serif;color:#3A4560;cursor:pointer}
+.hcr-tipos button{border:1px solid #E5E2DB;background:var(--c);border-radius:99px;padding:5px 11px;font:600 12.5px Inter,sans-serif;color:#3B4A61;cursor:pointer}
 .hcr-tipos button.on{border-color:var(--c);background:var(--f);color:var(--c)}
-.hcr-panel textarea,.hcr-panel input{width:100%;box-sizing:border-box;border:1px solid #E5E8F0;border-radius:11px;padding:10px 12px;font:400 14px Inter,sans-serif;color:#0F172A;outline:none;resize:vertical}
+.hcr-panel textarea,.hcr-panel input{width:100%;box-sizing:border-box;border:1px solid #E5E2DB;border-radius:11px;padding:10px 12px;font:400 14px Inter,sans-serif;color:#132238;outline:none;resize:vertical}
 .hcr-panel textarea{min-height:92px}
 .hcr-panel input{margin-bottom:8px}
-.hcr-panel textarea:focus,.hcr-panel input:focus{border-color:#1D3FD6;box-shadow:0 0 0 3px #EEF2FF}
-.hcr-senal{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:#64708A}
-.hcr-senal button{border:1px dashed #C7D2FE;background:#FAFBFF;color:#1D3FD6;border-radius:9px;padding:6px 10px;font:600 12.5px Inter,sans-serif;cursor:pointer}
+.hcr-panel textarea:focus,.hcr-panel input:focus{border-color:#132238;box-shadow:0 0 0 3px #F4EEDF}
+.hcr-senal{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:#60718D}
+.hcr-senal button{border:1px dashed #E2D3AE;background:#FCFAF7;color:#132238;border-radius:9px;padding:6px 10px;font:600 12.5px Inter,sans-serif;cursor:pointer}
 .hcr-senal span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .hcr-pie{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px}
-.hcr-pie a{font:600 12.5px Inter,sans-serif;color:#1D3FD6;text-decoration:none}
-.hcr-pie button{height:38px;padding:0 16px;border:0;border-radius:10px;background:#1D3FD6;color:#fff;font:600 14px Inter,sans-serif;cursor:pointer}
+.hcr-pie a{font:600 12.5px Inter,sans-serif;color:#132238;text-decoration:none}
+.hcr-pie button{height:38px;padding:0 16px;border:0;border-radius:10px;background:#132238;color:#fff;font:600 14px Inter,sans-serif;cursor:pointer}
 .hcr-pie button:disabled{opacity:.6}
 .hcr-ok{display:none;text-align:center;padding:16px 4px}
 .hcr-panel.enviado .hcr-ok{display:block}.hcr-panel.enviado .hcr-cuerpo{display:none}
-.hcr-err{color:#DC2626;font-size:12.5px;margin-top:6px}
+.hcr-err{color:#A23B33;font-size:12.5px;margin-top:6px}
 .hcr-mira,.hcr-mira *{cursor:crosshair!important}
-.hcr-marco{position:fixed;z-index:8999;pointer-events:none;border:2px solid #1D3FD6;background:rgba(29,63,214,.08);border-radius:6px;transition:all .08s;display:none}
-.hcr-aviso{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:9002;background:#0A1A4A;color:#fff;border-radius:99px;padding:9px 16px;font:600 13px Inter,sans-serif;box-shadow:0 12px 30px -10px rgba(10,26,74,.6);display:none}
+.hcr-marco{position:fixed;z-index:8999;pointer-events:none;border:2px solid #132238;background:rgba(19,34,56,.08);border-radius:6px;transition:all .08s;display:none}
+.hcr-aviso{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:9002;background:#132238;color:#fff;border-radius:99px;padding:9px 16px;font:600 13px Inter,sans-serif;box-shadow:0 12px 30px -10px rgba(19,34,56,.6);display:none}
 @media(max-width:860px){.hcr-btn{bottom:84px}.hcr-panel{bottom:138px}}
 [hidden]{display:none!important}
 </style>
@@ -39,12 +39,13 @@
     <h4>¿Qué ves mal o qué cambiarías?</h4>
     <p>Tu comentario se guarda con esta pantalla para corregirlo.</p>
     <div class="hcr-tipos" id="hcrTipos">
-      <button type="button" data-t="error" style="--c:#DC2626;--f:#FEF2F2" class="on">Error</button>
-      <button type="button" data-t="diseno" style="--c:#6D28D9;--f:#F5F3FF">Diseño</button>
-      <button type="button" data-t="texto" style="--c:#B45309;--f:#FFFBEB">Texto</button>
-      <button type="button" data-t="idea" style="--c:#1D3FD6;--f:#EEF2FF">Idea</button>
+      <button type="button" data-t="error" style="--c:#A23B33;--f:#F8EDEA" class="on">Error</button>
+      <button type="button" data-t="diseno" style="--c:#6E5A3A;--f:#F6F1E6">Diseño</button>
+      <button type="button" data-t="texto" style="--c:#8A6A2F;--f:#F7F0E1">Texto</button>
+      <button type="button" data-t="idea" style="--c:#132238;--f:#F4EEDF">Idea</button>
     </div>
-    {% if not session.get('user') %}<input id="hcrNombre" maxlength="80" placeholder="Tu nombre" autocomplete="name">{% endif %}
+    {% set compartida = config.ACCESO_PRUEBA_CLAVE and (session.get('user') or {}).get('email') == config.ACCESO_PRUEBA_USUARIO %}
+    {% if not session.get('user') or compartida %}<input id="hcrNombre" maxlength="80" placeholder="Tu nombre" autocomplete="name">{% endif %}
     <textarea id="hcrTexto" maxlength="3000" placeholder="Ej. Este botón no hace nada, o este texto se entiende mal…"></textarea>
     <div class="hcr-senal"><button type="button" id="hcrSenalar">🎯 Señalar en la pantalla</button><span id="hcrSenal"></span></div>
     <p class="hcr-err" id="hcrErr" hidden></p>
@@ -53,7 +54,7 @@
       <button type="button" id="hcrEnviar">Enviar</button>
     </div>
   </div>
-  <div class="hcr-ok"><b style="font:600 15px Sora,sans-serif;color:#0A1A4A">¡Gracias! Quedó registrado.</b>
+  <div class="hcr-ok"><b style="font:600 15px Sora,sans-serif;color:#132238">¡Gracias! Quedó registrado.</b>
     <p style="margin:6px 0 12px">Sigue revisando y comenta todo lo que veas.</p>
     <div class="hcr-pie" style="justify-content:center"><button type="button" id="hcrOtro">Escribir otro</button></div></div>
 </div>

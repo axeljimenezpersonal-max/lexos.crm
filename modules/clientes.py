@@ -52,9 +52,9 @@ ORIGENES = [
 TIPOS = {"persona_fisica": "Persona física", "persona_moral": "Empresa"}
 
 ESTATUS = {
-    "activo":    {"label": "Cliente",   "color": "#047857", "fondo": "#ECFDF5"},
-    "prospecto": {"label": "Prospecto", "color": "#B45309", "fondo": "#FFFBEB"},
-    "inactivo":  {"label": "Inactivo",  "color": "#64708A", "fondo": "#F1F5F9"},
+    "activo":    {"label": "Cliente",   "color": "#3D5A80", "fondo": "#EEF1F5"},
+    "prospecto": {"label": "Prospecto", "color": "#8A6A2F", "fondo": "#F7F0E1"},
+    "inactivo":  {"label": "Inactivo",  "color": "#60718D", "fondo": "#F1EEE8"},
 }
 
 GRUPOS = {"activo": "Clientes", "prospecto": "Prospectos", "inactivo": "Inactivos", "todos": "Todos"}
@@ -136,7 +136,9 @@ def _iniciales(nombre: str) -> str:
 
 
 def _color(cid: int) -> str:
-    return f"hsl({cid * 67 % 360}, 52%, 42%)"
+    """Avatar del cliente en la familia marino, gris azulado y dorado."""
+    paleta = ("#132238", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
+    return paleta[cid % len(paleta)]
 
 
 def _fecha_txt(v, anio=True) -> str:
@@ -587,8 +589,8 @@ def detalle(id: int):
     for a in tdb.execute(f"SELECT a.* FROM asuntos a WHERE a.cliente_id=? AND {alc} "
                          f"ORDER BY a.estado IN ('cerrado','completado','archivado'), a.fecha_alta DESC", (id, *pa)).fetchall():
         a = dict(a)
-        a["estado_info"] = ESTADOS_ASUNTO.get(a["estado"], {"label": a["estado"], "color": "#64708A", "fondo": "#F1F5F9"})
-        a["tipo_info"] = TIPOS_DERECHO.get(a.get("tipo_asunto"), {"label": "General", "color": "#64708A"})
+        a["estado_info"] = ESTADOS_ASUNTO.get(a["estado"], {"label": a["estado"], "color": "#60718D", "fondo": "#F1EEE8"})
+        a["tipo_info"] = TIPOS_DERECHO.get(a.get("tipo_asunto"), {"label": "General", "color": "#60718D"})
         a["responsable"] = usuarios.get(a.get("abogado_responsable"))
         a["abierto"] = a["estado"] in ABIERTOS
         asuntos.append(a)
@@ -968,7 +970,7 @@ def exportar_pdf(id: int):
     cobros = [cobranzas._decorar(r) for r in tdb.execute(
         f"{cobranzas.BASE_SQL} WHERE co.cliente_id=? AND co.estado!='cancelado' AND {alc_c}", (id, *pc)).fetchall()]
 
-    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#1D3FD6", "#0A1A4A", "#64708A", "#E5E8F0"))
+    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#132238", "#132238", "#60718D", "#E5E2DB"))
     e = lambda x: html.escape(str(x or "—"))  # noqa: E731
     st = lambda n, **k: ParagraphStyle(n, fontName=k.pop("font", "Helvetica"), **k)  # noqa: E731
     s_h = st("h", font="Helvetica-Bold", fontSize=10.5, textColor=TINTA, spaceBefore=14, spaceAfter=6)

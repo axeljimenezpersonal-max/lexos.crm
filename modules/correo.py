@@ -130,7 +130,7 @@ def _build_mime(from_email, from_name, to_list, cc_list, bcc_list,
     # Body with firma
     full_html = html_body
     if firma_html:
-        full_html += f'<br><div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:13px">{firma_html}</div>'
+        full_html += f'<br><div style="margin-top:16px;padding-top:12px;border-top:1px solid #E5E2DB;color:#60718D;font-size:13px">{firma_html}</div>'
 
     # Text alternative
     alt = MIMEMultipart("alternative")
@@ -395,7 +395,7 @@ def enviar():
 
             full_html = html_body
             if firma_html:
-                full_html += f'<br><div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:13px">{firma_html}</div>'
+                full_html += f'<br><div style="margin-top:16px;padding-top:12px;border-top:1px solid #E5E2DB;color:#60718D;font-size:13px">{firma_html}</div>'
 
             msg = Message(
                 subject=subject,
@@ -500,7 +500,7 @@ def buscar_contactos():
                 "email": r["email"],
                 "tipo": "cliente",
                 "avatar_iniciales": nombre[:2].upper(),
-                "color": "#3b82f6",
+                "color": "#3D5A80",
             })
     except Exception:
         pass
@@ -522,7 +522,7 @@ def buscar_contactos():
                 "email": r["email"],
                 "tipo": "equipo",
                 "avatar_iniciales": f"{r['nombre'][0]}{(r.get('apellidos') or 'X')[0]}".upper(),
-                "color": "#8b5cf6",
+                "color": "#8C7A5B",
             })
     except Exception:
         pass
@@ -545,7 +545,7 @@ def buscar_contactos():
                     "email": "",  # Contrapartes may not have email
                     "tipo": "contraparte",
                     "avatar_iniciales": nombre[:2].upper(),
-                    "color": "#f59e0b",
+                    "color": "#B08A4A",
                 })
     except Exception:
         pass

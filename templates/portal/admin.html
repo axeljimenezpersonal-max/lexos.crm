@@ -3,15 +3,15 @@
 {% block head %}
 <style>
   .ptl-admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-  .ptl-admin-stat { background: var(--bg-card,#1F2937); border: 1px solid var(--border,#374151); border-radius: 12px; padding: 18px; }
+  .ptl-admin-stat { background: var(--bg-card,#132238); border: 1px solid var(--border,#3B4A61); border-radius: 12px; padding: 18px; }
   .ptl-admin-stat-val { font-size: 1.6rem; font-weight: 700; }
-  .ptl-admin-stat-label { font-size: .78rem; color: var(--text-muted,#9CA3AF); }
-  .ptl-resp-form { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border,#374151); }
+  .ptl-admin-stat-label { font-size: .78rem; color: var(--text-muted,#8E99AB); }
+  .ptl-resp-form { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border,#3B4A61); }
   .ptl-resp-form input { flex: 1; }
   .ptl-acc-actions { display: flex; gap: 6px; }
-  .ptl-acc-btn { background: none; border: 1px solid var(--border,#374151); border-radius: 6px; padding: 4px 10px; font-size: .72rem; cursor: pointer; color: var(--text-muted,#9CA3AF); transition: all .15s; }
+  .ptl-acc-btn { background: none; border: 1px solid var(--border,#3B4A61); border-radius: 6px; padding: 4px 10px; font-size: .72rem; cursor: pointer; color: var(--text-muted,#8E99AB); transition: all .15s; }
   .ptl-acc-btn:hover { border-color: var(--e); color: var(--e); }
-  .ptl-acc-btn-danger:hover { border-color: #EF4444; color: #EF4444; }
+  .ptl-acc-btn-danger:hover { border-color: #B5483F; color: #B5483F; }
   @media (max-width: 700px) { .ptl-admin-grid { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
@@ -26,7 +26,7 @@
     <div class="ptl-admin-stat-label">Clientes con acceso al portal</div>
   </div>
   <div class="ptl-admin-stat">
-    <div class="ptl-admin-stat-val" style="color:#F59E0B;">{{ mensajes_no_leidos|length }}</div>
+    <div class="ptl-admin-stat-val" style="color:#B08A4A;">{{ mensajes_no_leidos|length }}</div>
     <div class="ptl-admin-stat-label">Mensajes sin leer</div>
   </div>
 </div>
@@ -49,7 +49,7 @@
   {% if mensajes_no_leidos %}
   <div style="display:grid; gap:12px;">
     {% for m in mensajes_no_leidos %}
-    <div class="card" style="padding:16px; border-left: 3px solid #F59E0B;">
+    <div class="card" style="padding:16px; border-left: 3px solid #B08A4A;">
       <div class="d-flex justify-between align-center mb-2">
         <div class="d-flex align-center gap-2">
           <strong class="text-sm">{{ m.cliente_nombre or '—' }}</strong>

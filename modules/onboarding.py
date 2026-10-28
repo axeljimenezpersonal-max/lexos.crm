@@ -31,7 +31,7 @@ FASES = [
         "slug": "configuracion",
         "titulo": "Configuración Base",
         "icono": "settings",
-        "color": "#00DFA2",
+        "color": "#AD9060",
         "pasos": [
             {
                 "id": 0,
@@ -68,7 +68,7 @@ FASES = [
         "slug": "primer_cliente",
         "titulo": "Primer Cliente",
         "icono": "user",
-        "color": "#10B981",
+        "color": "#4F6D8A",
         "pasos": [
             {
                 "id": 0,
@@ -107,7 +107,7 @@ FASES = [
         "slug": "primer_cobro",
         "titulo": "Primer Cobro",
         "icono": "dollar",
-        "color": "#F59E0B",
+        "color": "#B08A4A",
         "pasos": [
             {
                 "id": 0,
@@ -146,7 +146,7 @@ FASES = [
         "slug": "productividad",
         "titulo": "Productividad",
         "icono": "zap",
-        "color": "#3B82F6",
+        "color": "#3D5A80",
         "pasos": [
             {
                 "id": 0,
@@ -355,7 +355,7 @@ def badge_pdf():
         c.rect(0, 0, w, h, fill=1, stroke=0)
 
         # Marco decorativo
-        c.setStrokeColor(HexColor("#00DFA2"))
+        c.setStrokeColor(HexColor("#AD9060"))
         c.setLineWidth(3)
         c.roundRect(0.5 * inch, 0.5 * inch, w - inch, h - inch, 12, fill=0, stroke=1)
 
@@ -365,7 +365,7 @@ def badge_pdf():
         c.roundRect(0.65 * inch, 0.65 * inch, w - 1.3 * inch, h - 1.3 * inch, 8, fill=0, stroke=1)
 
         # Logo LexOS
-        c.setFillColor(HexColor("#00DFA2"))
+        c.setFillColor(HexColor("#AD9060"))
         c.roundRect(w / 2 - 32, h - 2.2 * inch, 64, 64, 8, fill=1, stroke=0)
         c.setFillColor(HexColor("#FFFFFF"))
         c.setFont("Helvetica-Bold", 26)
@@ -376,11 +376,11 @@ def badge_pdf():
         c.setFillColor(HexColor("#F1F2F7"))
         c.drawCentredString(w / 2, h - 2.8 * inch, "LexOS")
         c.setFont("Helvetica", 11)
-        c.setFillColor(HexColor("#6B7280"))
+        c.setFillColor(HexColor("#60718D"))
         c.drawCentredString(w / 2, h - 3.1 * inch, "Plataforma Legal Multi-tenant")
 
         # Badge
-        c.setFillColor(HexColor("#00DFA2"))
+        c.setFillColor(HexColor("#AD9060"))
         c.roundRect(w / 2 - 1.4 * inch, h - 4.2 * inch, 2.8 * inch, 0.55 * inch, 20, fill=1, stroke=0)
         c.setFillColor(HexColor("#FFFFFF"))
         c.setFont("Helvetica-Bold", 14)
@@ -392,7 +392,7 @@ def badge_pdf():
         c.drawCentredString(w / 2, h - 5.0 * inch, nombre_despacho)
 
         c.setFont("Helvetica", 13)
-        c.setFillColor(HexColor("#9CA3AF"))
+        c.setFillColor(HexColor("#8E99AB"))
         c.drawCentredString(w / 2, h - 5.4 * inch,
                             f"Administrado por {nombre_usuario}")
 
@@ -403,7 +403,7 @@ def badge_pdf():
 
         # Texto de certificación
         c.setFont("Helvetica", 10)
-        c.setFillColor(HexColor("#6B7280"))
+        c.setFillColor(HexColor("#60718D"))
         lines = [
             "Este despacho ha completado exitosamente el proceso de",
             "configuración inicial de LexOS y está listo para operar",
@@ -416,12 +416,12 @@ def badge_pdf():
 
         # Fecha
         c.setFont("Helvetica-Bold", 11)
-        c.setFillColor(HexColor("#00DFA2"))
+        c.setFillColor(HexColor("#AD9060"))
         c.drawCentredString(w / 2, h - 7.1 * inch, hoy)
 
         # Footer
         c.setFont("Helvetica", 9)
-        c.setFillColor(HexColor("#374151"))
+        c.setFillColor(HexColor("#3B4A61"))
         c.drawCentredString(w / 2, 0.9 * inch, "lexos.mx — Tecnología legal para México")
 
         c.save()

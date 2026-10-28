@@ -227,11 +227,11 @@ def contacto():
             from flask_mail import Message
             from app import mail
             import html as _html
-            filas = "".join(f"<tr><td style='padding:6px 12px 6px 0;color:#64708A'>{_html.escape(k.capitalize())}</td>"
-                            f"<td style='padding:6px 0;color:#0A1A4A'>{_html.escape(v) or '—'}</td></tr>" for k, v in datos.items())
+            filas = "".join(f"<tr><td style='padding:6px 12px 6px 0;color:#60718D'>{_html.escape(k.capitalize())}</td>"
+                            f"<td style='padding:6px 0;color:#132238'>{_html.escape(v) or '—'}</td></tr>" for k, v in datos.items())
             mail.send(Message(subject=f"Nueva solicitud de demostración — {datos['despacho'] or datos['nombre']}",
                               recipients=[destino], reply_to=datos["email"],
-                              html=f"<div style='font-family:Inter,Arial,sans-serif'><h2 style='color:#0A1A4A'>Solicitud de demostración</h2>"
+                              html=f"<div style='font-family:Inter,Arial,sans-serif'><h2 style='color:#132238'>Solicitud de demostración</h2>"
                                    f"<table>{filas}</table></div>"))
         except Exception:
             current_app.logger.warning("No se pudo enviar el aviso de contacto; quedó guardado en contactos_landing")
@@ -465,21 +465,21 @@ def forgot_password():
 
             html = f"""
             <div style="font-family:sans-serif;max-width:520px;margin:0 auto;">
-              <h2 style="color:#00DFA2;">LexOS — Restablecer contraseña</h2>
+              <h2 style="color:#AD9060;">LexOS — Restablecer contraseña</h2>
               <p>Hola <strong>{nombre_usuario}</strong>,</p>
               <p>Recibimos una solicitud para restablecer tu contraseña en
                  <strong>{nombre_despacho}</strong>.</p>
               <p style="margin:24px 0;">
                 <a href="{reset_url}"
-                   style="background:#00DFA2;color:#080C10;padding:12px 24px;
+                   style="background:#AD9060;color:#080C10;padding:12px 24px;
                           border-radius:6px;text-decoration:none;font-weight:600;">
                   Restablecer contraseña
                 </a>
               </p>
-              <p style="color:#6B7280;font-size:13px;">
+              <p style="color:#60718D;font-size:13px;">
                 Este enlace expira en {ttl} horas. Si no solicitaste esto, ignora este correo.
               </p>
-              <p style="color:#6B7280;font-size:12px;">
+              <p style="color:#60718D;font-size:12px;">
                 O copia esta URL: {reset_url}
               </p>
             </div>
@@ -646,11 +646,11 @@ def register_tenant():
         # Email de bienvenida
         welcome_html = f"""
         <div style="font-family:sans-serif;max-width:520px;margin:0 auto;">
-          <h2 style="color:#00DFA2;">¡Bienvenido a LexOS!</h2>
+          <h2 style="color:#AD9060;">¡Bienvenido a LexOS!</h2>
           <p>Hola <strong>{nombre_usr}</strong>,</p>
           <p>Tu despacho <strong>{nombre}</strong> está listo.
              Tu subdominio de acceso es:</p>
-          <p style="font-size:1.1em;font-weight:bold;color:#00DFA2;">
+          <p style="font-size:1.1em;font-weight:bold;color:#AD9060;">
             {slug}.lexos.mx
           </p>
           <p>Completa el tour de configuración para sacarle el máximo provecho a LexOS.</p>

@@ -3,16 +3,16 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --ptl-bg: #F8FAFC;
+  --ptl-bg: #FAF8F4;
   --ptl-card: #FFFFFF;
-  --ptl-border: #E2E8F0;
-  --ptl-text: #1E293B;
-  --ptl-muted: #64748B;
+  --ptl-border: #E3E0D9;
+  --ptl-text: #1A2B44;
+  --ptl-muted: #60718D;
   --ptl-accent: var(--e);
-  --ptl-accent-light: rgba(27,58,107,.08);
-  --ptl-success: #10B981;
-  --ptl-warning: #F59E0B;
-  --ptl-danger: #EF4444;
+  --ptl-accent-light: rgba(19,34,56,.08);
+  --ptl-success: #4F6D8A;
+  --ptl-warning: #B08A4A;
+  --ptl-danger: #B5483F;
   --ptl-radius: 12px;
 }
 
@@ -71,7 +71,7 @@ body {
   height: 52px;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(27,58,107,.4);
+  box-shadow: 0 4px 12px rgba(19,34,56,.4);
   cursor: pointer;
 }
 .ptl-nav {
@@ -188,7 +188,7 @@ body {
   padding: 16px 18px;
   transition: border-color .15s, box-shadow .15s;
 }
-.ptl-case-card:hover { border-color: var(--ptl-accent); box-shadow: 0 2px 8px rgba(27,58,107,.08); }
+.ptl-case-card:hover { border-color: var(--ptl-accent); box-shadow: 0 2px 8px rgba(19,34,56,.08); }
 .ptl-case-card-full { padding: 18px 20px; }
 .ptl-case-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .ptl-case-title { font-weight: 600; font-size: .92rem; }
@@ -210,7 +210,7 @@ body {
 .ptl-status-pendiente { background: rgba(245,158,11,.1); color: var(--ptl-warning); }
 .ptl-status-pagado { background: rgba(16,185,129,.1); color: var(--ptl-success); }
 .ptl-status-vencido { background: rgba(239,68,68,.1); color: var(--ptl-danger); }
-.ptl-status-abono { background: rgba(14,165,233,.1); color: #0EA5E9; }
+.ptl-status-abono { background: rgba(14,165,233,.1); color: #60718D; }
 .ptl-status-cancelado { background: rgba(100,116,139,.1); color: var(--ptl-muted); }
 
 /* ── Event card ── */
@@ -296,10 +296,10 @@ body {
 .ptl-table th {
   text-align: left; padding: 10px 14px; font-size: .7rem;
   text-transform: uppercase; letter-spacing: .04em; color: var(--ptl-muted);
-  background: #F1F5F9; font-weight: 600; white-space: nowrap;
+  background: #F1EEE8; font-weight: 600; white-space: nowrap;
 }
 .ptl-table td { padding: 10px 14px; font-size: .82rem; border-top: 1px solid var(--ptl-border); }
-.ptl-table tbody tr:hover { background: rgba(27,58,107,.02); }
+.ptl-table tbody tr:hover { background: rgba(19,34,56,.02); }
 .ptl-mono { font-family: 'SF Mono', monospace; font-size: .78rem; }
 .ptl-num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .ptl-actions-cell { display: flex; gap: 6px; }
@@ -347,7 +347,7 @@ body {
   word-wrap: break-word;
 }
 .ptl-msg-out .ptl-msg-bubble { background: var(--ptl-accent); color: #fff; border-bottom-right-radius: 4px; }
-.ptl-msg-in .ptl-msg-bubble { background: #F1F5F9; color: var(--ptl-text); border-bottom-left-radius: 4px; }
+.ptl-msg-in .ptl-msg-bubble { background: #F1EEE8; color: var(--ptl-text); border-bottom-left-radius: 4px; }
 .ptl-msg-time { font-size: .64rem; color: var(--ptl-muted); margin-top: 3px; }
 .ptl-msg-out .ptl-msg-time { text-align: right; }
 
@@ -382,12 +382,12 @@ body {
 .ptl-btn-primary { background: var(--ptl-accent); color: #fff; }
 .ptl-btn-primary:hover { background: var(--ed); }
 .ptl-btn-success { background: var(--ptl-success); color: #fff; }
-.ptl-btn-success:hover { background: #059669; }
+.ptl-btn-success:hover { background: #3D5A80; }
 .ptl-btn-outline {
   background: transparent; color: var(--ptl-muted);
   border: 1px solid var(--ptl-border);
 }
-.ptl-btn-outline:hover { background: #F1F5F9; color: var(--ptl-text); }
+.ptl-btn-outline:hover { background: #F1EEE8; color: var(--ptl-text); }
 
 /* ── Forms ── */
 .ptl-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
@@ -410,7 +410,7 @@ textarea {
 textarea:focus {
   outline: none;
   border-color: var(--ptl-accent);
-  box-shadow: 0 0 0 3px rgba(27,58,107,.1);
+  box-shadow: 0 0 0 3px rgba(19,34,56,.1);
 }
 
 /* ── Empty state ── */
@@ -455,7 +455,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #EEF2FF 0%, #F8FAFC 50%, #ECFDF5 100%);
+  background: linear-gradient(135deg, #F4EEDF 0%, #FAF8F4 50%, #EEF1F5 100%);
   padding: 20px;
 }
 .ptl-login-card {

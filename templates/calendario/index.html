@@ -398,7 +398,7 @@
           <div class="cf-g">
             <label>Color (opcional)</label>
             <div class="color-picker" id="colorPicker">
-              {% for c in ['#1D3FD6','#0284C7','#4F46E5','#7C3AED','#DC2626','#EA580C','#B45309','#047857','#0F766E','#64708A'] %}
+              {% for c in ['#132238','#4B6585','#34496B','#7A6440','#A23B33','#9A7536','#8A6A2F','#3D5A80','#0F766E','#60718D'] %}
               <div class="color-swatch" style="background:{{ c }}" data-color="{{ c }}"
                    onclick="pickColor('{{ c }}')"></div>
               {% endfor %}
@@ -515,7 +515,7 @@ function weekStart(d) {
   w.setHours(0,0,0,0); return w;
 }
 function daysInMonth(y,m) { return new Date(y,m+1,0).getDate(); }
-function evtColor(e) { return e.color || (TIPOS[e.tipo]||{}).color || "#64748B"; }
+function evtColor(e) { return e.color || (TIPOS[e.tipo]||{}).color || "#60718D"; }
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
@@ -1405,12 +1405,12 @@ function showPopover(id, ev) {
 
   /* Estado */
   const estEl = document.getElementById("detailEstado");
-  const estColors = {pendiente:"#F59E0B", completado:"#10B981", cancelado:"#EF4444"};
+  const estColors = {pendiente:"#B08A4A", completado:"#4F6D8A", cancelado:"#B5483F"};
   const estLabels = {pendiente:"Pendiente", completado:"Completado", cancelado:"Cancelado"};
   const est = e.estado || "pendiente";
   estEl.textContent = estLabels[est] || est;
-  estEl.style.background = (estColors[est]||"#6B7280") + "18";
-  estEl.style.color = estColors[est] || "#6B7280";
+  estEl.style.background = (estColors[est]||"#60718D") + "18";
+  estEl.style.color = estColors[est] || "#60718D";
 
   document.getElementById("detailModal").classList.add("open");
 }

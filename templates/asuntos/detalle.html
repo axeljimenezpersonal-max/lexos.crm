@@ -3,6 +3,7 @@
 {% block page_title %}{{ asunto.titulo | truncate(40) }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
 {% endblock %}
 
 {% macro ic(n, s=16) -%}
@@ -32,31 +33,16 @@
 
 {% block content %}
 {% set ti = asunto.tipo_info %}{% set ei = asunto.estado_info %}
-<nav class="af-migas"><a href="{{ url_for('asuntos.index') }}">Asuntos</a> / {{ asunto.numero_expediente or 'Sin expediente' }}</nav>
+{% set n_bit = namespace(n=0) %}{% for gr in bitacora %}{% set n_bit.n = n_bit.n + gr['items'] | length %}{% endfor %}
+<a class="xp-volver" href="{{ url_for('asuntos.index') }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Volver a expedientes</a>
 
-<header class="af-head">
-  <div class="af-top">
-    <div style="flex:1;min-width:260px">
-      <div class="af-meta">
-        <span class="as-chip" style="--c-c:{{ ti.color }};--c-f:color-mix(in srgb, {{ ti.color }} 10%, #fff)"><span class="as-dot" style="--d:{{ ti.color }}"></span>{{ ti.label }}</span>
-        {% if asunto.sub_tipo %}<span class="as-chip">{{ asunto.sub_tipo }}</span>{% endif %}
-        {% if asunto.privado %}<span class="as-chip" style="--c-c:#991B1B;--c-f:#FEF2F2" title="{{ config.ASISTENTE_NOMBRE }} nunca envía información de este asunto fuera del servidor">{{ ic('lock', 12) }} Privado</span>{% endif %}
-        {% if asunto.prioridad == 'alta' %}<span class="as-chip" style="--c-c:#DC2626;--c-f:#FEF2F2">Prioridad alta</span>{% endif %}
-      </div>
-      <h1 class="af-title" id="afTitulo"{% if puede_editar %} contenteditable="true" spellcheck="false" title="Clic para editar"{% endif %}>{{ asunto.titulo }}</h1>
-      <div class="af-datos">
-        <span>{{ ic('user', 15) }}{% if asunto.cliente_id and asunto.cliente %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">{{ asunto.cliente }}</a>{% else %}<span class="as-muted">Sin cliente</span>{% endif %}</span>
-        {% if asunto.juzgado %}<span>{{ ic('gavel', 15) }}{{ asunto.juzgado }}</span>{% endif %}
-        {% if asunto.contrario_nombre %}<span>{{ ic('vs', 15) }}vs. {{ asunto.contrario_nombre }}</span>{% endif %}
-        <span>{{ avatar(responsable) }}{{ responsable.nombre if responsable else 'Sin responsable' }}</span>
-      </div>
-    </div>
-
-    <div class="af-acc">
-      <div class="af-estado">
-        <button type="button" class="af-estado-btn" id="afEstadoBtn" style="--c-c:{{ ei.color }};--c-f:{{ ei.fondo }}"{% if not puede_editar %} disabled{% endif %} aria-haspopup="true">
-          <span class="as-dot" style="--d:{{ ei.color }}"></span>{{ ei.label }}{% if puede_editar %} {{ ic('down', 14) }}{% endif %}
-        </button>
+<header class="xp-head">
+  <div style="flex:1;min-width:280px">
+    <p class="xp-id">Expediente · <b>{{ asunto.numero_expediente or 'Sin número' }}</b>{% if asunto.privado %} · <span title="{{ config.ASISTENTE_NOMBRE }} nunca envía información de este expediente fuera del servidor">Privado</span>{% endif %}{% if asunto.prioridad == 'alta' %} · Prioridad alta{% endif %}</p>
+    <div class="xp-titulo-fila">
+      <h1 class="xp-titulo" id="afTitulo"{% if puede_editar %} contenteditable="true" spellcheck="false" title="Clic para editar"{% endif %}>{{ asunto.titulo }}</h1>
+      <div class="af-estado xp-estado">
+        <button type="button" class="xp-estado-btn e-{{ asunto.estado }}" id="afEstadoBtn"{% if not puede_editar %} disabled{% endif %} aria-haspopup="true"><i></i>{{ ei.label }}{% if puede_editar %} {{ ic('down', 14) }}{% endif %}</button>
         {% if puede_editar %}
         <div class="af-menu" id="afEstadoMenu" role="menu">
           {% for k in estados_menu %}{% set e = estados[k] %}
@@ -65,66 +51,232 @@
         </div>
         {% endif %}
       </div>
-      <a class="btn btn-secondary" href="{{ url_for('asistente.index', asunto=asunto.id) }}">{{ ic('spark', 15) }} Preguntar a {{ config.ASISTENTE_NOMBRE }}</a>
-      <a class="btn btn-secondary" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 15) }} Generar escrito</a>
-      <div class="af-estado">
-        <button type="button" class="btn btn-ghost" id="afMasBtn" aria-label="Más acciones" aria-haspopup="true" style="padding:9px 10px">{{ ic('more', 16) }}</button>
-        <div class="af-menu" id="afMasMenu" role="menu">
-          <a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">{{ ic('cal', 15) }} Agendar audiencia o término</a>
-          <a href="{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}">{{ ic('doc', 15) }} Descargar resumen en PDF</a>
-          <button type="button" id="afCopiar">{{ ic('link', 15) }} Copiar enlace</button>
-          {% if session.get('role') in ('super_admin', 'admin', 'abogado') %}
-          <button type="button" id="afPrivado" data-privado="{{ 1 if asunto.privado else 0 }}">{{ ic('lock', 15) }} {{ 'Quitar privado' if asunto.privado else 'Marcar como privado' }}</button>
-          {% endif %}
-          {% if puede_editar and asunto.estado != 'archivado' %}
-          <hr><button type="button" class="peligro" id="afArchivar">{{ ic('archive', 15) }} Archivar asunto</button>
-          {% endif %}
+    </div>
+    <div class="xp-linea">
+      <span>{{ ic('user', 16) }}{% if asunto.cliente_id and asunto.cliente %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">{{ asunto.cliente }}</a>{% else %}Sin cliente{% endif %}</span>
+      <span>{{ ic('doc', 16) }}{{ ti.label }}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo | capitalize }}{% endif %}</span>
+      {% if asunto.juzgado %}<span>{{ ic('gavel', 16) }}{{ asunto.juzgado }}</span>{% endif %}
+      {% if asunto.contrario_nombre %}<span>{{ ic('vs', 16) }}vs. {{ asunto.contrario_nombre }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="xp-meta">
+    <div><small>Fecha de apertura</small><b>{{ apertura or '—' }}</b></div>
+    <div><small>Última actividad</small><b>{{ ultima_actividad or '—' }}</b></div>
+    <div><small>Responsable</small><b>{{ responsable.nombre if responsable else 'Sin asignar' }}</b></div>
+  </div>
+</header>
+
+<div class="xp-barra">
+  <div class="xp-tabs" role="tablist">
+    <button class="xp-tab on" data-tab="resumen" role="tab">Resumen</button>
+    <button class="xp-tab" data-tab="documentos" role="tab">Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
+    <button class="xp-tab" data-tab="preguntar" role="tab">Preguntar</button>
+    <button class="xp-tab" data-tab="actividad" role="tab">Actividad<span>{{ n_bit.n }}</span></button>
+    <button class="xp-tab" data-tab="datos" role="tab">Datos</button>
+    <button class="xp-tab" data-tab="estrategia" role="tab">Estrategia</button>
+    <button class="xp-tab" data-tab="horas" role="tab">Horas<span>{{ horas_total | round(1) }}</span></button>
+  </div>
+  <div class="xp-acciones">
+    <button type="button" class="btn btn-primary" id="xpSubir"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir documento</button>
+    <div class="af-estado">
+      <button type="button" class="btn btn-ghost" id="afMasBtn" aria-label="Más acciones" aria-haspopup="true" style="padding:0 14px">{{ ic('more', 18) }}</button>
+      <div class="af-menu" id="afMasMenu" role="menu">
+        <a href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 15) }} Generar escrito desde machote</a>
+        <a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">{{ ic('cal', 15) }} Agendar audiencia o término</a>
+        <a href="{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}">{{ ic('doc', 15) }} Descargar resumen en PDF</a>
+        <button type="button" id="afCopiar">{{ ic('link', 15) }} Copiar enlace</button>
+        {% if session.get('role') in ('super_admin', 'admin', 'abogado') %}
+        <button type="button" id="afPrivado" data-privado="{{ 1 if asunto.privado else 0 }}">{{ ic('lock', 15) }} {{ 'Quitar privado' if asunto.privado else 'Marcar como privado' }}</button>
+        {% endif %}
+        {% if puede_editar and asunto.estado != 'archivado' %}
+        <hr><button type="button" class="peligro" id="afArchivar">{{ ic('archive', 15) }} Archivar expediente</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Resumen ─────────────────────────────────────────────── -->
+<section class="xp-panel on" id="p-resumen" role="tabpanel">
+  <div class="xp-resumen">
+    <div class="xp-card">
+      <div class="xp-card-h"><h2>Resumen del expediente</h2>{% if puede_editar %}<button type="button" class="link" data-ir="datos">{{ ic('pen', 14) }} Editar</button>{% endif %}</div>
+      <div class="xp-card-b xp-resumen-b">
+        {% if asunto.descripcion %}<p class="desc">{{ asunto.descripcion }}</p>
+        {% else %}<p class="desc vacio">Aún no hay descripción. Escribe los hechos principales en Datos para que todo el equipo, y {{ config.ASISTENTE_NOMBRE }}, tengan el contexto.</p>{% endif %}
+        <div class="xp-hechos">
+          <div><small>Tipo de asunto</small><b>{{ (asunto.sub_tipo or ti.label) | capitalize }}</b><em>{{ ti.label }}</em></div>
+          <div class="{{ 'rojo' if proximo and proximo.semaforo == 'rojo' }}"><small>Lo que sigue</small>
+            {% if proximo %}<b>{{ proximo.tipo }} · {{ proximo.corta }}</b><em>{{ proximo.cuando }}</em>
+            {% elif abierto %}<b>Nada agendado</b><em><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}" style="color:inherit">Agendar</a></em>
+            {% else %}<b>{{ ei.label }}</b><em>{{ (asunto.fecha_cierre or '')[:10] or 'Sin fecha de cierre' }}</em>{% endif %}</div>
+          <div><small>{{ 'Tiempo en curso' if abierto else 'Duró' }}</small>
+            {% if dias_llevamos is not none %}<b>{% if dias_llevamos >= 60 %}{{ (dias_llevamos / 30.44) | round(1) }} meses{% else %}{{ dias_llevamos }} días{% endif %}</b><em>desde {{ apertura }}</em>
+            {% else %}<b>—</b><em>sin fecha de inicio</em>{% endif %}</div>
+          <div><small>Honorarios cobrados</small>
+            {% if dinero.pactados or dinero.facturado %}<b>{{ dinero.cobrado | dinero }}</b><em>de {{ (dinero.pactados or dinero.facturado) | dinero }}</em>
+            {% else %}<b>—</b><em>sin honorarios pactados</em>{% endif %}</div>
         </div>
+      </div>
+    </div>
+
+    <div class="xp-card xp-sigue">
+      <div class="xp-card-h"><h2>Lo que sigue</h2><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">+ Agendar</a></div>
+      <div class="xp-card-b">
+        {% for e in eventos %}
+        <div class="xp-paso"><span class="marca evento" title="{{ e.etiqueta }}"></span>
+          <div><b>{{ e.titulo }}</b><small>{{ e.etiqueta }}{% if e.lugar %} · {{ e.lugar }}{% endif %}</small></div>
+          <span class="cuando">{{ e.dia }}{% if e.hora and e.hora != '00:00' %}<br>{{ e.hora }}{% endif %}</span></div>
+        {% endfor %}
+        {% for t in pendientes %}
+        <div class="xp-paso"><button type="button" class="marca" data-act="{{ t.id }}" aria-label="Marcar como hecho" title="Marcar como hecho"></button>
+          <div><b>{{ t.titulo }}</b><small>{{ t.etiqueta }}</small></div>
+          <span class="cuando {{ t.semaforo }}">{{ t.cuando }}</span></div>
+        {% endfor %}
+        {% if not eventos and not pendientes %}<p class="as-empty">Nada pendiente. Agenda la siguiente audiencia o término para que nadie lo pierda de vista.</p>{% endif %}
       </div>
     </div>
   </div>
 
-  <div class="af-strip">
-    <div class="{{ proximo.semaforo if proximo }}">
-      <small>Lo que sigue</small>
-      {% if proximo %}<b>{{ proximo.tipo }} · {{ proximo.corta }}</b><span>{{ proximo.cuando }} · {{ proximo.titulo | truncate(38) }}</span>
-      {% elif abierto %}<b>Nada agendado</b><span><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}" style="color:var(--e);font-weight:600;text-decoration:none">Agendar en el calendario</a></span>
-      {% else %}<b>{{ ei.label }}</b><span>{{ (asunto.fecha_cierre or '')[:10] or 'Sin fecha de cierre' }}</span>{% endif %}
+  <div class="xp-fila2">
+    <div class="xp-card">
+      <div class="xp-card-h"><h2>Partes y equipo</h2>{% if asunto.cliente_id %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">Ver ficha del cliente →</a>{% endif %}</div>
+      <div class="xp-card-b">
+        {% if asunto.cliente %}
+        <div class="xp-parte"><span class="av">{{ asunto.cliente.split()[0][0] }}{{ (asunto.cliente.split()[1] if asunto.cliente.split() | length > 1 else '')[:1] }}</span>
+          <div><em>Cliente{{ ' · persona moral' if asunto.cliente_tipo == 'persona_moral' }}</em><b>{% if asunto.cliente_id %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">{{ asunto.cliente }}</a>{% else %}{{ asunto.cliente }}{% endif %}</b>
+            {% if asunto.cliente_tel %}<span><a href="tel:{{ asunto.cliente_tel }}">Tel. {{ asunto.cliente_tel }}</a></span>{% endif %}
+            {% if asunto.cliente_email %}<span><a href="mailto:{{ asunto.cliente_email }}">{{ asunto.cliente_email }}</a></span>{% endif %}</div></div>
+        {% endif %}
+        {% if asunto.contrario_nombre %}
+        <div class="xp-parte"><span class="av gris">{{ asunto.contrario_nombre[:1] }}</span>
+          <div><em>Contraparte</em><b>{{ asunto.contrario_nombre }}</b>
+            {% if asunto.contrario_abogado or asunto.contrario_despacho %}<span>{{ [asunto.contrario_abogado, asunto.contrario_despacho] | select | join(' · ') }}</span>{% endif %}</div></div>
+        {% endif %}
+        {% if responsable %}
+        <div class="xp-parte"><span class="av dorado" style="background:{{ responsable.color }}">{{ responsable.iniciales }}</span>
+          <div><em>Responsable</em><b>{{ responsable.nombre }}</b></div></div>
+        {% endif %}
+        {% for c in colaboradores %}
+        <div class="xp-parte"><span class="av" style="background:{{ c.color }}">{{ c.iniciales }}</span>
+          <div><em>Colabora</em><b>{{ c.nombre }}</b>{% if es_admin %}<span><button type="button" class="btn btn-ghost btn-sm" data-quitar="{{ c.id }}" style="margin-top:6px">Quitar del expediente</button></span>{% endif %}</div></div>
+        {% endfor %}
+        {% if es_admin %}
+        {% set ya = colaboradores | map(attribute='id') | list %}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+          <select class="as-select" id="eqAgregar" aria-label="Agregar al equipo">
+            <option value="">+ Agregar colaborador…</option>
+            {% for ab in abogados if (not responsable or ab.id != responsable.id) and ab.id not in ya %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+          </select>
+          <select class="as-select" id="eqResponsable" aria-label="Cambiar responsable">
+            <option value="">Cambiar responsable…</option>
+            {% for ab in abogados if not responsable or ab.id != responsable.id %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
     </div>
-    <div>
-      <small>{{ 'Tiempo en curso' if abierto else 'Duró' }}</small>
-      {% if dias_llevamos is not none %}
-        {% if dias_llevamos >= 60 %}<b>{{ (dias_llevamos / 30.44) | round(1) }} meses</b>{% else %}<b>{{ dias_llevamos }} días</b>{% endif %}
-        <span>desde el {{ (asunto.fecha_inicio or '')[:10] }}</span>
-      {% else %}<b>—</b><span>sin fecha de inicio</span>{% endif %}
-    </div>
-    <div>
-      <small>Honorarios cobrados</small>
-      {% if dinero.pactados or dinero.facturado %}
-        <b>${{ '{:,.0f}'.format(dinero.cobrado) }} <small style="display:inline;font:500 13px Inter;color:var(--ash)">de ${{ '{:,.0f}'.format(dinero.pactados or dinero.facturado) }}</small></b>
-        <div class="af-bar"><i style="width:{{ dinero.pct }}%"></i></div>
-      {% else %}<b>—</b><span>sin honorarios pactados</span>{% endif %}
-    </div>
-    <div>
-      <small>Horas registradas</small>
-      <b>{{ horas_total | round(1) }} h</b><span>{{ horas | length }} registro{{ 's' if horas | length != 1 }}</span>
+
+    <div class="xp-card">
+      <div class="xp-card-h"><h2>Documentos recientes</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
+      <div class="xp-card-b">
+        {% if documentos %}
+        <table class="xp-docs">
+          <thead><tr><th>Nombre</th><th>Fecha</th><th>Por</th><th>Estado</th></tr></thead>
+          <tbody>
+          {% for d in documentos[:5] %}
+          {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+          <tr>
+            <td class="n">{% if enlace %}<a href="{{ d.archivo_url }}" target="_blank" rel="noopener">{% endif %}<span class="ext {{ d.ext }}">{{ d.ext or 'doc' }}</span>{{ d.nombre }}{% if enlace %}</a>{% endif %}</td>
+            <td>{{ d.dia }}</td>
+            <td>{{ d.autor or '—' }}</td>
+            <td>{% if enlace %}<span class="estado"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg>Guardado</span>{% else %}<span class="estado">Sin archivo</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="as-empty">Aún no hay documentos. Súbelos y quedan cifrados y disponibles para {{ config.ASISTENTE_NOMBRE }}.</p>
+        <button type="button" class="btn btn-ghost btn-sm" data-subir style="margin-top:10px">Subir documento</button>
+        {% endif %}
+      </div>
     </div>
   </div>
-</header>
 
-<div class="af-grid">
-  <main class="as-card" style="min-width:0">
-    <div class="af-tabs" role="tablist">
-      {% set ns = namespace(n=0) %}{% for gr in bitacora %}{% set ns.n = ns.n + gr['items'] | length %}{% endfor %}
-      <button class="af-tab on" data-tab="actividad" role="tab">Actividad<span>{{ ns.n }}</span></button>
-      <button class="af-tab" data-tab="documentos" role="tab">Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
-      <button class="af-tab" data-tab="datos" role="tab">Datos del asunto</button>
-      <button class="af-tab" data-tab="estrategia" role="tab">Estrategia</button>
-      <button class="af-tab" data-tab="horas" role="tab">Horas<span>{{ horas_total | round(1) }}</span></button>
+  <div class="xp-fila3">
+    {% if not abierto or asunto.resultado %}
+    <div class="xp-card">
+      <div class="xp-card-h"><h2>Resultado</h2></div>
+      <div class="xp-card-b">
+        <div class="as-res" id="pcRes">
+          {% for clave, info in resultados.items() %}<button type="button" data-res="{{ clave }}" class="{{ 'on' if asunto.resultado == clave }}" style="--rc:{{ info.color }};--rf:{{ info.fondo }}">{{ info.label }}</button>{% endfor %}
+        </div>
+        <textarea class="as-textarea pc-notas" id="pcNotas" maxlength="3000" rows="3" placeholder="¿Qué argumento o estrategia funcionó? ¿Qué harías distinto?">{{ asunto.resultado_notas or '' }}</textarea>
+        <div class="pc-hint" id="pcHint">{{ 'Se usa como precedente para asuntos parecidos.' if asunto.resultado else 'Regístralo: alimenta los precedentes del despacho.' }}</div>
+      </div>
     </div>
+    {% endif %}
+    <div class="xp-card">
+      <div class="xp-card-h"><h2>Cobranza</h2><a href="{{ url_for('cobranzas.index', asunto=asunto.id, grupo='todos') }}">Ver cobros →</a></div>
+      <div class="xp-card-b">
+        <div class="xp-kv"><span>Honorarios pactados</span><b>{{ dinero.pactados | dinero }}</b></div>
+        <div class="xp-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
+        <div class="xp-kv"><span>Cobrado</span><b>{{ dinero.cobrado | dinero }}</b></div>
+        <div class="xp-kv"><span>Por cobrar</span><b style="color:{{ '#8A6A2F' if dinero.pendiente else 'var(--e)' }}">{{ dinero.pendiente | dinero }}</b></div>
+        {% if session.get('role') in ('super_admin', 'admin', 'abogado', 'asistente') %}
+        <a class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px" href="{{ url_for('cobranzas.index') }}#nuevo-asunto-{{ asunto.id }}">+ Nuevo cobro</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="xp-card">
+      <div class="xp-card-h"><h2>Casos parecidos</h2><a href="{{ url_for('insights.index') }}">Precedentes →</a></div>
+      <div class="xp-card-b" id="pcCasos"><p class="as-empty">Buscando precedentes…</p></div>
+    </div>
+    <div class="xp-card">
+      <div class="xp-card-h"><h2>Etiquetas</h2></div>
+      <div class="xp-card-b">
+        <div class="af-tags" id="afTags">
+          {% for et in etiquetas %}<span class="af-tag" style="--t:{{ et.color }}">{{ et.nombre }}<button type="button" data-et="{{ et.id }}" aria-label="Quitar etiqueta {{ et.nombre }}">×</button></span>{% endfor %}
+          <button type="button" class="af-tag-add" id="afTagAdd">+ Etiqueta</button>
+        </div>
+        <form id="afTagForm" hidden style="margin-top:8px;gap:6px">
+          <input class="as-input" id="afTagInput" list="afTagList" maxlength="30" placeholder="Ej. Urgente, Apelación…" style="flex:1">
+          <datalist id="afTagList">{% for et in todas_etiquetas %}<option value="{{ et.nombre }}">{% endfor %}</datalist>
+          <button class="btn btn-primary btn-sm">Agregar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Preguntar ───────────────────────────────────────────── -->
+<section class="xp-panel" id="p-preguntar" role="tabpanel">
+  <div class="xp-preguntar">
+    <h2 style="font:600 24px 'Sora',sans-serif;letter-spacing:-.02em;color:var(--e);margin:0">Pregúntale a {{ config.ASISTENTE_NOMBRE }} sobre este expediente</h2>
+    <p style="font-size:15px;color:var(--ash);margin:8px 0 14px">Cada dato de la respuesta indica de qué documento o artículo sale, para que puedas comprobarlo.</p>
+    <div class="xp-alcance"><span>Busca en:</span><span class="on">{{ ic('check', 13) }} Este expediente · {{ documentos | length }} documento{{ 's' if documentos | length != 1 }}</span><span class="on">{{ ic('check', 13) }} Leyes federales</span></div>
+    <form class="xp-caja" id="xpPregunta" action="{{ url_for('asistente.index') }}" method="get">
+      <input type="hidden" name="asunto" value="{{ asunto.id }}">
+      <textarea name="q" id="xpQ" rows="2" maxlength="500" placeholder="Ej. ¿Cuándo nos notificaron la demanda y cuántos días tenemos para contestar?" required></textarea>
+      <button class="btn btn-primary">Preguntar</button>
+    </form>
+    <div class="xp-sugerencias">
+      <button type="button" data-q="Resume los hechos principales del expediente y señala sus fuentes.">Resume los hechos principales y señala sus fuentes</button>
+      <button type="button" data-q="¿Qué plazo o término sigue en este expediente y en qué artículo se funda?">¿Qué plazo sigue y en qué artículo se funda?</button>
+      <button type="button" data-q="¿Qué documentos mencionan fechas importantes (firma, notificación, audiencia)?">¿Qué documentos mencionan fechas importantes?</button>
+      <button type="button" data-q="¿Qué información o documentos faltan para avanzar este expediente?">¿Qué información o documentos faltan?</button>
+    </div>
+    {% if asunto.privado %}
+    <div class="xp-aviso-ia">{{ ic('lock', 16) }}<span>Este expediente es <b>privado</b>: {{ config.ASISTENTE_NOMBRE }} solo busca en el servidor del despacho y nada de su contenido se envía al servicio de IA.</span></div>
+    {% elif not config.ANTHROPIC_API_KEY %}
+    <div class="xp-aviso-ia">{{ ic('spark', 16) }}<span>{{ config.ASISTENTE_NOMBRE }} está en <b>modo búsqueda</b>: te muestra los pasajes de tus documentos y de la ley que responden a tu pregunta, pero todavía no redacta respuestas. La redacción se activa al conectar el servicio de IA.</span></div>
+    {% endif %}
+  </div>
+</section>
 
     <!-- ── Actividad ──────────────────────────────────────────────── -->
-    <section class="af-panel on" id="p-actividad" role="tabpanel">
+    <section class="xp-panel" id="p-actividad" role="tabpanel">
+<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
       <div class="af-comp">
         <div class="af-comp-tabs">
           <button type="button" class="on" data-comp="nota">{{ ic('note', 14) }} Nota</button>
@@ -168,7 +320,7 @@
         <button type="button" data-f="sentencia">Resoluciones</button>
       </div>
 
-      {% set colores = {'nota': ('#EEF2FF','#1D3FD6'), 'actividad': ('#FFF7ED','#C2410C'), 'documento': ('#ECFEFF','#0E7490'), 'sentencia': ('#F5F3FF','#6D28D9'), 'sistema': ('#F1F5F9','#64708A')} %}
+      {% set colores = {'nota': ('#F4EEDF','#132238'), 'actividad': ('#F7F0E1','#8A6A2F'), 'documento': ('#EEF1F5','#3D5A80'), 'sentencia': ('#F6F1E6','#6E5A3A'), 'sistema': ('#F1EEE8','#60718D')} %}
       {% set ico_tipo = {'nota': 'note', 'documento': 'doc', 'sentencia': 'scale'} %}
       {% set clave_sentido = {'Favorable': 'favorable', 'Parcial': 'parcial', 'Desfavorable': 'desfavorable'} %}
       <div id="afBitacora">
@@ -202,10 +354,12 @@
         <p class="as-empty" style="margin-top:14px">Todavía no hay actividad. Escribe la primera nota o agenda la siguiente audiencia.</p>
       {% endfor %}
       </div>
+</div></div>
     </section>
 
     <!-- ── Documentos ─────────────────────────────────────────────── -->
-    <section class="af-panel" id="p-documentos" role="tabpanel">
+    <section class="xp-panel" id="p-documentos" role="tabpanel">
+<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
       <div class="af-docs-h"><h4>Documentos del expediente</h4>
         <a class="btn btn-secondary btn-sm" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 13) }} Generar desde machote</a></div>
       {% for d in documentos %}
@@ -228,17 +382,19 @@
         <button type="button" class="btn btn-secondary btn-sm" id="afNuevaRes">+ Agregar resolución</button></div>
       {% for s in sentencias %}
       <div class="af-doc">
-        <span class="af-ext" style="background:#F5F3FF;color:#6D28D9">{{ ic('scale', 16) }}</span>
+        <span class="af-ext" style="background:#F6F1E6;color:#6E5A3A">{{ ic('scale', 16) }}</span>
         <div class="af-doc-b">
           {% if s.archivo_url and s.archivo_url.startswith('/archivos/') %}<a href="{{ s.archivo_url }}" target="_blank" rel="noopener">{{ s.titulo }}</a>{% else %}<b>{{ s.titulo }}</b>{% endif %}
           <small>{{ s.etiqueta }}{% if s.fecha_emision %} · {{ s.fecha_emision[:10] }}{% endif %}{% if s.sentido_label %} · {{ s.sentido_label }}{% endif %}</small>
         </div>
       </div>
       {% else %}<p class="as-empty">Sin resoluciones registradas. Anotar si fueron favorables alimenta los precedentes del despacho.</p>{% endfor %}
+</div></div>
     </section>
 
     <!-- ── Datos ──────────────────────────────────────────────────── -->
-    <section class="af-panel" id="p-datos" role="tabpanel">
+    <section class="xp-panel" id="p-datos" role="tabpanel">
+<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
       <form class="af-form" id="fDatos">
         <h4>El asunto</h4>
         <div><label class="as-label" for="dTipo">Materia</label>
@@ -269,10 +425,12 @@
           <select class="as-select" id="dForma" name="forma_cobro">{% for f, l in [('fijo','Cuota fija'),('por_hora','Por hora'),('por_evento','Por etapa o evento')] %}<option value="{{ f }}"{% if asunto.forma_cobro == f %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
       </form>
       <div class="af-guardar" id="fDatosBar"><div>Tienes cambios sin guardar <button type="button" class="btn btn-ghost btn-sm" id="fDatosDeshacer">Deshacer</button><button type="button" class="btn btn-primary btn-sm" id="fDatosGuardar">Guardar cambios</button></div></div>
+</div></div>
     </section>
 
     <!-- ── Estrategia ─────────────────────────────────────────────── -->
-    <section class="af-panel" id="p-estrategia" role="tabpanel">
+    <section class="xp-panel" id="p-estrategia" role="tabpanel">
+<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
       <p class="as-empty" style="margin-bottom:12px">La estrategia del caso en un solo lugar. Escribe un argumento o un riesgo por renglón.</p>
       <form class="af-form" id="fFicha">
         <div class="full"><label class="as-label" for="eObj">Qué quiere lograr el cliente</label><textarea class="as-textarea" id="eObj" name="objetivo_cliente" rows="2" maxlength="2000">{{ ficha.objetivo_cliente if ficha else '' }}</textarea></div>
@@ -287,116 +445,18 @@
         <a href="{{ url_for('asistente.index', asunto=asunto.id) }}" style="display:inline-flex;gap:6px;align-items:center;font:600 13px Inter;color:var(--e);text-decoration:none">{{ ic('spark', 14) }} Pídele a {{ config.ASISTENTE_NOMBRE }} que revise la estrategia</a>
         <button type="button" class="btn btn-primary btn-sm" id="fFichaGuardar">Guardar estrategia</button>
       </div>
+</div></div>
     </section>
 
     <!-- ── Horas ──────────────────────────────────────────────────── -->
-    <section class="af-panel" id="p-horas" role="tabpanel">
+    <section class="xp-panel" id="p-horas" role="tabpanel">
+<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
       <div class="af-horas-total"><b>{{ horas_total | round(1) }} h</b><span class="as-muted">registradas{% if asunto.forma_cobro == 'por_hora' %} · el asunto se cobra por hora{% endif %}</span></div>
       {% for h in horas %}
       <div class="af-hora"><span>{{ (h.fecha or '')[:10] }}</span><b>{{ h.horas | round(1) }} h</b><span>{{ h.descripcion or '—' }}</span><span class="as-muted">{{ h.autor }}</span></div>
       {% else %}<p class="as-empty">Sin horas registradas. Regístralas desde la pestaña Actividad.</p>{% endfor %}
+</div></div>
     </section>
-  </main>
-
-  <aside class="af-side">
-    <section class="as-card">
-      <div class="as-card-h"><h3>Próximo</h3><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">+ Agendar</a></div>
-      <div class="as-card-b">
-        {% for e in eventos %}
-        <div class="af-pend"><div class="af-fecha"><b>{{ e.dia.split(' ')[0] }}</b><small>{{ e.dia.split(' ')[1] }}</small></div>
-          <div class="af-pend-b"><b>{{ e.titulo }}</b><small>{{ e.etiqueta }}{% if e.hora and e.hora != '00:00' %} · {{ e.hora }}{% endif %}{% if e.lugar %} · {{ e.lugar }}{% endif %}</small></div></div>
-        {% endfor %}
-        {% for t in pendientes %}
-        <div class="af-pend">
-          <button type="button" class="af-tick" data-act="{{ t.id }}" aria-label="Marcar como hecho" title="Marcar como hecho"></button>
-          <div class="af-pend-b"><b>{{ t.titulo }}</b><small class="{{ t.semaforo }}">{{ t.etiqueta }}{% if t.cuando %} · {{ t.cuando }}{% endif %}</small></div></div>
-        {% endfor %}
-        {% if not eventos and not pendientes %}<p class="as-empty">Nada agendado para este asunto.</p>{% endif %}
-      </div>
-    </section>
-
-    {% if not abierto or asunto.resultado %}
-    <section class="as-card">
-      <div class="as-card-h"><h3>Resultado</h3></div>
-      <div class="as-card-b">
-        <div class="as-res" id="pcRes">
-          {% for clave, info in resultados.items() %}<button type="button" data-res="{{ clave }}" class="{{ 'on' if asunto.resultado == clave }}" style="--rc:{{ info.color }};--rf:{{ info.fondo }}">{{ info.label }}</button>{% endfor %}
-        </div>
-        <textarea class="as-textarea pc-notas" id="pcNotas" maxlength="3000" rows="3" placeholder="¿Qué argumento o estrategia funcionó? ¿Qué harías distinto?">{{ asunto.resultado_notas or '' }}</textarea>
-        <div class="pc-hint" id="pcHint">{{ 'Se usa como precedente para asuntos parecidos.' if asunto.resultado else 'Regístralo: alimenta los precedentes del despacho.' }}</div>
-      </div>
-    </section>
-    {% endif %}
-
-    <section class="as-card">
-      <div class="as-card-h"><h3>Casos parecidos del despacho</h3><a href="{{ url_for('insights.index') }}">Precedentes</a></div>
-      <div class="as-card-b" id="pcCasos"><p class="as-empty">Buscando precedentes…</p></div>
-    </section>
-
-    <section class="as-card">
-      <div class="as-card-h"><h3>Equipo</h3></div>
-      <div class="as-card-b">
-        {% if responsable %}<div class="af-persona">{{ avatar(responsable, 'lg') }}<div><b>{{ responsable.nombre }}</b><small>Responsable</small></div></div>{% endif %}
-        {% for c in colaboradores %}
-        <div class="af-persona">{{ avatar(c, 'lg') }}<div><b>{{ c.nombre }}</b><small>Colabora</small></div>
-          {% if es_admin %}<button type="button" data-quitar="{{ c.id }}" aria-label="Quitar a {{ c.nombre }}" title="Quitar del asunto">×</button>{% endif %}</div>
-        {% endfor %}
-        {% if es_admin %}
-        {% set ya = colaboradores | map(attribute='id') | list %}
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
-          <select class="as-select" id="eqAgregar" aria-label="Agregar al equipo">
-            <option value="">+ Agregar a alguien del equipo…</option>
-            {% for ab in abogados if (not responsable or ab.id != responsable.id) and ab.id not in ya %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
-          </select>
-          <select class="as-select" id="eqResponsable" aria-label="Cambiar responsable">
-            <option value="">Cambiar responsable…</option>
-            {% for ab in abogados if not responsable or ab.id != responsable.id %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
-          </select>
-        </div>
-        {% endif %}
-      </div>
-    </section>
-
-    {% if asunto.cliente_id and asunto.cliente %}
-    <section class="as-card">
-      <div class="as-card-h"><h3>Cliente</h3><a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">Ver ficha</a></div>
-      <div class="as-card-b">
-        <div class="af-persona" style="padding-top:0"><div><b>{{ asunto.cliente }}</b><small>{{ 'Persona moral' if asunto.cliente_tipo == 'persona_moral' else 'Persona física' }}</small></div></div>
-        {% if asunto.cliente_email %}<div class="af-kv"><span class="as-muted">Correo</span><a href="mailto:{{ asunto.cliente_email }}" style="color:var(--e);text-decoration:none;font-weight:600">{{ asunto.cliente_email }}</a></div>{% endif %}
-        {% if asunto.cliente_tel %}<div class="af-kv"><span class="as-muted">Teléfono</span><a href="tel:{{ asunto.cliente_tel }}" style="color:var(--fog);text-decoration:none;font-weight:600">{{ asunto.cliente_tel }}</a></div>{% endif %}
-      </div>
-    </section>
-    {% endif %}
-
-    <section class="as-card">
-      <div class="as-card-h"><h3>Cobranza</h3><a href="{{ url_for('cobranzas.index', asunto=asunto.id, grupo='todos') }}">Ver cobros</a></div>
-      <div class="as-card-b">
-        <div class="af-kv"><span class="as-muted">Honorarios pactados</span><b>${{ '{:,.0f}'.format(dinero.pactados) }}</b></div>
-        <div class="af-kv"><span class="as-muted">Facturado</span><b>${{ '{:,.0f}'.format(dinero.facturado) }}</b></div>
-        <div class="af-kv"><span class="as-muted">Cobrado</span><b style="color:#047857">${{ '{:,.0f}'.format(dinero.cobrado) }}</b></div>
-        <div class="af-kv"><span class="as-muted">Por cobrar</span><b style="color:{{ '#B45309' if dinero.pendiente else 'var(--fog)' }}">${{ '{:,.0f}'.format(dinero.pendiente) }}</b></div>
-        {% if session.get('role') in ('super_admin', 'admin', 'abogado', 'asistente') %}
-        <a class="btn btn-secondary btn-sm" style="width:100%;justify-content:center;margin-top:10px" href="{{ url_for('cobranzas.index') }}#nuevo-asunto-{{ asunto.id }}">+ Nuevo cobro</a>
-        {% endif %}
-      </div>
-    </section>
-
-    <section class="as-card">
-      <div class="as-card-h"><h3>Etiquetas</h3></div>
-      <div class="as-card-b">
-        <div class="af-tags" id="afTags">
-          {% for et in etiquetas %}<span class="af-tag" style="--t:{{ et.color }}">{{ et.nombre }}<button type="button" data-et="{{ et.id }}" aria-label="Quitar etiqueta {{ et.nombre }}">×</button></span>{% endfor %}
-          <button type="button" class="af-tag-add" id="afTagAdd">+ Etiqueta</button>
-        </div>
-        <form id="afTagForm" hidden style="margin-top:8px;gap:6px">
-          <input class="as-input" id="afTagInput" list="afTagList" maxlength="30" placeholder="Ej. Urgente, Apelación…" style="flex:1">
-          <datalist id="afTagList">{% for et in todas_etiquetas %}<option value="{{ et.nombre }}">{% endfor %}</datalist>
-          <button class="btn btn-primary btn-sm">Agregar</button>
-        </form>
-      </div>
-    </section>
-  </aside>
-</div>
 
 <div class="as-modal" id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTitulo">
   <div class="as-modal-c">
@@ -444,11 +504,16 @@
 
   /* Pestañas */
   function abrirTab(nombre) {
-    const btn = document.querySelector(`.af-tab[data-tab="${nombre}"]`); if (!btn) return;
-    document.querySelectorAll('.af-tab').forEach(t => t.classList.toggle('on', t === btn));
-    document.querySelectorAll('.af-panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + nombre));
+    const btn = document.querySelector(`.xp-tab[data-tab="${nombre}"]`); if (!btn) return;
+    document.querySelectorAll('.xp-tab').forEach(t => t.classList.toggle('on', t === btn));
+    document.querySelectorAll('.xp-panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + nombre));
+    btn.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
-  document.querySelectorAll('.af-tab').forEach(t => t.addEventListener('click', () => { abrirTab(t.dataset.tab); history.replaceState(null, '', '#' + t.dataset.tab); }));
+  const irA = n => { abrirTab(n); history.replaceState(null, '', '#' + n); };
+  document.querySelectorAll('.xp-tab').forEach(t => t.addEventListener('click', () => irA(t.dataset.tab)));
+  document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => irA(b.dataset.ir)));
+  document.querySelectorAll('#xpSubir, [data-subir]').forEach(b => b.addEventListener('click', () => { irA('documentos'); document.getElementById('afArchivo').click(); }));
+  document.querySelectorAll('.xp-sugerencias [data-q]').forEach(b => b.addEventListener('click', () => { const q = document.getElementById('xpQ'); q.value = b.dataset.q; document.getElementById('xpPregunta').requestSubmit(); }));
   if (location.hash) abrirTab(tabActual());
   window.addEventListener('hashchange', () => abrirTab(tabActual()));
 
@@ -554,7 +619,7 @@
   enviar($('#fHoras'), `/asuntos/${ID}/horas`, fd => ({ horas: fd.get('horas'), fecha: fd.get('fecha'), descripcion: fd.get('descripcion') }));
 
   /* Hecho / pendiente */
-  document.querySelectorAll('.af-tick[data-act]').forEach(b => b.addEventListener('click', async () => {
+  document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', async () => {
     const hecho = !b.classList.contains('on');
     const r = await post(`/asuntos/${ID}/actividades/${b.dataset.act}/realizado`, { realizado: hecho });
     if (!r.ok) { showToast('No se pudo actualizar', 'error'); return; }
@@ -673,7 +738,7 @@
     if (r.ok) location.href = {{ url_for('asuntos.index') | tojson }}; else showToast('No se pudo archivar', 'error');
   });
 
-  {% if recien_creado %}showToast('Asunto creado. Agenda lo que sigue o sube los primeros documentos.');{% endif %}
+  {% if recien_creado %}showToast('Expediente creado. Sube los primeros documentos o agenda lo que sigue.');{% endif %}
 })();
 </script>
 {% endblock %}

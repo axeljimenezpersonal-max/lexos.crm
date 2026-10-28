@@ -17,11 +17,11 @@ import numpy as np
 from modules.lector import vectores
 
 RESULTADOS = {
-    "favorable":     {"label": "Ganado",        "color": "#047857", "fondo": "#ECFDF5"},
-    "parcial":       {"label": "Parcial",       "color": "#B45309", "fondo": "#FFFBEB"},
-    "convenio":      {"label": "Convenio",      "color": "#0284C7", "fondo": "#F0F9FF"},
-    "desfavorable":  {"label": "Perdido",       "color": "#DC2626", "fondo": "#FEF2F2"},
-    "desistimiento": {"label": "Desistimiento", "color": "#64708A", "fondo": "#F1F5F9"},
+    "favorable":     {"label": "Ganado",        "color": "#3D5A80", "fondo": "#EEF1F5"},
+    "parcial":       {"label": "Parcial",       "color": "#8A6A2F", "fondo": "#F7F0E1"},
+    "convenio":      {"label": "Convenio",      "color": "#4B6585", "fondo": "#F0F9FF"},
+    "desfavorable":  {"label": "Perdido",       "color": "#A23B33", "fondo": "#F8EDEA"},
+    "desistimiento": {"label": "Desistimiento", "color": "#60718D", "fondo": "#F1EEE8"},
 }
 SENTIDOS = {"favorable": "Favorable", "parcial": "Parcial", "desfavorable": "Desfavorable"}
 

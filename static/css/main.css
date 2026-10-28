@@ -1,6 +1,6 @@
 /* ============================================================
    CODEX — Design System · Navy Premium
-   Fondo blanco · Navy #1B3A6B · Dorado #B8922A
+   Fondo blanco · Navy #132238 · Dorado #AD9060
    Tipografía: Inter (UI) · Cormorant Garamond (legal) · DM Mono (data)
    ============================================================ */
 
@@ -8,41 +8,44 @@
 
 /* ── Variables ─────────────────────────────────────────────── */
 :root {
-  /* ── MARCA HABEAS CORPUS ── */
-  --e:    #1D3FD6;   /* Azul cobalto — acento principal */
-  --ed:   #1734B5;   /* Cobalto oscuro — hover */
-  --ex:   rgba(29,63,214,0.06);
-  --e10:  rgba(29,63,214,0.10);
-  --e20:  rgba(29,63,214,0.20);
-  --e04:  rgba(29,63,214,0.04);
-  --edim: #EEF2FF;
-  --tinta: #0A1A4A;
-  --cielo: #5BC0FF;
+  /* ── MARCA HABEAS CORPUS: azul marino + dorado apagado sobre crema ── */
+  --e:    #132238;   /* Azul marino — texto fuerte, botones principales */
+  --ed:   #101D31;   /* Marino profundo — hover y seleccionado */
+  --dorado:   #AD9060;   /* Dorado apagado — indicadores activos, acento */
+  --dorado-p: #EFE2C3;   /* Dorado pálido — resaltados y estados seleccionados */
+  --gris-l:   #E5E8EC;   /* Gris claro — superficies de conversación */
+  --ex:   rgba(19,34,56,0.06);
+  --e10:  rgba(19,34,56,0.10);
+  --e20:  rgba(19,34,56,0.20);
+  --e04:  rgba(19,34,56,0.04);
+  --edim: #F4EEDF;
+  --tinta: #132238;
+  --cielo: #AD9060;
 
   /* ── FONDOS ── */
-  --n:    #F6F7FB;   /* Fondo de página */
-  --c:    #FFFFFF;   /* Fondo de tarjeta */
-  --c2:   #F2F4F9;   /* Inputs, superficies secundarias */
+  --n:    #F8F6F2;   /* Fondo de página */
+  --c:    #FCFAF7;   /* Paneles (blanco cálido) */
+  --c2:   #F1EEE8;   /* Inputs, superficies secundarias */
 
   /* ── TEXTO ── */
-  --fog:  #0F172A;   /* Texto principal */
-  --ash:  #64708A;   /* Texto secundario */
-  --w:    #F6F7FB;
+  --fog:  #132238;   /* Texto principal */
+  --ash:  #60718D;   /* Texto secundario */
+  --w:    #F8F6F2;
 
   /* ── ACENTO SECUNDARIO (se conserva el nombre por compatibilidad) ── */
-  --gold: #5BC0FF;
-  --gold-s: rgba(91,192,255,0.14);
+  --gold: #AD9060;
+  --gold-s: rgba(173,144,96,0.14);
 
   /* ── SEMÁFOROS ── */
-  --ok:   #047857;
-  --warn: #B45309;
-  --danger: #DC2626;
-  --info: #1D3FD6;
+  --ok:   #3D5A80;
+  --warn: #8A6A2F;
+  --danger: #A23B33;
+  --info: #132238;
 
   /* ── BORDES ── */
-  --border:   #E5E8F0;
-  --border-m: #D3D9E6;
-  --border-e: #B9C1D6;
+  --border:   #E5E2DB;
+  --border-m: #D8DADF;   /* Bordes de campos */
+  --border-e: #C5C2BA;
 
   /* ── ESPACIADO ── */
   --r-sm: 4px;
@@ -53,16 +56,16 @@
   --bg:           var(--n);
   --bg-2:         #EEF2F7;
   --bg-3:         var(--c);
-  --bg-4:         #E2E8F0;
+  --bg-4:         #E3E0D9;
   --border-light: var(--border-m);
   --card:         var(--c);
-  --sidebar:      #1B3A6B;
+  --sidebar:      #132238;
   --hover:        var(--e04);
 
   --accent:       var(--e);
   --accent-hover: var(--ed);
   --accent-soft:  var(--ex);
-  --accent-glow:  rgba(27,58,107,0.20);
+  --accent-glow:  rgba(19,34,56,0.20);
 
   --text:         var(--fog);
   --text-2:       var(--ash);
@@ -105,8 +108,8 @@ button, input, select, textarea { font-family: inherit; }
 /* ── Scrollbar ──────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(27,58,107,0.15); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(27,58,107,0.30); }
+::-webkit-scrollbar-thumb { background: rgba(19,34,56,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(19,34,56,0.30); }
 
 /* ══════════════════════════════════════════════════════════════
    ANIMATIONS
@@ -710,9 +713,9 @@ button, input, select, textarea { font-family: inherit; }
 .btn-secondary { background: var(--c); color: var(--fog); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--e04); color: var(--e); border-color: var(--border-m); }
 .btn-success { background: var(--ok); color: #fff; }
-.btn-success:hover { background: #047857; color: #fff; }
+.btn-success:hover { background: #3D5A80; color: #fff; }
 .btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #B91C1C; color: #fff; }
+.btn-danger:hover { background: #8F322B; color: #fff; }
 .btn-ghost { background: transparent; color: var(--ash); border: 1px solid var(--border); }
 .btn-ghost:hover { background: var(--e04); color: var(--e); border-color: var(--border-m); }
 .btn-outline {
@@ -740,7 +743,7 @@ button, input, select, textarea { font-family: inherit; }
   font-size: .85rem; outline: none; font-family: 'Inter', sans-serif;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
-.form-control:focus { border-color: var(--e); box-shadow: 0 0 0 3px rgba(27,58,107,0.08); }
+.form-control:focus { border-color: var(--e); box-shadow: 0 0 0 3px rgba(19,34,56,0.08); }
 .form-control::placeholder { color: var(--ash); opacity: 0.5; }
 .form-control option { background: var(--c); color: var(--fog); }
 select.form-control { appearance: none; cursor: pointer; }
@@ -790,8 +793,8 @@ tbody td strong, tbody td a { color: var(--fog); }
   text-transform: uppercase; white-space: nowrap; letter-spacing: 0.15em;
 }
 .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.badge-activo, .badge-pagado, .badge-completado { background: rgba(5,150,105,0.10); color: #059669; }
-.badge-pendiente, .badge-en_proceso { background: rgba(217,119,6,0.10); color: #D97706; }
+.badge-activo, .badge-pagado, .badge-completado { background: rgba(5,150,105,0.10); color: #3D5A80; }
+.badge-pendiente, .badge-en_proceso { background: rgba(217,119,6,0.10); color: #9A7536; }
 .badge-vencido, .badge-alta { background: var(--danger-soft); color: var(--danger); }
 .badge-cerrado, .badge-archivado, .badge-cancelado { background: rgba(100,116,139,0.10); color: var(--ash); }
 .badge-suspendido { background: var(--info-soft); color: var(--info); }
@@ -813,10 +816,10 @@ tbody td strong, tbody td a { color: var(--fog); }
   border-left: 3px solid transparent; margin-bottom: 14px;
   font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
 }
-.alert-success { background: rgba(5,150,105,0.08); border-color: var(--ok); color: #047857; }
-.alert-danger  { background: var(--danger-soft); border-color: var(--danger); color: #B91C1C; }
-.alert-warning { background: var(--warning-soft); border-color: var(--warn); color: #92400E; }
-.alert-info    { background: var(--info-soft); border-color: var(--info); color: #1D4ED8; }
+.alert-success { background: rgba(5,150,105,0.08); border-color: var(--ok); color: #3D5A80; }
+.alert-danger  { background: var(--danger-soft); border-color: var(--danger); color: #8F322B; }
+.alert-warning { background: var(--warning-soft); border-color: var(--warn); color: #74592A; }
+.alert-info    { background: var(--info-soft); border-color: var(--info); color: #26405F; }
 
 /* ══════════════════════════════════════════════════════════════
    MINI CALENDAR
@@ -896,10 +899,10 @@ tbody td strong, tbody td a { color: var(--fog); }
   width: 52px; height: 52px; border-radius: 50%;
   background: var(--e); color: #fff; border: none;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; box-shadow: 0 6px 20px rgba(27,58,107,0.30);
+  cursor: pointer; box-shadow: 0 6px 20px rgba(19,34,56,0.30);
   transition: all var(--transition); font-size: 1.4rem; line-height: 1;
 }
-.fab-main:hover { background: var(--ed); transform: scale(1.07); box-shadow: 0 8px 28px rgba(27,58,107,0.35); }
+.fab-main:hover { background: var(--ed); transform: scale(1.07); box-shadow: 0 8px 28px rgba(19,34,56,0.35); }
 .fab-main.open { transform: rotate(45deg); }
 .fab-main.open:hover { transform: rotate(45deg) scale(1.07); }
 .fab-items { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; opacity: 0; pointer-events: none; transform: translateY(10px); transition: opacity 150ms ease, transform 150ms ease; }
@@ -985,7 +988,7 @@ tbody td strong, tbody td a { color: var(--fog); }
 .search-bar input { background: none; border: none; outline: none; color: var(--fog); font-size: .85rem; padding: 8px 0; width: 100%; }
 .search-bar input::placeholder { color: var(--ash); opacity: .5; }
 .search-bar svg { color: var(--ash); flex-shrink: 0; }
-.search-bar:focus-within { border-color: var(--e); box-shadow: 0 0 0 3px rgba(27,58,107,0.08); }
+.search-bar:focus-within { border-color: var(--e); box-shadow: 0 0 0 3px rgba(19,34,56,0.08); }
 
 /* ══════════════════════════════════════════════════════════════
    FILTERS

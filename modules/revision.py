@@ -15,10 +15,10 @@ from modules.auth import login_required
 revision_bp = Blueprint("revision", __name__)
 
 TIPOS = {
-    "error":  {"label": "Error",  "color": "#DC2626", "fondo": "#FEF2F2"},
-    "diseno": {"label": "Diseño", "color": "#6D28D9", "fondo": "#F5F3FF"},
-    "texto":  {"label": "Texto",  "color": "#B45309", "fondo": "#FFFBEB"},
-    "idea":   {"label": "Idea",   "color": "#1D3FD6", "fondo": "#EEF2FF"},
+    "error":  {"label": "Error",  "color": "#A23B33", "fondo": "#F8EDEA"},
+    "diseno": {"label": "Diseño", "color": "#6E5A3A", "fondo": "#F6F1E6"},
+    "texto":  {"label": "Texto",  "color": "#8A6A2F", "fondo": "#F7F0E1"},
+    "idea":   {"label": "Idea",   "color": "#132238", "fondo": "#F4EEDF"},
 }
 
 
@@ -39,6 +39,8 @@ def activa() -> bool:
 
 def _autor() -> str:
     u = session.get("user") or {}
+    if current_app.config.get("ACCESO_PRUEBA_CLAVE") and u.get("email") == current_app.config.get("ACCESO_PRUEBA_USUARIO"):
+        return ""   # cuenta compartida: cada quien escribe su nombre
     nombre = f"{u.get('nombre', '')} {u.get('apellidos', '') or ''}".strip()
     return nombre or ""
 

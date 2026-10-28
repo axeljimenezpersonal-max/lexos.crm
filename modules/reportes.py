@@ -447,9 +447,9 @@ def exportar_pdf():
       h1 {{ font-size: 16px; margin-bottom: 4px; }}
       .meta {{ color: #666; font-size: 10px; margin-bottom: 16px; }}
       table {{ border-collapse: collapse; width: 100%; }}
-      th {{ background: #00DFA2; color: #080C10; text-align: left; padding: 6px 8px; font-size: 10px; font-weight: 600; }}
-      td {{ padding: 5px 8px; border-bottom: 1px solid #E5E7EB; }}
-      tr:nth-child(even) {{ background: #F9FAFB; }}
+      th {{ background: #AD9060; color: #080C10; text-align: left; padding: 6px 8px; font-size: 10px; font-weight: 600; }}
+      td {{ padding: 5px 8px; border-bottom: 1px solid #E5E2DB; }}
+      tr:nth-child(even) {{ background: #FAF8F4; }}
     </style></head><body>
     <h1>{nombre}</h1>
     <div class="meta">{despacho} · Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}</div>

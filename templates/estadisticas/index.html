@@ -71,7 +71,7 @@
   </div>
 
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#10B981;">
+    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#4F6D8A;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -82,7 +82,7 @@
   </div>
 
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(245,158,11,.12);color:#F59E0B;">
+    <div class="est-kpi-icon" style="background:rgba(245,158,11,.12);color:#B08A4A;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -102,7 +102,7 @@
   </div>
 
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#10B981;">
+    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#4F6D8A;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -124,7 +124,7 @@
   </div>
 
   <div class="est-kpi {{ 'est-kpi-alert' if kpi.vencidos > 0 }}">
-    <div class="est-kpi-icon" style="background:rgba(239,68,68,.12);color:#EF4444;">
+    <div class="est-kpi-icon" style="background:rgba(239,68,68,.12);color:#B5483F;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -362,13 +362,13 @@
 document.addEventListener('DOMContentLoaded', function() {
 
   // ── Chart defaults ──
-  Chart.defaults.color = '#9CA3AF';
+  Chart.defaults.color = '#8E99AB';
   Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
   Chart.defaults.font.size = 12;
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
   Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
 
-  const COLORS = ['#00DFA2','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316','#06B6D4','#84CC16'];
+  const COLORS = ['#AD9060','#4F6D8A','#B08A4A','#B5483F','#8C7A5B','#8E6F4A','#4B6585','#B08A4A','#06B6D4','#84CC16'];
 
   // ── 1. Asuntos por estado (dona) ──
   const estadoData = {{ ch_asuntos_estado | tojson }};
@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
       datasets: [{
         label: 'Asuntos',
         data: tipoData.map(d => d.total),
-        backgroundColor: '#00DFA2',
+        backgroundColor: '#AD9060',
         borderRadius: 4,
       }]
     },
@@ -421,14 +421,14 @@ document.addEventListener('DOMContentLoaded', function() {
         {
           label: 'Facturado',
           data: factData.map(d => d.facturado),
-          borderColor: '#00DFA2',
+          borderColor: '#AD9060',
           backgroundColor: 'rgba(0,223,162,.1)',
           fill: true, tension: .3, pointRadius: 3,
         },
         {
           label: 'Cobrado',
           data: factData.map(d => d.cobrado),
-          borderColor: '#10B981',
+          borderColor: '#4F6D8A',
           backgroundColor: 'rgba(16,185,129,.1)',
           fill: true, tension: .3, pointRadius: 3,
         }
@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
       datasets: [{
         label: 'Nuevos',
         data: cliData.map(d => d.total),
-        backgroundColor: '#10B981',
+        backgroundColor: '#4F6D8A',
         borderRadius: 4,
       }]
     },
@@ -473,8 +473,8 @@ document.addEventListener('DOMContentLoaded', function() {
     data: {
       labels: cargaData.map(d => d.nombre),
       datasets: [
-        { label: 'Activos', data: cargaData.map(d => d.activos), backgroundColor: '#00DFA2', borderRadius: 4 },
-        { label: 'Completados', data: cargaData.map(d => d.completados), backgroundColor: '#10B981', borderRadius: 4 },
+        { label: 'Activos', data: cargaData.map(d => d.activos), backgroundColor: '#AD9060', borderRadius: 4 },
+        { label: 'Completados', data: cargaData.map(d => d.completados), backgroundColor: '#4F6D8A', borderRadius: 4 },
       ]
     },
     options: {
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
       datasets: [{
         label: 'Facturado',
         data: topData.map(d => d.total),
-        backgroundColor: '#F59E0B',
+        backgroundColor: '#B08A4A',
         borderRadius: 4,
       }]
     },

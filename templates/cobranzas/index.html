@@ -87,7 +87,7 @@
     <div class="cb-filtros">
       {% if f.semana %}<span class="as-filtro">Vencen en los próximos 7 días<a href="{{ liga(semana='') }}" aria-label="Quitar filtro">×</a></span>{% endif %}
       {% if nombres.cliente %}<span class="as-filtro">{{ nombres.cliente }}<a href="{{ liga(cliente='') }}" aria-label="Quitar filtro de cliente">×</a></span>
-        <a class="as-filtro" style="text-decoration:none;background:#fff;border:1px solid var(--border)" href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=f.cliente) }}">Estado de cuenta (PDF)</a>{% endif %}
+        <a class="as-filtro" style="text-decoration:none;background:var(--c);border:1px solid var(--border)" href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=f.cliente) }}">Estado de cuenta (PDF)</a>{% endif %}
       {% if nombres.asunto %}<span class="as-filtro">Asunto: {{ nombres.asunto }}<a href="{{ liga(asunto='') }}" aria-label="Quitar filtro de asunto">×</a></span>{% endif %}
     </div>
     {% endif %}
@@ -203,7 +203,7 @@
           </div>
           {% endfor %}
         </div>
-        <div class="cb-leyenda"><span><i style="background:#C7D2FE"></i>Facturado</span><span><i style="background:var(--e)"></i>Cobrado</span></div>
+        <div class="cb-leyenda"><span><i style="background:#E2D3AE"></i>Facturado</span><span><i style="background:var(--e)"></i>Cobrado</span></div>
       </div>
     </section>
   </aside>
@@ -593,7 +593,7 @@
   function despues() {
     const resta = Math.round(((+pagoInfo.saldo) - (+$('#pgMonto').value || 0)) * 100) / 100, p = $('#pgDespues');
     p.className = 'cb-despues' + (resta <= 0 ? ' ok' : '');
-    p.innerHTML = resta < 0 ? '<b style="color:#DC2626">Es más que el saldo pendiente</b>' :
+    p.innerHTML = resta < 0 ? '<b style="color:#A23B33">Es más que el saldo pendiente</b>' :
       resta === 0 ? '<b>Con este pago queda liquidado ✓</b>' : `Después de este pago quedará un saldo de <b>${fmt(resta, pagoInfo.moneda)}</b>`;
   }
   $('#pgMonto').addEventListener('input', despues);

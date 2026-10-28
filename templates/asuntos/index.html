@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Asuntos{% endblock %}
-{% block page_title %}Asuntos{% endblock %}
+{% block title %}Expedientes{% endblock %}
+{% block page_title %}Expedientes{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
 {% endblock %}
 
 {% macro proximo_html(a) -%}
@@ -18,124 +19,103 @@
 {%- endmacro %}
 
 {% block content %}
-<div class="as-head">
+<div class="ex-head">
   <div>
-    <h1 class="page-title">Asuntos</h1>
-    <p class="as-sub">{{ conteos.abiertos }} en curso · {{ conteos.concluidos }} concluidos</p>
+    <h1 class="ex-h1">Expedientes</h1>
+    <p class="ex-sub">Consulta, gestiona y da seguimiento a tus expedientes jurídicos y notariales.</p>
   </div>
   {% if session.get('role') in ('super_admin', 'admin', 'abogado') %}
-  <a href="{{ url_for('asuntos.nuevo') }}" class="btn btn-primary">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-    Nuevo asunto
-  </a>
+  <a href="{{ url_for('asuntos.nuevo') }}" class="btn btn-primary ex-crear">Crear expediente
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></a>
   {% endif %}
 </div>
 
-<section class="as-kpis" aria-label="Resumen">
-  <a class="as-kpi{% if grupo == 'abiertos' and not atencion and vista == 'lista' %} on{% endif %}" href="{{ liga(grupo='', atencion='', vista='') }}">
-    <small>En curso</small><b>{{ resumen.abiertos }}</b><span>por iniciar, activos y en espera</span>
-  </a>
-  <a class="as-kpi{% if resumen.termino %} alerta{% endif %}{% if atencion == 'termino' %} on{% endif %}" href="{{ liga(atencion='termino', grupo='', vista='') }}">
-    <small>Vencen en 7 días</small><b>{{ resumen.termino }}</b><span>términos, audiencias y pendientes</span>
-  </a>
-  <a class="as-kpi{% if resumen.sin_mov %} aviso{% endif %}{% if atencion == 'sin_mov' %} on{% endif %}" href="{{ liga(atencion='sin_mov', grupo='', vista='') }}">
-    <small>Sin movimiento</small><b>{{ resumen.sin_mov }}</b><span>más de 30 días sin actividad</span>
-  </a>
-  <a class="as-kpi{% if grupo == 'concluidos' %} on{% endif %}" href="{{ liga(grupo='concluidos', atencion='', vista='') }}">
-    <small>Concluidos este año</small><b>{{ resumen.concluidos }}</b><span>con su resultado en Precedentes</span>
-  </a>
-</section>
-
-<div class="as-toolbar">
-  <form class="as-search" method="get" action="{{ url_for('asuntos.index') }}" role="search">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input type="search" name="q" value="{{ q }}" placeholder="Buscar por título, expediente, cliente o contraparte" aria-label="Buscar asuntos">
+<div class="ex-toolbar">
+  <form class="ex-buscar" method="get" action="{{ url_for('asuntos.index') }}" role="search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar por número, nombre, asunto, cliente o contraparte…" aria-label="Buscar expedientes">
     {% if grupo != 'abiertos' %}<input type="hidden" name="grupo" value="{{ grupo }}">{% endif %}
     {% if tipo %}<input type="hidden" name="tipo" value="{{ tipo }}">{% endif %}
     {% if abogado %}<input type="hidden" name="abogado" value="{{ abogado }}">{% endif %}
     {% if vista == 'tablero' %}<input type="hidden" name="vista" value="tablero">{% endif %}
   </form>
-  <select class="as-select" aria-label="Materia" onchange="location.href=this.value">
-    <option value="{{ liga(tipo='') }}">Todas las materias</option>
+  <select class="ex-select" aria-label="Tipo de asunto" onchange="location.href=this.value">
+    <option value="{{ liga(tipo='') }}">Tipo de asunto</option>
     {% for k, t in tipos_derecho.items() %}<option value="{{ liga(tipo=k) }}"{% if tipo == k %} selected{% endif %}>{{ t.label }}</option>{% endfor %}
   </select>
   {% if abogados %}
-  <select class="as-select" aria-label="Responsable" onchange="location.href=this.value">
-    <option value="{{ liga(abogado='') }}">Todo el equipo</option>
+  <select class="ex-select" aria-label="Responsable" onchange="location.href=this.value">
+    <option value="{{ liga(abogado='') }}">Responsable</option>
     {% for ab in abogados %}<option value="{{ liga(abogado=ab.id) }}"{% if abogado == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
   </select>
   {% endif %}
-  <div class="as-seg" role="tablist" aria-label="Vista">
+  <div class="ex-seg" role="tablist" aria-label="Vista">
     <a href="{{ liga(vista='') }}" class="{{ 'on' if vista == 'lista' }}">Lista</a>
     <a href="{{ liga(vista='tablero', grupo='') }}" class="{{ 'on' if vista == 'tablero' }}">Tablero</a>
   </div>
+  {% if q or tipo or abogado or atencion %}<a class="ex-limpiar" href="{{ url_for('asuntos.index', vista=vista if vista == 'tablero' else None) }}">Limpiar filtros</a>{% endif %}
 </div>
 
-{% if vista == 'lista' %}
-<div class="as-toolbar" style="margin-top:12px">
-  <div class="as-seg" aria-label="Estado">
+<div class="ex-tabs">
+  {% if vista == 'lista' %}
+  <nav aria-label="Estado">
     {% for k, g_ in grupos.items() %}
     <a href="{{ liga(grupo=k if k != 'abiertos' else '', atencion='') }}" class="{{ 'on' if grupo == k and not atencion }}">{{ g_[0] }}<span>{{ conteos[k] }}</span></a>
     {% endfor %}
+  </nav>
+  {% endif %}
+  <div class="ex-atencion">
+    <a class="{{ 'on' if atencion == 'termino' }}{{ ' alerta' if resumen.termino }}" href="{{ liga(atencion='' if atencion == 'termino' else 'termino', grupo='', vista='') }}"><i class="pt{{ ' rojo' if resumen.termino }}"></i>{{ resumen.termino }} vence{{ 'n' if resumen.termino != 1 }} en 7 días</a>
+    <a class="{{ 'on' if atencion == 'sin_mov' }}" href="{{ liga(atencion='' if atencion == 'sin_mov' else 'sin_mov', grupo='', vista='') }}"><i class="pt"></i>{{ resumen.sin_mov }} sin movimiento</a>
   </div>
 </div>
-{% endif %}
-
-{% if atencion %}
-<div class="as-filtro">{{ 'Vencen en los próximos 7 días (o ya vencieron)' if atencion == 'termino' else 'Más de 30 días sin movimiento' }}<a href="{{ liga(atencion='') }}" aria-label="Quitar filtro">×</a></div>
-{% endif %}
 
 {% if vista == 'lista' %}
-<div class="as-tabla-wrap">
+<div class="ex-tabla-wrap">
   {% if asuntos %}
-  <table class="as-tabla">
+  <table class="ex-tabla">
     <thead><tr>
-      <th>Asunto</th><th>Cliente</th><th>{{ 'Resultado' if grupo == 'concluidos' else 'Lo que sigue' }}</th>
-      <th>Responsable</th><th>Estado</th><th>Movimiento</th>
+      <th>Expediente</th><th>Asunto</th><th>Cliente</th><th>{{ 'Resultado' if grupo == 'concluidos' else 'Lo que sigue' }}</th>
+      <th>Última actividad</th><th>Estado</th>
     </tr></thead>
     <tbody>
       {% for a in asuntos %}
       <tr data-href="{{ url_for('asuntos.detalle', id=a.id) }}">
-        <td>
-          <div class="as-tit">
-            <span class="as-dot" style="--d:{{ a.tipo_info.color }}" title="{{ a.tipo_info.label }}"></span>
-            <div style="min-width:0">
-              <a href="{{ url_for('asuntos.detalle', id=a.id) }}">{{ a.titulo }}</a>{% if a.privado %}<span class="as-lock" title="Asunto privado">🔒</span>{% endif %}
-              <small>{{ a.numero_expediente or 'Sin expediente' }} · {{ a.tipo_info.label }}{% if a.sub_tipo %} · {{ a.sub_tipo }}{% endif %}</small>
-            </div>
-          </div>
+        <td class="c-num">{{ a.numero_expediente or '—' }}</td>
+        <td class="c-tit">
+          <a href="{{ url_for('asuntos.detalle', id=a.id) }}">{{ a.titulo }}</a>{% if a.privado %}<span class="as-lock" title="Asunto privado">🔒</span>{% endif %}
+          <small>{{ a.tipo_info.label }}{% if a.sub_tipo %} · {{ a.sub_tipo | capitalize }}{% endif %}</small>
         </td>
         <td class="c-cli">{{ a.cliente or '—' }}</td>
         <td class="c-prox">{{ proximo_html(a) }}</td>
-        <td class="c-resp">{% if a.responsable %}<span class="as-resp">{{ avatar(a.responsable) }}<span>{{ a.responsable.corto }}</span></span>{% else %}<span class="as-muted">Sin asignar</span>{% endif %}</td>
-        <td class="c-est"><span class="as-chip" style="--c-c:{{ a.estado_info.color }};--c-f:{{ a.estado_info.fondo }}">{{ a.estado_info.label }}</span></td>
-        <td class="c-mov as-muted">{{ a.movimiento }}</td>
+        <td class="c-mov">{{ a.movimiento }}<small>{{ a.responsable.nombre if a.responsable else 'Sin responsable' }}</small></td>
+        <td class="c-est"><span class="ex-chip e-{{ a.estado }}">{{ a.estado_info.label }}</span></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% if total_pages > 1 %}
   <div class="as-pag">
-    <span>Página {{ page }} de {{ total_pages }} · {{ total }} asuntos</span>
+    <span>Página {{ page }} de {{ total_pages }} · {{ total }} expedientes</span>
     <div>
-      {% if page > 1 %}<a class="btn btn-secondary btn-sm" href="{{ liga(page=page - 1) }}">← Anterior</a>{% endif %}
-      {% if page < total_pages %}<a class="btn btn-secondary btn-sm" href="{{ liga(page=page + 1) }}">Siguiente →</a>{% endif %}
+      {% if page > 1 %}<a class="btn btn-ghost btn-sm" href="{{ liga(page=page - 1) }}">← Anterior</a>{% endif %}
+      {% if page < total_pages %}<a class="btn btn-ghost btn-sm" href="{{ liga(page=page + 1) }}">Siguiente →</a>{% endif %}
     </div>
   </div>
   {% endif %}
   {% else %}
   <div class="as-vacio">
     {% if q or tipo or abogado or atencion %}
-      <h3>Nada coincide con esos filtros</h3>
-      <p>Prueba con otra búsqueda o quita los filtros.</p>
-      <a class="btn btn-secondary" href="{{ url_for('asuntos.index') }}">Ver todos los asuntos en curso</a>
+      <h3>Nada coincide con esa búsqueda</h3>
+      <p>Prueba con otras palabras o quita los filtros.</p>
+      <a class="btn btn-ghost" href="{{ url_for('asuntos.index') }}">Limpiar filtros</a>
     {% elif grupo == 'abiertos' %}
-      <h3>No hay asuntos en curso</h3>
-      <p>Da de alta el primero: en un minuto queda listo con su cliente, juzgado y responsable.</p>
-      <a class="btn btn-primary" href="{{ url_for('asuntos.nuevo') }}">Nuevo asunto</a>
+      <h3>Todavía no hay expedientes en curso</h3>
+      <p>Crea el primero: queda listo con su cliente, responsable y documentos.</p>
+      <a class="btn btn-primary" href="{{ url_for('asuntos.nuevo') }}">Crear expediente</a>
     {% else %}
-      <h3>No hay asuntos aquí</h3>
-      <p>Cuando haya asuntos en este estado, aparecerán en esta lista.</p>
+      <h3>No hay expedientes aquí</h3>
+      <p>Cuando haya expedientes en este estado, aparecerán en esta lista.</p>
     {% endif %}
   </div>
   {% endif %}
@@ -193,7 +173,7 @@
 {% block scripts %}
 <script>
 (() => {
-  document.querySelectorAll('.as-tabla tbody tr').forEach(tr => tr.addEventListener('click', e => {
+  document.querySelectorAll('.ex-tabla tbody tr').forEach(tr => tr.addEventListener('click', e => {
     if (e.target.closest('a')) return;
     location.href = tr.dataset.href;
   }));

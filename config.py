@@ -50,6 +50,10 @@ class Config:
     # ─── Modo revisión (botón "Comentar" para socios y probadores) ───────────
     REVISION_ACTIVA = os.environ.get("REVISION_ACTIVA", "").lower() in ("1", "true", "si", "sí")
     REVISION_CLAVE = os.environ.get("REVISION_CLAVE", "")
+    # Cuenta compartida para colaboradores, "usuario:contraseña" (p. ej. prueba:prueba).
+    # Con la variable puesta se crea en el despacho de demostración y se anuncia en la portada.
+    ACCESO_PRUEBA_USUARIO, _, ACCESO_PRUEBA_CLAVE = os.environ.get("ACCESO_PRUEBA", "").partition(":")
+    ACCESO_PRUEBA_DESPACHO = "bufete-ramirez"
 
     # ─── Google Calendar OAuth ──────────────────────────────────────────────────
     GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")

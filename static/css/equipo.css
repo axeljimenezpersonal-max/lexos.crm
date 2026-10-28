@@ -33,7 +33,7 @@
 }
 .eq-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.25); transform: translateY(-2px); }
 .eq-card--inactive { opacity: .5; }
-.eq-card--suspended { border-color: #EF4444; }
+.eq-card--suspended { border-color: #B5483F; }
 
 /* ── 3-dots menu ── */
 .eq-card-menu { position: absolute; top: 10px; right: 10px; }
@@ -55,7 +55,7 @@
   padding: 8px 14px; font-size: .8rem; cursor: pointer;
 }
 .eq-dropdown button:hover { background: var(--hover); }
-.eq-dropdown button.danger { color: #EF4444; }
+.eq-dropdown button.danger { color: #B5483F; }
 
 /* ── Avatar ── */
 .eq-avatar {
@@ -109,10 +109,10 @@
   font-size: .65rem; font-weight: 600; padding: 2px 8px;
   border-radius: 6px;
 }
-.eq-estatus--activo { background: rgba(16,185,129,.15); color: #10B981; }
-.eq-estatus--pendiente { background: rgba(245,158,11,.15); color: #F59E0B; }
-.eq-estatus--suspendido { background: rgba(239,68,68,.15); color: #EF4444; }
-.eq-estatus--inactivo { background: rgba(107,114,128,.15); color: #6B7280; }
+.eq-estatus--activo { background: rgba(16,185,129,.15); color: #4F6D8A; }
+.eq-estatus--pendiente { background: rgba(245,158,11,.15); color: #B08A4A; }
+.eq-estatus--suspendido { background: rgba(239,68,68,.15); color: #B5483F; }
+.eq-estatus--inactivo { background: rgba(107,114,128,.15); color: #60718D; }
 
 /* ── Ver perfil button ── */
 .eq-btn-ver {

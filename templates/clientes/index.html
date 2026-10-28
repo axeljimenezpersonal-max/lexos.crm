@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Clientes{% endblock %}
+{% block title %}Personas{% endblock %}
 {% block page_title %}Clientes{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
@@ -10,8 +10,8 @@
 {% block content %}
 <div class="as-head">
   <div>
-    <h1 class="page-title">Clientes</h1>
-    <p class="as-sub">{{ conteos.activo }} cliente{{ 's' if conteos.activo != 1 }}{% if conteos.prospecto %} · {{ conteos.prospecto }} prospecto{{ 's' if conteos.prospecto != 1 }}{% endif %}</p>
+    <h1 class="page-title">Personas</h1>
+    <p class="as-sub">Clientes y contrapartes del despacho · {{ conteos.activo }} cliente{{ 's' if conteos.activo != 1 }}{% if conteos.prospecto %} · {{ conteos.prospecto }} prospecto{{ 's' if conteos.prospecto != 1 }}{% endif %}</p>
   </div>
   <div class="cl-acciones">
     <div class="as-seg" aria-label="Sección">

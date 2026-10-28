@@ -30,11 +30,11 @@ cobranzas_bp = Blueprint("cobranzas", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 ESTADOS = {
-    "pendiente": {"label": "Por cobrar",   "color": "#1D3FD6", "fondo": "#EEF2FF"},
-    "abono":     {"label": "Pago parcial", "color": "#0369A1", "fondo": "#E0F2FE"},
-    "vencido":   {"label": "Vencido",      "color": "#DC2626", "fondo": "#FEF2F2"},
-    "pagado":    {"label": "Pagado",       "color": "#047857", "fondo": "#ECFDF5"},
-    "cancelado": {"label": "Cancelado",    "color": "#64708A", "fondo": "#F1F5F9"},
+    "pendiente": {"label": "Por cobrar",   "color": "#132238", "fondo": "#F4EEDF"},
+    "abono":     {"label": "Pago parcial", "color": "#3D5A80", "fondo": "#E0F2FE"},
+    "vencido":   {"label": "Vencido",      "color": "#A23B33", "fondo": "#F8EDEA"},
+    "pagado":    {"label": "Pagado",       "color": "#3D5A80", "fondo": "#EEF1F5"},
+    "cancelado": {"label": "Cancelado",    "color": "#60718D", "fondo": "#F1EEE8"},
 }
 ABIERTOS = ("pendiente", "abono", "vencido")
 
@@ -388,7 +388,7 @@ def index():
         deudores.append(d)
 
     # ── Antigüedad del saldo ─────────────────────────────────
-    tramos = [("Al corriente", "#1D3FD6"), ("1 a 30 días", "#F59E0B"), ("31 a 90 días", "#EA580C"), ("Más de 90 días", "#DC2626")]
+    tramos = [("Al corriente", "#132238"), ("1 a 30 días", "#B08A4A"), ("31 a 90 días", "#9A7536"), ("Más de 90 días", "#A23B33")]
     antig = [0.0, 0.0, 0.0, 0.0]
     for s in tdb.execute(f"""SELECT {SALDO} AS saldo, co.fecha_vencimiento FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
                              WHERE {ABIERTO_SQL} AND {alc}""", ap).fetchall():
@@ -814,19 +814,19 @@ def recordatorio(id: int):
     if co["fecha_vencimiento"]:
         filas.append(("Fecha de pago", _fecha_txt(co["fecha_vencimiento"])))
     tabla = "".join(
-        f'<tr><td style="padding:10px 0;color:#64708A;font-size:13px">{html.escape(k)}</td>'
-        f'<td style="padding:10px 0;text-align:right;font-weight:600;color:#0A1A4A;font-size:14px">{html.escape(str(v))}</td></tr>'
+        f'<tr><td style="padding:10px 0;color:#60718D;font-size:13px">{html.escape(k)}</td>'
+        f'<td style="padding:10px 0;text-align:right;font-weight:600;color:#132238;font-size:14px">{html.escape(str(v))}</td></tr>'
         for k, v in filas)
     cuerpo = f"""
-    <div style="font-family:Inter,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border:1px solid #E5E8F0;border-radius:14px;overflow:hidden">
-      <div style="background:#0A1A4A;padding:22px 26px"><div style="font-size:17px;font-weight:700;color:#fff">{html.escape(despacho)}</div></div>
+    <div style="font-family:Inter,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border:1px solid #E5E2DB;border-radius:14px;overflow:hidden">
+      <div style="background:#132238;padding:22px 26px"><div style="font-size:17px;font-weight:700;color:#fff">{html.escape(despacho)}</div></div>
       <div style="padding:26px">
-        <p style="font-size:15px;color:#0F172A;margin:0 0 12px">Hola{html.escape(' ' + saludo if saludo else '')},</p>
-        <p style="font-size:14px;color:#3A4560;line-height:1.6;margin:0 0 16px">Le compartimos un recordatorio amable del siguiente saldo pendiente:</p>
-        <table style="width:100%;border-collapse:collapse;border-top:1px solid #E5E8F0;border-bottom:1px solid #E5E8F0">{tabla}</table>
-        <p style="font-size:14px;color:#3A4560;line-height:1.6;margin:16px 0 0">Si ya realizó el pago, le agradeceremos responder este correo con el comprobante. Quedamos atentos a cualquier duda.</p>
+        <p style="font-size:15px;color:#132238;margin:0 0 12px">Hola{html.escape(' ' + saludo if saludo else '')},</p>
+        <p style="font-size:14px;color:#3B4A61;line-height:1.6;margin:0 0 16px">Le compartimos un recordatorio amable del siguiente saldo pendiente:</p>
+        <table style="width:100%;border-collapse:collapse;border-top:1px solid #E5E2DB;border-bottom:1px solid #E5E2DB">{tabla}</table>
+        <p style="font-size:14px;color:#3B4A61;line-height:1.6;margin:16px 0 0">Si ya realizó el pago, le agradeceremos responder este correo con el comprobante. Quedamos atentos a cualquier duda.</p>
       </div>
-      <div style="background:#F6F7FB;padding:14px 26px;font-size:11px;color:#64708A">{html.escape(despacho)} · Enviado con Habeas Corpus</div>
+      <div style="background:#F8F6F2;padding:14px 26px;font-size:11px;color:#60718D">{html.escape(despacho)} · Enviado con Habeas Corpus</div>
     </div>"""
     try:
         from flask_mail import Message
@@ -987,7 +987,7 @@ def estado_cuenta_pdf(cliente_id: int):
     saldo = sum(c["saldo_v"] for c in cobros)
     vencido = sum(c["saldo_v"] for c in cobros if c["vence"] and (c["vence"]["dias"] or 0) < 0)
 
-    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#1D3FD6", "#0A1A4A", "#64708A", "#E5E8F0"))
+    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#132238", "#132238", "#60718D", "#E5E2DB"))
     st = lambda n, **k: ParagraphStyle(n, fontName=k.pop("font", "Helvetica"), **k)  # noqa: E731
     s_titulo = st("t", font="Helvetica-Bold", fontSize=18, textColor=TINTA, leading=22)
     s_sub = st("s", fontSize=9, textColor=GRIS, leading=13)
@@ -1015,15 +1015,15 @@ def estado_cuenta_pdf(cliente_id: int):
     resumen.setStyle(TableStyle([
         ("FONT", (0, 0), (-1, 0), "Helvetica", 8), ("TEXTCOLOR", (0, 0), (-1, 0), GRIS),
         ("FONT", (0, 1), (-1, 1), "Helvetica-Bold", 13), ("TEXTCOLOR", (0, 1), (-1, 1), TINTA),
-        ("TEXTCOLOR", (2, 1), (2, 1), AZUL), ("TEXTCOLOR", (3, 1), (3, 1), colors.HexColor("#DC2626") if vencido else TINTA),
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F7FB")), ("BOX", (0, 0), (-1, -1), .5, LINEA),
+        ("TEXTCOLOR", (2, 1), (2, 1), AZUL), ("TEXTCOLOR", (3, 1), (3, 1), colors.HexColor("#A23B33") if vencido else TINTA),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8F6F2")), ("BOX", (0, 0), (-1, -1), .5, LINEA),
         ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7), ("LEFTPADDING", (0, 0), (-1, -1), 10),
     ]))
     story += [resumen, Spacer(1, 16)]
 
     filas = [["Folio", "Concepto", "Emisión", "Fecha de pago", "Total", "Pagado", "Saldo"]]
     for c in cobros:
-        concepto = e(c["concepto"]) + (f"<br/><font color='#64708A' size='7'>{e(c['asunto_titulo'])}</font>" if c["asunto_titulo"] else "")
+        concepto = e(c["concepto"]) + (f"<br/><font color='#60718D' size='7'>{e(c['asunto_titulo'])}</font>" if c["asunto_titulo"] else "")
         filas.append([Paragraph(e(c["folio"]), s_celda), Paragraph(concepto, s_celda),
                       _fecha_txt(c["fecha_emision"]), _fecha_txt(c["fecha_vencimiento"]),
                       Paragraph(dinero(c["total_v"], c["moneda"]), s_der), Paragraph(dinero(c["pagado_v"], c["moneda"]), s_der),

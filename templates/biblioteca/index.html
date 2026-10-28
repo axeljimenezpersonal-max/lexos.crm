@@ -1,33 +1,85 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon_folder, icon_clipboard, icon_edit, icon_book, icon_file_text, icon_trash, icon_link, icon_file, icon_scale, icon_eye, icon_paperclip, icon_image %}
-{% block title %}Biblioteca{% endblock %}
-{% block page_title %}Biblioteca{% endblock %}{% block head %}
+{% block title %}Documentos{% endblock %}
+{% block page_title %}Documentos{% endblock %}{% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/biblioteca.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="tb-breadcrumb"><span>Biblioteca</span></div>
-
-<!-- ══════════════════════════════════════════════
-     SECTION TABS
-     ══════════════════════════════════════════════ -->
-<div class="bib-tabs">
-  <a class="bib-tab {{ 'active' if seccion == 'estudio' }}"
-     href="{{ url_for('biblioteca.index', seccion='estudio') }}">
-    {{ icon_folder(14, 14) }} Estudio
-  </a>
-  <a class="bib-tab {{ 'active' if seccion == 'formatos' }}"
-     href="{{ url_for('biblioteca.index', seccion='formatos') }}">
-    {{ icon_clipboard(14, 14) }} Formatos
-  </a>
-  <a class="bib-tab {{ 'active' if seccion == 'acuerdos' }}"
-     href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">
-    {{ icon_scale(14, 14) }} Acuerdos y Audiencias
-  </a>
-  <a class="bib-tab-editor" href="{{ url_for('biblioteca.editor') }}">
-    {{ icon_edit(14, 14) }} Editor de documentos
-  </a>
+<div class="ex-head">
+  <div>
+    <h1 class="ex-h1">Documentos</h1>
+    <p class="ex-sub">Todo lo que el despacho tiene guardado y cifrado: documentos de expedientes, archivos del estudio, formatos y acuerdos.</p>
+  </div>
+  <a class="btn btn-ghost ex-crear" href="{{ url_for('biblioteca.editor') }}">{{ icon_edit(16, 16) }} Editor de documentos</a>
 </div>
+
+<div class="ex-tabs" style="margin-top:0">
+  <nav aria-label="Secciones">
+    <a class="{{ 'on' if seccion == 'expedientes' }}" href="{{ url_for('biblioteca.index', seccion='expedientes') }}">De expedientes{% if seccion == 'expedientes' %}<span>{{ conteo_estados.values() | sum }}</span>{% endif %}</a>
+    <a class="{{ 'on' if seccion == 'estudio' }}" href="{{ url_for('biblioteca.index', seccion='estudio') }}">Estudio</a>
+    <a class="{{ 'on' if seccion == 'formatos' }}" href="{{ url_for('biblioteca.index', seccion='formatos') }}">Formatos</a>
+    <a class="{{ 'on' if seccion == 'acuerdos' }}" href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">Acuerdos y audiencias</a>
+  </nav>
+</div>
+
+{% if seccion == 'expedientes' %}
+<div class="ex-toolbar" style="margin-top:20px">
+  <form class="ex-buscar" method="get" action="{{ url_for('biblioteca.index') }}" role="search">
+    <input type="hidden" name="seccion" value="expedientes">
+    {% if estado_f %}<input type="hidden" name="estado" value="{{ estado_f }}">{% endif %}
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Buscar por nombre del documento, expediente o número…" aria-label="Buscar documentos">
+  </form>
+  <div class="ex-atencion" style="padding:0">
+    {% for k, l in [('listo','Listos'),('procesando','Procesando'),('revision','Requieren revisión'),('error','Con error')] %}
+    {% if conteo_estados[k] or estado_f == k %}<a class="{{ 'on' if estado_f == k }}" href="{{ url_for('biblioteca.index', seccion='expedientes', estado='' if estado_f == k else k, q=request.args.get('q') or None) }}">{{ conteo_estados[k] }} {{ l | lower }}</a>{% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<div class="ex-tabla-wrap">
+  {% if docs_exp %}
+  <table class="ex-tabla doc-tabla">
+    <thead><tr><th>Nombre</th><th>Expediente</th><th>Fecha</th><th>Subido por</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for d in docs_exp %}
+    {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+    <tr data-href="{{ url_for('asuntos.detalle', id=d.asunto_id) }}#documentos">
+      <td class="c-tit">{% if enlace %}<a href="{{ d.archivo_url }}" target="_blank" rel="noopener" class="doc-n">{% else %}<span class="doc-n">{% endif %}<span class="doc-ext {{ d.ext }}">{{ d.ext or 'doc' }}</span><span>{{ d.nombre }}{% if d.paginas %}<small>{{ d.paginas }} página{{ 's' if d.paginas != 1 }}</small>{% endif %}</span>{% if enlace %}</a>{% else %}</span>{% endif %}</td>
+      <td><a class="doc-exp" href="{{ url_for('asuntos.detalle', id=d.asunto_id) }}#documentos">{{ d.asunto }}</a><small class="doc-num">{{ d.numero_expediente or '' }}</small></td>
+      <td class="c-mov">{{ d.dia }}</td>
+      <td class="c-mov">{{ d.autor or '—' }}</td>
+      <td><span class="doc-estado {{ d.grupo }}"{% if d.lectura_error %} title="{{ d.lectura_error }}"{% endif %}>
+        {% if d.grupo == 'listo' %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg>
+        {% elif d.grupo == 'procesando' %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        {% elif d.grupo == 'revision' %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 20h20zM12 10v4M12 17v.5"/></svg>
+        {% elif d.grupo == 'error' %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+        {% else %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>{% endif %}
+        {{ d.estado }}</span>{% if d.lectura_error %}<small class="doc-motivo">{{ d.lectura_error }}</small>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="as-vacio">
+    {% if request.args.get('q') or estado_f %}
+      <h3>Nada coincide con esa búsqueda</h3><p>Prueba con otras palabras o quita el filtro.</p>
+      <a class="btn btn-ghost" href="{{ url_for('biblioteca.index', seccion='expedientes') }}">Limpiar filtros</a>
+    {% else %}
+      <h3>Todavía no hay documentos en los expedientes</h3>
+      <p>Súbelos desde cada expediente con «Subir documento»: se guardan cifrados y {{ config.ASISTENTE_NOMBRE }} los lee para que puedas buscar en ellos.</p>
+      <a class="btn btn-primary" href="{{ url_for('asuntos.index') }}">Ir a expedientes</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  <script>
+  document.querySelectorAll('.doc-tabla tbody tr').forEach(tr => tr.addEventListener('click', e => { if (!e.target.closest('a')) location.href = tr.dataset.href; }));
+  </script>
+  <p class="doc-nota">«Guardado» significa que el archivo está cifrado en la bóveda pero aún no se ha leído para la búsqueda. «Requiere revisión» indica un escaneo sin texto o un formato que todavía no se puede leer.</p>
+</div>
+{% endif %}
 
 <!-- ══════════════════════════════════════════════════════════════════════════
      SECTION 1 — ESTUDIO

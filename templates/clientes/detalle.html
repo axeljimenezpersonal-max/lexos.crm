@@ -144,7 +144,7 @@
         </div>
       </form>
 
-      {% set colores = {'nota': ('#EEF2FF','#1D3FD6'), 'llamada': ('#ECFEFF','#0E7490'), 'reunion': ('#F5F3FF','#6D28D9'), 'whatsapp': ('#E7F8EE','#0B6B3A'), 'correo': ('#FFF7ED','#C2410C'), 'portal': ('#F1F5F9','#3A4560'), 'pago': ('#ECFDF5','#047857')} %}
+      {% set colores = {'nota': ('#F4EEDF','#132238'), 'llamada': ('#EEF1F5','#3D5A80'), 'reunion': ('#F6F1E6','#6E5A3A'), 'whatsapp': ('#EEF1F5','#2E4766'), 'correo': ('#F7F0E1','#8A6A2F'), 'portal': ('#F1EEE8','#3B4A61'), 'pago': ('#EEF1F5','#3D5A80')} %}
       {% set iconos = {'nota': 'note', 'llamada': 'phone', 'reunion': 'people', 'whatsapp': 'wa', 'correo': 'mail', 'portal': 'portal', 'pago': 'money'} %}
       {% for grupo in bitacora %}
         <div class="af-dia">{{ grupo.dia }}</div>
@@ -200,8 +200,8 @@
       {% if cobros %}
       <div class="cb-resumen" style="margin-bottom:10px">
         <div class="cb-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
-        <div class="cb-kv"><span>Pagado</span><b style="color:#047857">{{ dinero.cobrado | dinero }}</b></div>
-        <div class="cb-kv total"><span>Saldo pendiente</span><b{% if dinero.vencido %} style="color:#DC2626"{% endif %}>{{ dinero.saldo | dinero }}</b></div>
+        <div class="cb-kv"><span>Pagado</span><b style="color:#3D5A80">{{ dinero.cobrado | dinero }}</b></div>
+        <div class="cb-kv total"><span>Saldo pendiente</span><b{% if dinero.vencido %} style="color:#A23B33"{% endif %}>{{ dinero.saldo | dinero }}</b></div>
       </div>
       {% endif %}
       {% for c in cobros %}
@@ -283,7 +283,7 @@
     {% if cliente.notas %}
     <section class="as-card">
       <div class="as-card-h"><h3>Notas internas</h3></div>
-      <div class="as-card-b"><p style="font-size:13.5px;color:#3A4560;line-height:1.55;white-space:pre-line">{{ cliente.notas }}</p></div>
+      <div class="as-card-b"><p style="font-size:13.5px;color:#3B4A61;line-height:1.55;white-space:pre-line">{{ cliente.notas }}</p></div>
     </section>
     {% endif %}
 

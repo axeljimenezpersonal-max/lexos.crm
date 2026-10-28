@@ -27,16 +27,16 @@ calendario_bp = Blueprint("calendario", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 TIPOS_EVENTO = {
-    "audiencia":    {"label": "Audiencia",            "color": "#1D3FD6", "icon": "gavel"},
-    "vencimiento":  {"label": "Término",              "color": "#DC2626", "icon": "clock"},
-    "fecha_limite": {"label": "Fecha límite crítica", "color": "#991B1B", "icon": "alert_triangle"},
-    "diligencia":   {"label": "Diligencia",           "color": "#4F46E5", "icon": "flag"},
-    "reunion":      {"label": "Reunión",              "color": "#0284C7", "icon": "users"},
-    "tarea":        {"label": "Tarea",                "color": "#047857", "icon": "check_circle"},
-    "recordatorio": {"label": "Recordatorio",         "color": "#64708A", "icon": "bell"},
-    "otro":         {"label": "Otro",                 "color": "#64748B", "icon": "more_vertical"},
+    "audiencia":    {"label": "Audiencia",            "color": "#132238", "icon": "gavel"},
+    "vencimiento":  {"label": "Término",              "color": "#A23B33", "icon": "clock"},
+    "fecha_limite": {"label": "Fecha límite crítica", "color": "#7E2C26", "icon": "alert_triangle"},
+    "diligencia":   {"label": "Diligencia",           "color": "#34496B", "icon": "flag"},
+    "reunion":      {"label": "Reunión",              "color": "#4B6585", "icon": "users"},
+    "tarea":        {"label": "Tarea",                "color": "#3D5A80", "icon": "check_circle"},
+    "recordatorio": {"label": "Recordatorio",         "color": "#60718D", "icon": "bell"},
+    "otro":         {"label": "Otro",                 "color": "#60718D", "icon": "more_vertical"},
     # Tipo heredado de versiones anteriores: se muestra como término pero no se ofrece al crear.
-    "plazo":        {"label": "Término",              "color": "#DC2626", "icon": "clock", "oculto": True},
+    "plazo":        {"label": "Término",              "color": "#A23B33", "icon": "clock", "oculto": True},
 }
 
 TERMINO_TIPOS = ("vencimiento", "fecha_limite", "plazo")
@@ -573,7 +573,7 @@ def ajax_disponibilidad():
                 "titulo": r["titulo"],
                 "inicio": r["fecha_inicio"],
                 "fin":    r["fecha_fin"],
-                "color":  r["color_custom"] or TIPOS_EVENTO.get(r["tipo"], {}).get("color", "#6B7280"),
+                "color":  r["color_custom"] or TIPOS_EVENTO.get(r["tipo"], {}).get("color", "#60718D"),
             })
     return jsonify(by_user)
 

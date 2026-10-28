@@ -138,7 +138,7 @@
           <td>
             {% if tasa is not none %}
             <span style="font-family:'DM Mono',monospace;font-size:11px;
-                         color:{{ '#00DFA2' if tasa >= 60 else '#F59E0B' if tasa >= 40 else '#EF4444' }};">
+                         color:{{ '#AD9060' if tasa >= 60 else '#B08A4A' if tasa >= 40 else '#B5483F' }};">
               {{ tasa }}%
             </span>
             {% else %}
@@ -173,7 +173,7 @@
                   letter-spacing:0.2em;text-transform:uppercase;
                   color:rgba(0,223,162,0.4);margin-bottom:6px;
                   display:flex;align-items:center;gap:6px;">
-        <div style="width:5px;height:5px;border-radius:50%;background:#00DFA2;"></div>
+        <div style="width:5px;height:5px;border-radius:50%;background:#AD9060;"></div>
         Perfil de adversario
       </div>
       <div style="font-family:'Merriweather',serif;font-size:16px;
@@ -199,11 +199,11 @@
         <span class="cps-l">Total casos</span>
       </div>
       <div class="cps-item">
-        <span class="cps-v" style="color:#00DFA2;">{{ fav }}</span>
+        <span class="cps-v" style="color:#AD9060;">{{ fav }}</span>
         <span class="cps-l">A favor</span>
       </div>
       <div class="cps-item">
-        <span class="cps-v" style="color:#EF4444;">{{ desf }}</span>
+        <span class="cps-v" style="color:#B5483F;">{{ desf }}</span>
         <span class="cps-l">En contra</span>
       </div>
     </div>
@@ -222,7 +222,7 @@
           Adversario con historial desfavorable ante este despacho.
         </div>
         <span class="cp-insight-tag"
-              style="background:rgba(0,223,162,0.08);color:#00DFA2;border-color:rgba(0,223,162,0.2);">
+              style="background:rgba(0,223,162,0.08);color:#AD9060;border-color:rgba(0,223,162,0.2);">
           Ventaja estratégica
         </span>
       </div>
@@ -234,7 +234,7 @@
           Revisar estrategia y argumentos previos.
         </div>
         <span class="cp-insight-tag"
-              style="background:rgba(239,68,68,0.08);color:#EF4444;border-color:rgba(239,68,68,0.2);">
+              style="background:rgba(239,68,68,0.08);color:#B5483F;border-color:rgba(239,68,68,0.2);">
           Requiere análisis
         </span>
       </div>
@@ -245,7 +245,7 @@
           {{ fav }} de {{ total_cp }} casos favorables. Adversario con tasa mixta.
         </div>
         <span class="cp-insight-tag"
-              style="background:rgba(245,158,11,0.08);color:#F59E0B;border-color:rgba(245,158,11,0.2);">
+              style="background:rgba(245,158,11,0.08);color:#B08A4A;border-color:rgba(245,158,11,0.2);">
           Monitorear
         </span>
       </div>
@@ -257,7 +257,7 @@
           Se necesitan al menos 2 casos para generar insights estadísticos.
         </div>
         <span class="cp-insight-tag"
-              style="background:rgba(245,158,11,0.08);color:#F59E0B;border-color:rgba(245,158,11,0.2);">
+              style="background:rgba(245,158,11,0.08);color:#B08A4A;border-color:rgba(245,158,11,0.2);">
           Sin datos suficientes
         </span>
       </div>
@@ -421,7 +421,7 @@ async function guardarCP() {
   const nombreInput = document.getElementById('cpNombre');
   const nombre = nombreInput.value.trim();
   if (!nombre) {
-    nombreInput.style.borderColor = '#EF4444';
+    nombreInput.style.borderColor = '#B5483F';
     nombreInput.focus();
     return;
   }

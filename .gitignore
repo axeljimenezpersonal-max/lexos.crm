@@ -8,3 +8,6 @@ databases/
 *.sqlite
 storage/
 logs/
+data/
+*.db-shm
+*.db-wal

@@ -25,12 +25,12 @@ ESPECIALIDADES = [
     "administrativo", "otro",
 ]
 CARGO_COLORS = {
-    "socio": "#00DFA2", "asociado": "#3B82F6", "pasante": "#10B981",
-    "asistente": "#6B7280", "admin": "#F59E0B",
+    "socio": "#AD9060", "asociado": "#3D5A80", "pasante": "#4F6D8A",
+    "asistente": "#60718D", "admin": "#B08A4A",
 }
 AVATAR_COLORS = [
-    "#00DFA2", "#EC4899", "#F59E0B", "#10B981", "#3B82F6",
-    "#EF4444", "#8B5CF6", "#14B8A6", "#F97316", "#06B6D4",
+    "#AD9060", "#8E6F4A", "#B08A4A", "#4F6D8A", "#3D5A80",
+    "#B5483F", "#8C7A5B", "#4B6585", "#B08A4A", "#06B6D4",
 ]
 
 
@@ -63,7 +63,7 @@ def index():
     for m in members:
         m["color"] = _user_color(m["id"])
         m["cargo"] = m.get("cargo") or "asociado"
-        m["cargo_color"] = CARGO_COLORS.get(m["cargo"], "#6B7280")
+        m["cargo_color"] = CARGO_COLORS.get(m["cargo"], "#60718D")
         try:
             m["especialidades_list"] = json.loads(m.get("especialidades") or "[]")
         except Exception:
@@ -89,11 +89,11 @@ def index():
         # Carga
         a = m["asuntos_activos"]
         if a <= 3:
-            m["carga_label"], m["carga_color"], m["carga_pct"] = "Bajo", "#10B981", min(a * 15, 100)
+            m["carga_label"], m["carga_color"], m["carga_pct"] = "Bajo", "#4F6D8A", min(a * 15, 100)
         elif a <= 7:
-            m["carga_label"], m["carga_color"], m["carga_pct"] = "Medio", "#F59E0B", min(a * 12, 100)
+            m["carga_label"], m["carga_color"], m["carga_pct"] = "Medio", "#B08A4A", min(a * 12, 100)
         else:
-            m["carga_label"], m["carga_color"], m["carga_pct"] = "Alto", "#EF4444", min(a * 10, 100)
+            m["carga_label"], m["carga_color"], m["carga_pct"] = "Alto", "#B5483F", min(a * 10, 100)
 
     return render_template(
         "configuracion/equipo.html",
@@ -126,7 +126,7 @@ def detalle(uid):
     m = dict(u)
     m["color"] = _user_color(m["id"])
     m["cargo"] = m.get("cargo") or "asociado"
-    m["cargo_color"] = CARGO_COLORS.get(m["cargo"], "#6B7280")
+    m["cargo_color"] = CARGO_COLORS.get(m["cargo"], "#60718D")
     try:
         m["especialidades_list"] = json.loads(m.get("especialidades") or "[]")
     except Exception:
@@ -172,7 +172,7 @@ def perfil(uid):
     m = dict(u)
     m["color"] = _user_color(m["id"])
     m["cargo"] = m.get("cargo") or "asociado"
-    m["cargo_color"] = CARGO_COLORS.get(m["cargo"], "#6B7280")
+    m["cargo_color"] = CARGO_COLORS.get(m["cargo"], "#60718D")
     m["estatus"] = m.get("estatus") or ("activo" if m.get("activo") else "inactivo")
     try:
         m["especialidades_list"] = json.loads(m.get("especialidades") or "[]")
@@ -270,11 +270,11 @@ def perfil(uid):
     # Carga
     a = stats["asuntos_activos"]
     if a <= 3:
-        carga = {"label": "Bajo", "color": "#10B981", "pct": min(a * 15, 100)}
+        carga = {"label": "Bajo", "color": "#4F6D8A", "pct": min(a * 15, 100)}
     elif a <= 7:
-        carga = {"label": "Medio", "color": "#F59E0B", "pct": min(a * 12, 100)}
+        carga = {"label": "Medio", "color": "#B08A4A", "pct": min(a * 12, 100)}
     else:
-        carga = {"label": "Alto", "color": "#EF4444", "pct": min(a * 10, 100)}
+        carga = {"label": "Alto", "color": "#B5483F", "pct": min(a * 10, 100)}
 
     return render_template(
         "configuracion/perfil_miembro.html",
@@ -331,28 +331,28 @@ def enviar_correo(uid):
 
     # ── Construir HTML bonito ──
     html_body = f"""
-    <div style="font-family:'Segoe UI',Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <div style="font-family:'Segoe UI',Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #E5E2DB;">
       <!-- Header -->
-      <div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:28px 32px;">
+      <div style="background:linear-gradient(135deg,#1A2B44 0%,#334155 100%);padding:28px 32px;">
         <div style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-.3px;">{despacho_nombre}</div>
-        <div style="font-size:12px;color:#94a3b8;margin-top:4px;">Mensaje interno del equipo</div>
+        <div style="font-size:12px;color:#9AA4B5;margin-top:4px;">Mensaje interno del equipo</div>
       </div>
 
       <!-- Body -->
       <div style="padding:32px;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:6px;">Asunto</div>
-        <div style="font-size:17px;font-weight:700;color:#1e293b;margin-bottom:24px;">{asunto_correo}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#9AA4B5;margin-bottom:6px;">Asunto</div>
+        <div style="font-size:17px;font-weight:700;color:#1A2B44;margin-bottom:24px;">{asunto_correo}</div>
 
-        <div style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap;">{cuerpo}</div>
+        <div style="font-size:14px;color:#3B4A61;line-height:1.7;white-space:pre-wrap;">{cuerpo}</div>
       </div>
 
       <!-- Footer -->
-      <div style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;">
-        <div style="font-size:13px;color:#64748b;">
+      <div style="background:#FAF8F4;padding:20px 32px;border-top:1px solid #E5E2DB;">
+        <div style="font-size:13px;color:#60718D;">
           Enviado por <strong>{sender_name}</strong>
           {f'&lt;{sender_email}&gt;' if sender_email else ''}
         </div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">
+        <div style="font-size:11px;color:#9AA4B5;margin-top:4px;">
           Este correo fue enviado desde la plataforma LexOS · {datetime.now().strftime('%d/%m/%Y %H:%M')}
         </div>
       </div>

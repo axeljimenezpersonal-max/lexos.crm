@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from flask import (
     Blueprint,
     abort,
+    flash,
     g,
     jsonify,
     redirect,
@@ -39,39 +40,44 @@ ZONA = ZoneInfo("America/Mexico_City")
 # ─────────────────────────────────────────────────────────────────────────────
 
 TIPOS_DERECHO = {
-    "civil":          {"label": "Civil",          "color": "#2563EB",
+    "civil":          {"label": "Civil",          "color": "#2F4A6E",
                        "subtypes": ["Arrendamiento", "Sucesión", "Responsabilidad civil", "Obligaciones", "Contratos", "Otro"]},
-    "mercantil":      {"label": "Mercantil",      "color": "#0284C7",
+    "mercantil":      {"label": "Mercantil",      "color": "#4B6585",
                        "subtypes": ["Cobro", "Contratos mercantiles", "Sociedades", "Concurso mercantil", "Títulos de crédito", "Otro"]},
-    "laboral":        {"label": "Laboral",        "color": "#D97706",
+    "laboral":        {"label": "Laboral",        "color": "#9A7536",
                        "subtypes": ["Despido injustificado", "Reinstalación", "Prestaciones", "Seguridad social", "Otro"]},
-    "penal":          {"label": "Penal",          "color": "#DC2626",
+    "penal":          {"label": "Penal",          "color": "#A23B33",
                        "subtypes": ["Defensa", "Querella", "Delitos patrimoniales", "Delitos contra la persona", "Otro"]},
-    "familiar":       {"label": "Familiar",       "color": "#DB2777",
+    "familiar":       {"label": "Familiar",       "color": "#8E6F4A",
                        "subtypes": ["Divorcio", "Custodia", "Pensión alimenticia", "Adopción", "Otro"]},
-    "administrativo": {"label": "Administrativo", "color": "#7C3AED",
+    "administrativo": {"label": "Administrativo", "color": "#7A6440",
                        "subtypes": ["IMSS", "ISSSTE", "SAT", "Permisos y licencias", "Otro"]},
-    "fiscal":         {"label": "Fiscal",         "color": "#059669",
+    "fiscal":         {"label": "Fiscal",         "color": "#3D5A80",
                        "subtypes": ["Controversia fiscal", "Devoluciones", "Resoluciones SAT", "Otro"]},
-    "amparo":         {"label": "Amparo",         "color": "#EA580C",
+    "amparo":         {"label": "Amparo",         "color": "#9A7536",
                        "subtypes": ["Amparo indirecto", "Amparo directo", "Amparo en revisión", "Otro"]},
-    "inmobiliario":   {"label": "Inmobiliario",   "color": "#0D9488",
+    "inmobiliario":   {"label": "Inmobiliario",   "color": "#4B6585",
                        "subtypes": ["Compraventa", "Arrendamiento", "Usucapión", "Fraccionamiento", "Otro"]},
-    "constitucional": {"label": "Constitucional", "color": "#6D28D9",
+    "constitucional": {"label": "Constitucional", "color": "#6E5A3A",
                        "subtypes": ["Acción de inconstitucionalidad", "Controversia constitucional", "Otro"]},
-    "internacional":  {"label": "Internacional",  "color": "#0891B2",
+    "internacional":  {"label": "Internacional",  "color": "#60718D",
                        "subtypes": ["Arbitraje", "Contratos internacionales", "Otro"]},
-    "otro":           {"label": "Otro",           "color": "#64748B", "subtypes": []},
+    "notarial":       {"label": "Notarial",       "color": "#AD9060",
+                       "subtypes": ["Compraventa", "Poder notarial", "Constitución de sociedad", "Testamento", "Sucesión notarial",
+                                    "Cancelación de hipoteca", "Ratificación de firmas", "Otro"]},
+    "otro":           {"label": "Otro",           "color": "#60718D", "subtypes": []},
 }
+# Materias sin juicio: no se piden juzgado ni contraparte
+SIN_JUICIO = ("notarial",)
 
 ESTADOS = {
-    "por_iniciar": {"label": "Por iniciar", "color": "#64708A", "fondo": "#F1F5F9"},
-    "activo":      {"label": "Activo",      "color": "#1D3FD6", "fondo": "#EEF2FF"},
-    "en_espera":   {"label": "En espera",   "color": "#B45309", "fondo": "#FFFBEB"},
-    "suspendido":  {"label": "Suspendido",  "color": "#9333EA", "fondo": "#FAF5FF"},
-    "completado":  {"label": "Concluido",   "color": "#047857", "fondo": "#ECFDF5"},
-    "cerrado":     {"label": "Concluido",   "color": "#047857", "fondo": "#ECFDF5"},
-    "archivado":   {"label": "Archivado",   "color": "#64748B", "fondo": "#F1F5F9"},
+    "por_iniciar": {"label": "Por iniciar", "color": "#60718D", "fondo": "#F1EEE8"},
+    "activo":      {"label": "En trámite",      "color": "#132238", "fondo": "#F4EEDF"},
+    "en_espera":   {"label": "En espera",   "color": "#8A6A2F", "fondo": "#F7F0E1"},
+    "suspendido":  {"label": "Suspendido",  "color": "#6E5A3A", "fondo": "#F6F1E6"},
+    "completado":  {"label": "Concluido",   "color": "#3D5A80", "fondo": "#EEF1F5"},
+    "cerrado":     {"label": "Concluido",   "color": "#3D5A80", "fondo": "#EEF1F5"},
+    "archivado":   {"label": "Archivado",   "color": "#60718D", "fondo": "#F1EEE8"},
 }
 ABIERTOS = ("por_iniciar", "activo", "en_espera", "suspendido")
 CONCLUIDOS = ("completado", "cerrado")
@@ -85,7 +91,7 @@ GRUPOS = {
 }
 TABLERO = [
     {"key": "por_iniciar", "label": "Por iniciar", "estados": ("por_iniciar",)},
-    {"key": "activo",      "label": "Activo",      "estados": ("activo",)},
+    {"key": "activo",      "label": "En trámite",      "estados": ("activo",)},
     {"key": "en_espera",   "label": "En espera",   "estados": ("en_espera", "suspendido")},
     {"key": "cerrado",     "label": "Concluido",   "estados": CONCLUIDOS},
 ]
@@ -114,6 +120,8 @@ PLANTILLAS = {
                   "descripcion": "Acto reclamado:\n\n"},
     "familiar":  {"titulo_ejemplo": "Divorcio / custodia — [Apellidos]",
                   "descripcion": "Hechos y pretensiones del cliente:\n\n"},
+    "notarial":  {"titulo_ejemplo": "Compraventa de inmueble — [Calle y número]",
+                  "descripcion": "Partes, inmueble y condiciones de la operación:\n\n"},
 }
 
 PER_PAGE = 25
@@ -165,12 +173,16 @@ def _usuarios() -> dict[int, dict]:
     return {r["id"]: _persona(r) for r in rows}
 
 
+# Avatares en la familia marino, gris azulado y dorado
+_COLORES_PERSONA = ("#132238", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
+
+
 def _persona(r) -> dict:
     nombre = f"{r['nombre']} {r['apellidos'] or ''}".strip()
     partes = nombre.split()
     iniciales = (partes[0][0] + partes[-1][0]) if len(partes) > 1 else nombre[:2]
     return {"id": r["id"], "nombre": nombre, "corto": f"{r['nombre']} {(r['apellidos'] or '').split(' ')[0]}".strip(),
-            "iniciales": iniciales.upper(), "color": f"hsl({r['id'] * 47 % 360}, 55%, 42%)"}
+            "iniciales": iniciales.upper(), "color": _COLORES_PERSONA[r["id"] % len(_COLORES_PERSONA)]}
 
 
 def _safe_float(v, default=0.0):
@@ -495,7 +507,8 @@ def nuevo():
         return render_template(
             "asuntos/nuevo.html", err=err, form=form or {},
             tipos_derecho=TIPOS_DERECHO, abogados=abogados, clientes=clientes, plantillas=PLANTILLAS,
-            auto_num=_auto_numero(tdb), today_str=_hoy().isoformat(),
+            auto_num=_auto_numero(tdb), today_str=_hoy().isoformat(), sin_juicio=SIN_JUICIO,
+            extensiones=sorted(boveda.EXTENSIONES),
             cliente_inicial=_safe_int(request.args.get("cliente_id") or request.args.get("cliente")),
         )
 
@@ -537,6 +550,15 @@ def nuevo():
             tdb.execute("INSERT OR IGNORE INTO asunto_colaboradores (asunto_id, user_id) VALUES (?,?)", (new_id, cid))
     tdb.commit()
     _log("crear_asunto", new_id, {"titulo": titulo})
+
+    # Documentos que vinieron en el paso 2
+    rechazados = []
+    for archivo in request.files.getlist("archivos"):
+        if archivo and archivo.filename and not _guardar_documento(tdb, new_id, archivo,
+                                                                   archivo.filename.rsplit(".", 1)[0]):
+            rechazados.append(archivo.filename)
+    if rechazados:
+        flash(f"No se guardaron {len(rechazados)} archivo(s) con formato no permitido: {', '.join(rechazados[:3])}", "warning")
     return redirect(url_for("asuntos.detalle", id=new_id, nuevo=1))
 
 
@@ -564,7 +586,7 @@ def _bitacora(tdb, id: int, asunto: dict, usuarios: dict) -> list[dict]:
     items = []
 
     def autor(uid):
-        return usuarios.get(uid) or {"nombre": "Sistema", "iniciales": "HC", "color": "#64708A"}
+        return usuarios.get(uid) or {"nombre": "Sistema", "iniciales": "HC", "color": "#60718D"}
 
     for a in tdb.execute("SELECT * FROM asunto_actividades WHERE asunto_id=?", (id,)).fetchall():
         items.append({"id": a["id"], "tipo": "actividad", "etiqueta": ACTIVIDAD_LABEL.get(a["tipo"], "Actividad"),
@@ -736,11 +758,16 @@ def detalle(id: int):
         "SELECT id, COALESCE(razon_social, nombre || ' ' || COALESCE(apellidos,'')) AS nombre FROM clientes "
         "WHERE activo=1 OR id=? ORDER BY 2 LIMIT 500", (asunto.get("cliente_id") or 0,)).fetchall()]
 
+    bitacora = _bitacora(tdb, id, asunto, usuarios)
+    ultimo = _ultimos_movimientos(tdb, [id]).get(id)
+
     es_admin = rol in ("super_admin", "admin")
     return render_template(
         "asuntos/detalle.html",
+        apertura=_fecha_corta(asunto.get("fecha_inicio") or asunto.get("fecha_alta")).split(" · ")[0],
+        ultima_actividad=_fecha_corta(ultimo.isoformat()) if ultimo else "",
         asunto=asunto, responsable=responsable, colaboradores=colaboradores, abogados=abogados,
-        bitacora=_bitacora(tdb, id, asunto, usuarios), proximo=proximo, eventos=eventos, pendientes=pendientes,
+        bitacora=bitacora, proximo=proximo, eventos=eventos, pendientes=pendientes,
         documentos=documentos, sentencias=sentencias, horas=horas, horas_total=horas_total,
         cobros=cobros[:4], dinero=dinero, etiquetas=etiquetas, todas_etiquetas=todas_etiquetas, ficha=ficha,
         dias_llevamos=dias_llevamos, abierto=abierto, clientes=clientes,
@@ -821,9 +848,9 @@ def agregar_etiqueta(id):
     tdb = g.tenant_db
     data = request.get_json(force=True)
     nombre = (data.get("nombre") or "").strip()
-    color = data.get("color") or "#1D3FD6"
+    color = data.get("color") or "#132238"
     if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
-        color = "#1D3FD6"
+        color = "#132238"
     etiqueta_id = data.get("etiqueta_id")
 
     if not etiqueta_id and not nombre:
@@ -1210,10 +1237,17 @@ def subir_documento(id: int):
     if not f or not f.filename:
         return jsonify(ok=False, error="Archivo requerido"), 400
 
+    doc_id = _guardar_documento(tdb, id, f, nombre)
+    if not doc_id:
+        return jsonify(ok=False, error="Tipo de archivo no permitido"), 400
+    return jsonify(ok=True, id=doc_id)
+
+
+def _guardar_documento(tdb, id: int, f, nombre: str = "") -> int | None:
+    """Cifra el archivo en la bóveda, lo registra en el expediente y lo manda a leer (OCR e índice)."""
     info = boveda.guardar(f, "asuntos", id)
     if not info:
-        return jsonify(ok=False, error="Tipo de archivo no permitido"), 400
-
+        return None
     cur = tdb.execute(
         """INSERT INTO documentos
            (asunto_id, nombre, archivo_url, archivo_nombre, tamanio, mime_type, subido_por)
@@ -1224,7 +1258,7 @@ def subir_documento(id: int):
     tdb.commit()
     lector.encolar(info["url"], nombre or info["nombre"], "documento", cur.lastrowid, asunto_id=id)
     _log("subir_documento", id, {"nombre": nombre or f.filename})
-    return jsonify(ok=True, id=cur.lastrowid)
+    return cur.lastrowid
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1261,18 +1295,18 @@ def enviar_correo_asunto(id: int):
     despacho_h, titulo_h, asunto_h = html.escape(despacho), html.escape(asunto_titulo), html.escape(asunto_correo)
     cuerpo_h, sender_h = html.escape(cuerpo), html.escape(sender_name)
     html_body = f"""
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-      <div style="background:linear-gradient(135deg,#1e293b,#334155);padding:24px 28px">
+    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #E5E2DB">
+      <div style="background:linear-gradient(135deg,#1A2B44,#334155);padding:24px 28px">
         <div style="font-size:18px;font-weight:800;color:#fff">{despacho_h}</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:3px">Ref: {titulo_h}</div>
+        <div style="font-size:11px;color:#9AA4B5;margin-top:3px">Ref: {titulo_h}</div>
       </div>
       <div style="padding:28px">
-        <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:16px">{asunto_h}</div>
-        <div style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap">{cuerpo_h}</div>
+        <div style="font-size:15px;font-weight:700;color:#1A2B44;margin-bottom:16px">{asunto_h}</div>
+        <div style="font-size:14px;color:#3B4A61;line-height:1.7;white-space:pre-wrap">{cuerpo_h}</div>
       </div>
-      <div style="background:#f8fafc;padding:16px 28px;border-top:1px solid #e5e7eb">
-        <div style="font-size:12px;color:#64748b">Enviado por <strong>{sender_h}</strong></div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Habeas Corpus · {date.today().strftime('%d/%m/%Y')}</div>
+      <div style="background:#FAF8F4;padding:16px 28px;border-top:1px solid #E5E2DB">
+        <div style="font-size:12px;color:#60718D">Enviado por <strong>{sender_h}</strong></div>
+        <div style="font-size:10px;color:#9AA4B5;margin-top:2px">Habeas Corpus · {date.today().strftime('%d/%m/%Y')}</div>
       </div>
     </div>"""
 
@@ -1343,7 +1377,7 @@ def exportar_pdf(id: int):
                                topMargin=2*cm, bottomMargin=2*cm)
     styles = getSampleStyleSheet()
     ACCENT = colors.HexColor(tipo_info["color"])
-    MUTED  = colors.HexColor("#9CA3AF")
+    MUTED  = colors.HexColor("#8E99AB")
 
     title_s   = ParagraphStyle("t", parent=styles["Heading1"],  fontSize=18, textColor=ACCENT, spaceAfter=4)
     sub_s     = ParagraphStyle("s", parent=styles["Normal"],    fontSize=9, textColor=MUTED, spaceAfter=10)
@@ -1363,8 +1397,8 @@ def exportar_pdf(id: int):
             ("FONTSIZE", (0,0),(-1,-1), 8),
             ("TEXTCOLOR",(0,0),(0,-1), MUTED),
             ("FONTNAME", (0,0),(0,-1),"Helvetica-Bold"),
-            ("ROWBACKGROUNDS",(0,0),(-1,-1),[colors.white, colors.HexColor("#F9FAFB")]),
-            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#E5E7EB")),
+            ("ROWBACKGROUNDS",(0,0),(-1,-1),[colors.white, colors.HexColor("#FAF8F4")]),
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#E5E2DB")),
             ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
         ]))
         story.append(t)
@@ -1408,8 +1442,8 @@ def exportar_pdf(id: int):
         t = Table(ah, colWidths=[2.5*cm, 2.5*cm, 10*cm, 2*cm])
         t.setStyle(TableStyle([
             ("BACKGROUND",(0,0),(-1,0),ACCENT),("TEXTCOLOR",(0,0),(-1,0),colors.white),
-            ("FONTSIZE",(0,0),(-1,-1),7),("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#E5E7EB")),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#F9FAFB")]),
+            ("FONTSIZE",(0,0),(-1,-1),7),("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#E5E2DB")),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#FAF8F4")]),
         ]))
         story.append(t)
 

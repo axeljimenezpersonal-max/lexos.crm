@@ -1,0 +1,62 @@
+{# Aviso de la cuenta compartida para colaboradores (ACCESO_PRUEBA).
+   modo='login' lo muestra encima del formulario; si no, flota en la esquina inferior izquierda. #}
+{% set ap_url = url_for('auth.login', tenant=config.ACCESO_PRUEBA_DESPACHO, prefill_email=config.ACCESO_PRUEBA_USUARIO) %}
+<style>
+.hcap{font:400 13.5px/1.45 Inter,system-ui,sans-serif}
+.hcap b{font-weight:600}
+.hcap code{font:600 13px ui-monospace,SFMono-Regular,monospace;padding:1px 6px;border-radius:6px}
+.hcap-flota{position:fixed;left:18px;bottom:18px;z-index:8990;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 36px);
+  padding:12px 12px 12px 16px;border-radius:16px;background:#132238;color:#E9E4D8;box-shadow:0 18px 40px -14px rgba(19,34,56,.6),0 0 0 1px rgba(255,255,255,.1)}
+.hcap-flota[hidden]{display:none}
+.hcap-flota code{background:rgba(173,144,96,.16);color:#fff}
+.hcap-flota small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#AD9060;font-weight:600;margin-bottom:2px}
+.hcap-flota a{flex:none;height:36px;display:flex;align-items:center;padding:0 14px;border-radius:10px;background:#AD9060;color:#101D31;font-weight:600;text-decoration:none}
+.hcap-flota a:hover{background:#C1A574}
+.hcap-flota button{flex:none;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:#A9B3C2;font-size:18px;line-height:1;cursor:pointer}
+.hcap-flota button:hover{background:rgba(255,255,255,.08);color:#fff}
+.hcap-login{margin-bottom:20px;padding:14px 16px;border-radius:14px;background:#F4EEDF;border:1px solid #E2D3AE;color:#132238}
+.hcap-login code{background:var(--c);color:#132238;border:1px solid #E6DCC4}
+.hcap-login p{margin:2px 0 10px}
+.hcap-login button{height:34px;padding:0 14px;border:0;border-radius:9px;background:#132238;color:#fff;font:600 13px Inter,sans-serif;cursor:pointer}
+.hcap code{white-space:nowrap}
+@media(max-width:860px){
+  .hcap-flota{left:12px;right:12px;bottom:12px;max-width:none;gap:10px;padding:10px 8px 10px 14px;font-size:13px}
+  .hcap-flota>div{flex:1;min-width:0}
+  .hcap-flota a{padding:0 12px}
+  body:has(.hcap-flota:not([hidden])) .hcr-btn{bottom:96px}
+  body:has(.hcap-flota:not([hidden])) .hcr-panel{bottom:150px}
+}
+</style>
+{% if modo == 'login' %}
+<div class="hcap hcap-login" role="note">
+  <b>Acceso de prueba para colaboradores</b>
+  <p>Usuario <code>{{ config.ACCESO_PRUEBA_USUARIO }}</code> · Contraseña <code>{{ config.ACCESO_PRUEBA_CLAVE }}</code></p>
+  <button type="button" id="hcapUsar">Entrar con la cuenta de prueba</button>
+</div>
+<script>
+document.getElementById('hcapUsar').addEventListener('click', () => {
+  {% if tenant and tenant.slug == config.ACCESO_PRUEBA_DESPACHO %}
+  document.getElementById('email').value = {{ config.ACCESO_PRUEBA_USUARIO | tojson }};
+  document.getElementById('password').value = {{ config.ACCESO_PRUEBA_CLAVE | tojson }};
+  document.getElementById('loginForm').submit();
+  {% else %}
+  location = {{ ap_url | tojson }};
+  {% endif %}
+});
+</script>
+{% else %}
+<div class="hcap hcap-flota" id="hcapFlota" role="note">
+  <div><small>Acceso de prueba</small>Usuario <code>{{ config.ACCESO_PRUEBA_USUARIO }}</code> · Contraseña <code>{{ config.ACCESO_PRUEBA_CLAVE }}</code></div>
+  <a href="{{ ap_url }}">Entrar</a>
+  <button type="button" aria-label="Ocultar aviso" id="hcapCerrar">×</button>
+</div>
+<script>
+(() => {
+  const el = document.getElementById('hcapFlota');
+  try { if (sessionStorage.getItem('hcapOculto')) el.hidden = true; } catch (_) {}
+  document.getElementById('hcapCerrar').addEventListener('click', () => {
+    el.hidden = true; try { sessionStorage.setItem('hcapOculto', '1'); } catch (_) {}
+  });
+})();
+</script>
+{% endif %}

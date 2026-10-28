@@ -121,12 +121,69 @@ def _resolve_variables(html: str, asunto_id=None, cliente_id=None) -> str:
 #  INDEX — página principal con 3 secciones (tabs)
 # ═════════════════════════════════════════════════════════════════════════════
 
+
+# Estado de lectura de cada documento (OCR e índice), con texto y no solo color
+ESTADOS_LECTURA = {
+    "listo":       {"label": "Listo",             "grupo": "listo"},
+    "pendiente":   {"label": "Procesando",        "grupo": "procesando"},
+    "procesando":  {"label": "Procesando",        "grupo": "procesando"},
+    "requiere_ocr": {"label": "Requiere revisión", "grupo": "revision"},
+    "sin_texto":   {"label": "Requiere revisión", "grupo": "revision"},
+    "no_soportado": {"label": "Requiere revisión", "grupo": "revision"},
+    "error":       {"label": "Error",             "grupo": "error"},
+}
+
+
+def _documentos_de_expedientes(tdb):
+    """Todos los documentos de los expedientes que la persona puede ver, con su estado de lectura."""
+    from modules.asuntos import _FILTRO_PROPIOS, _solo_lo_suyo, _usuarios
+    where, params = ["1"], []
+    if _solo_lo_suyo():
+        uid = session.get("user_id")
+        where.append(_FILTRO_PROPIOS)
+        params += [uid, uid, uid]
+    q = (request.args.get("q") or "").strip()
+    if q:
+        where.append("(d.nombre LIKE ? OR d.archivo_nombre LIKE ? OR a.titulo LIKE ? OR a.numero_expediente LIKE ?)")
+        params += [f"%{q}%"] * 4
+    filas = tdb.execute(
+        f"""SELECT d.id, d.nombre, d.archivo_url, d.archivo_nombre, d.tamanio, d.fecha_subida, d.subido_por,
+                   a.id AS asunto_id, a.titulo AS asunto, a.numero_expediente,
+                   l.estado AS lectura, l.error AS lectura_error, l.paginas
+            FROM documentos d
+            JOIN asuntos a ON a.id = d.asunto_id
+            LEFT JOIN lector_documentos l ON l.archivo_url = d.archivo_url
+            WHERE {' AND '.join(where)}
+            ORDER BY d.fecha_subida DESC LIMIT 300""",
+        params,
+    ).fetchall()
+    usuarios = _usuarios()
+    docs, conteo = [], {"listo": 0, "procesando": 0, "revision": 0, "error": 0, "guardado": 0}
+    for r in filas:
+        d = dict(r)
+        info = ESTADOS_LECTURA.get(d["lectura"] or "")
+        d["estado"] = info["label"] if info else ("Guardado" if d["archivo_url"] else "Sin archivo")
+        d["grupo"] = info["grupo"] if info else "guardado"
+        d["ext"] = (d["archivo_nombre"] or d["archivo_url"] or "").rsplit(".", 1)[-1].lower()[:4]
+        d["autor"] = (usuarios.get(d["subido_por"]) or {}).get("corto", "")
+        d["dia"] = (d["fecha_subida"] or "")[:10]
+        conteo[d["grupo"]] += 1
+        docs.append(d)
+    estado_f = request.args.get("estado", "")
+    if estado_f in conteo:
+        docs = [d for d in docs if d["grupo"] == estado_f]
+    return docs, conteo
+
+
 @biblioteca_bp.route("/")
 @login_required
 @tenant_required
 def index():
     tdb = g.tenant_db
-    seccion = request.args.get("seccion", "estudio")
+    seccion = request.args.get("seccion", "expedientes")
+    if seccion not in ("expedientes", "estudio", "formatos", "acuerdos"):
+        seccion = "expedientes"
+    docs_exp, conteo_estados = _documentos_de_expedientes(tdb) if seccion == "expedientes" else ([], {})
 
     # ── Estudio data ──
     carpetas = tdb.execute(
@@ -202,6 +259,8 @@ def index():
     return render_template(
         "biblioteca/index.html",
         seccion=seccion,
+        docs_exp=docs_exp, conteo_estados=conteo_estados, estado_f=request.args.get("estado", ""),
+        estados_lectura=ESTADOS_LECTURA,
         # Estudio
         carpetas=carpetas, archivos=archivos,
         carpeta_id=carpeta_id, q=q, tipo_f=tipo_f,
@@ -679,7 +738,7 @@ def editor_exportar_pdf():
   table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
   th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
   th {{ background: #f5f5f5; font-weight: 600; }}
-  blockquote {{ border-left: 3px solid #00DFA2; padding-left: 12px; color: #555; margin: 12px 0; }}
+  blockquote {{ border-left: 3px solid #AD9060; padding-left: 12px; color: #555; margin: 12px 0; }}
   img {{ max-width: 100%; }}
 </style>
 </head><body>{html}</body></html>"""

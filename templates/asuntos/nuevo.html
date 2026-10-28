@@ -1,161 +1,233 @@
 {% extends "base.html" %}
-{% block title %}Nuevo asunto{% endblock %}
-{% block page_title %}Nuevo asunto{% endblock %}
+{% block title %}Crear expediente{% endblock %}
+{% block page_title %}Crear expediente{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
 {% endblock %}
 
 {% block content %}
 {% set f = form %}
 {% set tipo_sel = f.get('tipo_asunto') or '' %}
-<div class="an-wrap">
-  <nav class="af-migas"><a href="{{ url_for('asuntos.index') }}">Asuntos</a> / Nuevo</nav>
-  <h1 class="page-title" style="margin-top:6px">Nuevo asunto</h1>
-  <p class="as-sub">Solo el título es obligatorio. Lo demás lo puedes completar después desde la ficha del asunto.</p>
-  {% if err %}<div class="an-err" role="alert">{{ err }}</div>{% endif %}
+<a class="xp-volver" href="{{ url_for('asuntos.index') }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Volver a expedientes</a>
 
-  <form method="post" id="anForm" novalidate>
-    <input type="hidden" name="tipo_asunto" id="anTipo" value="{{ tipo_sel }}">
-    <input type="hidden" name="sub_tipo" id="anSub" value="{{ f.get('sub_tipo', '') }}">
+<div class="cx-top">
+  <div>
+    <p class="cx-eyebrow">Nuevo expediente</p>
+    <h1 class="ex-h1" id="cxTitulo">Datos del expediente</h1>
+    <p class="ex-sub" id="cxSub">Registra lo básico para identificarlo. Solo el título es obligatorio; lo demás lo completas después.</p>
+  </div>
+  <span class="cx-n">Paso <b id="cxN">1</b> de 4</span>
+</div>
 
-    <section class="an-sec">
-      <h2><i>1</i>¿De qué materia es?</h2>
-      <div class="an-materias" id="anMaterias" role="radiogroup" aria-label="Materia">
-        {% for k, t in tipos_derecho.items() %}
-        <button type="button" class="an-materia{% if tipo_sel == k %} on{% endif %}" data-tipo="{{ k }}" style="--m:{{ t.color }}" role="radio" aria-checked="{{ 'true' if tipo_sel == k else 'false' }}">
-          <span class="as-dot" style="--d:{{ t.color }}"></span>{{ t.label }}
-        </button>
-        {% endfor %}
-      </div>
-      <div class="an-subtipos" id="anSubtipos"></div>
-    </section>
+<ol class="cx-stepper" id="cxStepper">
+  <li class="on" data-paso="1"><button type="button"><i>1</i><span>Datos</span></button></li>
+  <li data-paso="2"><button type="button"><i>2</i><span>Documentos</span></button></li>
+  <li data-paso="3"><button type="button"><i>3</i><span>Revisión</span></button></li>
+  <li data-paso="4"><button type="button"><i>4</i><span>Acceso</span></button></li>
+</ol>
 
-    <section class="an-sec">
-      <h2><i>2</i>Lo básico</h2>
-      <div class="an-body">
-        <div class="full">
-          <label class="as-label" for="anTitulo">Título del asunto</label>
-          <input class="as-input" id="anTitulo" name="titulo" required maxlength="200" value="{{ f.get('titulo', '') }}" placeholder="Ej. Juicio ordinario mercantil — Constructora Omega vs Desarrollos Altamira" autofocus>
+{% if err %}<div class="alert alert-danger" role="alert" style="margin-top:16px">{{ err }}</div>{% endif %}
+
+<form method="post" enctype="multipart/form-data" id="anForm" novalidate>
+  <input type="hidden" name="tipo_asunto" id="anTipo" value="{{ tipo_sel }}">
+  <input type="hidden" name="sub_tipo" id="anSub" value="{{ f.get('sub_tipo', '') }}">
+
+  <div class="cx-grid">
+    <div class="cx-main">
+
+      <!-- Paso 1 · Datos -->
+      <section class="cx-paso on" data-paso="1">
+        <h2 class="cx-h2">Tipo de expediente</h2>
+        <div class="an-materias" id="anMaterias" role="radiogroup" aria-label="Tipo de expediente">
+          {% for k, t in tipos_derecho.items() %}
+          <button type="button" class="an-materia{% if tipo_sel == k %} on{% endif %}" data-tipo="{{ k }}" style="--m:{{ t.color }}" role="radio" aria-checked="{{ 'true' if tipo_sel == k else 'false' }}">
+            <span class="as-dot" style="--d:{{ t.color }}"></span>{{ t.label }}
+          </button>
+          {% endfor %}
         </div>
-        <div>
-          <label class="as-label" for="anCliente">Cliente</label>
-          <select class="as-select" id="anCliente" name="cliente_id">
-            <option value="">Sin cliente por ahora</option>
-            {% set cli_sel = (f.get('cliente_id') or cliente_inicial or '') | string %}
-            {% for c in clientes %}<option value="{{ c.id }}"{% if cli_sel == c.id | string %} selected{% endif %}>{{ c.razon_social or (c.nombre ~ ' ' ~ (c.apellidos or '')) }}</option>{% endfor %}
-          </select>
-          <small class="as-muted" style="display:block;font-size:12px;margin-top:5px">¿Es nuevo? <a href="{{ url_for('clientes.index') }}#nuevo" style="color:var(--e);font-weight:600;text-decoration:none">Agrégalo en Clientes</a></small>
-        </div>
-        <div>
-          <label class="as-label" for="anResp">Abogado responsable</label>
-          <select class="as-select" id="anResp" name="abogado_responsable">
-            {% set resp_sel = (f.get('abogado_responsable') or session.get('user_id')) | string %}
-            {% for a in abogados %}<option value="{{ a.id }}"{% if resp_sel == a.id | string %} selected{% endif %}>{{ a.nombre }} {{ a.apellidos }}</option>{% endfor %}
-          </select>
-        </div>
-        <div>
-          <span class="as-label">Prioridad</span>
-          <div class="an-seg">
-            {% set prio = f.get('prioridad') or 'media' %}
-            {% for v, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<label><input type="radio" name="prioridad" value="{{ v }}"{% if prio == v %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}
+        <div class="an-subtipos" id="anSubtipos"></div>
+
+        <h2 class="cx-h2">Información general</h2>
+        <div class="cx-campos">
+          <div class="full">
+            <label class="as-label" for="anTitulo">Título o asunto <span class="req">*</span></label>
+            <input class="as-input" id="anTitulo" name="titulo" required maxlength="200" value="{{ f.get('titulo', '') }}" placeholder="Ej. Compraventa de inmueble — Calle Ahuehuetes 142" autofocus>
+          </div>
+          <div>
+            <label class="as-label" for="anCliente">Cliente</label>
+            <select class="as-select" id="anCliente" name="cliente_id">
+              <option value="">Sin cliente por ahora</option>
+              {% set cli_sel = (f.get('cliente_id') or cliente_inicial or '') | string %}
+              {% for c in clientes %}<option value="{{ c.id }}"{% if cli_sel == c.id | string %} selected{% endif %}>{{ c.razon_social or (c.nombre ~ ' ' ~ (c.apellidos or '')) }}</option>{% endfor %}
+            </select>
+            <small class="cx-ayuda">¿Es nuevo? <a href="{{ url_for('clientes.index') }}#nuevo">Agrégalo en Personas</a></small>
+          </div>
+          <div>
+            <label class="as-label" for="anExp">Número de expediente</label>
+            <input class="as-input" id="anExp" name="numero_expediente" maxlength="60" value="{{ f.get('numero_expediente', '') }}" placeholder="{{ auto_num }}">
+            <small class="cx-ayuda">Si lo dejas vacío se asigna {{ auto_num }}.</small>
+          </div>
+          <div>
+            <label class="as-label" for="anIni">Fecha de apertura</label>
+            <input class="as-input" type="date" id="anIni" name="fecha_inicio" value="{{ f.get('fecha_inicio') or today_str }}">
+          </div>
+          <div>
+            <label class="as-label" for="anLim">Fecha límite <small>(si ya la conoces)</small></label>
+            <input class="as-input" type="date" id="anLim" name="fecha_limite" value="{{ f.get('fecha_limite', '') }}">
+          </div>
+          <div>
+            <span class="as-label">Prioridad</span>
+            <div class="an-seg">
+              {% set prio = f.get('prioridad') or 'media' %}
+              {% for v, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<label><input type="radio" name="prioridad" value="{{ v }}"{% if prio == v %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}
+            </div>
+          </div>
+          <div>
+            <span class="as-label">Estado</span>
+            <div class="an-seg">
+              {% set est = f.get('estado') or 'activo' %}
+              {% for v, l in [('activo','En trámite'),('por_iniciar','Por iniciar')] %}<label><input type="radio" name="estado" value="{{ v }}"{% if est == v %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}
+            </div>
+          </div>
+          <div class="full">
+            <label class="as-label" for="anDesc">Descripción <small>(opcional)</small></label>
+            <textarea class="as-textarea" id="anDesc" name="descripcion" rows="3" maxlength="5000" placeholder="En pocas líneas: qué pasó y qué quiere lograr el cliente.">{{ f.get('descripcion', '') }}</textarea>
           </div>
         </div>
-        <div>
-          <span class="as-label">Estado</span>
-          <div class="an-seg">
-            {% set est = f.get('estado') or 'activo' %}
-            {% for v, l in [('activo','Ya empezó'),('por_iniciar','Por iniciar')] %}<label><input type="radio" name="estado" value="{{ v }}"{% if est == v %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}
+
+        <div id="cxJuicio">
+          <h2 class="cx-h2">Juicio y contraparte <small>(opcional)</small></h2>
+          <div class="cx-campos">
+            <div class="full">
+              <label class="as-label" for="anJuz">Juzgado o autoridad</label>
+              <input class="as-input" id="anJuz" name="juzgado" maxlength="200" value="{{ f.get('juzgado', '') }}" placeholder="Ej. Juzgado Décimo de lo Civil de la CDMX">
+            </div>
+            <div>
+              <label class="as-label" for="anJuicio">Número de juicio <small>(del juzgado)</small></label>
+              <input class="as-input" id="anJuicio" name="numero_juicio" maxlength="60" value="{{ f.get('numero_juicio', '') }}" placeholder="Ej. 1234/2026">
+            </div>
+            <div>
+              <label class="as-label" for="anCon">Contraparte</label>
+              <input class="as-input" id="anCon" name="contrario_nombre" maxlength="200" value="{{ f.get('contrario_nombre', '') }}" placeholder="Persona o empresa contraria">
+            </div>
+            <div>
+              <label class="as-label" for="anConAb">Su abogado</label>
+              <input class="as-input" id="anConAb" name="contrario_abogado" maxlength="200" value="{{ f.get('contrario_abogado', '') }}">
+            </div>
+            <div>
+              <label class="as-label" for="anConDes">Su despacho</label>
+              <input class="as-input" id="anConDes" name="contrario_despacho" maxlength="200" value="{{ f.get('contrario_despacho', '') }}">
+            </div>
           </div>
         </div>
-        <div class="full">
-          <label class="as-label" for="anDesc">Hechos <small>(opcional)</small></label>
-          <textarea class="as-textarea" id="anDesc" name="descripcion" rows="3" maxlength="5000" placeholder="En pocas líneas: qué pasó y qué quiere lograr el cliente.">{{ f.get('descripcion', '') }}</textarea>
-        </div>
-      </div>
-    </section>
 
-    <section class="an-sec">
-      <h2><i>3</i>El juicio <span class="as-muted" style="font:500 13px Inter">(opcional)</span></h2>
-      <div class="an-body">
-        <div>
-          <label class="as-label" for="anExp">Expediente interno</label>
-          <input class="as-input" id="anExp" name="numero_expediente" maxlength="60" value="{{ f.get('numero_expediente', '') }}" placeholder="{{ auto_num }}">
-          <small class="as-muted" style="display:block;font-size:12px;margin-top:5px">Si lo dejas vacío se asigna {{ auto_num }}.</small>
+        <h2 class="cx-h2">Honorarios <small>(opcional)</small></h2>
+        <div class="cx-campos">
+          <div>
+            <label class="as-label" for="anHon">Honorarios pactados</label>
+            <input class="as-input" type="number" min="0" step="0.01" id="anHon" name="honorarios_pactados" value="{{ f.get('honorarios_pactados', '') }}" placeholder="$0.00">
+          </div>
+          <div>
+            <label class="as-label" for="anForma">Forma de cobro</label>
+            <select class="as-select" id="anForma" name="forma_cobro">
+              {% for v, l in [('fijo','Cuota fija'),('por_hora','Por hora'),('por_evento','Por etapa o evento')] %}<option value="{{ v }}"{% if f.get('forma_cobro') == v %} selected{% endif %}>{{ l }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="as-label" for="anMonto" id="anMontoLbl">Monto en litigio</label>
+            <input class="as-input" type="number" min="0" step="0.01" id="anMonto" name="monto_estimado" value="{{ f.get('monto_estimado', '') }}" placeholder="$0.00">
+          </div>
         </div>
-        <div>
-          <label class="as-label" for="anJuicio">Número de juicio <small>(del juzgado)</small></label>
-          <input class="as-input" id="anJuicio" name="numero_juicio" maxlength="60" value="{{ f.get('numero_juicio', '') }}" placeholder="Ej. 1234/2026">
-        </div>
-        <div class="full">
-          <label class="as-label" for="anJuz">Juzgado o autoridad</label>
-          <input class="as-input" id="anJuz" name="juzgado" maxlength="200" value="{{ f.get('juzgado', '') }}" placeholder="Ej. Juzgado Décimo de lo Civil de la CDMX">
-        </div>
-        <div>
-          <label class="as-label" for="anIni">Fecha de inicio</label>
-          <input class="as-input" type="date" id="anIni" name="fecha_inicio" value="{{ f.get('fecha_inicio') or today_str }}">
-        </div>
-        <div>
-          <label class="as-label" for="anLim">Fecha límite <small>(si ya la conoces)</small></label>
-          <input class="as-input" type="date" id="anLim" name="fecha_limite" value="{{ f.get('fecha_limite', '') }}">
-        </div>
-        <div class="full">
-          <label class="as-label" for="anCon">Contraparte</label>
-          <input class="as-input" id="anCon" name="contrario_nombre" maxlength="200" value="{{ f.get('contrario_nombre', '') }}" placeholder="Nombre de la persona o empresa contraria">
-        </div>
-        <div>
-          <label class="as-label" for="anConAb">Su abogado</label>
-          <input class="as-input" id="anConAb" name="contrario_abogado" maxlength="200" value="{{ f.get('contrario_abogado', '') }}">
-        </div>
-        <div>
-          <label class="as-label" for="anConDes">Su despacho</label>
-          <input class="as-input" id="anConDes" name="contrario_despacho" maxlength="200" value="{{ f.get('contrario_despacho', '') }}">
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="an-sec">
-      <h2><i>4</i>Honorarios y equipo <span class="as-muted" style="font:500 13px Inter">(opcional)</span></h2>
-      <div class="an-body">
-        <div>
-          <label class="as-label" for="anHon">Honorarios pactados</label>
-          <input class="as-input" type="number" min="0" step="0.01" id="anHon" name="honorarios_pactados" value="{{ f.get('honorarios_pactados', '') }}" placeholder="$0.00">
+      <!-- Paso 2 · Documentos -->
+      <section class="cx-paso" data-paso="2">
+        <label class="cx-drop" id="cxDrop">
+          <input type="file" id="cxArchivos" name="archivos" multiple hidden accept="{% for e in extensiones %}.{{ e }}{{ ',' if not loop.last }}{% endfor %}">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 9h14l8 8v22a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z"/><path d="M28 9v8h8M18 26h12M18 31h12"/></svg>
+          <span><b>Arrastra tus archivos aquí</b><small>o selecciónalos desde tu computadora o celular</small></span>
+          <span class="btn btn-primary">Seleccionar archivos</span>
+        </label>
+        <p class="cx-formatos">Formatos permitidos: PDF, Word, Excel, imágenes (JPG, PNG, HEIC, TIFF) y más · Tamaño máximo por envío: {{ (config.MAX_CONTENT_LENGTH / 1048576) | round | int }} MB</p>
+        <div class="cx-lista" id="cxLista" hidden>
+          <h2 class="cx-h2" style="margin-top:6px">Archivos para el expediente (<span id="cxCuenta">0</span>)</h2>
+          <ul id="cxArchivosLista"></ul>
         </div>
-        <div>
-          <label class="as-label" for="anForma">Forma de cobro</label>
-          <select class="as-select" id="anForma" name="forma_cobro">
-            {% for v, l in [('fijo','Cuota fija'),('por_hora','Por hora'),('por_evento','Por etapa o evento')] %}<option value="{{ v }}"{% if f.get('forma_cobro') == v %} selected{% endif %}>{{ l }}</option>{% endfor %}
-          </select>
+        <p class="cx-nota">Puedes saltar este paso y agregar documentos después desde el expediente.</p>
+      </section>
+
+      <!-- Paso 3 · Revisión -->
+      <section class="cx-paso" data-paso="3">
+        <div class="xp-card">
+          <div class="xp-card-h"><h2>Revisa antes de crear</h2><button type="button" class="link" data-ir-paso="1">Editar datos</button></div>
+          <div class="xp-card-b"><dl class="cx-revision" id="cxRevision"></dl></div>
         </div>
-        <div>
-          <label class="as-label" for="anMonto">Monto en litigio</label>
-          <input class="as-input" type="number" min="0" step="0.01" id="anMonto" name="monto_estimado" value="{{ f.get('monto_estimado', '') }}" placeholder="$0.00">
+        <div class="xp-card" style="margin-top:16px">
+          <div class="xp-card-h"><h2>Documentos</h2><button type="button" class="link" data-ir-paso="2">Cambiar</button></div>
+          <div class="xp-card-b" id="cxRevDocs"></div>
         </div>
-        <div></div>
+        <p class="cx-nota">Al crear el expediente, los documentos se guardan cifrados y {{ config.ASISTENTE_NOMBRE }} los lee para que puedas buscar en ellos. Los escaneados pueden tardar unos minutos en estar listos.</p>
+      </section>
+
+      <!-- Paso 4 · Acceso -->
+      <section class="cx-paso" data-paso="4">
+        <h2 class="cx-h2">Responsable</h2>
+        <div class="cx-campos">
+          <div class="full">
+            <label class="as-label" for="anResp">Persona a cargo del expediente</label>
+            <select class="as-select" id="anResp" name="abogado_responsable">
+              {% set resp_sel = (f.get('abogado_responsable') or session.get('user_id')) | string %}
+              {% for a in abogados %}<option value="{{ a.id }}"{% if resp_sel == a.id | string %} selected{% endif %}>{{ a.nombre }} {{ a.apellidos }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
         {% if abogados | length > 1 %}
-        <div class="full">
-          <span class="as-label">¿Quién más colabora?</span>
-          <div class="an-colabs">
-            {% set colabs = f.getlist('colaboradores') if f.getlist is defined else [] %}
-            {% for a in abogados %}<label data-colab="{{ a.id }}"><input type="checkbox" name="colaboradores" value="{{ a.id }}"{% if a.id | string in colabs %} checked{% endif %}>{{ a.nombre }} {{ a.apellidos }}</label>{% endfor %}
-          </div>
+        <h2 class="cx-h2">¿Quién más colabora?</h2>
+        <div class="an-colabs">
+          {% set colabs = f.getlist('colaboradores') if f.getlist is defined else [] %}
+          {% for a in abogados %}<label data-colab="{{ a.id }}"><input type="checkbox" name="colaboradores" value="{{ a.id }}"{% if a.id | string in colabs %} checked{% endif %}>{{ a.nombre }} {{ a.apellidos }}</label>{% endfor %}
         </div>
         {% endif %}
-        <label class="an-priv full">
+        <div class="cx-quien">
+          <b>Quién podrá verlo</b>
+          <p>La administración y los asistentes del despacho, el responsable y quienes colaboren. Los demás abogados no lo verán en su lista.</p>
+        </div>
+        <label class="an-priv">
           <input type="checkbox" name="privado" value="1"{% if f.get('privado') %} checked{% endif %}>
-          <span><b>Asunto privado</b><small>{{ config.ASISTENTE_NOMBRE }} nunca enviará información de este asunto fuera del servidor del despacho. Recomendado para asuntos penales.</small></span>
+          <span><b>Expediente privado</b><small>{{ config.ASISTENTE_NOMBRE }} solo buscará en el servidor del despacho y nunca enviará su contenido al servicio de IA. Recomendado para asuntos penales.</small></span>
         </label>
-      </div>
-    </section>
+      </section>
 
-    <div class="an-pie">
-      <small>Podrás agregar documentos, audiencias y notas en cuanto lo crees.</small>
-      <div style="display:flex;gap:8px">
-        <a class="btn btn-ghost" href="{{ url_for('asuntos.index') }}">Cancelar</a>
-        <button class="btn btn-primary" id="anCrear">Crear asunto</button>
-      </div>
+      <footer class="cx-pie">
+        <a class="btn btn-ghost" href="{{ url_for('asuntos.index') }}" id="cxCancelar">Cancelar</a>
+        <button type="button" class="btn btn-ghost" id="cxAtras" hidden>← Atrás</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn btn-ghost" id="cxSaltar" hidden>Saltar este paso</button>
+        <button type="button" class="btn btn-primary" id="cxSiguiente">Siguiente →</button>
+        <button class="btn btn-primary" id="anCrear" hidden>Crear expediente</button>
+      </footer>
     </div>
-  </form>
-</div>
+
+    <aside class="cx-side">
+      <div class="cx-ficha">
+        <p class="cx-eyebrow">Expediente <span id="cxBorrador">(borrador)</span></p>
+        <b class="cx-num" id="cxNum">{{ f.get('numero_expediente') or auto_num }}</b>
+        <span class="cx-tipo" id="cxTipoFecha">Sin tipo · {{ today_str }}</span>
+        <div class="cx-ficha-tit" id="cxFichaTit">Sin título todavía</div>
+        <dl>
+          <dt>Cliente</dt><dd id="cxFichaCli">—</dd>
+          <dt>Documentos</dt><dd id="cxFichaDocs">Ninguno</dd>
+        </dl>
+        <p class="cx-ficha-nota">Esta información identifica el expediente en todo el sistema.</p>
+      </div>
+      <div class="cx-consejo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>
+        <div><b>Consejo</b><p id="cxConsejo">Usa un título claro: tipo de asunto y partes. Así lo encontrarás fácil en la búsqueda.</p></div>
+      </div>
+    </aside>
+  </div>
+</form>
 {% endblock %}
 
 {% block scripts %}
@@ -203,10 +275,112 @@
   resp.addEventListener('change', ocultarResp); ocultarResp();
 
   document.getElementById('anForm').addEventListener('submit', e => {
-    if (!titulo.value.trim()) { e.preventDefault(); titulo.focus(); showToast('Escribe un título para el asunto', 'error'); return; }
+    if (!titulo.value.trim()) { e.preventDefault(); titulo.focus(); showToast('Escribe el título del expediente', 'error'); return; }
     document.getElementById('anCrear').disabled = true;
   });
   pintarSubtipos();
+})();
+</script>
+
+<script>
+(() => {
+  const SIN_JUICIO = {{ sin_juicio | list | tojson }};
+  const TIPOS = {{ tipos_derecho | tojson }};
+  const PASOS = {
+    1: ['Datos del expediente', 'Registra lo básico para identificarlo. Solo el título es obligatorio; lo demás lo completas después.', 'Usa un título claro: tipo de asunto y partes. Así lo encontrarás fácil en la búsqueda.'],
+    2: ['Carga los documentos', 'Agrega los archivos que ya tienes: escrituras, identificaciones, contratos, acuerdos o fotos.', 'Sube primero lo que más consultas: identificaciones, el contrato o el último acuerdo. Lo demás puede esperar.'],
+    3: ['Revisa y confirma', 'Comprueba que los datos estén bien antes de crear el expediente.', 'Si algo no está claro todavía, déjalo vacío. Podrás corregirlo desde la pestaña Datos.'],
+    4: ['Acceso al expediente', 'Elige quién lo lleva y quién más puede verlo.', 'Marca como privado lo que no deba procesar la IA, como los asuntos penales.'],
+  };
+  const $ = id => document.getElementById(id);
+  const form = $('anForm'), titulo = $('anTitulo');
+  let paso = 1;
+
+  function ir(n) {
+    if (n > 1 && !titulo.value.trim()) { n = 1; titulo.focus(); showToast('Escribe el título del expediente', 'error'); }
+    paso = n;
+    document.querySelectorAll('.cx-paso').forEach(s => s.classList.toggle('on', +s.dataset.paso === n));
+    document.querySelectorAll('#cxStepper li').forEach(li => { const k = +li.dataset.paso; li.classList.toggle('on', k === n); li.classList.toggle('hecho', k < n); });
+    $('cxN').textContent = n; $('cxTitulo').textContent = PASOS[n][0]; $('cxSub').textContent = PASOS[n][1]; $('cxConsejo').textContent = PASOS[n][2];
+    $('cxAtras').hidden = n === 1; $('cxCancelar').hidden = n !== 1;
+    $('cxSaltar').hidden = n !== 2; $('cxSiguiente').hidden = n === 4; $('anCrear').hidden = n !== 4;
+    if (n === 3) revisar();
+    window.scrollTo({ top: 0 });
+  }
+  $('cxSiguiente').addEventListener('click', () => ir(Math.min(paso + 1, 4)));
+  $('cxSaltar').addEventListener('click', () => ir(3));
+  $('cxAtras').addEventListener('click', () => ir(Math.max(paso - 1, 1)));
+  document.querySelectorAll('#cxStepper button').forEach(b => b.addEventListener('click', () => ir(+b.closest('li').dataset.paso)));
+  document.querySelectorAll('[data-ir-paso]').forEach(b => b.addEventListener('click', () => ir(+b.dataset.irPaso)));
+  form.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT' && paso < 4) { e.preventDefault(); ir(paso + 1); } });
+
+  // Juicio y contraparte solo cuando aplica
+  const tipo = $('anTipo');
+  function ajustarTipo() {
+    const sin = SIN_JUICIO.includes(tipo.value);
+    $('cxJuicio').hidden = sin;
+    $('anMontoLbl').textContent = sin ? 'Valor de la operación' : 'Monto en litigio';
+    ficha();
+  }
+  $('anMaterias').addEventListener('click', () => setTimeout(ajustarTipo));
+  $('anSubtipos').addEventListener('click', () => setTimeout(ficha));
+
+  // Archivos: lista editable antes de enviar
+  const input = $('cxArchivos'), drop = $('cxDrop');
+  let elegidos = new DataTransfer();
+  const peso = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+  function agregar(files) { [...files].forEach(f => elegidos.items.add(f)); input.files = elegidos.files; pintarArchivos(); }
+  function pintarArchivos() {
+    const ul = $('cxArchivosLista'); ul.replaceChildren();
+    [...elegidos.files].forEach((f, i) => {
+      const li = document.createElement('li');
+      const ext = (f.name.split('.').pop() || '').slice(0, 4).toLowerCase();
+      li.innerHTML = `<span class="ext ${ext}">${ext}</span><span class="n"></span><span class="t">${peso(f.size)}</span><span class="e">Listo para subir</span><button type="button" aria-label="Quitar">×</button>`;
+      li.querySelector('.n').textContent = f.name;
+      li.querySelector('button').addEventListener('click', () => { const dt = new DataTransfer(); [...elegidos.files].forEach((x, j) => j !== i && dt.items.add(x)); elegidos = dt; input.files = elegidos.files; pintarArchivos(); });
+      ul.append(li);
+    });
+    $('cxLista').hidden = !elegidos.files.length; $('cxCuenta').textContent = elegidos.files.length; ficha();
+  }
+  input.addEventListener('change', () => { const nuevos = [...input.files]; input.files = elegidos.files; agregar(nuevos); });
+  ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('sobre'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('sobre')));
+  drop.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) agregar(e.dataTransfer.files); });
+
+  // Ficha lateral en vivo
+  const texto = el => el.options ? (el.value ? el.options[el.selectedIndex].text : '') : el.value.trim();
+  function ficha() {
+    const t = TIPOS[tipo.value]?.label || 'Sin tipo', sub = $('anSub').value;
+    const fecha = $('anIni').value || '{{ today_str }}';
+    $('cxNum').textContent = $('anExp').value.trim() || '{{ auto_num }}';
+    $('cxTipoFecha').textContent = `${sub || t} · ${fecha.split('-').reverse().join('/')}`;
+    $('cxFichaTit').textContent = titulo.value.trim() || 'Sin título todavía';
+    $('cxFichaCli').textContent = texto($('anCliente')) || '—';
+    const n = elegidos.files.length; $('cxFichaDocs').textContent = n ? `${n} archivo${n > 1 ? 's' : ''}` : 'Ninguno';
+  }
+  form.addEventListener('input', ficha); form.addEventListener('change', ficha);
+
+  function revisar() {
+    const filas = [
+      ['Tipo', (TIPOS[tipo.value]?.label || 'Sin tipo') + ($('anSub').value ? ' · ' + $('anSub').value : '')],
+      ['Título', titulo.value.trim()],
+      ['Cliente', texto($('anCliente')) || 'Sin cliente por ahora'],
+      ['Número', $('anExp').value.trim() || '{{ auto_num }} (automático)'],
+      ['Apertura', ($('anIni').value || '').split('-').reverse().join('/')],
+    ];
+    if (!$('cxJuicio').hidden) {
+      if ($('anJuz').value.trim()) filas.push(['Juzgado', $('anJuz').value.trim()]);
+      if ($('anCon').value.trim()) filas.push(['Contraparte', $('anCon').value.trim()]);
+    }
+    if ($('anHon').value) filas.push(['Honorarios', '$' + Number($('anHon').value).toLocaleString('es-MX', { minimumFractionDigits: 2 })]);
+    const dl = $('cxRevision'); dl.replaceChildren();
+    filas.forEach(([k, v]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v || '—'; dl.append(dt, dd); });
+    const docs = $('cxRevDocs'), n = elegidos.files.length;
+    docs.textContent = n ? [...elegidos.files].map(f => f.name).join(' · ') : 'Sin documentos por ahora. Podrás subirlos desde el expediente.';
+  }
+
+  ajustarTipo(); ficha();
+  {% if err %}ir(1);{% endif %}
 })();
 </script>
 {% endblock %}
