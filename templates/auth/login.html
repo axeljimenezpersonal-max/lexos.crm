@@ -169,5 +169,6 @@ document.getElementById('email').addEventListener('blur', async function () {
   } catch (_) {}
 });
 </script>
+{% if config.REVISION_ACTIVA %}{% include "components/revision.html" %}{% endif %}
 </body>
 </html>

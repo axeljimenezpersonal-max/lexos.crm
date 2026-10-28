@@ -1,0 +1,125 @@
+{# Modo revisión: botón "Comentar" flotante. Se incluye solo si REVISION_ACTIVA. #}
+<style>
+.hcr-btn{position:fixed;right:18px;bottom:18px;z-index:9000;display:flex;align-items:center;gap:8px;height:44px;padding:0 16px 0 13px;border:0;border-radius:99px;background:#0A1A4A;color:#fff;font:600 14px Inter,system-ui,sans-serif;box-shadow:0 12px 30px -8px rgba(10,26,74,.55),0 0 0 1px rgba(255,255,255,.12);cursor:pointer}
+.hcr-btn:hover{background:#1D3FD6}
+.hcr-btn i{width:8px;height:8px;border-radius:50%;background:#5BC0FF;box-shadow:0 0 0 4px rgba(91,192,255,.25)}
+.hcr-panel{position:fixed;right:18px;bottom:72px;z-index:9001;width:min(360px,calc(100vw - 32px));background:#fff;border-radius:18px;box-shadow:0 30px 70px -20px rgba(10,26,74,.45),0 0 0 1px #E5E8F0;padding:18px;font:400 14px/1.5 Inter,system-ui,sans-serif;color:#0F172A;display:none}
+.hcr-panel.open{display:block}
+.hcr-panel h4{font:600 15.5px Sora,Inter,sans-serif;color:#0A1A4A;margin:0}
+.hcr-panel p{font-size:12.5px;color:#64708A;margin:3px 0 12px}
+.hcr-tipos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.hcr-tipos button{border:1px solid #E5E8F0;background:#fff;border-radius:99px;padding:5px 11px;font:600 12.5px Inter,sans-serif;color:#3A4560;cursor:pointer}
+.hcr-tipos button.on{border-color:var(--c);background:var(--f);color:var(--c)}
+.hcr-panel textarea,.hcr-panel input{width:100%;box-sizing:border-box;border:1px solid #E5E8F0;border-radius:11px;padding:10px 12px;font:400 14px Inter,sans-serif;color:#0F172A;outline:none;resize:vertical}
+.hcr-panel textarea{min-height:92px}
+.hcr-panel input{margin-bottom:8px}
+.hcr-panel textarea:focus,.hcr-panel input:focus{border-color:#1D3FD6;box-shadow:0 0 0 3px #EEF2FF}
+.hcr-senal{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:#64708A}
+.hcr-senal button{border:1px dashed #C7D2FE;background:#FAFBFF;color:#1D3FD6;border-radius:9px;padding:6px 10px;font:600 12.5px Inter,sans-serif;cursor:pointer}
+.hcr-senal span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.hcr-pie{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px}
+.hcr-pie a{font:600 12.5px Inter,sans-serif;color:#1D3FD6;text-decoration:none}
+.hcr-pie button{height:38px;padding:0 16px;border:0;border-radius:10px;background:#1D3FD6;color:#fff;font:600 14px Inter,sans-serif;cursor:pointer}
+.hcr-pie button:disabled{opacity:.6}
+.hcr-ok{display:none;text-align:center;padding:16px 4px}
+.hcr-panel.enviado .hcr-ok{display:block}.hcr-panel.enviado .hcr-cuerpo{display:none}
+.hcr-err{color:#DC2626;font-size:12.5px;margin-top:6px}
+.hcr-mira,.hcr-mira *{cursor:crosshair!important}
+.hcr-marco{position:fixed;z-index:8999;pointer-events:none;border:2px solid #1D3FD6;background:rgba(29,63,214,.08);border-radius:6px;transition:all .08s;display:none}
+.hcr-aviso{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:9002;background:#0A1A4A;color:#fff;border-radius:99px;padding:9px 16px;font:600 13px Inter,sans-serif;box-shadow:0 12px 30px -10px rgba(10,26,74,.6);display:none}
+@media(max-width:860px){.hcr-btn{bottom:84px}.hcr-panel{bottom:138px}}
+[hidden]{display:none!important}
+</style>
+
+<button type="button" class="hcr-btn" id="hcrBtn" aria-haspopup="dialog"><i></i>Comentar</button>
+<div class="hcr-marco" id="hcrMarco"></div>
+<div class="hcr-aviso" id="hcrAviso">Haz clic en lo que quieres señalar · Esc para cancelar</div>
+<div class="hcr-panel" id="hcrPanel" role="dialog" aria-label="Comentar esta pantalla">
+  <div class="hcr-cuerpo">
+    <h4>¿Qué ves mal o qué cambiarías?</h4>
+    <p>Tu comentario se guarda con esta pantalla para corregirlo.</p>
+    <div class="hcr-tipos" id="hcrTipos">
+      <button type="button" data-t="error" style="--c:#DC2626;--f:#FEF2F2" class="on">Error</button>
+      <button type="button" data-t="diseno" style="--c:#6D28D9;--f:#F5F3FF">Diseño</button>
+      <button type="button" data-t="texto" style="--c:#B45309;--f:#FFFBEB">Texto</button>
+      <button type="button" data-t="idea" style="--c:#1D3FD6;--f:#EEF2FF">Idea</button>
+    </div>
+    {% if not session.get('user') %}<input id="hcrNombre" maxlength="80" placeholder="Tu nombre" autocomplete="name">{% endif %}
+    <textarea id="hcrTexto" maxlength="3000" placeholder="Ej. Este botón no hace nada, o este texto se entiende mal…"></textarea>
+    <div class="hcr-senal"><button type="button" id="hcrSenalar">🎯 Señalar en la pantalla</button><span id="hcrSenal"></span></div>
+    <p class="hcr-err" id="hcrErr" hidden></p>
+    <div class="hcr-pie">
+      {% if session.get('role') in ('super_admin', 'admin') %}<a href="{{ url_for('revision.index') }}">Ver todos los comentarios</a>{% else %}<span></span>{% endif %}
+      <button type="button" id="hcrEnviar">Enviar</button>
+    </div>
+  </div>
+  <div class="hcr-ok"><b style="font:600 15px Sora,sans-serif;color:#0A1A4A">¡Gracias! Quedó registrado.</b>
+    <p style="margin:6px 0 12px">Sigue revisando y comenta todo lo que veas.</p>
+    <div class="hcr-pie" style="justify-content:center"><button type="button" id="hcrOtro">Escribir otro</button></div></div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const btn = $('hcrBtn'), panel = $('hcrPanel'), marco = $('hcrMarco'), aviso = $('hcrAviso');
+  let tipo = 'error', senal = '', mirando = false;
+  try { const n = localStorage.getItem('hcrNombre'); if (n && $('hcrNombre')) $('hcrNombre').value = n; } catch (_) {}
+
+  btn.addEventListener('click', () => { panel.classList.toggle('open'); if (panel.classList.contains('open')) $('hcrTexto').focus(); });
+  $('hcrTipos').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    tipo = b.dataset.t; $('hcrTipos').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  });
+
+  // Señalar un elemento de la pantalla
+  function describir(el) {
+    const txt = (el.innerText || el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.alt || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+    const partes = []; let n = el;
+    while (n && n.nodeType === 1 && partes.length < 4 && n !== document.body) {
+      partes.unshift(n.tagName.toLowerCase() + (n.id ? '#' + n.id : n.classList[0] ? '.' + n.classList[0] : ''));
+      n = n.parentElement;
+    }
+    return (txt ? `«${txt}» · ` : '') + partes.join(' > ');
+  }
+  function sobre(e) {
+    const el = e.target; if (el.closest('.hcr-panel,.hcr-btn')) return;
+    const r = el.getBoundingClientRect();
+    Object.assign(marco.style, { display: 'block', left: r.left - 3 + 'px', top: r.top - 3 + 'px', width: r.width + 6 + 'px', height: r.height + 6 + 'px' });
+  }
+  function clic(e) {
+    if (e.target.closest('.hcr-panel,.hcr-btn')) return;
+    e.preventDefault(); e.stopPropagation();
+    senal = describir(e.target); $('hcrSenal').textContent = senal; terminar();
+  }
+  function tecla(e) { if (e.key === 'Escape') terminar(); }
+  function terminar() {
+    mirando = false; document.documentElement.classList.remove('hcr-mira');
+    marco.style.display = 'none'; aviso.style.display = 'none'; panel.classList.add('open');
+    document.removeEventListener('mouseover', sobre, true); document.removeEventListener('click', clic, true); document.removeEventListener('keydown', tecla, true);
+  }
+  $('hcrSenalar').addEventListener('click', () => {
+    mirando = true; panel.classList.remove('open'); document.documentElement.classList.add('hcr-mira'); aviso.style.display = 'block';
+    document.addEventListener('mouseover', sobre, true); document.addEventListener('click', clic, true); document.addEventListener('keydown', tecla, true);
+  });
+
+  $('hcrEnviar').addEventListener('click', async () => {
+    const texto = $('hcrTexto').value.trim(), nombre = $('hcrNombre') ? $('hcrNombre').value.trim() : '';
+    const err = $('hcrErr'); err.hidden = true;
+    if (!texto) { err.textContent = 'Escribe tu comentario.'; err.hidden = false; return; }
+    if ($('hcrNombre') && !nombre) { err.textContent = 'Escribe tu nombre.'; err.hidden = false; $('hcrNombre').focus(); return; }
+    try { if (nombre) localStorage.setItem('hcrNombre', nombre); } catch (_) {}
+    const b = $('hcrEnviar'); b.disabled = true;
+    try {
+      const r = await fetch('{{ url_for("revision.comentar") }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ tipo, texto, nombre, senal, url: location.pathname + location.search + location.hash, pagina: document.title, ancho: innerWidth }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo enviar');
+      panel.classList.add('enviado');
+    } catch (x) { err.textContent = x.message; err.hidden = false; }
+    finally { b.disabled = false; }
+  });
+  $('hcrOtro').addEventListener('click', () => {
+    panel.classList.remove('enviado'); $('hcrTexto').value = ''; senal = ''; $('hcrSenal').textContent = ''; $('hcrTexto').focus();
+  });
+})();
+</script>

@@ -233,6 +233,7 @@ def create_app(env="default"):
     from modules.corpus import corpus_bp
     from modules.asistente import asistente_bp
     from modules.insights import insights_bp
+    from modules.revision import revision_bp
 
     app.register_blueprint(auth_bp,         url_prefix="/auth")
     app.register_blueprint(dashboard_bp,    url_prefix="/")
@@ -254,6 +255,14 @@ def create_app(env="default"):
     app.register_blueprint(corpus_bp, url_prefix="/base-legal")
     app.register_blueprint(asistente_bp, url_prefix="/asistente")
     app.register_blueprint(insights_bp, url_prefix="/precedentes")
+    app.register_blueprint(revision_bp, url_prefix="/revision")
+
+    # ─── Modo revisión: el sitio de pruebas no debe aparecer en buscadores ───
+    @app.after_request
+    def no_indexar(resp):
+        if app.config.get("REVISION_ACTIVA"):
+            resp.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return resp
 
     return app
 

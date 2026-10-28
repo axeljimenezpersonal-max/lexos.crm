@@ -942,7 +942,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
         const r = await fetch(form.action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ email }) });
         const d = await r.json();
         if (d.found && d.count === 1) { res.append(opcion(d.redirect, d.tenant_name, 'Entrando…')); setTimeout(() => location = d.redirect, 700); }
-        else if (d.found && d.count > 1) d.tenants.forEach(t => res.append(opcion(`/auth/login?tenant_slug=${encodeURIComponent(t.slug)}&prefill_email=${encodeURIComponent(email)}`, t.nombre_despacho, t.slug)));
+        else if (d.found && d.count > 1) d.tenants.forEach(t => res.append(opcion(`/auth/login?tenant=${encodeURIComponent(t.slug)}&prefill_email=${encodeURIComponent(email)}`, t.nombre_despacho, t.slug)));
         else { const p = document.createElement('p'); p.className = 'err'; p.textContent = d.message || 'No encontramos una cuenta con ese correo.'; res.append(p); }
       } catch (_) { const p = document.createElement('p'); p.className = 'err'; p.textContent = 'Sin conexión. Intenta de nuevo.'; res.append(p); }
       finally { btn.disabled = false; btn.textContent = 'Entrar'; }
@@ -950,5 +950,6 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
   }
 })();
 </script>
+{% if config.REVISION_ACTIVA %}{% include "components/revision.html" %}{% endif %}
 </body>
 </html>

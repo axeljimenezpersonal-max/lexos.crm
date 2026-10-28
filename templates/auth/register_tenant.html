@@ -301,5 +301,6 @@ document.getElementById('rfc').addEventListener('input', function () {
   this.value = this.value.toUpperCase();
 });
 </script>
+{% if config.REVISION_ACTIVA %}{% include "components/revision.html" %}{% endif %}
 </body>
 </html>

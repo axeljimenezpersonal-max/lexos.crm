@@ -262,9 +262,10 @@ def discover():
     ).fetchall()
 
     base_domain = current_app.config["BASE_DOMAIN"]
-    # Detectar entorno local por el host real del request (más confiable que DEBUG)
+    # Sin subdominios por despacho (local o un solo dominio, p. ej. Railway) el despacho
+    # se elige con ?tenant= y queda en la sesión.
     req_host = request.host.split(":")[0]
-    is_local = req_host in ("localhost", "127.0.0.1")
+    is_local = req_host in ("localhost", "127.0.0.1") or not req_host.endswith(f".{base_domain}")
 
     if not rows:
         if request.is_json:

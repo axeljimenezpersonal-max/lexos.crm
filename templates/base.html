@@ -673,6 +673,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% block scripts %}{% endblock %}
+{% if config.REVISION_ACTIVA %}{% include "components/revision.html" %}{% endif %}
 
 <script>
 /* ── Global showToast (Animate.css / Sinapsys style) ──────────────

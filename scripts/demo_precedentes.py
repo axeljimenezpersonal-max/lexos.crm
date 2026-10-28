@@ -251,7 +251,7 @@ def main() -> None:
     p.add_argument("--tenant", default="bufete-ramirez")
     args = p.parse_args()
 
-    app = create_app()
+    app = create_app(os.environ.get("FLASK_ENV", "development"))
     with app.test_request_context("/", query_string={"tenant": args.tenant}):
         app.preprocess_request()
         if not getattr(g, "tenant", None):

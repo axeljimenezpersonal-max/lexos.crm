@@ -47,6 +47,10 @@ class Config:
     )
     CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
 
+    # ─── Modo revisión (botón "Comentar" para socios y probadores) ───────────
+    REVISION_ACTIVA = os.environ.get("REVISION_ACTIVA", "").lower() in ("1", "true", "si", "sí")
+    REVISION_CLAVE = os.environ.get("REVISION_CLAVE", "")
+
     # ─── Google Calendar OAuth ──────────────────────────────────────────────────
     GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")

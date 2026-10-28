@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Comentarios de revisión{% endblock %}
+{% block page_title %}Comentarios de revisión{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
+<style>
+.rvc{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;padding:14px 16px;border-top:1px solid var(--border);align-items:start}
+.rvc:first-child{border-top:0}
+.rvc.resuelto{opacity:.5}
+.rvc p{font-size:14px;color:var(--fog);line-height:1.55;white-space:pre-line;grid-column:2}
+.rvc small{grid-column:2;font-size:12px;color:var(--ash)}
+.rvc small a{color:var(--e);font-weight:600;text-decoration:none}
+.rvc .senal{grid-column:2;font:500 12px ui-monospace,monospace;color:#3A4560;background:#F4F6FB;border-radius:6px;padding:4px 8px;overflow-wrap:anywhere}
+.rvc button{grid-row:1/span 3;grid-column:3}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="as-head">
+  <div>
+    <h1 class="page-title">Comentarios de revisión</h1>
+    <p class="as-sub">{{ pendientes }} pendiente{{ 's' if pendientes != 1 }} de {{ comentarios | length }} · lo que tu equipo marcó con el botón "Comentar"</p>
+  </div>
+</div>
+<div class="as-tabla-wrap">
+  {% for c in comentarios %}{% set t = tipos.get(c.tipo, tipos['idea']) %}
+  <div class="rvc{{ ' resuelto' if c.estado == 'resuelto' }}">
+    <span class="as-chip" style="--c-c:{{ t.color }};--c-f:{{ t.fondo }}">{{ t.label }}</span>
+    <p>{{ c.texto }}</p>
+    <button type="button" class="btn btn-secondary btn-sm" data-id="{{ c.id }}" data-estado="{{ 'pendiente' if c.estado == 'resuelto' else 'resuelto' }}">{{ 'Reabrir' if c.estado == 'resuelto' else 'Resuelto' }}</button>
+    {% if c.senal %}<span class="senal">{{ c.senal }}</span>{% endif %}
+    <small>{{ c.autor }}{% if c.despacho %} · {{ c.despacho }}{% endif %} · {{ (c.fecha or '')[:16] }} UTC · <a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.pagina or c.url }}</a>{% if c.ancho %} · pantalla de {{ c.ancho }}px{% endif %}</small>
+  </div>
+  {% else %}
+  <div class="as-vacio"><h3>Aún no hay comentarios</h3><p>Cuando alguien use el botón "Comentar", aparecerá aquí.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-estado]').forEach(b => b.addEventListener('click', async () => {
+  const r = await fetch(`/revision/${b.dataset.id}/estado`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ estado: b.dataset.estado }) });
+  if (r.ok) location.reload(); else showToast('No se pudo actualizar', 'error');
+}));
+</script>
+{% endblock %}
