@@ -27,7 +27,7 @@ calendario_bp = Blueprint("calendario", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 TIPOS_EVENTO = {
-    "audiencia":    {"label": "Audiencia",            "color": "#163A7A", "icon": "gavel"},
+    "audiencia":    {"label": "Audiencia",            "color": "#142E59", "icon": "gavel"},
     "vencimiento":  {"label": "Término",              "color": "#A23B33", "icon": "clock"},
     "fecha_limite": {"label": "Fecha límite crítica", "color": "#7E2C26", "icon": "alert_triangle"},
     "diligencia":   {"label": "Diligencia",           "color": "#34496B", "icon": "flag"},

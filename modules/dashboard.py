@@ -1,7 +1,8 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, render_template, g, session, redirect, url_for, request, jsonify
-from modules.asuntos import ABIERTOS, ESTADOS, TIPOS_DERECHO, _FILTRO_PROPIOS, _solo_lo_suyo
+from modules.asuntos import ABIERTOS, ESTADOS, TIPOS_DERECHO, _FILTRO_PROPIOS, _solo_lo_suyo, _usuarios
 from modules.auth import login_required, sesion_del_despacho, tenant_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -10,6 +11,9 @@ TERMINO_TIPOS = ("plazo", "vencimiento", "fecha_limite")
 TIPO_EVENTO = {"plazo": "Término", "vencimiento": "Término", "fecha_limite": "Término",
                "audiencia": "Audiencia", "diligencia": "Diligencia", "reunion": "Reunión",
                "tarea": "Pendiente", "recordatorio": "Recordatorio"}
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+                "octubre", "noviembre", "diciembre"]
 MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 NOMBRE_CLIENTE_SQL = "COALESCE(NULLIF(c.razon_social, ''), TRIM(c.nombre || ' ' || COALESCE(c.apellidos, '')))"
@@ -29,6 +33,91 @@ def _fecha(valor):
 
 def _corta(f):
     return f"{f.day} {MESES_CORTOS[f.month - 1]} {f.year}" if f else ""
+
+
+ZONA = ZoneInfo("America/Mexico_City")
+
+# Actividad reciente: qué se movió en el despacho, de cualquier fuente.
+# Cada fila: fecha (UTC), quién, qué hizo, sobre qué, en qué expediente y qué ícono lleva.
+ACTIVIDAD_SQL = """
+    SELECT a.fecha_alta AS fecha, a.creado_por AS quien, 'abrió el expediente' AS verbo, a.titulo AS que,
+           a.id AS asunto_id, a.titulo AS asunto, 'expediente' AS tipo FROM asuntos a WHERE {alc}
+    UNION ALL SELECT n.fecha, n.creado_por, 'agregó una nota', n.contenido, a.id, a.titulo, 'nota'
+           FROM asunto_notas n JOIN asuntos a ON a.id = n.asunto_id WHERE {alc}
+    UNION ALL SELECT n.fecha_alta, n.creado_por, 'agregó una nota', COALESCE(NULLIF(n.titulo, ''), n.contenido), a.id, a.titulo, 'nota'
+           FROM notas n JOIN asuntos a ON a.id = n.asunto_id WHERE {alc}
+    UNION ALL SELECT x.fecha_alta, x.creado_por, 'registró una actuación', x.titulo, a.id, a.titulo, 'actuacion'
+           FROM asunto_actividades x JOIN asuntos a ON a.id = x.asunto_id WHERE {alc}
+    UNION ALL SELECT d.fecha_subida, d.subido_por, 'subió', d.nombre, a.id, a.titulo, 'documento'
+           FROM documentos d JOIN asuntos a ON a.id = d.asunto_id WHERE {alc}
+    UNION ALL SELECT s.fecha_alta, s.creado_por, 'agregó la resolución', s.titulo, a.id, a.titulo, 'documento'
+           FROM asunto_sentencias s JOIN asuntos a ON a.id = s.asunto_id WHERE {alc}
+    UNION ALL SELECT e.fecha_alta, e.creado_por, 'agendó', e.titulo, a.id, a.titulo, 'evento'
+           FROM eventos_calendario e JOIN asuntos a ON a.id = e.asunto_id WHERE {alc}
+    UNION ALL SELECT p.fecha_alta, p.creado_por, 'registró un pago de', '$' || printf('%,d', CAST(p.monto AS INTEGER)) || ' · ' || co.concepto,
+           a.id, a.titulo, 'pago'
+           FROM cobro_pagos p JOIN cobros co ON co.id = p.cobro_id JOIN asuntos a ON a.id = co.asunto_id WHERE {alc}
+"""
+
+
+def _local(valor):
+    try:
+        dt = datetime.fromisoformat(str(valor)[:19])
+    except (TypeError, ValueError):
+        return None
+    return dt.replace(tzinfo=timezone.utc).astimezone(ZONA).replace(tzinfo=None)
+
+
+def _hace(dt) -> str:
+    if not dt:
+        return ""
+    ahora = datetime.now(ZONA).replace(tzinfo=None)
+    seg = (ahora - dt).total_seconds()
+    if seg < 90:
+        return "Hace un momento"
+    if seg < 3600:
+        return f"Hace {int(seg // 60)} min"
+    if dt.date() == ahora.date():
+        return f"Hoy · {dt:%H:%M}"
+    if dt.date() == ahora.date() - timedelta(days=1):
+        return f"Ayer · {dt:%H:%M}"
+    return f"{dt.day} {MESES_CORTOS[dt.month - 1]}" + ("" if dt.year == ahora.year else f" {dt.year}")
+
+
+def actividad_reciente(tdb, alcance: str, alcance_p: list, limite: int = 8) -> list[dict]:
+    partes = ACTIVIDAD_SQL.count("{alc}")
+    filas = tdb.execute(
+        f"SELECT * FROM ({ACTIVIDAD_SQL.format(alc=alcance)}) WHERE fecha IS NOT NULL ORDER BY fecha DESC LIMIT ?",
+        alcance_p * partes + [limite * 6],
+    ).fetchall()
+    usuarios = _usuarios()
+    salida = []
+    for r in filas:
+        u = usuarios.get(r["quien"]) or {}
+        que = " ".join(str(r["que"] or "").split())
+        dt = _local(r["fecha"])
+        previo = salida[-1] if salida else None
+        # Varias cosas iguales seguidas de la misma persona se cuentan en una sola línea
+        if (previo and previo["_quien"] == r["quien"] and previo["_verbo"] == r["verbo"] and dt and previo["_dt"]
+                and abs((previo["_dt"] - dt).total_seconds()) < 1800 and r["tipo"] in ("evento", "documento", "nota")):
+            previo["_n"] += 1
+            nombres = {"evento": ("evento", "eventos"), "documento": ("documento", "documentos"), "nota": ("nota", "notas")}[r["tipo"]]
+            previo["verbo"] = {"evento": "agendó", "documento": "subió", "nota": "agregó"}[r["tipo"]]
+            previo["que"] = f"{previo['_n']} {nombres[1]}"
+            previo["asunto"] = previo["_primero"] + f" y {previo['_n'] - 1} más"
+            continue
+        salida.append({
+            "quien": u.get("corto") or "Alguien del despacho", "iniciales": u.get("iniciales", "·"),
+            "color": u.get("color", "#60718D"), "verbo": r["verbo"],
+            "que": que[:140] + ("…" if len(que) > 140 else ""), "tipo": r["tipo"],
+            "asunto": r["asunto"] if r["tipo"] != "expediente" else "",
+            "url": url_for("asuntos.detalle", id=r["asunto_id"]),
+            "cuando": _hace(dt),
+            "_quien": r["quien"], "_verbo": r["verbo"], "_dt": dt, "_n": 1, "_primero": que[:60],
+        })
+        if len(salida) > limite:
+            break
+    return salida[:limite]
 
 
 def _hora(evento):
@@ -60,25 +149,19 @@ def index():
     archivados = tdb.execute(f"SELECT COUNT(*) FROM asuntos a WHERE {alcance} AND a.estado = 'archivado'",
                              alcance_p).fetchone()[0]
 
-    # ── Expedientes recientes (primero los que siguen en curso) ──
-    recientes = []
-    for r in tdb.execute(
-        f"""SELECT a.id, a.titulo, a.numero_expediente, a.tipo_asunto, a.sub_tipo, a.estado,
-                   {NOMBRE_CLIENTE_SQL} AS cliente, {ULTIMA_SQL} AS ultima
-            FROM asuntos a LEFT JOIN clientes c ON c.id = a.cliente_id
-            WHERE {alcance}
-            ORDER BY a.estado IN ({abiertos}) DESC, ultima DESC LIMIT 6""",
-        (*alcance_p, *ABIERTOS),
-    ).fetchall():
-        est = ESTADOS.get(r["estado"], ESTADOS["activo"])
-        tipo = r["sub_tipo"] or TIPOS_DERECHO.get(r["tipo_asunto"], {}).get("label", "")
-        tipo = tipo[:1].upper() + tipo[1:]
-        recientes.append({
-            "id": r["id"], "titulo": r["titulo"], "numero": r["numero_expediente"] or f"#{r['id']}",
-            "detalle": " · ".join(x for x in (tipo, r["cliente"]) if x),
-            "estado": "En trámite" if r["estado"] == "activo" else est["label"], "clave": r["estado"],
-            "ultima": _corta(_fecha(r["ultima"])),
-        })
+    # ── Actividad reciente en los expedientes que esta persona puede ver ──
+    actividad = actividad_reciente(tdb, alcance, alcance_p)
+
+    # Filtros rápidos del buscador: lo más útil del día y las materias que lleva el despacho
+    materias = [r[0] for r in tdb.execute(
+        f"""SELECT a.tipo_asunto FROM asuntos a WHERE {alcance} AND a.estado IN ({abiertos}) AND a.tipo_asunto IS NOT NULL
+            GROUP BY a.tipo_asunto ORDER BY COUNT(*) DESC LIMIT 3""", (*alcance_p, *ABIERTOS)).fetchall()]
+    sugerencias = [("esta semana", "Esta semana"), ("términos por vencer", "Términos por vencer"),
+                   ("audiencias de mañana", "Audiencias de mañana"), ("sin movimiento", "Sin movimiento")]
+    if _solo_lo_suyo():
+        sugerencias.insert(0, ("mis expedientes", "Mis expedientes"))
+    sugerencias += [(TIPOS_DERECHO[m]["label"].lower(), TIPOS_DERECHO[m]["label"]) for m in materias if m in TIPOS_DERECHO]
+    sugerencias.append(("cobros vencidos", "Cobros vencidos"))
 
     # ── Próximos vencimientos: términos vencidos + lo de los próximos 30 días ──
     terminos = ",".join("?" * len(TERMINO_TIPOS))
@@ -131,7 +214,9 @@ def index():
         nombre=nombre,
         en_curso=en_curso,
         archivados=archivados,
-        recientes=recientes,
+        actividad=actividad,
+        sugerencias=sugerencias,
+        hoy_txt=f"{DIAS[hoy.weekday()]} {hoy.day} de {MESES_LARGOS[hoy.month - 1]}",
         vencimientos=vencimientos,
         terminos_pronto=terminos_pronto,
         sin_movimiento=sin_movimiento,

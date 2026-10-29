@@ -133,7 +133,7 @@
   text-decoration: none;
   display: block;
 }
-.lex-table .tc-link:hover { color: #163A7A; }
+.lex-table .tc-link:hover { color: #142E59; }
 .lex-table .tc-sub {
   font-family: 'DM Mono', monospace;
   font-size: 9px; color: var(--ash);
@@ -215,7 +215,7 @@
   border: 1px solid rgba(99,102,241,0.2);
 }
 .badge-admin, .badge-super_admin {
-  background: rgba(19,34,56,0.08); color: #163A7A;
+  background: rgba(19,34,56,0.08); color: #142E59;
   border: 1px solid rgba(19,34,56,0.18);
 }
 .badge-abogado {
@@ -270,7 +270,7 @@
   color: var(--ash); cursor: pointer; transition: all 0.15s;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.btn-icon-only:hover { background: rgba(19,34,56,0.06); color: #163A7A; border-color: var(--border-m); }
+.btn-icon-only:hover { background: rgba(19,34,56,0.06); color: #142E59; border-color: var(--border-m); }
 
 /* ════════════════════════════════════════════════════════════════
    INPUTS / FORMULARIOS
@@ -298,7 +298,7 @@ select.lex-input {
   outline: none;
 }
 .lex-input:focus {
-  border-color: #163A7A;
+  border-color: #142E59;
   box-shadow: 0 0 0 3px rgba(19,34,56,0.08);
 }
 .lex-input::placeholder { color: var(--ash); opacity: 0.5; }
@@ -335,7 +335,7 @@ select.lex-input {
   outline: none;
   transition: border-color 0.15s;
 }
-.lex-search input:focus { border-color: #163A7A; box-shadow: 0 0 0 3px rgba(19,34,56,0.08); }
+.lex-search input:focus { border-color: #142E59; box-shadow: 0 0 0 3px rgba(19,34,56,0.08); }
 .lex-search input::placeholder { color: var(--ash); opacity: 0.5; font-size: 10px; letter-spacing: 0.06em; }
 
 /* ════════════════════════════════════════════════════════════════
@@ -358,7 +358,7 @@ select.lex-input {
 .chip.active {
   background: rgba(19,34,56,0.08);
   border-color: rgba(19,34,56,0.20);
-  color: #163A7A;
+  color: #142E59;
 }
 
 /* Active filter chips */
@@ -366,12 +366,12 @@ select.lex-input {
   display: inline-flex; align-items: center; gap: 5px;
   font-family: 'DM Mono', monospace;
   font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-  background: rgba(19,34,56,0.08); color: #163A7A;
+  background: rgba(19,34,56,0.08); color: #142E59;
   border: 1px solid rgba(19,34,56,0.18);
   border-radius: 100px; padding: 3px 8px 3px 10px;
 }
 .filter-chip button {
-  background: none; border: none; color: #163A7A;
+  background: none; border: none; color: #142E59;
   cursor: pointer; padding: 0; line-height: 1;
   font-size: 12px; opacity: 0.7;
   display: flex; align-items: center; justify-content: center;
@@ -414,11 +414,11 @@ select.lex-input {
   text-decoration: none; display: flex; align-items: center; gap: 6px;
 }
 .tab:hover { color: var(--fog); }
-.tab.active { color: #163A7A; border-bottom-color: #163A7A; }
+.tab.active { color: #142E59; border-bottom-color: #142E59; }
 .tab-count {
   font-family: 'DM Mono', monospace;
   font-size: 8px; font-weight: 500;
-  background: rgba(19,34,56,0.08); color: #163A7A;
+  background: rgba(19,34,56,0.08); color: #142E59;
   padding: 1px 5px; border-radius: 3px;
 }
 
@@ -434,7 +434,7 @@ select.lex-input {
 .lex-kpi {
   background: var(--c);
   border: 1px solid var(--border);
-  border-top: 2px solid #163A7A;
+  border-top: 2px solid #142E59;
   border-radius: 8px;
   padding: 16px 18px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -533,7 +533,7 @@ select.lex-input {
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.lex-modal-close:hover { background: rgba(19,34,56,0.06); color: #163A7A; border-color: var(--border-m); }
+.lex-modal-close:hover { background: rgba(19,34,56,0.06); color: #142E59; border-color: var(--border-m); }
 .lex-modal-body { padding: 24px; }
 .lex-modal-footer {
   padding: 16px 24px;
@@ -561,7 +561,7 @@ select.lex-input {
   border-color: var(--border-m); color: var(--fog);
 }
 .lex-pagination .active {
-  background: rgba(19,34,56,0.08); color: #163A7A; border-color: rgba(19,34,56,0.2);
+  background: rgba(19,34,56,0.08); color: #142E59; border-color: rgba(19,34,56,0.2);
 }
 .lex-pagination .disabled { opacity: 0.3; pointer-events: none; }
 
@@ -586,7 +586,7 @@ select.lex-input {
   background: rgba(19,34,56,0.08);
   border: 1px solid rgba(19,34,56,0.18);
   display: flex; align-items: center; justify-content: center;
-  font-family: 'DM Mono', monospace; font-weight: 500; color: #163A7A;
+  font-family: 'DM Mono', monospace; font-weight: 500; color: #142E59;
   flex-shrink: 0;
   text-transform: uppercase;
 }
@@ -695,7 +695,7 @@ select.lex-input {
 }
 .lex-insight:hover { border-color: var(--border-m); color: var(--fog); }
 .lex-insight strong { color: var(--fog); font-weight: 500; }
-.lex-insight-icon { color: #163A7A; flex-shrink: 0; }
+.lex-insight-icon { color: #142E59; flex-shrink: 0; }
 
 /* ════════════════════════════════════════════════════════════════
    DETAIL LAYOUT
@@ -819,7 +819,7 @@ select.lex-input {
 .lex-member-stat { text-align: center; }
 .lex-member-stat-val {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 22px; font-weight: 300; color: #163A7A; display: block;
+  font-size: 22px; font-weight: 300; color: #142E59; display: block;
 }
 .lex-member-stat-lbl {
   font-family: 'DM Mono', monospace;
@@ -836,7 +836,7 @@ select.lex-input {
 .text-title { font-family: 'Cormorant Garamond', serif; font-weight: 300; }
 .text-ash  { color: var(--ash); }
 .text-fog  { color: var(--fog); }
-.text-e    { color: #163A7A; }
+.text-e    { color: #142E59; }
 .text-danger { color: #A23B33; }
 .text-warn   { color: #9A7536; }
 .text-xs  { font-size: 9px; }

@@ -18,6 +18,7 @@
   {% if p %}<span class="as-av {{ cls }}" style="background:{{ p.color }}" title="{{ p.nombre }}">{{ p.iniciales }}</span>{% endif %}
 {%- endmacro %}
 
+{% from "components/buscador.html" import buscador %}
 {% block content %}
 <div class="ex-head">
   <div>
@@ -30,47 +31,117 @@
   {% endif %}
 </div>
 
-<div class="ex-toolbar">
-  <form class="ex-buscar" method="get" action="{{ url_for('asuntos.index') }}" role="search">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input type="search" name="q" value="{{ q }}" placeholder="Buscar por número, nombre, asunto, cliente o contraparte…" aria-label="Buscar expedientes">
-    {% if grupo != 'abiertos' %}<input type="hidden" name="grupo" value="{{ grupo }}">{% endif %}
-    {% if tipo %}<input type="hidden" name="tipo" value="{{ tipo }}">{% endif %}
-    {% if abogado %}<input type="hidden" name="abogado" value="{{ abogado }}">{% endif %}
-    {% if vista == 'tablero' %}<input type="hidden" name="vista" value="tablero">{% endif %}
-  </form>
-  <select class="ex-select" aria-label="Tipo de asunto" onchange="location.href=this.value">
-    <option value="{{ liga(tipo='') }}">Tipo de asunto</option>
-    {% for k, t in tipos_derecho.items() %}<option value="{{ liga(tipo=k) }}"{% if tipo == k %} selected{% endif %}>{{ t.label }}</option>{% endfor %}
-  </select>
-  {% if abogados %}
-  <select class="ex-select" aria-label="Responsable" onchange="location.href=this.value">
-    <option value="{{ liga(abogado='') }}">Responsable</option>
-    {% for ab in abogados %}<option value="{{ liga(abogado=ab.id) }}"{% if abogado == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
-  </select>
-  {% endif %}
-  <div class="ex-seg" role="tablist" aria-label="Vista">
-    <a href="{{ liga(vista='') }}" class="{{ 'on' if vista == 'lista' }}">Lista</a>
-    <a href="{{ liga(vista='tablero', grupo='') }}" class="{{ 'on' if vista == 'tablero' }}">Tablero</a>
-  </div>
-  {% if q or tipo or abogado or atencion %}<a class="ex-limpiar" href="{{ url_for('asuntos.index', vista=vista if vista == 'tablero' else None) }}">Limpiar filtros</a>{% endif %}
+<div class="ex-busca">
+  {{ buscador(en='expedientes', accion=url_for('asuntos.index'), valor=q, chips=chips, enviar=True,
+       placeholder='Busca por número, cliente, contraparte, juzgado o con una frase: «amparos de Luis»',
+       ocultos={'vista': vista if vista != 'carpetas' else ''},
+       sugerencias=[('por vencer', 'Por vencer'), ('esta semana', 'Esta semana'), ('sin movimiento', 'Sin movimiento')]
+                   + ([('mis expedientes', 'Mis expedientes')] if session.get('role') == 'abogado' else [])
+                   + [('amparo', 'Amparo'), ('familiar', 'Familiar'), ('mercantil', 'Mercantil'), ('notarial', 'Notarial'), ('concluidos', 'Concluidos')]) }}
+  {% if sugerencia %}<p class="ex-nota">No encontré «{{ q }}» tal cual; te muestro resultados de <b>{{ sugerencia }}</b>.</p>{% endif %}
 </div>
 
 <div class="ex-tabs">
-  {% if vista == 'lista' %}
+  {% if vista != 'tablero' %}
   <nav aria-label="Estado">
     {% for k, g_ in grupos.items() %}
     <a href="{{ liga(grupo=k if k != 'abiertos' else '', atencion='') }}" class="{{ 'on' if grupo == k and not atencion }}">{{ g_[0] }}<span>{{ conteos[k] }}</span></a>
     {% endfor %}
   </nav>
   {% endif %}
-  <div class="ex-atencion">
-    <a class="{{ 'on' if atencion == 'termino' }}{{ ' alerta' if resumen.termino }}" href="{{ liga(atencion='' if atencion == 'termino' else 'termino', grupo='', vista='') }}"><i class="pt{{ ' rojo' if resumen.termino }}"></i>{{ resumen.termino }} vence{{ 'n' if resumen.termino != 1 }} en 7 días</a>
-    <a class="{{ 'on' if atencion == 'sin_mov' }}" href="{{ liga(atencion='' if atencion == 'sin_mov' else 'sin_mov', grupo='', vista='') }}"><i class="pt"></i>{{ resumen.sin_mov }} sin movimiento</a>
+  <div class="ex-derecha">
+    <select class="ex-select" aria-label="Tipo de asunto" onchange="location.href=this.value">
+      <option value="{{ liga(tipo='') }}">Todas las materias</option>
+      {% for k, t in tipos_derecho.items() %}<option value="{{ liga(tipo=k) }}"{% if tipo == k %} selected{% endif %}>{{ t.label }}</option>{% endfor %}
+    </select>
+    {% if abogados %}
+    <select class="ex-select" aria-label="Responsable" onchange="location.href=this.value">
+      <option value="{{ liga(abogado='') }}">Todo el equipo</option>
+      {% for ab in abogados %}<option value="{{ liga(abogado=ab.id) }}"{% if abogado == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <div class="ex-seg" role="tablist" aria-label="Vista">
+      <a href="{{ liga(vista='') }}" class="{{ 'on' if vista == 'carpetas' }}" title="Carpetas" aria-label="Carpetas"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></a>
+      <a href="{{ liga(vista='lista') }}" class="{{ 'on' if vista == 'lista' }}" title="Lista" aria-label="Lista"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></a>
+      <a href="{{ liga(vista='tablero', grupo='') }}" class="{{ 'on' if vista == 'tablero' }}" title="Tablero" aria-label="Tablero"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg></a>
+    </div>
   </div>
 </div>
+<div class="ex-atencion">
+  <a class="{{ 'on' if atencion == 'termino' }}{{ ' alerta' if resumen.termino }}" href="{{ liga(atencion='' if atencion == 'termino' else 'termino', grupo='', q='') }}"><i class="pt{{ ' rojo' if resumen.termino }}"></i>{{ resumen.termino }} vence{{ 'n' if resumen.termino != 1 }} en 7 días</a>
+  <a class="{{ 'on' if atencion == 'sin_mov' }}" href="{{ liga(atencion='' if atencion == 'sin_mov' else 'sin_mov', grupo='', q='') }}"><i class="pt"></i>{{ resumen.sin_mov }} sin movimiento</a>
+  {% if q or tipo or abogado or atencion %}<a class="ex-limpiar" href="{{ url_for('asuntos.index', vista=vista if vista != 'carpetas' else None) }}">Limpiar filtros</a>{% endif %}
+</div>
 
-{% if vista == 'lista' %}
+{% macro vacio() %}
+  <div class="as-vacio">
+    {% if q or tipo or abogado or atencion %}
+      <h3>Nada coincide con esa búsqueda</h3>
+      <p>Prueba con otras palabras o quita los filtros.</p>
+      <a class="btn btn-ghost" href="{{ url_for('asuntos.index') }}">Limpiar filtros</a>
+    {% elif grupo == 'abiertos' %}
+      <h3>Todavía no hay expedientes en curso</h3>
+      <p>Crea el primero: queda listo con su cliente, responsable y documentos.</p>
+      <a class="btn btn-primary" href="{{ url_for('asuntos.nuevo') }}">Crear expediente</a>
+    {% else %}
+      <h3>No hay expedientes aquí</h3>
+      <p>Cuando haya expedientes en este estado, aparecerán aquí.</p>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro paginas() %}
+  {% if total_pages > 1 %}
+  <div class="as-pag">
+    <span>Página {{ page }} de {{ total_pages }} · {{ total }} expedientes</span>
+    <div>
+      {% if page > 1 %}<a class="btn btn-ghost btn-sm" href="{{ liga(page=page - 1) }}">← Anterior</a>{% endif %}
+      {% if page < total_pages %}<a class="btn btn-ghost btn-sm" href="{{ liga(page=page + 1) }}">Siguiente →</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{% if vista == 'carpetas' %}
+  {% if asuntos %}
+  <div class="cp-grid">
+    {% for a in asuntos %}
+    <a class="cp cp-{{ 'cerrada' if a.estado in ('cerrado', 'completado', 'archivado') else 'abierta' }}" href="{{ url_for('asuntos.detalle', id=a.id) }}" style="--m:{{ a.tipo_info.color }}">
+      <span class="cp-pestana"><span>{{ a.numero_expediente or ('#' ~ a.id) }}</span></span>
+      <span class="cp-hoja" aria-hidden="true"></span>
+      <span class="cp-hoja dos" aria-hidden="true"></span>
+      <span class="cp-frente">
+        <span class="cp-top">
+          <span class="cp-materia">{{ a.tipo_info.label }}{% if a.sub_tipo %} · {{ a.sub_tipo | capitalize }}{% endif %}</span>
+          <span class="ex-chip e-{{ a.estado }}">{{ a.estado_info.label }}</span>
+        </span>
+        <b class="cp-tit">{{ a.titulo }}{% if a.privado %} <span class="as-lock" title="Asunto privado">🔒</span>{% endif %}</b>
+        <span class="cp-cli">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          {{ a.cliente or 'Sin cliente' }}
+        </span>
+        {% if a.proximo %}
+        <span class="cp-sigue s-{{ a.proximo.semaforo }}"><i aria-hidden="true"></i><span><b>{{ a.proximo.tipo }} · {{ a.proximo.corta }}</b> {{ a.proximo.cuando | lower }}</span></span>
+        {% elif a.resultado_info %}
+        <span class="cp-sigue"><span class="as-chip" style="--c-c:{{ a.resultado_info.color }};--c-f:{{ a.resultado_info.fondo }}">{{ a.resultado_info.label }}</span></span>
+        {% else %}
+        <span class="cp-sigue vacio">Sin pendientes agendados</span>
+        {% endif %}
+        <span class="cp-pie">
+          {% if a.responsable %}<span class="cp-resp">{{ avatar(a.responsable) }}<span>{{ a.responsable.corto }}</span></span>{% else %}<span class="cp-resp as-muted">Sin responsable</span>{% endif %}
+          <span class="cp-datos">
+            <span title="Documentos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>{{ a.documentos }}</span>
+            <span title="Última actividad">{{ a.movimiento }}</span>
+          </span>
+        </span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {{ paginas() }}
+  {% else %}{{ vacio() }}{% endif %}
+
+{% elif vista == 'lista' %}
 <div class="ex-tabla-wrap">
   {% if asuntos %}
   <table class="ex-tabla">
@@ -94,31 +165,8 @@
       {% endfor %}
     </tbody>
   </table>
-  {% if total_pages > 1 %}
-  <div class="as-pag">
-    <span>Página {{ page }} de {{ total_pages }} · {{ total }} expedientes</span>
-    <div>
-      {% if page > 1 %}<a class="btn btn-ghost btn-sm" href="{{ liga(page=page - 1) }}">← Anterior</a>{% endif %}
-      {% if page < total_pages %}<a class="btn btn-ghost btn-sm" href="{{ liga(page=page + 1) }}">Siguiente →</a>{% endif %}
-    </div>
-  </div>
-  {% endif %}
-  {% else %}
-  <div class="as-vacio">
-    {% if q or tipo or abogado or atencion %}
-      <h3>Nada coincide con esa búsqueda</h3>
-      <p>Prueba con otras palabras o quita los filtros.</p>
-      <a class="btn btn-ghost" href="{{ url_for('asuntos.index') }}">Limpiar filtros</a>
-    {% elif grupo == 'abiertos' %}
-      <h3>Todavía no hay expedientes en curso</h3>
-      <p>Crea el primero: queda listo con su cliente, responsable y documentos.</p>
-      <a class="btn btn-primary" href="{{ url_for('asuntos.nuevo') }}">Crear expediente</a>
-    {% else %}
-      <h3>No hay expedientes aquí</h3>
-      <p>Cuando haya expedientes en este estado, aparecerán en esta lista.</p>
-    {% endif %}
-  </div>
-  {% endif %}
+  {{ paginas() }}
+  {% else %}{{ vacio() }}{% endif %}
 </div>
 
 {% else %}

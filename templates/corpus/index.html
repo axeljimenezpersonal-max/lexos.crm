@@ -43,6 +43,7 @@
 {% endblock %}
 
 {% block content %}
+{% include "components/asistente_tabs.html" %}
 {% set leyes = resumen.leyes %}{% set dof = resumen.dof %}
 <h1 class="page-title">Base legal de México</h1>
 <p class="bl-sub">Leyes federales vigentes y Diario Oficial de la Federación, descargados de las fuentes oficiales y actualizados todos los días. Es la base que consulta el asistente.</p>

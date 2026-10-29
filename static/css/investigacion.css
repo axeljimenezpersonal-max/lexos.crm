@@ -10,7 +10,7 @@
 }
 .inv-search-input {
   flex: 1;
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 2px solid var(--border, #3B4A61);
   border-radius: 12px;
   color: var(--text, #FAF8F4);
@@ -73,7 +73,7 @@
 
 /* ── Filters sidebar ── */
 .inv-filters {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 12px;
   padding: 16px;
@@ -99,7 +99,7 @@
 .inv-fg select,
 .inv-fg input {
   width: 100%;
-  background: var(--bg-main, #163A7A);
+  background: var(--bg-main, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 8px;
   color: var(--text, #FAF8F4);
@@ -134,7 +134,7 @@
 }
 .inv-result-list { display: flex; flex-direction: column; gap: 8px; }
 .inv-result {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 10px;
   padding: 14px 18px;
@@ -189,7 +189,7 @@
   margin-bottom: 20px;
 }
 .inv-recurso {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 10px;
   padding: 18px;
@@ -220,17 +220,17 @@
 /* External search bar */
 .inv-ext-search {
   display: flex; gap: 8px; margin-bottom: 20px;
-  background: var(--bg-card, #163A7A); border: 1px solid var(--border, #3B4A61);
+  background: var(--bg-card, #142E59); border: 1px solid var(--border, #3B4A61);
   border-radius: 12px; padding: 14px 18px; align-items: center;
 }
-.inv-ext-search input { flex: 1; background: var(--bg-main, #163A7A); border: 1px solid var(--border, #3B4A61); border-radius: 8px; color: var(--text, #FAF8F4); padding: 8px 12px; font-size: .84rem; }
-.inv-ext-search select { background: var(--bg-main, #163A7A); border: 1px solid var(--border, #3B4A61); border-radius: 8px; color: var(--text, #FAF8F4); padding: 8px 10px; font-size: .8rem; }
+.inv-ext-search input { flex: 1; background: var(--bg-main, #142E59); border: 1px solid var(--border, #3B4A61); border-radius: 8px; color: var(--text, #FAF8F4); padding: 8px 12px; font-size: .84rem; }
+.inv-ext-search select { background: var(--bg-main, #142E59); border: 1px solid var(--border, #3B4A61); border-radius: 8px; color: var(--text, #FAF8F4); padding: 8px 10px; font-size: .8rem; }
 .inv-ext-search button { background: var(--e); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: .82rem; font-weight: 600; cursor: pointer; }
 
 /* ── Colecciones ── */
 .inv-col-grid { display: flex; flex-direction: column; gap: 12px; }
 .inv-col-card {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 10px;
   overflow: hidden;
@@ -268,7 +268,7 @@
 .inv-hist-item {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px;
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 8px;
   font-size: .82rem;
@@ -284,7 +284,7 @@
 
 /* ── Órganos table ── */
 .inv-organos-card {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 12px;
   overflow: hidden;
@@ -305,7 +305,7 @@
 .inv-table th {
   text-align: left; padding: 10px 14px; font-size: .7rem;
   text-transform: uppercase; letter-spacing: .04em;
-  color: var(--text-muted, #8E99AB); background: var(--bg-main, #163A7A);
+  color: var(--text-muted, #8E99AB); background: var(--bg-main, #142E59);
   font-weight: 600;
 }
 .inv-table td { padding: 10px 14px; font-size: .82rem; border-bottom: 1px solid var(--border, #3B4A61); }
@@ -331,7 +331,7 @@
 }
 .inv-modal-bg.open { opacity: 1; pointer-events: auto; }
 .inv-modal {
-  background: var(--bg-card, #163A7A); border: 1px solid var(--border, #3B4A61);
+  background: var(--bg-card, #142E59); border: 1px solid var(--border, #3B4A61);
   border-radius: 14px; padding: 28px; width: 440px; max-width: 90vw;
 }
 .inv-modal h3 { font-size: 1rem; margin-bottom: 16px; }

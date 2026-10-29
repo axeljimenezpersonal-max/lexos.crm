@@ -7,6 +7,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/buscador.html" import buscador %}
 <div class="as-head">
   <div>
     <h1 class="page-title">Cobranza</h1>
@@ -56,13 +57,14 @@
 
 <div class="cb-grid">
   <div>
+    <div class="cb-busca">
+      {{ buscador(en='cobros', accion=url_for('cobranzas.index'), valor=f.q, chips=f.chips, enviar=True,
+           placeholder='Busca por cliente, concepto, folio o expediente: «vencidos de Omega»',
+           ocultos={'grupo': request.args.get('grupo'), 'cliente': request.args.get('cliente'), 'asunto': request.args.get('asunto'),
+                    'abogado': request.args.get('abogado'), 'semana': '1' if f.semana else ''},
+           sugerencias=[('vencidos', 'Vencidos'), ('esta semana', 'Vencen esta semana'), ('este mes', 'Vencen este mes'), ('honorarios', 'Honorarios')]) }}
+    </div>
     <div class="as-toolbar">
-      <form class="as-search" method="get" action="{{ url_for('cobranzas.index') }}" role="search">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="search" name="q" value="{{ f.q }}" placeholder="Buscar por cliente, concepto, folio o asunto" aria-label="Buscar cobros">
-        {% for k in ('grupo', 'cliente', 'asunto', 'abogado') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-        {% if f.semana %}<input type="hidden" name="semana" value="1">{% endif %}
-      </form>
       <select class="as-select" aria-label="Cliente" onchange="location.href=this.value">
         <option value="{{ liga(cliente='') }}">Todos los clientes</option>
         {% for c in clientes %}<option value="{{ liga(cliente=c.id) }}"{% if f.cliente == c.id %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}

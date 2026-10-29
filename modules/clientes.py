@@ -137,7 +137,7 @@ def _iniciales(nombre: str) -> str:
 
 def _color(cid: int) -> str:
     """Avatar del cliente en la familia marino, gris azulado y dorado."""
-    paleta = ("#163A7A", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
+    paleta = ("#142E59", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
     return paleta[cid % len(paleta)]
 
 
@@ -204,6 +204,8 @@ def index():
     a = request.args
     grupo = a.get("estatus") if a.get("estatus") in GRUPOS else "activo"
     q = a.get("q", "").strip()[:100]
+    if q and "estatus" not in a:
+        grupo = "todos"
     tipo = a.get("tipo") if a.get("tipo") in TIPOS else ""
     abogado = _safe_int(a.get("abogado"), None)
     orden = a.get("orden") if a.get("orden") in ("recientes", "nombre", "saldo", "contacto") else "recientes"
@@ -212,13 +214,16 @@ def index():
     if grupo != "todos":
         where.append("COALESCE(c.estatus,'activo')=?")
         params.append(grupo)
+    # Buscador inteligente: sin acentos, tolera errores de dedo y entiende «de Luis», «amparo», etc.
+    from modules import buscador
+    chips, orden_busqueda, sugerencia = [], None, None
     if q:
-        lk = f"%{q}%"
-        digitos = re.sub(r"\D", "", q)
-        where.append(f"({NOMBRE_SQL} LIKE ? OR c.rfc LIKE ? OR c.email LIKE ? OR c.contacto_principal LIKE ?"
-                     + (" OR REPLACE(REPLACE(c.celular,' ',''),'-','') LIKE ? OR REPLACE(REPLACE(c.telefono,' ',''),'-','') LIKE ?" if len(digitos) >= 4 else "")
-                     + ")")
-        params += [lk] * 4 + ([f"%{digitos}%"] * 2 if len(digitos) >= 4 else [])
+        inter = buscador.interpretar(q, _usuarios())
+        hallados = buscador.personas(tdb, inter, limite=None)
+        chips, orden_busqueda = inter["chips"], hallados["ids"]
+        sugerencia = " ".join(hallados["corregido"]) if hallados.get("corregido") else None
+        where.append(f"c.id IN ({','.join('?' * len(orden_busqueda)) or 'NULL'})")
+        params += orden_busqueda
     if tipo:
         where.append("c.tipo=?")
         params.append(tipo)
@@ -244,6 +249,8 @@ def index():
     orden_sql = {"nombre": "nombre_v COLLATE NOCASE", "saldo": "saldo DESC, nombre_v COLLATE NOCASE",
                  "contacto": "ultimo_contacto DESC", "recientes": "c.fecha_alta DESC, c.id DESC"}[orden]
 
+    if orden_busqueda:
+        orden_sql = "CASE c.id " + " ".join(f"WHEN {int(i)} THEN {n}" for n, i in enumerate(orden_busqueda)) + " END"
     total = tdb.execute(f"SELECT COUNT(*) FROM clientes c WHERE {clause}", params).fetchone()[0]
     total_pages = max(1, math.ceil(total / PER_PAGE))
     page = min(max(1, _safe_int(a.get("page"), 1)), total_pages)
@@ -287,7 +294,7 @@ def index():
         grupo=grupo, q=q, tipo=tipo, abogado=abogado, orden=orden, liga=liga,
         grupos=GRUPOS, conteos=conteos, resumen=resumen, tipos=TIPOS,
         abogados=_get_abogados(), estados_mx=ESTADOS_MX, origenes=ORIGENES,
-        es_admin=_es_admin(), volver=a.get("volver", ""),
+        es_admin=_es_admin(), volver=a.get("volver", ""), chips=chips, sugerencia=sugerencia,
     )
 
 
@@ -970,7 +977,7 @@ def exportar_pdf(id: int):
     cobros = [cobranzas._decorar(r) for r in tdb.execute(
         f"{cobranzas.BASE_SQL} WHERE co.cliente_id=? AND co.estado!='cancelado' AND {alc_c}", (id, *pc)).fetchall()]
 
-    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#163A7A", "#163A7A", "#60718D", "#E5E2DB"))
+    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#142E59", "#142E59", "#60718D", "#E5E2DB"))
     e = lambda x: html.escape(str(x or "—"))  # noqa: E731
     st = lambda n, **k: ParagraphStyle(n, fontName=k.pop("font", "Helvetica"), **k)  # noqa: E731
     s_h = st("h", font="Helvetica-Bold", fontSize=10.5, textColor=TINTA, spaceBefore=14, spaceAfter=6)

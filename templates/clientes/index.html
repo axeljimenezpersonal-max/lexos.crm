@@ -8,6 +8,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/buscador.html" import buscador %}
 <div class="as-head">
   <div>
     <h1 class="page-title">Personas</h1>
@@ -48,12 +49,21 @@
   </a>
 </section>
 
-<div class="as-toolbar">
-  <form class="as-search" method="get" action="{{ url_for('clientes.index') }}" role="search">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, RFC, correo o teléfono" aria-label="Buscar clientes">
-    {% for k in ('estatus', 'tipo', 'abogado', 'orden') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-  </form>
+<div class="cl-busca">
+  {{ buscador(en='personas', accion=url_for('clientes.index'), valor=q, chips=chips, enviar=True,
+       placeholder='Busca por nombre, RFC, correo, teléfono o ciudad',
+       ocultos={'estatus': request.args.get('estatus'), 'tipo': tipo, 'abogado': abogado, 'orden': request.args.get('orden')},
+       sugerencias=[('amparo', 'Con amparos'), ('familiar', 'Con asuntos familiares'), ('mercantil', 'Con asuntos mercantiles')]
+                   + ([('mis', 'Míos')] if session.get('role') == 'abogado' else [])) }}
+  {% if sugerencia %}<p class="ex-nota">No encontré «{{ q }}» tal cual; te muestro resultados de <b>{{ sugerencia }}</b>.</p>{% endif %}
+</div>
+
+<div class="as-toolbar cl-barra">
+  <div class="as-seg as-tabs" aria-label="Estatus">
+    {% for k, label in grupos.items() %}
+    <a href="{{ liga(estatus=k if k != 'activo' else '') }}" class="{{ 'on' if grupo == k }}">{{ label }}<span>{{ conteos[k] }}</span></a>
+    {% endfor %}
+  </div>
   <select class="as-select" aria-label="Tipo de cliente" onchange="location.href=this.value">
     <option value="{{ liga(tipo='') }}">Personas y empresas</option>
     {% for k, l in tipos.items() %}<option value="{{ liga(tipo=k) }}"{% if tipo == k %} selected{% endif %}>{{ l }}</option>{% endfor %}
@@ -64,14 +74,6 @@
     {% for ab in abogados %}<option value="{{ liga(abogado=ab.id) }}"{% if abogado == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
   </select>
   {% endif %}
-</div>
-
-<div class="as-toolbar" style="margin-top:12px">
-  <div class="as-seg as-tabs" aria-label="Estatus">
-    {% for k, label in grupos.items() %}
-    <a href="{{ liga(estatus=k if k != 'activo' else '') }}" class="{{ 'on' if grupo == k }}">{{ label }}<span>{{ conteos[k] }}</span></a>
-    {% endfor %}
-  </div>
   <label class="cl-orden">Ordenar por
     <select class="as-select" onchange="location.href=this.value">
       {% for k, l in [('recientes', 'Más recientes'), ('nombre', 'Nombre'), ('saldo', 'Saldo pendiente'), ('contacto', 'Último contacto')] %}
@@ -80,33 +82,35 @@
   </label>
 </div>
 
-<div class="as-tabla-wrap">
+<div class="cl-wrap">
   {% if clientes %}
-  <table class="as-tabla cl-tabla">
-    <thead><tr>
-      <th>Cliente</th><th class="c-cont">Contacto</th><th>Asuntos</th><th class="num">Saldo</th><th class="c-ult">Último contacto</th><th class="c-resp">Responsable</th>
-    </tr></thead>
-    <tbody>
-      {% for c in clientes %}
-      <tr data-href="{{ url_for('clientes.detalle', id=c.id) }}">
-        <td class="c-nom">
-          <div class="cl-nom">
-            <span class="cl-av" style="--av:{{ c.color }}">{% if c.foto_url %}<img src="{{ c.foto_url }}" alt="">{% else %}{{ c.iniciales }}{% endif %}</span>
-            <div style="min-width:0">
-              <a href="{{ url_for('clientes.detalle', id=c.id) }}">{{ c.nombre_v }}</a>
-              <small>{{ tipos[c.tipo] if c.tipo in tipos else 'Persona física' }}{% if c.rfc %} · {{ c.rfc }}{% endif %}{% if grupo == 'todos' and c.estatus and c.estatus != 'activo' %} · {{ c.estatus_info.label }}{% endif %}</small>
-            </div>
-          </div>
-        </td>
-        <td class="c-cont"><div class="cl-contacto">{{ c.tel or '—' }}{% if c.email %}<small>{{ c.email }}</small>{% endif %}</div></td>
-        <td class="c-asu"><div class="cl-num{{ ' cero' if not c.asuntos_total }}">{% if c.en_curso %}<b>{{ c.en_curso }}</b><small>en curso{% if c.asuntos_total > c.en_curso %} · {{ c.asuntos_total }} en total{% endif %}</small>{% elif c.asuntos_total %}<b>0</b><small>{{ c.asuntos_total }} concluido{{ 's' if c.asuntos_total != 1 }}</small>{% else %}<b>—</b>{% endif %}</div></td>
-        <td class="num c-saldo"><div class="cl-num{{ ' rojo' if c.vencido else '' }}{{ ' cero' if not c.saldo }}">{% if c.saldo %}<b>{{ c.saldo | dinero(decimales=False) }}</b><small>{{ 'vencido' if c.vencido else 'por cobrar' }}</small>{% else %}<b>—</b>{% endif %}</div></td>
-        <td class="c-ult as-muted">{{ c.contacto_hace or 'Sin registrar' }}</td>
-        <td class="c-resp">{% if c.responsable %}<span class="as-resp"><span class="as-av" style="background:{{ c.responsable.color }}">{{ c.responsable.iniciales }}</span><span>{{ c.responsable.corto }}</span></span>{% else %}<span class="as-muted">Sin asignar</span>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="cl-grid">
+    {% for c in clientes %}
+    <a class="cl-card" href="{{ url_for('clientes.detalle', id=c.id) }}">
+      <span class="cl-av lg" style="--av:{{ c.color }}">{% if c.foto_url %}<img src="{{ c.foto_url }}" alt="">{% else %}{{ c.iniciales }}{% endif %}</span>
+      <span class="cl-card-c">
+        <span class="cl-card-top">
+          <b>{{ c.nombre_v }}</b>
+          {% if c.estatus and c.estatus != 'activo' %}<span class="cl-est">{{ c.estatus_info.label }}</span>{% endif %}
+        </span>
+        <small class="cl-tipo">{{ tipos[c.tipo] if c.tipo in tipos else 'Persona física' }}{% if c.rfc %} · {{ c.rfc }}{% endif %}</small>
+        <span class="cl-cont">
+          {% if c.tel %}<span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>{{ c.tel }}</span>{% endif %}
+          {% if c.email %}<span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>{{ c.email }}</span>{% endif %}
+          {% if not c.tel and not c.email %}<span class="as-muted">Sin datos de contacto</span>{% endif %}
+        </span>
+        <span class="cl-card-pie">
+          {% if c.responsable %}<span class="as-resp"><span class="as-av" style="background:{{ c.responsable.color }}">{{ c.responsable.iniciales }}</span><span>{{ c.responsable.corto }}</span></span>{% else %}<span class="as-muted">Sin responsable</span>{% endif %}
+          <span class="as-muted">{{ c.contacto_hace or 'Sin contacto registrado' }}</span>
+        </span>
+      </span>
+      <span class="cl-card-num">
+        <span class="cl-n{{ ' cero' if not c.en_curso }}"><b>{{ c.en_curso or '—' }}</b><small>{{ 'en curso' if c.en_curso else ('concluidos: ' ~ c.asuntos_total if c.asuntos_total else 'sin asuntos') }}</small></span>
+        <span class="cl-n{{ ' rojo' if c.vencido }}{{ ' cero' if not c.saldo }}"><b>{{ c.saldo | dinero(decimales=False) if c.saldo else '—' }}</b><small>{{ ('vencido' if c.vencido else 'por cobrar') if c.saldo else 'al corriente' }}</small></span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
   {% if total_pages > 1 %}
   <div class="as-pag">
     <span>Página {{ page }} de {{ total_pages }} · {{ total }} clientes</span>
@@ -165,9 +169,6 @@
 <script>
 (() => {
   const XHR = { 'X-Requested-With': 'XMLHttpRequest' };
-  document.querySelectorAll('.cl-tabla tbody tr').forEach(tr => tr.addEventListener('click', e => {
-    if (!e.target.closest('a')) location.href = tr.dataset.href;
-  }));
   document.querySelectorAll('[data-nuevo]').forEach(b => b.addEventListener('click', () => abrirCliente()));
   function porHash() {
     if (location.hash === '#nuevo') { history.replaceState(null, '', location.pathname + location.search); abrirCliente(); }

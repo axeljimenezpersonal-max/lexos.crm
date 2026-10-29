@@ -72,7 +72,7 @@ SIN_JUICIO = ("notarial",)
 
 ESTADOS = {
     "por_iniciar": {"label": "Por iniciar", "color": "#60718D", "fondo": "#F1EEE8"},
-    "activo":      {"label": "En trámite",      "color": "#163A7A", "fondo": "#F4EEDF"},
+    "activo":      {"label": "En trámite",      "color": "#142E59", "fondo": "#F4EEDF"},
     "en_espera":   {"label": "En espera",   "color": "#8A6A2F", "fondo": "#F7F0E1"},
     "suspendido":  {"label": "Suspendido",  "color": "#6E5A3A", "fondo": "#F6F1E6"},
     "completado":  {"label": "Concluido",   "color": "#3D5A80", "fondo": "#EEF1F5"},
@@ -174,7 +174,7 @@ def _usuarios() -> dict[int, dict]:
 
 
 # Avatares en la familia marino, gris azulado y dorado
-_COLORES_PERSONA = ("#163A7A", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
+_COLORES_PERSONA = ("#142E59", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
 
 
 def _persona(r) -> dict:
@@ -317,8 +317,9 @@ def _ultimos_movimientos(tdb, ids: list[int]) -> dict[int, date]:
               UNION ALL SELECT asunto_id, fecha_subida FROM documentos WHERE asunto_id IN ({marcas})
               UNION ALL SELECT asunto_id, fecha_alta FROM asunto_sentencias WHERE asunto_id IN ({marcas})
               UNION ALL SELECT entidad_id, fecha FROM actividad_log WHERE entidad='asunto' AND entidad_id IN ({marcas})
+              UNION ALL SELECT asunto_id, fecha_alta FROM eventos_calendario WHERE asunto_id IN ({marcas})
             ) GROUP BY asunto_id""",
-        ids * 6,
+        ids * 7,
     ).fetchall()
     return {r["asunto_id"]: (_local(r["ultima"]) or datetime.now()).date() for r in filas}
 
@@ -386,10 +387,22 @@ def index():
     tipo     = request.args.get("tipo", "")
     abogado  = _safe_int(request.args.get("abogado"))
     atencion = request.args.get("atencion", "")
-    vista    = "tablero" if request.args.get("vista") == "tablero" else "lista"
+    vista    = request.args.get("vista") if request.args.get("vista") in ("tablero", "lista") else "carpetas"
     page     = max(1, _safe_int(request.args.get("page"), 1))
     if grupo not in GRUPOS:
         grupo = "abiertos"
+
+    # Buscador inteligente: entiende la frase (materia, responsable, fechas, estado) y ordena por parecido
+    from modules import buscador
+    chips, orden_busqueda, sugerencia = [], None, None
+    if q:
+        inter = buscador.interpretar(q, _usuarios())
+        hallados = buscador.expedientes(tdb, inter, limite=None)
+        chips, orden_busqueda = inter["chips"], hallados["ids"]
+        sugerencia = " ".join(hallados["corregido"]) if hallados.get("corregido") else None
+        # Si la frase no dice el estado, se busca en todos
+        if "grupo" not in request.args or inter["filtros"].get("estado"):
+            grupo = "todos"
 
     # Alcance: lo que esta persona puede ver
     alcance, alcance_p = ["1"], []
@@ -420,11 +433,9 @@ def index():
 
     # Filtros
     where, params = [], []
-    if q:
-        like = f"%{q}%"
-        where.append("(a.titulo LIKE ? OR a.numero_expediente LIKE ? OR a.numero_juicio LIKE ? "
-                     "OR c.nombre LIKE ? OR c.apellidos LIKE ? OR c.razon_social LIKE ? OR a.contrario_nombre LIKE ?)")
-        params += [like] * 7
+    if orden_busqueda is not None:
+        where.append(f"a.id IN ({','.join('?' * len(orden_busqueda)) or 'NULL'})")
+        params += orden_busqueda
     if tipo:
         where.append("a.tipo_asunto=?")
         params.append(tipo)
@@ -457,21 +468,38 @@ def index():
         page = min(page, total_pages)
         orden = ("COALESCE(a.fecha_cierre, a.fecha_alta) DESC" if grupo != "abiertos" else
                  "CASE a.prioridad WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END, a.fecha_alta DESC")
+        if orden_busqueda:
+            # Los ids vienen del buscador (enteros), ya ordenados por parecido
+            orden = "CASE a.id " + " ".join(f"WHEN {int(i)} THEN {n}" for n, i in enumerate(orden_busqueda)) + " END"
         filas = tdb.execute(
             f"{columnas}{base}{filtro}{cond} ORDER BY {orden} LIMIT ? OFFSET ?",
             alcance_p + params + list(estados) + [PER_PAGE, (page - 1) * PER_PAGE],
         ).fetchall()
         asuntos = _decorar(filas, tdb, usuarios)
-        if grupo == "abiertos":
+        if orden_busqueda:
+            # Lo que más se parece a la búsqueda, arriba
+            pos = {i: n for n, i in enumerate(orden_busqueda)}
+            asuntos.sort(key=lambda a: pos.get(a["id"], 10**6))
+        elif grupo == "abiertos":
             # Lo que vence primero, arriba
             asuntos.sort(key=lambda a: (a["proximo"]["dias"] if a["proximo"] else 10**6))
+        if asuntos:
+            marcas = ",".join("?" * len(asuntos))
+            ids = [a["id"] for a in asuntos]
+            docs = dict(tdb.execute(
+                f"""SELECT asunto_id, COUNT(*) FROM (SELECT asunto_id FROM documentos WHERE asunto_id IN ({marcas})
+                    UNION ALL SELECT asunto_id FROM asunto_sentencias WHERE asunto_id IN ({marcas})) GROUP BY asunto_id""",
+                ids * 2).fetchall())
+            for a in asuntos:
+                a["documentos"] = docs.get(a["id"], 0)
 
+    # Los conteos de las pestañas respetan la búsqueda y los filtros
     conteos = {k: tdb.execute(
-        f"SELECT COUNT(*) {base} AND a.estado IN ({','.join('?' * len(v[1]))})", alcance_p + list(v[1])
+        f"SELECT COUNT(*) {base}{filtro} AND a.estado IN ({','.join('?' * len(v[1]))})", alcance_p + params + list(v[1])
     ).fetchone()[0] for k, v in GRUPOS.items()}
 
     actuales = {"q": q, "grupo": "" if grupo == "abiertos" else grupo, "tipo": tipo, "abogado": abogado,
-                "atencion": atencion, "vista": "" if vista == "lista" else vista}
+                "atencion": atencion, "vista": "" if vista == "carpetas" else vista}
 
     def liga(**cambios):
         datos = {**actuales, **cambios}
@@ -484,6 +512,7 @@ def index():
         total=total, page=page, total_pages=total_pages,
         tipos_derecho=TIPOS_DERECHO, abogados=_get_abogados() if not _solo_lo_suyo() else [],
         resultados=precedentes.RESULTADOS, estados=ESTADOS,
+        chips=chips, sugerencia=sugerencia,
     )
 
 
@@ -848,9 +877,9 @@ def agregar_etiqueta(id):
     tdb = g.tenant_db
     data = request.get_json(force=True)
     nombre = (data.get("nombre") or "").strip()
-    color = data.get("color") or "#163A7A"
+    color = data.get("color") or "#142E59"
     if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
-        color = "#163A7A"
+        color = "#142E59"
     etiqueta_id = data.get("etiqueta_id")
 
     if not etiqueta_id and not nombre:
@@ -1296,12 +1325,12 @@ def enviar_correo_asunto(id: int):
     cuerpo_h, sender_h = html.escape(cuerpo), html.escape(sender_name)
     html_body = f"""
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #E5E2DB">
-      <div style="background:linear-gradient(135deg,#12306A,#334155);padding:24px 28px">
+      <div style="background:linear-gradient(135deg,#11284F,#334155);padding:24px 28px">
         <div style="font-size:18px;font-weight:800;color:#fff">{despacho_h}</div>
         <div style="font-size:11px;color:#9AA4B5;margin-top:3px">Ref: {titulo_h}</div>
       </div>
       <div style="padding:28px">
-        <div style="font-size:15px;font-weight:700;color:#12306A;margin-bottom:16px">{asunto_h}</div>
+        <div style="font-size:15px;font-weight:700;color:#11284F;margin-bottom:16px">{asunto_h}</div>
         <div style="font-size:14px;color:#3B4A61;line-height:1.7;white-space:pre-wrap">{cuerpo_h}</div>
       </div>
       <div style="background:#FAF8F4;padding:16px 28px;border-top:1px solid #E5E2DB">

@@ -9,6 +9,7 @@ Variables:
 """
 import hashlib
 import os
+from datetime import date, datetime, timedelta, timezone
 import sqlite3
 import subprocess
 import sys
@@ -41,6 +42,7 @@ def main() -> None:
 
     cuenta_compartida()
     eventos_demo()
+    notas_demo()
 
     if primera_vez:
         # Casos concluidos, sentencias y machotes de ejemplo (no detiene el arranque si falla)
@@ -102,7 +104,6 @@ INHABILES = {(1, 1), (2, 5), (3, 21), (5, 1), (9, 16), (11, 2), (11, 20), (12, 2
 
 def _dia_habil(desde, n: int):
     """Suma n días hábiles (lunes a viernes, sin los inhábiles fijos)."""
-    from datetime import timedelta
     d = desde
     while n > 0:
         d += timedelta(days=1)
@@ -114,7 +115,6 @@ def _dia_habil(desde, n: int):
 def eventos_demo() -> None:
     """Mantiene la agenda del despacho de demostración en las próximas dos semanas.
     Solo mueve los eventos de EVENTOS_DEMO que ya pasaron o faltan; no toca lo demás."""
-    from datetime import date
     import init_db
     try:
         tdb = init_db.get_tenant_conn(Config.ACCESO_PRUEBA_DESPACHO)
@@ -135,11 +135,13 @@ def eventos_demo() -> None:
             tdb.execute(f"DELETE FROM evento_participantes WHERE evento_id IN ({viejos})", (asunto_id, titulo))
             tdb.execute("DELETE FROM eventos_calendario WHERE asunto_id=? AND titulo=?", (asunto_id, titulo))
             dia = _dia_habil(hoy, dias).isoformat()
+            # Se "agendó" hace unas horas, para que la actividad reciente se vea escalonada
+            alta = (datetime.now(timezone.utc) - timedelta(hours=3 + dias * 5)).strftime("%Y-%m-%d %H:%M:%S")
             ev = tdb.execute(
                 """INSERT INTO eventos_calendario (titulo, tipo, asunto_id, fecha_inicio, todo_el_dia,
-                                                  lugar, recordatorio, creado_por)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (titulo, tipo, asunto_id, f"{dia} {hora or '09:00'}:00", 0 if hora else 1, lugar, 1440, 3)).lastrowid
+                                                  lugar, recordatorio, creado_por, fecha_alta)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (titulo, tipo, asunto_id, f"{dia} {hora or '09:00'}:00", 0 if hora else 1, lugar, 1440, 3, alta)).lastrowid
             tdb.execute("INSERT INTO evento_participantes (evento_id, user_id) VALUES (?, 3)", (ev,))
             creados += 1
         tdb.commit()
@@ -147,6 +149,45 @@ def eventos_demo() -> None:
         tdb.close()
     if creados:
         print(f"[arranque] Agenda de demostración: {creados} eventos puestos al día", flush=True)
+
+
+# Notas de ejemplo: (expediente, autor, texto, hace cuántas horas)
+NOTAS_DEMO = (
+    (1, 3, "Hablé con el cliente: está de acuerdo con el convenio de visitas. Preparo el escrito para la audiencia.", 2),
+    (2, 1, "La contraparte pidió prórroga. Revisar antes del viernes si conviene oponernos.", 6),
+    (3, 4, "Llegó el informe justificado de la autoridad; lo tomo en cuenta para los alegatos.", 27),
+    (1, 5, "El cliente confirmó que asistirá a la audiencia inicial.", 31),
+)
+
+
+def notas_demo() -> None:
+    """Notas recientes en el despacho de demostración. Si ya son viejas (más de una semana), se renuevan."""
+    import init_db
+    try:
+        tdb = init_db.get_tenant_conn(Config.ACCESO_PRUEBA_DESPACHO)
+    except Exception:
+        return
+    ahora, puestas = datetime.now(timezone.utc), 0
+    try:
+        abiertos = {r[0] for r in tdb.execute("SELECT id FROM asuntos WHERE estado NOT IN ('completado','cerrado','archivado')")}
+        for asunto_id, autor, texto, horas in NOTAS_DEMO:
+            if asunto_id not in abiertos:
+                continue
+            fila = tdb.execute("SELECT id, fecha FROM asunto_notas WHERE asunto_id=? AND contenido=?", (asunto_id, texto)).fetchone()
+            fecha = (ahora - timedelta(hours=horas)).strftime("%Y-%m-%d %H:%M:%S")
+            if fila and str(fila[1] or "") >= (ahora - timedelta(days=7)).strftime("%Y-%m-%d"):
+                continue
+            if fila:
+                tdb.execute("UPDATE asunto_notas SET fecha=? WHERE id=?", (fecha, fila[0]))
+            else:
+                tdb.execute("INSERT INTO asunto_notas (asunto_id, contenido, creado_por, fecha) VALUES (?,?,?,?)",
+                            (asunto_id, texto, autor, fecha))
+            puestas += 1
+        tdb.commit()
+    finally:
+        tdb.close()
+    if puestas:
+        print(f"[arranque] Notas de demostración: {puestas} puestas al día", flush=True)
 
 
 if __name__ == "__main__":

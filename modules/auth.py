@@ -228,10 +228,10 @@ def contacto():
             from app import mail
             import html as _html
             filas = "".join(f"<tr><td style='padding:6px 12px 6px 0;color:#60718D'>{_html.escape(k.capitalize())}</td>"
-                            f"<td style='padding:6px 0;color:#163A7A'>{_html.escape(v) or '—'}</td></tr>" for k, v in datos.items())
+                            f"<td style='padding:6px 0;color:#142E59'>{_html.escape(v) or '—'}</td></tr>" for k, v in datos.items())
             mail.send(Message(subject=f"Nueva solicitud de demostración — {datos['despacho'] or datos['nombre']}",
                               recipients=[destino], reply_to=datos["email"],
-                              html=f"<div style='font-family:Inter,Arial,sans-serif'><h2 style='color:#163A7A'>Solicitud de demostración</h2>"
+                              html=f"<div style='font-family:Inter,Arial,sans-serif'><h2 style='color:#142E59'>Solicitud de demostración</h2>"
                                    f"<table>{filas}</table></div>"))
         except Exception:
             current_app.logger.warning("No se pudo enviar el aviso de contacto; quedó guardado en contactos_landing")

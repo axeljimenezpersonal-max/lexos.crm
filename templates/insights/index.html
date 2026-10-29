@@ -43,7 +43,7 @@
 .pr-empty p,.pr-empty li{font-size:14px;color:#3B4A61;line-height:1.6;margin-top:8px}
 .pr-empty ol{padding-left:20px}
 .pr-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
-.pr-nota{display:flex;gap:10px;align-items:flex-start;background:var(--edim);border:1px solid #E2D3AE;color:#163A7A;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;margin-top:16px}
+.pr-nota{display:flex;gap:10px;align-items:flex-start;background:var(--edim);border:1px solid #E2D3AE;color:#142E59;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;margin-top:16px}
 .pr-nota svg{flex:none;margin-top:1px}
 .mc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:14px}
 .mc-card{background:var(--c);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:6px}
@@ -52,9 +52,10 @@
 .mc-card p{font-size:13px;color:var(--ash);line-height:1.5;flex:1}
 .mc-card .btn{align-self:flex-start;margin-top:6px}
 .mc-campos{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.mc-campos code{font:500 12px ui-monospace,Menlo,monospace;background:#F4F1EB;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:#163A7A;cursor:pointer}
+.mc-campos code{font:500 12px ui-monospace,Menlo,monospace;background:#F4F1EB;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:#142E59;cursor:pointer}
 .mc-campos code:hover{border-color:var(--e)}
-@media(max-width:1000px){.pr-grid,.pr-two{grid-template-columns:1fr}.pr-kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1000px){.pr-grid,.pr-two{grid-template-columns:minmax(0,1fr)}.pr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.pr-row{grid-template-columns:minmax(0,1fr) auto}.pr-row > :nth-child(2){grid-column:1 / -1;grid-row:2}}
 </style>
 {% endblock %}
 
@@ -69,6 +70,7 @@
 {%- endmacro %}
 
 {% block content %}
+{% include "components/asistente_tabs.html" %}
 {% set gen = stats.general %}
 <h1 class="page-title">Precedentes del despacho</h1>
 <p class="pr-sub">Lo que el despacho ya vivió: cómo terminaron los asuntos, qué funcionó y los machotes listos para llenarse con los datos de cada caso.</p>

@@ -1,110 +1,112 @@
 {% extends "base.html" %}
+{% from "components/buscador.html" import buscador %}
 {% block title %}Inicio{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/inicio.css') }}">
 {% endblock %}
 
 {% block content %}
-<section class="in-hero">
-  <div class="in-hero-tx">
-    <p class="in-eyebrow">{% if nombre %}Bienvenido, {{ nombre }}{% else %}Bienvenido{% endif %}</p>
+<div class="in">
+  <section class="in-hero">
+    <p class="in-eyebrow">{% if nombre %}Hola, {{ nombre }}{% else %}Hola{% endif %} <span>·</span> {{ hoy_txt }}</p>
     <h1>¿Con qué expediente quieres trabajar?</h1>
     <p class="in-sub">Consulta, crea y da seguimiento a tus expedientes jurídicos y notariales desde un solo lugar.</p>
-  </div>
-  <svg class="in-arco" viewBox="0 0 220 220" aria-hidden="true">
-    <path d="M30 210V108a80 80 0 0 1 160 0v102" fill="none" stroke="currentColor" stroke-width="1.2"/>
-    <path d="M48 210V110a62 62 0 0 1 124 0v100" fill="none" stroke="currentColor" stroke-width=".8" opacity=".6"/>
-    <path d="M100 14h20l-4 22h-12z" fill="currentColor" opacity=".9"/>
-  </svg>
-</section>
+    <svg class="in-arco" viewBox="0 0 220 220" aria-hidden="true">
+      <path d="M30 210V108a80 80 0 0 1 160 0v102" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <path d="M48 210V110a62 62 0 0 1 124 0v100" fill="none" stroke="currentColor" stroke-width=".8" opacity=".6"/>
+      <path d="M100 14h20l-4 22h-12z" fill="currentColor" opacity=".9"/>
+    </svg>
+  </section>
 
-<section class="in-acciones" aria-label="Acciones principales">
-  <a class="in-accion oscura" href="{{ url_for('asuntos.index') }}">
-    <span class="in-ico" aria-hidden="true">
-      <svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 9h14l8 8v22a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z"/><path d="M28 9v8h8M17 24h14M17 29h14M17 34h9"/><path d="M8 14v26a3 3 0 0 0 3 3h19" opacity=".55"/></svg>
-    </span>
-    <span class="in-acc-tx">
+  <section class="in-acciones" aria-label="Acciones principales">
+    <a class="in-accion oscura" href="{{ url_for('asuntos.index') }}">
+      <span class="in-ico" aria-hidden="true">
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M5 15a3 3 0 0 1 3-3h10l4 4h18a3 3 0 0 1 3 3v19a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><path d="M5 22h38" opacity=".55"/></svg>
+      </span>
       <small>Tus expedientes</small>
       <b>Consultar expedientes</b>
       <span>Busca y revisa expedientes, documentos y actuaciones.</span>
-      <em>{{ en_curso }} en curso{% if archivados %} · {{ archivados }} archivado{{ 's' if archivados != 1 }}{% endif %}</em>
-    </span>
-    <span class="in-flecha" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-  </a>
-  <a class="in-accion clara" href="{{ url_for('asuntos.nuevo') }}">
-    <span class="in-ico" aria-hidden="true">
-      <svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 9h14l8 8v22a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z"/><path d="M28 9v8h8M17 24h14M17 29h9"/></svg>
-      <i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg></i>
-    </span>
-    <span class="in-acc-tx">
+      <footer>
+        <em>{{ en_curso }} en curso{% if archivados %} · {{ archivados }} archivado{{ 's' if archivados != 1 }}{% endif %}</em>
+        <i class="in-flecha" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i>
+      </footer>
+    </a>
+    <a class="in-accion clara" href="{{ url_for('asuntos.nuevo') }}">
+      <span class="in-ico" aria-hidden="true">
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M5 15a3 3 0 0 1 3-3h10l4 4h18a3 3 0 0 1 3 3v19a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><path d="M24 23v11M18.5 28.5h11"/></svg>
+      </span>
       <small>Nuevo expediente</small>
       <b>Crear expediente</b>
       <span>Registra un nuevo asunto y comienza a integrarlo.</span>
-    </span>
-    <span class="in-flecha" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-  </a>
-</section>
-
-<form class="in-buscar" action="{{ url_for('asuntos.index') }}" method="get" role="search">
-  <input type="hidden" name="grupo" value="todos">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-  <label class="sr" for="inBuscar">Buscar expedientes</label>
-  <input id="inBuscar" name="q" type="search" placeholder="Buscar por número de expediente, nombre, cliente o palabra clave…" autocomplete="off">
-  <a class="in-filtros" href="{{ url_for('asuntos.index') }}">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>Filtros
-  </a>
-</form>
-
-{% if terminos_pronto or sin_movimiento %}
-<div class="in-avisos" role="status">
-  {% if terminos_pronto %}<a href="{{ url_for('asuntos.index', atencion='termino') }}"><i class="pt rojo" aria-hidden="true"></i>{{ terminos_pronto }} término{{ 's' if terminos_pronto != 1 }} vencido{{ 's' if terminos_pronto != 1 }} o por vencer hoy y mañana</a>{% endif %}
-  {% if sin_movimiento %}<a href="{{ url_for('asuntos.index', atencion='sin_mov') }}"><i class="pt" aria-hidden="true"></i>{{ sin_movimiento }} expediente{{ 's' if sin_movimiento != 1 }} sin movimiento en 30 días</a>{% endif %}
-</div>
-{% endif %}
-
-<div class="in-paneles">
-  <section class="in-panel" aria-labelledby="inRecientes">
-    <header>
-      <h2 id="inRecientes">Expedientes recientes</h2>
-      <a href="{{ url_for('asuntos.index') }}">Ver todos <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-    </header>
-    {% for r in recientes %}
-    <a class="in-exp" href="{{ url_for('asuntos.detalle', id=r.id) }}">
-      <span class="in-exp-tx"><b>{{ r.titulo }}</b>{% if r.detalle %}<small>{{ r.detalle }}</small>{% endif %}</span>
-      <span class="in-exp-num">{{ r.numero }}</span>
-      <span class="in-chip e-{{ r.clave }}">{{ r.estado }}</span>
-      <span class="in-exp-fecha">{{ r.ultima }}</span>
+      <footer>
+        <em>Juicio, trámite o escritura</em>
+        <i class="in-flecha" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i>
+      </footer>
     </a>
-    {% else %}
-    <div class="in-vacio">
-      <b>Aún no hay expedientes</b>
-      <p>Crea el primero o importa los archivos que ya tienes.</p>
-      <a class="btn btn-primary btn-sm" href="{{ url_for('asuntos.nuevo') }}">Crear expediente</a>
+  </section>
+
+  <section class="in-busca" aria-labelledby="inBuscaT">
+    <h2 id="inBuscaT" class="in-tit">Buscar en el despacho</h2>
+    {{ buscador(en='todo', grande=True, sugerencias=sugerencias,
+         placeholder='Escribe un nombre, un número de expediente o una frase como «audiencias de mañana»') }}
+    {% if terminos_pronto or sin_movimiento %}
+    <div class="in-avisos" role="status">
+      {% if terminos_pronto %}<a href="{{ url_for('asuntos.index', atencion='termino') }}"><i class="pt rojo" aria-hidden="true"></i>{{ terminos_pronto }} término{{ 's' if terminos_pronto != 1 }} vencido{{ 's' if terminos_pronto != 1 }} o por vencer hoy y mañana</a>{% endif %}
+      {% if sin_movimiento %}<a href="{{ url_for('asuntos.index', atencion='sin_mov') }}"><i class="pt" aria-hidden="true"></i>{{ sin_movimiento }} expediente{{ 's' if sin_movimiento != 1 }} sin movimiento en 30 días</a>{% endif %}
     </div>
-    {% endfor %}
-    <footer>
-      <a href="{{ url_for('biblioteca.index') }}">¿Tienes expedientes en carpetas o escaneados? <b>Importar archivos existentes</b></a>
-    </footer>
+    {% endif %}
   </section>
 
   <section class="in-panel" aria-labelledby="inVence">
     <header>
-      <h2 id="inVence">Próximos vencimientos</h2>
+      <h2 id="inVence" class="in-tit">Próximos vencimientos</h2>
       <a href="{{ url_for('calendario.index') }}">Ver calendario <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </header>
-    {% for v in vencimientos %}
-    <a class="in-vence{{ ' vencido' if v.vencido }}" href="{{ v.url }}">
-      <span class="in-dia"><b>{{ v.dia }}</b><small>{{ v.mes }}</small></span>
-      <span class="in-exp-tx"><b>{{ v.titulo }}</b>{% if v.detalle %}<small>{{ v.detalle }}</small>{% endif %}</span>
-      <span class="in-cuando"><i class="pt{{ ' rojo' if v.vencido }}" aria-hidden="true"></i>{{ v.cuando }}</span>
-    </a>
+    {% if vencimientos %}
+    <div class="in-vences">
+      {% for v in vencimientos %}
+      <a class="in-vence{{ ' vencido' if v.vencido }}" href="{{ v.url }}">
+        <span class="in-dia"><b>{{ v.dia }}</b><small>{{ v.mes }}</small></span>
+        <span class="in-tx"><b>{{ v.titulo }}</b>{% if v.detalle %}<small>{{ v.detalle }}</small>{% endif %}</span>
+        <span class="in-cuando"><i class="pt{{ ' rojo' if v.vencido }}" aria-hidden="true"></i>{{ v.cuando }}</span>
+      </a>
+      {% endfor %}
+    </div>
     {% else %}
     <div class="in-vacio">
       <b>Nada en los próximos 30 días</b>
       <p>Cuando registres audiencias, términos o firmas aparecerán aquí.</p>
       <a class="btn btn-ghost btn-sm" href="{{ url_for('calendario.index') }}#nuevo">Agendar</a>
     </div>
-    {% endfor %}
+    {% endif %}
+  </section>
+
+  <section class="in-panel" aria-labelledby="inActividad">
+    <header>
+      <h2 id="inActividad" class="in-tit">Actividad reciente</h2>
+      <a href="{{ url_for('asuntos.index') }}">Ver expedientes <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </header>
+    {% if actividad %}
+    <ol class="in-linea">
+      {% for a in actividad %}
+      <li>
+        <span class="in-av" style="--av:{{ a.color }}" aria-hidden="true">{{ a.iniciales }}</span>
+        <a class="in-mov" href="{{ a.url }}">
+          <span class="in-mov-tx"><b>{{ a.quien }}</b> {{ a.verbo }} <span class="in-que t-{{ a.tipo }}">{{ a.que }}</span></span>
+          <small>{% if a.asunto %}{{ a.asunto }} · {% endif %}{{ a.cuando }}</small>
+        </a>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="in-vacio">
+      <b>Todavía no hay movimientos</b>
+      <p>Aquí verás las notas, documentos, audiencias y pagos que registre el equipo.</p>
+    </div>
+    {% endif %}
+    <footer>
+      <a href="{{ url_for('biblioteca.index') }}">¿Tienes expedientes en carpetas o escaneados? <b>Importar archivos existentes</b></a>
+    </footer>
   </section>
 </div>
 {% endblock %}

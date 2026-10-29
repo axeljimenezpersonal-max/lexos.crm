@@ -4,7 +4,7 @@
 
 {% block head %}
 <style>
-.as-wrap{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;height:calc(100vh - var(--top-h) - 70px);min-height:560px}
+.as-wrap{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;height:calc(100vh - var(--top-h) - 140px);min-height:560px}
 .as-side{background:var(--c);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;min-height:0}
 .as-side-h{padding:12px}
 .as-new{width:100%}
@@ -121,6 +121,7 @@
 {% endblock %}
 
 {% block content %}
+{% include "components/asistente_tabs.html" %}
 <div class="as-wrap">
   <aside class="as-side" id="asSide" aria-label="Conversaciones">
     <div class="as-side-h"><button class="btn btn-primary as-new" id="asNueva" type="button">+ Nueva conversación</button></div>

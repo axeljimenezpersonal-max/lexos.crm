@@ -15,6 +15,7 @@
   <!-- ── Global styles ── -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/lex-design-system.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/buscador.css') }}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <!-- ── Animate.css ── -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
@@ -66,11 +67,13 @@
 
   .tb-nav { display: flex; align-items: stretch; gap: 26px; height: 100%; margin: 0 auto; }
   .tb-link {
-    position: relative; display: flex; align-items: center; gap: 6px; height: 100%;
+    position: relative; display: flex; align-items: center; gap: 7px; height: 100%;
     font: 500 14.5px 'Inter', sans-serif; color: #3B4A61; text-decoration: none; white-space: nowrap;
     background: none; border: 0; cursor: pointer; padding: 0;
   }
   .tb-link:hover { color: var(--e); }
+  .tb-link .nav-icon { color: #8A94A6; transition: color .15s; }
+  .tb-link:hover .nav-icon, .tb-link.active .nav-icon { color: var(--e); }
   .tb-link.active { color: var(--e); font-weight: 600; }
   .tb-link.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--dorado); border-radius: 2px; }
   .nav-icon { width: 18px; height: 18px; flex-shrink: 0; }
@@ -254,8 +257,13 @@
   }
   @media (max-width: 1280px) {
     .topbar-main { padding: 0 24px; gap: 20px; }
-    .tb-nav { gap: 20px; }
+    .tb-nav { gap: 18px; }
     .tb-user-tx { display: none; }
+  }
+  @media (max-width: 1200px) {
+    .tb-nav { gap: 14px; }
+    .tb-link { font-size: 14px; gap: 5px; }
+    .tb-link .nav-icon { width: 16px; height: 16px; }
   }
   @media (max-width: 1080px) {
     .tb-nav { display: none; }
@@ -304,15 +312,18 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" class="sm-input" id="searchInput" placeholder="Buscar asuntos, clientes, documentos…" autocomplete="off">
+      <input type="text" class="sm-input" id="searchInput" placeholder="Busca lo que sea: «amparos de Luis», «audiencias de mañana»…" autocomplete="off" spellcheck="false">
       <kbd class="sm-esc-kbd">ESC</kbd>
     </div>
     <div class="sm-body" id="searchBody">
-      <div class="sm-hint">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        Escribe para buscar en Habeas Corpus
+      <div class="sm-ejemplos">
+        <p>Busca por nombre, número de expediente o con una frase. Por ejemplo:</p>
+        <div>
+          <button type="button" class="bz-chip" data-ejemplo="audiencias de esta semana">Audiencias de esta semana</button>
+          <button type="button" class="bz-chip" data-ejemplo="términos vencidos">Términos vencidos</button>
+          <button type="button" class="bz-chip" data-ejemplo="expedientes sin movimiento">Expedientes sin movimiento</button>
+          <button type="button" class="bz-chip" data-ejemplo="cobros vencidos">Cobros vencidos</button>
+        </div>
       </div>
     </div>
     <div class="sm-footer">
@@ -326,6 +337,8 @@
 {%- macro ico(name, size=18) -%}
 <svg class="nav-icon" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 {%- if name == 'home' %}<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>
+{%- elif name == 'folder' %}<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+{%- elif name == 'grid' %}<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>
 {%- elif name == 'case' %}<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>
 {%- elif name == 'users' %}<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>
 {%- elif name == 'cal' %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
@@ -356,7 +369,8 @@
 <!-- ══════════════════════════════════════════════════════════
      APP SHELL
      ══════════════════════════════════════════════════════════ -->
-{%- set es_mas = ep.startswith(('cobranzas','estadisticas','reportes','equipo','portal','investigacion','corpus','insights','lector')) -%}
+{%- set es_mas = ep.startswith(('cobranzas','estadisticas','reportes','equipo','portal','lector')) -%}
+{%- set es_asistente = ep.startswith(('asistente','investigacion','corpus','insights')) -%}
 {%- set iniciales = (current_user.nombre[0] ~ (current_user.apellidos or '')[:1]) if current_user else '?' -%}
 {%- macro enlaces_mas(clase='td-item') -%}
   <div class="{{ 'td-grupo' if clase == 'td-item' else 'mm-grupo' }}">Despacho</div>
@@ -365,11 +379,7 @@
   {% if is_admin %}<a href="{{ url_for('reportes.index') }}" class="{{ clase }}{% if ep.startswith('reportes') %} active{% endif %}">{{ ico('report', 16) }}<span>Reportes</span></a>{% endif %}
   <a href="{{ url_for('equipo.index') }}" class="{{ clase }}{% if ep.startswith('equipo') %} active{% endif %}">{{ ico('team', 16) }}<span>Equipo</span></a>
   {% if is_admin %}<a href="{{ url_for('portal.index') }}" class="{{ clase }}{% if ep.startswith('portal') %} active{% endif %}">{{ ico('globe', 16) }}<span>Portal de clientes</span></a>{% endif %}
-  <div class="{{ 'td-grupo' if clase == 'td-item' else 'mm-grupo' }}">Investigación</div>
-  <a href="{{ url_for('investigacion.index') }}" class="{{ clase }}{% if ep.startswith('investigacion') %} active{% endif %}">{{ ico('research', 16) }}<span>Investigación</span></a>
-  <a href="{{ url_for('corpus.index') }}" class="{{ clase }}{% if ep.startswith('corpus') %} active{% endif %}">{{ ico('gavel', 16) }}<span>Base legal</span></a>
-  <a href="{{ url_for('insights.index') }}" class="{{ clase }}{% if ep.startswith('insights') %} active{% endif %}">{{ ico('scale', 16) }}<span>Precedentes</span></a>
-  <a href="{{ url_for('lector.index') }}" class="{{ clase }}{% if ep.startswith('lector') %} active{% endif %}">{{ ico('memory', 16) }}<span>Memoria</span></a>
+  <a href="{{ url_for('lector.index') }}" class="{{ clase }}{% if ep.startswith('lector') %} active{% endif %}">{{ ico('memory', 16) }}<span>Memoria de documentos</span></a>
 {%- endmacro %}
 <div class="app-shell">
 
@@ -381,14 +391,14 @@
     </a>
 
     <nav class="tb-nav" aria-label="Menú principal">
-      <a href="{{ url_for('dashboard.index') }}" class="tb-link{% if ep.startswith('dashboard') %} active{% endif %}">Inicio</a>
-      <a href="{{ url_for('asuntos.index') }}" class="tb-link{% if ep.startswith('asuntos') %} active{% endif %}">Expedientes</a>
-      <a href="{{ url_for('clientes.index') }}" class="tb-link{% if ep.startswith('clientes') or ep.startswith('contrapartes') %} active{% endif %}">Personas</a>
-      <a href="{{ url_for('calendario.index') }}" class="tb-link{% if ep.startswith('calendario') %} active{% endif %}">Calendario{% if notif_count > 0 %}<span class="nav-badge">{{ notif_count }}</span>{% endif %}</a>
-      <a href="{{ url_for('biblioteca.index') }}" class="tb-link{% if ep.startswith('biblioteca') %} active{% endif %}">Documentos</a>
-      <a href="{{ url_for('asistente.index') }}" class="tb-link{% if ep.startswith('asistente') %} active{% endif %}">{{ config.ASISTENTE_NOMBRE }}</a>
+      <a href="{{ url_for('dashboard.index') }}" class="tb-link{% if ep.startswith('dashboard') %} active{% endif %}">{{ ico('home') }}Inicio</a>
+      <a href="{{ url_for('asuntos.index') }}" class="tb-link{% if ep.startswith('asuntos') %} active{% endif %}">{{ ico('folder') }}Expedientes</a>
+      <a href="{{ url_for('clientes.index') }}" class="tb-link{% if ep.startswith('clientes') or ep.startswith('contrapartes') %} active{% endif %}">{{ ico('users') }}Personas</a>
+      <a href="{{ url_for('calendario.index') }}" class="tb-link{% if ep.startswith('calendario') %} active{% endif %}">{{ ico('cal') }}Calendario{% if notif_count > 0 %}<span class="nav-badge">{{ notif_count }}</span>{% endif %}</a>
+      <a href="{{ url_for('biblioteca.index') }}" class="tb-link{% if ep.startswith('biblioteca') %} active{% endif %}">{{ ico('doc') }}Documentos</a>
+      <a href="{{ url_for('asistente.index') }}" class="tb-link{% if es_asistente %} active{% endif %}">{{ ico('spark') }}{{ config.ASISTENTE_NOMBRE }}</a>
       <div class="tb-dd-wrap" id="masWrap">
-        <button type="button" class="tb-link{% if es_mas %} active{% endif %}" id="masToggle" aria-haspopup="true">Más
+        <button type="button" class="tb-link{% if es_mas %} active{% endif %}" id="masToggle" aria-haspopup="true">{{ ico('grid') }}Más
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
         <div class="tb-dropdown" id="masDropdown" style="min-width:240px">{{ enlaces_mas() }}</div>
       </div>
@@ -461,11 +471,11 @@
   <nav class="mm-panel" id="menuPanel" aria-label="Menú completo">
     <div class="mm-head"><b>Menú</b><button type="button" class="btn-icon" id="menuCerrar" aria-label="Cerrar menú"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
     <a href="{{ url_for('dashboard.index') }}" class="{% if ep.startswith('dashboard') %}active{% endif %}">{{ ico('home', 18) }}<span>Inicio</span></a>
-    <a href="{{ url_for('asuntos.index') }}" class="{% if ep.startswith('asuntos') %}active{% endif %}">{{ ico('case', 18) }}<span>Expedientes</span></a>
+    <a href="{{ url_for('asuntos.index') }}" class="{% if ep.startswith('asuntos') %}active{% endif %}">{{ ico('folder', 18) }}<span>Expedientes</span></a>
     <a href="{{ url_for('clientes.index') }}" class="{% if ep.startswith('clientes') or ep.startswith('contrapartes') %}active{% endif %}">{{ ico('users', 18) }}<span>Personas</span></a>
     <a href="{{ url_for('calendario.index') }}" class="{% if ep.startswith('calendario') %}active{% endif %}">{{ ico('cal', 18) }}<span>Calendario</span></a>
     <a href="{{ url_for('biblioteca.index') }}" class="{% if ep.startswith('biblioteca') %}active{% endif %}">{{ ico('doc', 18) }}<span>Documentos</span></a>
-    <a href="{{ url_for('asistente.index') }}" class="{% if ep.startswith('asistente') %}active{% endif %}">{{ ico('spark', 18) }}<span>{{ config.ASISTENTE_NOMBRE }}</span></a>
+    <a href="{{ url_for('asistente.index') }}" class="{% if es_asistente %}active{% endif %}">{{ ico('spark', 18) }}<span>{{ config.ASISTENTE_NOMBRE }}</span></a>
     {{ enlaces_mas('') }}
     <div class="mm-grupo">Cuenta</div>
     <a href="{{ url_for('auth.perfil') }}">{{ ico('user', 18) }}<span>Mi perfil</span></a>
@@ -508,9 +518,9 @@
 
 <nav class="tabbar" aria-label="Menú rápido">
   <a href="{{ url_for('dashboard.index') }}" class="{% if ep.startswith('dashboard') %}active{% endif %}">{{ ico('home', 20) }}Inicio</a>
-  <a href="{{ url_for('asuntos.index') }}" class="{% if ep.startswith('asuntos') %}active{% endif %}">{{ ico('case', 20) }}Expedientes</a>
+  <a href="{{ url_for('asuntos.index') }}" class="{% if ep.startswith('asuntos') %}active{% endif %}">{{ ico('folder', 20) }}Expedientes</a>
   <a href="{{ url_for('calendario.index') }}" class="{% if ep.startswith('calendario') %}active{% endif %}">{{ ico('cal', 20) }}Calendario</a>
-  <a href="{{ url_for('asistente.index') }}" class="{% if ep.startswith('asistente') %}active{% endif %}">{{ ico('spark', 20) }}{{ config.ASISTENTE_NOMBRE }}</a>
+  <a href="{{ url_for('asistente.index') }}" class="{% if es_asistente %}active{% endif %}">{{ ico('spark', 20) }}{{ config.ASISTENTE_NOMBRE }}</a>
   <a href="#menu" id="tabMenu">{{ ico('menu', 20) }}Más</a>
 </nav>
 
@@ -520,6 +530,7 @@
 
 <!-- ── Scripts ─────────────────────────────────────────────── -->
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/buscador.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
 

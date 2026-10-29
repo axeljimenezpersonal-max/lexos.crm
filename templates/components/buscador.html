@@ -1,0 +1,41 @@
+{#
+  Buscador inteligente (el mismo en todas las secciones).
+  en:          todo | expedientes | personas | documentos | agenda | cobros
+  accion:      a dónde va al presionar Enter (por defecto, la página de resultados)
+  chips:       filtros que el servidor entendió de la búsqueda actual (cada uno con su "sin")
+  sugerencias: [(frase, etiqueta)] filtros rápidos; al tocarlos se agregan a la búsqueda
+  enviar:      True = al tocar una sugerencia se recarga la página con el filtro (listas)
+#}
+{% macro buscador(en='todo', accion=None, valor='', placeholder='Busca expedientes, personas, documentos o fechas…',
+                  chips=[], sugerencias=[], enviar=False, grande=False, ocultos={}, etiqueta='Buscar') %}
+{%- set destino = accion or url_for('buscador.resultados') -%}
+<form class="bz{{ ' bz-grande' if grande }}" action="{{ destino }}" method="get" role="search"
+      data-en="{{ en }}" data-enviar="{{ '1' if enviar else '' }}" autocomplete="off">
+  {% for k, v in ocultos.items() %}{% if v %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+  {% if en != 'todo' and not accion %}<input type="hidden" name="en" value="{{ en }}">{% endif %}
+  <div class="bz-caja">
+    <svg class="bz-lupa" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input class="bz-input" type="search" name="q" value="{{ valor }}" placeholder="{{ placeholder }}"
+           aria-label="{{ etiqueta }}" role="combobox" aria-expanded="false" aria-autocomplete="list" spellcheck="false">
+    <span class="bz-ia" title="Entiende frases como «amparos de Luis que vencen esta semana»" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>Inteligente
+    </span>
+    {% if valor %}<a class="bz-limpiar" href="{{ destino }}{% for k, v in ocultos.items() %}{% if v %}{{ '?' if loop.first else '&' }}{{ k }}={{ v | urlencode }}{% endif %}{% endfor %}" aria-label="Borrar búsqueda">×</a>{% endif %}
+    <button type="submit" class="bz-ir">Buscar</button>
+  </div>
+  {% if chips %}
+  <div class="bz-entendi" aria-label="Filtros que entendí">
+    <span>Entendí:</span>
+    {% for c in chips %}
+    <a class="bz-chip on" href="{{ destino }}?q={{ c.sin | urlencode }}{% for k, v in ocultos.items() %}{% if v %}&{{ k }}={{ v | urlencode }}{% endif %}{% endfor %}" title="Quitar filtro">{{ c.etiqueta }}<i aria-hidden="true">×</i></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if sugerencias %}
+  <div class="bz-sugerencias" aria-label="Filtros rápidos">
+    {% for frase, label in sugerencias %}<button type="button" class="bz-chip" data-frase="{{ frase }}">{{ label }}</button>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="bz-panel" role="listbox" hidden></div>
+</form>
+{% endmacro %}

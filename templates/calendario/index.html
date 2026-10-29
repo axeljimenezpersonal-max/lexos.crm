@@ -28,6 +28,13 @@
   </button>
 </div>
 
+<div class="cal-busca">
+  {% from "components/buscador.html" import buscador %}
+  {{ buscador(en='agenda', placeholder='Busca en la agenda: «audiencias de la próxima semana», «términos vencidos», «Fuentes»',
+       sugerencias=[('hoy', 'Hoy'), ('mañana', 'Mañana'), ('audiencias esta semana', 'Audiencias de esta semana'),
+                    ('términos próxima semana', 'Términos de la próxima semana'), ('vencidos', 'Vencidos')]) }}
+</div>
+
 <div class="cal-page">
 
   <aside class="cal-side" aria-label="Panel del calendario">
@@ -398,7 +405,7 @@
           <div class="cf-g">
             <label>Color (opcional)</label>
             <div class="color-picker" id="colorPicker">
-              {% for c in ['#163A7A','#4B6585','#34496B','#7A6440','#A23B33','#9A7536','#8A6A2F','#3D5A80','#0F766E','#60718D'] %}
+              {% for c in ['#142E59','#4B6585','#34496B','#7A6440','#A23B33','#9A7536','#8A6A2F','#3D5A80','#0F766E','#60718D'] %}
               <div class="color-swatch" style="background:{{ c }}" data-color="{{ c }}"
                    onclick="pickColor('{{ c }}')"></div>
               {% endfor %}

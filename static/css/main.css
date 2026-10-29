@@ -1,6 +1,6 @@
 /* ============================================================
    CODEX — Design System · Navy Premium
-   Fondo blanco · Navy #163A7A · Dorado #AD9060
+   Fondo blanco · Navy #142E59 · Dorado #AD9060
    Tipografía: Inter (UI) · Cormorant Garamond (legal) · DM Mono (data)
    ============================================================ */
 
@@ -9,8 +9,8 @@
 /* ── Variables ─────────────────────────────────────────────── */
 :root {
   /* ── MARCA HABEAS CORPUS: azul marino + dorado apagado sobre crema ── */
-  --e:    #163A7A;   /* Azul profundo — texto fuerte, botones principales */
-  --ed:   #112E63;   /* Azul profundo oscuro — hover y seleccionado */
+  --e:    #142E59;   /* Azul profundo — texto fuerte, botones principales */
+  --ed:   #11264A;   /* Azul profundo oscuro — hover y seleccionado */
   --dorado:   #AD9060;   /* Dorado apagado — indicadores activos, acento */
   --dorado-p: #EFE2C3;   /* Dorado pálido — resaltados y estados seleccionados */
   --gris-l:   #E5E8EC;   /* Gris claro — superficies de conversación */
@@ -19,7 +19,7 @@
   --e20:  rgba(19,34,56,0.20);
   --e04:  rgba(19,34,56,0.04);
   --edim: #F4EEDF;
-  --tinta: #163A7A;
+  --tinta: #142E59;
   --cielo: #AD9060;
 
   /* ── FONDOS ── */
@@ -28,7 +28,7 @@
   --c2:   #F1EEE8;   /* Inputs, superficies secundarias */
 
   /* ── TEXTO ── */
-  --fog:  #163A7A;   /* Texto principal */
+  --fog:  #142E59;   /* Texto principal */
   --ash:  #60718D;   /* Texto secundario */
   --w:    #F8F6F2;
 
@@ -40,7 +40,7 @@
   --ok:   #3D5A80;
   --warn: #8A6A2F;
   --danger: #A23B33;
-  --info: #163A7A;
+  --info: #142E59;
 
   /* ── BORDES ── */
   --border:   #E5E2DB;
@@ -59,7 +59,7 @@
   --bg-4:         #E3E0D9;
   --border-light: var(--border-m);
   --card:         var(--c);
-  --sidebar:      #163A7A;
+  --sidebar:      #142E59;
   --hover:        var(--e04);
 
   --accent:       var(--e);

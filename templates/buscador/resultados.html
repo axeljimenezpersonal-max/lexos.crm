@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "components/buscador.html" import buscador %}
+{% block title %}Buscar{% endblock %}
+{% block head %}
+<style>
+  .br { max-width: 980px; margin: 0 auto; }
+  .br h1 { margin-bottom: 18px; }
+  .br-tabs { display: flex; gap: 22px; margin: 22px 0 6px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+  .br-tabs a { padding: 10px 0; font: 500 14px 'Inter', sans-serif; color: var(--ash); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  .br-tabs a.on { color: var(--e); font-weight: 600; border-color: var(--dorado); }
+  .br-tabs a span { margin-left: 6px; font-size: 12px; color: var(--ash); }
+  .br-grupo { margin-top: 26px; }
+  .br-grupo h2 { display: flex; justify-content: space-between; align-items: baseline; font: 600 13px 'Inter', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ash); margin: 0 0 8px; }
+  .br-grupo h2 a { font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--e); text-decoration: none; }
+  .br-lista { background: var(--c); border: 1px solid var(--border); border-radius: 14px; padding: 6px; }
+  .br-lista .bz-item { padding: 12px; }
+  .br-vacio { margin-top: 40px; text-align: center; color: var(--ash); }
+  .br-vacio b { display: block; font: 600 20px 'Sora', sans-serif; color: var(--e); margin-bottom: 6px; }
+  .br-nota { margin-top: 16px; padding: 11px 14px; border-radius: 12px; background: #F7F0E1; color: #74592A; font-size: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="br">
+  <h1 class="page-title">Buscar</h1>
+  {{ buscador(en='todo', valor=q, chips=datos.chips if datos else [], grande=True,
+       ocultos={'en': ambito if ambito != 'todo' else ''},
+       sugerencias=[('audiencias de esta semana', 'Audiencias de esta semana'), ('términos vencidos', 'Términos vencidos'),
+                    ('sin movimiento', 'Sin movimiento'), ('mis expedientes', 'Mis expedientes'), ('cobros vencidos', 'Cobros vencidos')]) }}
+
+  {% if datos %}
+  <nav class="br-tabs" aria-label="Dónde buscar">
+    <a href="{{ url_for('buscador.resultados', q=q) }}" class="{{ 'on' if ambito == 'todo' }}">Todo</a>
+    {% for k, label in ambitos %}
+    <a href="{{ url_for('buscador.resultados', q=q, en=k) }}" class="{{ 'on' if ambito == k }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if datos.sugerencia %}
+  <div class="br-nota">No encontré «{{ datos.tokens | join(' ') }}»; te muestro resultados de <b>{{ datos.sugerencia }}</b>.</div>
+  {% endif %}
+
+  {% for gr in datos.grupos %}
+  <section class="br-grupo">
+    <h2><span>{{ gr.titulo }} · {{ gr.total }}</span>{% if ambito == 'todo' and gr.total > gr['items'] | length %}<a href="{{ gr.ver_todo }}">Ver los {{ gr.total }}</a>{% endif %}</h2>
+    <div class="br-lista bz-res">
+      {% for it in gr['items'] %}
+      <a class="bz-item" href="{{ it.url }}">
+        {% if it.tipo == 'evento' and it.dia %}<span class="bz-dia"><b>{{ it.dia }}</b><small>{{ it.mes }}</small></span>
+        {% else %}<span class="bz-ico t-{{ it.tipo }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          {% if it.tipo == 'expediente' %}<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          {% elif it.tipo == 'persona' %}<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+          {% elif it.tipo == 'documento' %}<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>
+          {% else %}<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>{% endif %}</svg></span>{% endif %}
+        <span class="bz-tx"><b>{{ it.titulo }}</b><small>{% if it.numero %}<em>{{ it.numero }}</em> · {% endif %}{{ it.sub }}</small></span>
+        {% if it.chip %}<span class="bz-est e-{{ it.chip_clave or '' }}">{{ it.chip }}</span>{% endif %}
+        {% if it.extra %}<span class="bz-extra">{{ it.extra }}</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <div class="br-vacio">
+    <b>No encontré nada con «{{ q }}»</b>
+    Prueba con otro nombre, un número de expediente o una frase como «audiencias de la próxima semana».
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Resalta en los resultados las palabras que se buscaron
+(() => {
+  const tokens = {{ ((datos.sugerencia.split(' ') if datos and datos.sugerencia else (datos.tokens if datos else [])) | tojson) }};
+  if (!tokens.length) return;
+  const plano = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  document.querySelectorAll('.bz-res .bz-tx b, .bz-res .bz-tx small').forEach(el => {
+    el.childNodes.forEach(n => {
+      if (n.nodeType !== 3) return;
+      const t = n.textContent, p = plano(t);
+      const marcas = new Array(t.length).fill(false);
+      tokens.forEach(k => { let i = p.indexOf(k); while (i > -1) { if (i === 0 || !/[a-z0-9]/.test(p[i - 1])) for (let j = i; j < i + k.length; j++) marcas[j] = true; i = p.indexOf(k, i + 1); } });
+      if (!marcas.includes(true)) return;
+      const frag = document.createDocumentFragment();
+      let buf = '', on = marcas[0];
+      const vaciar = () => { if (!buf) return; if (on) { const m = document.createElement('mark'); m.textContent = buf; frag.append(m); } else frag.append(buf); buf = ''; };
+      for (let i = 0; i < t.length; i++) { if (marcas[i] !== on) { vaciar(); on = marcas[i]; } buf += t[i]; }
+      vaciar();
+      n.replaceWith(frag);
+    });
+  });
+})();
+</script>
+{% endblock %}

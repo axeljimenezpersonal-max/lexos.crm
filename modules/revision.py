@@ -18,7 +18,7 @@ TIPOS = {
     "error":  {"label": "Error",  "color": "#A23B33", "fondo": "#F8EDEA"},
     "diseno": {"label": "Diseño", "color": "#6E5A3A", "fondo": "#F6F1E6"},
     "texto":  {"label": "Texto",  "color": "#8A6A2F", "fondo": "#F7F0E1"},
-    "idea":   {"label": "Idea",   "color": "#163A7A", "fondo": "#F4EEDF"},
+    "idea":   {"label": "Idea",   "color": "#142E59", "fondo": "#F4EEDF"},
 }
 
 

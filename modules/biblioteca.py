@@ -122,6 +122,8 @@ def _resolve_variables(html: str, asunto_id=None, cliente_id=None) -> str:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+_MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
 # Estado de lectura de cada documento (OCR e índice), con texto y no solo color
 ESTADOS_LECTURA = {
     "listo":       {"label": "Listo",             "grupo": "listo"},
@@ -135,44 +137,85 @@ ESTADOS_LECTURA = {
 
 
 def _documentos_de_expedientes(tdb):
-    """Todos los documentos de los expedientes que la persona puede ver, con su estado de lectura."""
-    from modules.asuntos import _FILTRO_PROPIOS, _solo_lo_suyo, _usuarios
+    """Documentos y resoluciones de los expedientes que la persona puede ver, con su estado de lectura.
+    La búsqueda usa el buscador inteligente (sin acentos, frases como «de Luis» o «amparo»)."""
+    from modules import buscador
+    from modules.asuntos import TIPOS_DERECHO, _FILTRO_PROPIOS, _solo_lo_suyo, _usuarios
     where, params = ["1"], []
     if _solo_lo_suyo():
         uid = session.get("user_id")
         where.append(_FILTRO_PROPIOS)
         params += [uid, uid, uid]
-    q = (request.args.get("q") or "").strip()
-    if q:
-        where.append("(d.nombre LIKE ? OR d.archivo_nombre LIKE ? OR a.titulo LIKE ? OR a.numero_expediente LIKE ?)")
-        params += [f"%{q}%"] * 4
-    filas = tdb.execute(
+    w = " AND ".join(where)
+    filas = [dict(r, origen="documento") for r in tdb.execute(
         f"""SELECT d.id, d.nombre, d.archivo_url, d.archivo_nombre, d.tamanio, d.fecha_subida, d.subido_por,
-                   a.id AS asunto_id, a.titulo AS asunto, a.numero_expediente,
+                   d.tipo_documento AS clase, a.id AS asunto_id, a.titulo AS asunto, a.numero_expediente,
+                   a.tipo_asunto, a.abogado_responsable, a.estado AS asunto_estado,
                    l.estado AS lectura, l.error AS lectura_error, l.paginas
             FROM documentos d
             JOIN asuntos a ON a.id = d.asunto_id
             LEFT JOIN lector_documentos l ON l.archivo_url = d.archivo_url
-            WHERE {' AND '.join(where)}
-            ORDER BY d.fecha_subida DESC LIMIT 300""",
-        params,
-    ).fetchall()
+            WHERE {w}""", params).fetchall()]
+    filas += [dict(r, origen="resolucion", archivo_nombre=None, tamanio=None, lectura=None, lectura_error=None, paginas=None)
+              for r in tdb.execute(
+        f"""SELECT s.id, s.titulo AS nombre, s.archivo_url, COALESCE(s.fecha_emision, s.fecha_alta) AS fecha_subida,
+                   s.creado_por AS subido_por, s.tipo AS clase, s.contenido, a.id AS asunto_id, a.titulo AS asunto,
+                   a.numero_expediente, a.tipo_asunto, a.abogado_responsable, a.estado AS asunto_estado
+            FROM asunto_sentencias s JOIN asuntos a ON a.id = s.asunto_id
+            WHERE {w}""", params).fetchall()]
+
+    q = (request.args.get("q") or "").strip()
+    chips, sugerencia = [], None
     usuarios = _usuarios()
+    if q:
+        inter = buscador.interpretar(q, usuarios)
+        f = inter["filtros"]
+        chips = inter["chips"]
+        if f.get("materia"):
+            filas = [d for d in filas if d["tipo_asunto"] == f["materia"]]
+        uid = buscador._uid_responsable(f)
+        if uid:
+            filas = [d for d in filas if d["abogado_responsable"] == uid]
+        for d in filas:
+            d["_pajar"] = buscador.normalizar(" ".join(str(v or "") for v in (
+                d["nombre"], d["archivo_nombre"], d["clase"], d["asunto"], d["numero_expediente"],
+                TIPOS_DERECHO.get(d["tipo_asunto"] or "otro", {}).get("label"), (d.get("contenido") or "")[:400])))
+        filas, corregido = buscador._filtrar(filas, inter["tokens"])
+        sugerencia = " ".join(corregido) if corregido else None
+
+    filas.sort(key=lambda d: str(d["fecha_subida"] or ""), reverse=True)
     docs, conteo = [], {"listo": 0, "procesando": 0, "revision": 0, "error": 0, "guardado": 0}
-    for r in filas:
-        d = dict(r)
+    carpetas: dict[int, dict] = {}
+    for d in filas:
         info = ESTADOS_LECTURA.get(d["lectura"] or "")
-        d["estado"] = info["label"] if info else ("Guardado" if d["archivo_url"] else "Sin archivo")
-        d["grupo"] = info["grupo"] if info else "guardado"
-        d["ext"] = (d["archivo_nombre"] or d["archivo_url"] or "").rsplit(".", 1)[-1].lower()[:4]
+        if d["origen"] == "resolucion":
+            d["estado"], d["grupo"] = ("Guardado", "guardado") if d["archivo_url"] else ("Capturada", "guardado")
+        else:
+            d["estado"] = info["label"] if info else ("Guardado" if d["archivo_url"] else "Sin archivo")
+            d["grupo"] = info["grupo"] if info else "guardado"
+        nombre_arch = d["archivo_nombre"] or d["archivo_url"] or ""
+        d["ext"] = nombre_arch.rsplit(".", 1)[-1].lower()[:4] if "." in nombre_arch else ""
+        d["tipo_txt"] = "Resolución" if d["origen"] == "resolucion" else (d["ext"].upper() or "Documento")
         d["autor"] = (usuarios.get(d["subido_por"]) or {}).get("corto", "")
-        d["dia"] = (d["fecha_subida"] or "")[:10]
+        try:
+            f = date.fromisoformat(str(d["fecha_subida"] or "")[:10])
+            d["dia"] = f"{f.day} {_MESES_CORTOS[f.month - 1]} {f.year}"
+        except ValueError:
+            d["dia"] = ""
         conteo[d["grupo"]] += 1
+        c = carpetas.setdefault(d["asunto_id"], {"id": d["asunto_id"], "titulo": d["asunto"], "n": 0,
+                                                 "numero": d["numero_expediente"] or f"#{d['asunto_id']}",
+                                                 "abierto": d["asunto_estado"] not in ("cerrado", "completado", "archivado")})
+        c["n"] += 1
         docs.append(d)
+    asunto_f = request.args.get("asunto", type=int)
+    if asunto_f:
+        docs = [d for d in docs if d["asunto_id"] == asunto_f]
     estado_f = request.args.get("estado", "")
     if estado_f in conteo:
         docs = [d for d in docs if d["grupo"] == estado_f]
-    return docs, conteo
+    carpetas_l = sorted(carpetas.values(), key=lambda c: (not c["abierto"], -c["n"]))
+    return docs, conteo, {"chips": chips, "sugerencia": sugerencia, "carpetas": carpetas_l, "asunto": asunto_f}
 
 
 @biblioteca_bp.route("/")
@@ -183,7 +226,8 @@ def index():
     seccion = request.args.get("seccion", "expedientes")
     if seccion not in ("expedientes", "estudio", "formatos", "acuerdos"):
         seccion = "expedientes"
-    docs_exp, conteo_estados = _documentos_de_expedientes(tdb) if seccion == "expedientes" else ([], {})
+    docs_exp, conteo_estados, busqueda = (_documentos_de_expedientes(tdb) if seccion == "expedientes"
+                                          else ([], {}, {"chips": [], "sugerencia": None, "carpetas": [], "asunto": None}))
 
     # ── Estudio data ──
     carpetas = tdb.execute(
@@ -259,7 +303,7 @@ def index():
     return render_template(
         "biblioteca/index.html",
         seccion=seccion,
-        docs_exp=docs_exp, conteo_estados=conteo_estados, estado_f=request.args.get("estado", ""),
+        docs_exp=docs_exp, conteo_estados=conteo_estados, estado_f=request.args.get("estado", ""), busqueda=busqueda,
         estados_lectura=ESTADOS_LECTURA,
         # Estudio
         carpetas=carpetas, archivos=archivos,

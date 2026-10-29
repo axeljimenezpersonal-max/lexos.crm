@@ -333,7 +333,7 @@ def enviar_correo(uid):
     html_body = f"""
     <div style="font-family:'Segoe UI',Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #E5E2DB;">
       <!-- Header -->
-      <div style="background:linear-gradient(135deg,#12306A 0%,#334155 100%);padding:28px 32px;">
+      <div style="background:linear-gradient(135deg,#11284F 0%,#334155 100%);padding:28px 32px;">
         <div style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-.3px;">{despacho_nombre}</div>
         <div style="font-size:12px;color:#9AA4B5;margin-top:4px;">Mensaje interno del equipo</div>
       </div>
@@ -341,7 +341,7 @@ def enviar_correo(uid):
       <!-- Body -->
       <div style="padding:32px;">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#9AA4B5;margin-bottom:6px;">Asunto</div>
-        <div style="font-size:17px;font-weight:700;color:#12306A;margin-bottom:24px;">{asunto_correo}</div>
+        <div style="font-size:17px;font-weight:700;color:#11284F;margin-bottom:24px;">{asunto_correo}</div>
 
         <div style="font-size:14px;color:#3B4A61;line-height:1.7;white-space:pre-wrap;">{cuerpo}</div>
       </div>

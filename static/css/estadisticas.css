@@ -8,7 +8,7 @@
   align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 12px;
   padding: 16px 20px;
@@ -24,7 +24,7 @@
 }
 .est-filt-group select,
 .est-filt-group input {
-  background: var(--bg-main, #163A7A);
+  background: var(--bg-main, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 8px;
   color: var(--text, #FAF8F4);
@@ -65,7 +65,7 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 12px;
   padding: 18px 16px;
@@ -116,7 +116,7 @@
 }
 .est-charts-2col { grid-template-columns: 1fr 1fr; }
 .est-chart-card {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 12px;
   overflow: hidden;
@@ -180,7 +180,7 @@
 
 /* ── Tables section ── */
 .est-tables-section {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid var(--border, #3B4A61);
   border-radius: 12px;
   overflow: hidden;
@@ -218,7 +218,7 @@
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--text-muted, #8E99AB);
-  background: var(--bg-main, #163A7A);
+  background: var(--bg-main, #142E59);
   font-weight: 600;
 }
 .est-table td {
@@ -257,7 +257,7 @@
 
 /* ── Alerts section ── */
 .est-alerts-section {
-  background: var(--bg-card, #163A7A);
+  background: var(--bg-card, #142E59);
   border: 1px solid rgba(239,68,68,.3);
   border-radius: 12px;
   overflow: hidden;
