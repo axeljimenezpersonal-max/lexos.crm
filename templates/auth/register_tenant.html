@@ -30,10 +30,11 @@
   .hc-lista li::before{content:"";flex:none;width:18px;height:18px;margin-top:1px;border-radius:50%;background:#AD9060 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23132238' stroke-width='3.2'%3E%3Cpath d='m6 12 4 4 8-9'/%3E%3C/svg%3E") center/12px no-repeat}
   .ar-inner .ar-header h1{font:600 32px/1.1 Sora,sans-serif;letter-spacing:-.03em;color:#142E59}
   </style>
+  <style>.reg-split{grid-template-columns:1fr 1.4fr}@media (max-width:768px){.reg-split{grid-template-columns:1fr}}@media (max-width:420px){.plan-card{min-width:0;padding-left:10px;padding-right:10px}}</style>
   <style>.hc-left .hc-acceso{margin-top:34px;font-size:14px;color:#9AA4B5}.hc-left .hc-acceso a{color:#C1A574;font-weight:600;text-decoration:none}</style>
 </head>
 <body>
-<div class="auth-split" style="grid-template-columns: 1fr 1.4fr;">
+<div class="auth-split reg-split">
 
   <!-- Left panel -->
   <div class="auth-left hc-left">
@@ -64,7 +65,7 @@
     <div class="ar-inner" style="max-width:520px;width:100%;padding: 24px 0;">
       <div class="ar-header">
         <h1>Registrar despacho</h1>
-        <p>Completa los datos para crear tu espacio de trabajo en CODEX.</p>
+        <p>Completa los datos para crear tu espacio de trabajo en Habeas Corpus.</p>
       </div>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -191,15 +192,21 @@
           </div>
         </div>
 
+        <!-- Aceptación legal (obligatoria) -->
+        <div class="form-group">
+          <label class="checkbox-label" style="align-items:flex-start;gap:10px;line-height:1.5;">
+            <input type="checkbox" name="acepto_terminos" value="1" required style="flex:none;margin-top:3px;"
+                   {% if form_data.get('acepto_terminos') == '1' %}checked{% endif %}>
+            <span>He leído y acepto los
+              <a href="{{ url_for('legal.terminos') }}" target="_blank" rel="noopener" class="text-accent">términos y condiciones</a> y el
+              <a href="{{ url_for('legal.privacidad') }}" target="_blank" rel="noopener" class="text-accent">aviso de privacidad</a>
+              de Habeas Corpus. <span style="color:var(--danger)">*</span></span>
+          </label>
+        </div>
+
         <button type="submit" class="btn btn-primary w-full" style="padding:12px;margin-top:8px;" id="submitBtn">
           Crear mi despacho →
         </button>
-
-        <p class="text-xs text-muted" style="text-align:center;margin-top:16px;">
-          Al registrarte aceptas los
-          <a href="#" class="text-accent">Términos de Servicio</a> y la
-          <a href="#" class="text-accent">Política de Privacidad</a> de CODEX.
-        </p>
       </form>
     </div>
   </div>

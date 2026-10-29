@@ -1,0 +1,169 @@
+{% extends "legal/base_legal.html" %}
+{% from "legal/_macros.html" import pd, indice, aviso_borrador %}
+{% block titulo %}Términos y condiciones{% endblock %}
+{% block cuerpo %}
+{% set secciones = [
+  ('partes', '1. Quiénes somos y aceptación'),
+  ('definiciones', '2. Definiciones'),
+  ('servicio', '3. El servicio'),
+  ('cuentas', '4. Cuentas y usuarios'),
+  ('informacion', '5. Tu información es tuya'),
+  ('confidencialidad', '6. Confidencialidad y secreto profesional'),
+  ('seguridad', '7. Cifrado y respaldos'),
+  ('dictum', '8. Dictum, el asistente con IA'),
+  ('uso', '9. Uso aceptable'),
+  ('pagos', '10. Planes, precios y pagos'),
+  ('disponibilidad', '11. Disponibilidad y soporte'),
+  ('responsabilidad', '12. Limitación de responsabilidad'),
+  ('terminacion', '13. Suspensión y terminación'),
+  ('exportacion', '14. Exportación de datos al salir'),
+  ('propiedad', '15. Propiedad intelectual'),
+  ('cambios', '16. Cambios a estos términos'),
+  ('ley', '17. Ley aplicable y jurisdicción'),
+  ('contacto', '18. Contacto'),
+] %}
+<main class="hoja">
+{{ indice(secciones) }}
+<article>
+  <p class="eyebrow">Documento legal</p>
+  <h1>Términos y condiciones</h1>
+  <p class="meta">Versión {{ version }} · Vigentes desde el {{ pd('fecha de publicación') }}</p>
+  {{ aviso_borrador(borrador) }}
+
+  <h2 id="partes">1. Quiénes somos y aceptación</h2>
+  <p>Estos términos regulan el uso de <strong>Habeas Corpus</strong>, un sistema en línea para despachos de abogados, notarías y otras oficinas legales en México. El servicio lo presta {{ pd('razón social') }}, con RFC {{ pd('RFC') }} y domicilio en {{ pd('domicilio fiscal') }} («Habeas Corpus», «nosotros»).</p>
+  <p>Al registrar un despacho, o al marcar «Acepto» al entrar, la persona que lo hace declara que tiene facultades para obligar al despacho o notaría y que acepta estos términos y el <a href="{{ url_for('legal.privacidad') }}">aviso de privacidad</a>. La aceptación electrónica tiene la misma validez que una firma autógrafa, conforme al Código de Comercio y al Código Civil Federal. Guardamos constancia de quién aceptó, qué versión, cuándo y desde qué dirección IP.</p>
+
+  <h2 id="definiciones">2. Definiciones</h2>
+  <ul>
+    <li><strong>Despacho</strong>: el despacho, notaría, oficina legal o profesionista que contrata el servicio. Es nuestro cliente.</li>
+    <li><strong>Usuarios</strong>: las personas a quienes el Despacho da acceso (socios, abogados, asistentes y, en su caso, sus propios clientes a través del portal).</li>
+    <li><strong>Información del Despacho</strong>: todo lo que el Despacho y sus Usuarios capturan o suben: expedientes, clientes, contrapartes, documentos, notas, agenda, cobranza y conversaciones con Dictum.</li>
+    <li><strong>Dictum</strong>: el asistente con inteligencia artificial incluido en el servicio.</li>
+  </ul>
+
+  <h2 id="servicio">3. El servicio</h2>
+  <p>Habeas Corpus es un software como servicio (SaaS): el Despacho lo usa por internet, sin instalar nada, mediante una suscripción. Incluye, según el plan contratado, la gestión de expedientes y términos, agenda, clientes, documentos, cobranza, reportes, un portal para los clientes del Despacho y Dictum.</p>
+  <p>Podemos mejorar, cambiar o retirar funciones. Si un cambio reduce de forma importante lo que el Despacho contrató, lo avisaremos con al menos 30 días naturales de anticipación y el Despacho podrá cancelar sin penalización.</p>
+  <p>Habeas Corpus es una herramienta de trabajo. <strong>No presta servicios jurídicos</strong> ni sustituye al abogado, al notario o al personal del Despacho.</p>
+
+  <h2 id="cuentas">4. Cuentas y usuarios</h2>
+  <ul>
+    <li>El Despacho decide quién entra, con qué permisos, y da de baja a quien deje de colaborar con él.</li>
+    <li>Cada Usuario debe tener su propia cuenta. Las contraseñas son personales y no deben compartirse.</li>
+    <li>El Despacho responde por lo que hagan sus Usuarios dentro del sistema y debe avisarnos de inmediato si sospecha un acceso no autorizado.</li>
+    <li>Los datos de registro deben ser verdaderos y mantenerse actualizados.</li>
+  </ul>
+
+  <h2 id="informacion">5. Tu información es tuya</h2>
+  <p><strong>La Información del Despacho pertenece al Despacho.</strong> Habeas Corpus no adquiere ningún derecho sobre ella, salvo el permiso limitado necesario para guardarla, procesarla y mostrarla con el único fin de prestar el servicio.</p>
+  <p>Frente a los datos personales contenidos en la Información del Despacho (por ejemplo, los de sus clientes y contrapartes), el Despacho es el <strong>responsable</strong> y Habeas Corpus actúa solo como <strong>encargado</strong>, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares. En consecuencia, nos obligamos a:</p>
+  <ul>
+    <li>tratar esos datos únicamente conforme a las instrucciones del Despacho y para prestar el servicio;</li>
+    <li>no usarlos para fines propios, no venderlos, no compartirlos con terceros salvo con los proveedores que necesitamos para operar (ver el aviso de privacidad) y no usarlos para entrenar modelos de inteligencia artificial;</li>
+    <li>guardarlos con medidas de seguridad, mantenerlos confidenciales y avisar al Despacho sin demora si ocurre una vulneración de seguridad que lo afecte;</li>
+    <li>apoyar al Despacho para atender las solicitudes de derechos ARCO de sus clientes;</li>
+    <li>devolverlos y después suprimirlos al terminar la relación, como se explica en las secciones 13 y 14.</li>
+  </ul>
+  <p>El Despacho, como responsable, debe contar con su propio aviso de privacidad frente a sus clientes y obtener los consentimientos que exija la ley, incluido el consentimiento expreso y por escrito para los datos personales sensibles.</p>
+  <p>Podemos generar estadísticas agregadas y anónimas sobre el uso del sistema (por ejemplo, cuántos expedientes se crean al mes) que no permitan identificar al Despacho ni a ninguna persona.</p>
+
+  <h2 id="confidencialidad">6. Confidencialidad y secreto profesional</h2>
+  <p>Sabemos que la Información del Despacho está protegida por el secreto profesional. Por eso:</p>
+  <ul>
+    <li>Tratamos toda la Información del Despacho como confidencial, durante la relación y después de que termine.</li>
+    <li>Nuestro personal no consulta la Información del Despacho. Solo puede hacerlo cuando el Despacho lo pide para darle soporte, o cuando es indispensable para resolver una falla de seguridad, y siempre con obligaciones de confidencialidad por escrito.</li>
+    <li>Si una autoridad nos requiere Información del Despacho, avisaremos al Despacho antes de entregarla, salvo que la ley o la autoridad lo prohíban, y solo entregaremos lo estrictamente requerido.</li>
+  </ul>
+  <p>El secreto profesional del abogado y las obligaciones del notario frente a su protocolo y sus clientes siguen siendo del Despacho. Usar Habeas Corpus no las traslada a nosotros ni las modifica.</p>
+
+  <h2 id="seguridad">7. Cifrado y respaldos</h2>
+  <ul>
+    <li><strong>En tránsito</strong>: toda la comunicación con Habeas Corpus viaja cifrada (HTTPS).</li>
+    <li><strong>Documentos</strong>: los archivos que sube el Despacho se guardan cifrados, con una llave distinta para cada despacho. No se pueden abrir directamente desde el servidor ni desde un enlace público; solo se entregan a Usuarios con sesión en ese despacho o a sus clientes cuando el Despacho se los comparte.</li>
+    <li><strong>Respaldos</strong>: hacemos copias de seguridad automáticas de las bases de datos y de los documentos. Cada copia se cifra antes de salir del servidor y se guarda en un lugar distinto. Conservamos las copias de los últimos 7 días y, antes de esos, una por semana de 4 semanas más.</li>
+    <li><strong>Contraseñas</strong>: nunca se guardan en texto legible.</li>
+  </ul>
+  <p>Ningún sistema es infalible. Aplicamos medidas razonables de seguridad administrativas, técnicas y físicas, pero no podemos garantizar que nunca ocurra un incidente. Si ocurre uno que afecte la Información del Despacho, lo avisaremos sin demora, con lo que sepamos y lo que estemos haciendo para resolverlo.</p>
+
+  <h2 id="dictum">8. Dictum, el asistente con IA</h2>
+  <div class="nota">
+    <p><strong>Dictum no sustituye el criterio del abogado.</strong> Sus respuestas son un apoyo de consulta: pueden contener errores, omisiones o información desactualizada, aunque citen sus fuentes.</p>
+  </div>
+  <ul>
+    <li>Toda respuesta de Dictum debe ser revisada por un profesional del derecho antes de usarse en un asunto, escrito, opinión o trámite. Verifica siempre las leyes, tesis y precedentes que cite, así como los plazos que calcule.</li>
+    <li>Dictum no da asesoría jurídica, no representa a nadie y no crea relación abogado-cliente entre Habeas Corpus y el Despacho o sus clientes.</li>
+    <li>Las decisiones y documentos del Despacho, y sus consecuencias, son responsabilidad del Despacho.</li>
+    <li>Para responder, Dictum puede usar la Información del Despacho que el Usuario tiene permitido ver. Cuando funciona con un modelo de lenguaje de un proveedor externo, enviamos a ese proveedor solo los fragmentos necesarios para cada respuesta, bajo condiciones que le impiden usarlos para entrenar sus modelos.</li>
+  </ul>
+
+  <h2 id="uso">9. Uso aceptable</h2>
+  <p>El Despacho y sus Usuarios se obligan a no:</p>
+  <ul>
+    <li>usar el servicio para actividades ilícitas o para guardar información obtenida ilegalmente;</li>
+    <li>intentar acceder a información de otros despachos, vulnerar la seguridad o probarla sin nuestra autorización por escrito;</li>
+    <li>copiar, revender o descompilar el software, ni extraer información de forma masiva con programas automáticos;</li>
+    <li>subir archivos con virus o código malicioso.</li>
+  </ul>
+
+  <h2 id="pagos">10. Planes, precios y pagos</h2>
+  <ul>
+    <li>Los precios de cada plan están publicados en nuestra página y no incluyen IVA, salvo que se indique lo contrario.</li>
+    <li>La suscripción se paga por adelantado, mensual o anualmente, y se renueva sola hasta que el Despacho la cancele. Forma de pago y facturación: {{ pd('medios de pago y emisión de CFDI') }}.</li>
+    <li>Podemos cambiar los precios avisando con al menos 30 días naturales de anticipación; el cambio aplica a partir del siguiente periodo.</li>
+    <li>El periodo de prueba gratuito no requiere pago. Al terminar, el Despacho decide si contrata un plan.</li>
+    <li>Lo pagado no es reembolsable, salvo que la ley disponga otra cosa o lo indiquen estos términos.</li>
+  </ul>
+
+  <h2 id="disponibilidad">11. Disponibilidad y soporte</h2>
+  <p>Hacemos lo razonable para que Habeas Corpus esté disponible todo el tiempo, pero puede haber interrupciones por mantenimiento (que procuraremos avisar y hacer fuera del horario de oficina) o por causas ajenas a nosotros, como fallas de internet, de nuestros proveedores o casos fortuitos. Salvo que se pacte por escrito un nivel de servicio, no garantizamos una disponibilidad determinada.</p>
+  <p>Damos soporte por correo en {{ pd('correo de soporte') }}, en días hábiles.</p>
+  <div class="nota">
+    <p><strong>Importante para el cómputo de términos.</strong> La agenda y los recordatorios de Habeas Corpus son una ayuda. El Despacho debe llevar su propio control de términos y plazos procesales y no depender exclusivamente del sistema.</p>
+  </div>
+
+  <h2 id="responsabilidad">12. Limitación de responsabilidad</h2>
+  <ul>
+    <li>Habeas Corpus se ofrece «tal cual». No garantizamos que el servicio esté libre de errores ni que sea adecuado para un fin específico del Despacho.</li>
+    <li>No respondemos por daños indirectos, lucro cesante, pérdida de oportunidades o de clientes, ni por las consecuencias de decisiones tomadas con base en Dictum, en los recordatorios del sistema o en información capturada por el Despacho.</li>
+    <li>No respondemos por el mal uso de las cuentas del Despacho, por contraseñas compartidas ni por fallas de los equipos o de la conexión del Despacho.</li>
+    <li>En cualquier caso, nuestra responsabilidad total frente al Despacho se limita al monto que el Despacho nos haya pagado en los 12 meses anteriores al hecho que la origine.</li>
+    <li>Estas limitaciones no aplican en caso de dolo o culpa grave, ni a nuestras obligaciones de confidencialidad y de protección de datos personales, ni en lo que la ley no permita limitar.</li>
+  </ul>
+
+  <h2 id="terminacion">13. Suspensión y terminación</h2>
+  <h3>Si el Despacho decide irse</h3>
+  <p>Puede cancelar en cualquier momento escribiéndonos a {{ pd('correo de soporte') }}. La cancelación surte efecto al terminar el periodo ya pagado.</p>
+  <h3>Cuándo podemos suspender o terminar</h3>
+  <ul>
+    <li><strong>Falta de pago</strong>: después de avisar y dar al menos 15 días naturales para pagar, podemos suspender el acceso. Durante la suspensión la información no se borra.</li>
+    <li><strong>Uso indebido o riesgo de seguridad</strong>: podemos suspender de inmediato las cuentas involucradas si hay un uso ilícito, una violación grave de estos términos o un riesgo para la seguridad de otros despachos. Avisaremos al Despacho y, si el problema se corrige, restableceremos el acceso.</li>
+    <li>Si dejamos de ofrecer el servicio, avisaremos con al menos 90 días naturales de anticipación.</li>
+  </ul>
+  <h3>Qué pasa con la información</h3>
+  <p>Al terminar la relación, por cualquier causa, la Información del Despacho queda disponible para exportarse durante <strong>30 días naturales</strong>. Después la borramos de nuestros sistemas activos; las copias de seguridad que la contengan se eliminan solas en un máximo de 45 días adicionales, conforme a su ciclo de conservación. Solo conservaremos lo que la ley nos obligue a guardar, como la información fiscal de la relación.</p>
+
+  <h2 id="exportacion">14. Exportación de datos al salir</h2>
+  <p>El Despacho puede llevarse su información cuando quiera, sin costo y sin necesidad de justificarlo:</p>
+  <ul>
+    <li>los registros (expedientes, clientes, contrapartes, agenda, cobranza y notas) en formatos de uso común, como hojas de cálculo (Excel o CSV);</li>
+    <li>los documentos en su formato original, ya descifrados.</li>
+  </ul>
+  <p>Si el Despacho lo pide por escrito a {{ pd('correo de soporte') }}, le entregamos una copia completa en un plazo máximo de 10 días hábiles. No retenemos la información como medida de presión, ni siquiera si hay pagos pendientes.</p>
+
+  <h2 id="propiedad">15. Propiedad intelectual</h2>
+  <p>El software, el diseño, la marca Habeas Corpus, Dictum y sus contenidos propios son de Habeas Corpus o de sus licenciantes. La suscripción da al Despacho un derecho de uso personal, no exclusivo e intransferible mientras esté vigente. Los textos de leyes, tesis y criterios públicos que el sistema muestra pertenecen al dominio público.</p>
+
+  <h2 id="cambios">16. Cambios a estos términos</h2>
+  <p>Podemos actualizar estos términos. Cada versión lleva un número y una fecha. Si el cambio es importante, lo avisaremos por correo o dentro del sistema con al menos 15 días naturales de anticipación, y al entrar se pedirá aceptar la nueva versión. Si el Despacho no está de acuerdo, puede cancelar antes de que entre en vigor y exportar su información como se indica en la sección 14.</p>
+
+  <h2 id="ley">17. Ley aplicable y jurisdicción</h2>
+  <p>Estos términos se rigen por las leyes federales de los Estados Unidos Mexicanos. Para su interpretación y cumplimiento, las partes se someten a los tribunales competentes de {{ pd('ciudad, p. ej. Ciudad de México') }}, y renuncian a cualquier otro fuero que pudiera corresponderles por su domicilio presente o futuro.</p>
+  <p>Nada de lo anterior limita los derechos que la ley otorgue al Despacho y que no puedan renunciarse.</p>
+
+  <h2 id="contacto">18. Contacto</h2>
+  <p>{{ pd('razón social') }} · {{ pd('domicilio') }}<br>
+     Soporte: {{ pd('correo de soporte') }} · Datos personales: {{ pd('correo de privacidad') }}</p>
+</article>
+</main>
+{% endblock %}

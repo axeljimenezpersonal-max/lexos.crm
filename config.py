@@ -24,6 +24,19 @@ class Config:
     # si se pierde, los documentos cifrados no se pueden recuperar.
     BOVEDA_MASTER_KEY = os.environ.get("BOVEDA_MASTER_KEY", "")
 
+    # ─── Términos y aviso de privacidad ─────────────────────────────────────
+    # Al cambiar el texto, sube la versión: cada usuario tendrá que aceptarla otra vez.
+    TERMINOS_VERSION = "2026-10"
+    PRIVACIDAD_VERSION = "2026-10"
+
+    # ─── Respaldos (scripts/respaldo.py) ────────────────────────────────────
+    # Destino: una carpeta ("/respaldos") o un bucket S3-compatible ("s3://bucket/prefijo").
+    RESPALDO_DESTINO = os.environ.get("RESPALDO_DESTINO", "")
+    RESPALDO_S3_ENDPOINT = os.environ.get("RESPALDO_S3_ENDPOINT", "")
+    RESPALDO_S3_REGION = os.environ.get("RESPALDO_S3_REGION", "auto")
+    # Token para pedir un respaldo por HTTP (cron de Railway). Sin él, la ruta no existe.
+    RESPALDO_TOKEN = os.environ.get("RESPALDO_TOKEN", "")
+
     # ─── Asistente jurídico ─────────────────────────────────────────────────
     ASISTENTE_NOMBRE = os.environ.get("ASISTENTE_NOMBRE", "Dictum")
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")

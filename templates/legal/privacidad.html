@@ -1,0 +1,142 @@
+{% extends "legal/base_legal.html" %}
+{% from "legal/_macros.html" import pd, indice, aviso_borrador %}
+{% block titulo %}Aviso de privacidad{% endblock %}
+{% block cuerpo %}
+{% set secciones = [
+  ('responsable', '1. Responsable'),
+  ('dos-papeles', '2. Nuestros dos papeles'),
+  ('datos', '3. Datos que tratamos'),
+  ('encargo', '4. Datos de terceros que suben los despachos'),
+  ('finalidades', '5. Finalidades'),
+  ('transferencias', '6. Remisiones y transferencias'),
+  ('arco', '7. Derechos ARCO'),
+  ('revocar', '8. Revocar el consentimiento y limitar el uso'),
+  ('seguridad', '9. Seguridad'),
+  ('cookies', '10. Cookies'),
+  ('cambios', '11. Cambios a este aviso'),
+  ('autoridad', '12. Autoridad'),
+] %}
+<main class="hoja">
+{{ indice(secciones) }}
+<article>
+  <p class="eyebrow">Documento legal</p>
+  <h1>Aviso de privacidad integral</h1>
+  <p class="meta">Versión {{ version }} · Última actualización: {{ pd('fecha de publicación') }}</p>
+  {{ aviso_borrador(borrador) }}
+
+  <p>Este aviso se emite conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares publicada en el Diario Oficial de la Federación el 20 de marzo de 2025 (la «Ley») y demás normativa aplicable.</p>
+
+  <h2 id="responsable">1. Responsable</h2>
+  <p><strong>{{ pd('razón social') }}</strong> («Habeas Corpus»), con domicilio en {{ pd('domicilio completo') }}, es responsable del tratamiento de los datos personales que se describen en este aviso.</p>
+  <p>Para cualquier asunto de datos personales puedes escribir a <strong>{{ pd('correo de privacidad') }}</strong>, que atiende {{ pd('persona o departamento de datos personales') }}.</p>
+
+  <h2 id="dos-papeles">2. Nuestros dos papeles</h2>
+  <table class="tabla">
+    <tr><th>Somos responsables de…</th><th>Somos solo encargados de…</th></tr>
+    <tr>
+      <td>Los datos de quienes usan Habeas Corpus o nos contactan: los despachos y notarías que contratan, sus usuarios y quienes piden una demostración.</td>
+      <td>Los datos que cada despacho o notaría captura o sube al sistema sobre sus propios clientes, contrapartes y asuntos. El responsable de esos datos es el despacho.</td>
+    </tr>
+  </table>
+
+  <h2 id="datos">3. Datos que tratamos como responsables</h2>
+  <ul>
+    <li><strong>Identificación y contacto</strong>: nombre, apellidos, correo electrónico, teléfono, cargo y fotografía de perfil, si la subes.</li>
+    <li><strong>Del despacho</strong>: nombre comercial, razón social, RFC, domicilio, áreas de práctica y datos de facturación.</li>
+    <li><strong>De la cuenta</strong>: contraseña (guardada de forma que no puede leerse), rol, fechas de acceso y preferencias.</li>
+    <li><strong>Técnicos y de seguridad</strong>: dirección IP, navegador, fecha y hora de las acciones y registro de actividad dentro del sistema.</li>
+    <li><strong>De las integraciones que tú decidas conectar</strong> (por ejemplo, Google Calendar o Gmail): los permisos y la información que autorices en esa conexión.</li>
+    <li><strong>De la solicitud de demostración</strong>: nombre, despacho, correo, teléfono, tamaño del despacho y tu mensaje.</li>
+  </ul>
+  <p>Como responsables, <strong>no solicitamos datos personales sensibles</strong> de nuestros usuarios.</p>
+
+  <h2 id="encargo">4. Datos de terceros que suben los despachos</h2>
+  <p>Para trabajar, los despachos y notarías guardan en Habeas Corpus información de sus clientes, contrapartes, testigos y demás personas relacionadas con sus asuntos. Esa información puede incluir datos de identificación, patrimoniales, financieros, judiciales y <strong>datos personales sensibles</strong>, como los relativos a la salud, la vida familiar, la vida sexual, las creencias, el origen étnico o los antecedentes penales.</p>
+  <p>Sobre esos datos:</p>
+  <ul>
+    <li>El <strong>responsable es el despacho o la notaría</strong>, que debe darles a sus clientes su propio aviso de privacidad y obtener los consentimientos que exija la Ley, incluido el consentimiento expreso y por escrito para los datos sensibles.</li>
+    <li>Habeas Corpus actúa como <strong>encargado</strong>: los trata solo por cuenta y bajo instrucciones del despacho, únicamente para prestarle el servicio. No los usamos para fines propios, no los vendemos, no los compartimos con fines comerciales y no los usamos para entrenar modelos de inteligencia artificial.</li>
+    <li>Los guardamos con las medidas de seguridad descritas en la sección 9, los mantenemos confidenciales y, al terminar la relación con el despacho, se los devolvemos y después los suprimimos.</li>
+    <li>Si eres cliente o contraparte de un despacho y quieres ejercer tus derechos sobre esos datos, dirígete al despacho. Si la solicitud nos llega a nosotros, se la turnaremos al despacho sin demora y lo apoyaremos para atenderla.</li>
+  </ul>
+
+  <h2 id="finalidades">5. Finalidades</h2>
+  <h3>Finalidades necesarias para el servicio</h3>
+  <ul>
+    <li>Crear y administrar la cuenta del despacho y de sus usuarios, y verificar la identidad al iniciar sesión.</li>
+    <li>Prestar el servicio contratado, incluidas sus funciones de Dictum, recordatorios y notificaciones.</li>
+    <li>Proteger la seguridad del sistema, prevenir fraudes y accesos no autorizados y llevar constancia de la aceptación de los términos y de este aviso.</li>
+    <li>Dar soporte técnico y atender solicitudes.</li>
+    <li>Cobrar, facturar y cumplir obligaciones fiscales y legales.</li>
+    <li>Atender requerimientos de autoridades competentes.</li>
+  </ul>
+  <h3>Finalidades adicionales (puedes negarte)</h3>
+  <ul>
+    <li>Enviarte novedades del producto, invitaciones a eventos y contenido de interés legal.</li>
+    <li>Pedirte tu opinión mediante encuestas para mejorar el servicio.</li>
+  </ul>
+  <p>Si no quieres que usemos tus datos para estas finalidades adicionales, escríbenos a {{ pd('correo de privacidad') }} o usa el enlace para darte de baja que viene en cada correo. Negarte no afecta tu acceso al servicio.</p>
+
+  <h2 id="transferencias">6. Remisiones y transferencias</h2>
+  <h3>Proveedores que nos ayudan a operar (remisiones)</h3>
+  <p>Para prestar el servicio compartimos datos con proveedores que actúan como encargados nuestros y solo pueden usarlos para ese fin, bajo obligaciones de confidencialidad y seguridad. Estas comunicaciones no requieren tu consentimiento. Algunos de estos proveedores están fuera de México (por ejemplo, en los Estados Unidos):</p>
+  <table class="tabla">
+    <tr><th>Proveedor</th><th>Para qué</th></tr>
+    <tr><td>Alojamiento en la nube {{ pd('confirmar: Railway') }}</td><td>Servidores donde vive el sistema.</td></tr>
+    <tr><td>Almacenamiento de respaldos {{ pd('proveedor elegido') }}</td><td>Copias de seguridad cifradas.</td></tr>
+    <tr><td>Modelo de lenguaje {{ pd('confirmar: Anthropic') }}</td><td>Generar las respuestas de Dictum, con los fragmentos estrictamente necesarios.</td></tr>
+    <tr><td>Correo electrónico {{ pd('proveedor de correo') }}</td><td>Enviar avisos, restablecimiento de contraseña y notificaciones.</td></tr>
+  </table>
+  <h3>Transferencias a terceros</h3>
+  <p>No vendemos ni rentamos datos personales. Solo los transferimos sin necesidad de tu consentimiento en los casos que permite la Ley, por ejemplo:</p>
+  <ul>
+    <li>a autoridades competentes, cuando una ley o una orden fundada y motivada nos obligue;</li>
+    <li>cuando sea necesario para reconocer, ejercer o defender un derecho en un proceso judicial;</li>
+    <li>a la empresa que, en su caso, adquiera o se fusione con Habeas Corpus, que quedará obligada por este aviso.</li>
+  </ul>
+  <p>Si en el futuro quisiéramos hacer una transferencia que sí requiera tu consentimiento, te lo pediremos antes.</p>
+
+  <h2 id="arco">7. Derechos ARCO</h2>
+  <p>Tienes derecho a:</p>
+  <ul>
+    <li><strong>Acceso</strong>: saber qué datos tuyos tenemos y cómo los usamos.</li>
+    <li><strong>Rectificación</strong>: corregirlos si son inexactos o están incompletos.</li>
+    <li><strong>Cancelación</strong>: pedir que los eliminemos cuando ya no sean necesarios.</li>
+    <li><strong>Oposición</strong>: oponerte a su uso para fines específicos.</li>
+  </ul>
+  <h3>Cómo ejercerlos</h3>
+  <p>Envía tu solicitud a <strong>{{ pd('correo de privacidad') }}</strong> con:</p>
+  <ol class="lista">
+    <li>tu nombre y un correo u otro medio para responderte;</li>
+    <li>copia de una identificación oficial o, si actúas por otra persona, el documento que acredite la representación;</li>
+    <li>una descripción clara de los datos y del derecho que quieres ejercer;</li>
+    <li>cualquier dato que nos ayude a localizar tu información (por ejemplo, el despacho al que perteneces);</li>
+    <li>en caso de rectificación, la corrección que pides y, si aplica, el documento que la respalde.</li>
+  </ol>
+  <p>Te responderemos en los plazos que marca la Ley: como máximo en 20 días hábiles te comunicaremos si la solicitud procede y, si procede, la haremos efectiva dentro de los 15 días hábiles siguientes. El trámite es gratuito; solo podrían cobrarse los gastos de envío o de reproducción en copias, si los pides.</p>
+  <p>Algunos datos no pueden eliminarse de inmediato porque la ley nos obliga a conservarlos (por ejemplo, la información fiscal) o porque son necesarios para cumplir el contrato vigente.</p>
+
+  <h2 id="revocar">8. Revocar el consentimiento y limitar el uso</h2>
+  <p>Puedes revocar el consentimiento que nos diste o pedir que limitemos el uso de tus datos escribiendo a {{ pd('correo de privacidad') }}, con los mismos requisitos de la sección anterior. Ten en cuenta que, si revocas el consentimiento para las finalidades necesarias, no podremos seguir prestándote el servicio.</p>
+
+  <h2 id="seguridad">9. Seguridad</h2>
+  <ul>
+    <li>Toda la comunicación viaja cifrada (HTTPS).</li>
+    <li>Los documentos se guardan cifrados con una llave distinta para cada despacho, y solo se entregan a usuarios autorizados de ese despacho.</li>
+    <li>Cada despacho tiene su propia base de datos, separada de las de los demás.</li>
+    <li>Hacemos respaldos automáticos que se cifran antes de salir del servidor.</li>
+    <li>El acceso de nuestro personal está restringido y sujeto a confidencialidad.</li>
+  </ul>
+  <p>Si ocurre una vulneración de seguridad que afecte de forma significativa tus derechos, te lo informaremos sin demora para que puedas tomar medidas.</p>
+
+  <h2 id="cookies">10. Cookies</h2>
+  <p>Usamos solo las cookies técnicas indispensables para mantener tu sesión abierta y proteger el sistema. No usamos cookies de publicidad ni de rastreo. Las tipografías de la página se cargan desde Google Fonts, lo que implica que tu navegador comparte con Google tu dirección IP.</p>
+
+  <h2 id="cambios">11. Cambios a este aviso</h2>
+  <p>Podemos actualizar este aviso por cambios en la ley, en nuestros servicios o en nuestras prácticas. La versión vigente siempre estará en <a href="{{ url_for('legal.privacidad') }}">esta página</a>, con su número de versión y fecha. Si el cambio es importante, te avisaremos por correo o dentro del sistema y, cuando corresponda, te pediremos aceptarlo al entrar.</p>
+
+  <h2 id="autoridad">12. Autoridad</h2>
+  <p>Si consideras que tu derecho a la protección de datos personales fue vulnerado, puedes acudir a la autoridad competente en la materia, que desde marzo de 2025 es la Secretaría Anticorrupción y Buen Gobierno.</p>
+</article>
+</main>
+{% endblock %}

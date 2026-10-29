@@ -567,6 +567,8 @@ def register_tenant():
             errors.append("Las contraseñas no coinciden.")
         if plan not in [p["id"] for p in Config.PLANES]:
             plan = "starter"
+        if request.form.get("acepto_terminos") != "1":
+            errors.append("Para crear tu despacho debes aceptar los términos y el aviso de privacidad.")
 
         gdb = _gdb()
 
@@ -642,6 +644,8 @@ def register_tenant():
             "id": user_id, "nombre": nombre_usr, "apellidos": apellido_usr,
             "email": email, "rol": "super_admin", "avatar_url": None,
         }
+        from modules.legal import registrar_aceptacion
+        registrar_aceptacion(user_id, tenant_id, email, "registro")
 
         # Email de bienvenida
         welcome_html = f"""
