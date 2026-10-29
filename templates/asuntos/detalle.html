@@ -116,6 +116,7 @@
   <div class="xp-tabs" role="tablist">
     <button class="xp-tab on" data-tab="resumen" role="tab">{{ ic('doc', 15) }}Resumen</button>
     <button class="xp-tab" data-tab="documentos" role="tab">{{ ic('doc', 15) }}Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
+    <button class="xp-tab" data-tab="preguntar" role="tab">{{ ic('spark', 15) }}Preguntar a {{ config.ASISTENTE_NOMBRE }}{% if hallazgos %}<span>{{ hallazgos | length }}</span>{% endif %}</button>
     <button class="xp-tab" data-tab="actividad" role="tab">{{ ic('note', 15) }}Actividad<span>{{ n_bit.n }}</span></button>
     <button class="xp-tab" data-tab="estrategia" role="tab">{{ ic('scale', 15) }}Estrategia</button>
     <button class="xp-tab" data-tab="horas" role="tab">{{ ic('clock', 15) }}Horas<span>{{ horas_total | round(1) }}</span></button>
@@ -609,8 +610,12 @@
     document.querySelectorAll('.xp-panel').forEach(p => p.classList.toggle('on', p === panel));
     document.querySelector('.xp2-dictum')?.classList.toggle('on', nombre === 'preguntar');
     if (btn) btn.scrollIntoView({ block: 'nearest', inline: 'center' });
-    else if (nombre === 'preguntar') panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
+  // El botón grande de la carpeta lleva directo al chat, que está más abajo
+  document.querySelector('.xp2-dictum')?.addEventListener('click', e => {
+    e.preventDefault();
+    setTimeout(() => document.querySelector('.xp2-tabs').scrollIntoView({ block: 'start', behavior: 'smooth' }), 30);
+  });
   const irA = n => { abrirTab(n); history.replaceState(null, '', '#' + n); };
   document.querySelectorAll('.xp-tab').forEach(t => t.addEventListener('click', () => irA(t.dataset.tab)));
   document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => irA(b.dataset.ir)));
