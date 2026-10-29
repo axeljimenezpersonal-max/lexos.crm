@@ -203,3 +203,69 @@
   .xd-subir { min-height: 180px; }
   .xr-equipo-acc { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Colores propios: chat de Dictum ──────────────────────────── */
+.xc { border-color: #C9D3E1; box-shadow: 0 24px 50px -36px rgba(20,46,89,.55); }
+.xc-h { background: var(--e); border-bottom: 0; }
+.xc-h b { color: #fff; }
+.xc-h b svg { color: #E6D6B3; }
+.xc-h small { color: #C3CCDA; }
+.xc-h .btn-ghost { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.25); color: #fff; }
+.xc-h .btn-ghost:hover { background: rgba(255,255,255,.18); color: #fff; }
+.xc-feed { background: #EEF2F7; }
+.xc-hola p { color: #2B3A52; }
+.xc-sug button { border-color: #C9D3E1; }
+.xc-sug button:hover { border-color: var(--e); background: #fff; }
+.xc-msg.yo { background: #8A6A2F; }
+.xc-msg.bot { background: #fff; border: 1px solid #D8DFEA; }
+.xc-caja { background: #fff; }
+.xc .xp-aviso-ia { background: #F7F0E1; }
+.xr-links { display: inline-flex; gap: 14px; }
+
+/* ── Actividad: tipos grandes, cada uno con su color ─────────── */
+#p-actividad .af-comp { border: 0; background: none; padding: 0; }
+#p-actividad .af-comp-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0; margin-bottom: 12px; border: 0; background: none; }
+#p-actividad .af-comp-tabs button { --c: var(--e); --f: #EEF1F5; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 16px; border: 2px solid transparent; background: var(--f); text-align: left; cursor: pointer; color: var(--c); transition: border-color .15s, transform .15s; }
+#p-actividad .af-comp-tabs button i { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: #fff; flex-shrink: 0; }
+#p-actividad .af-comp-tabs button span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#p-actividad .af-comp-tabs button b { font: 600 15.5px 'Sora', sans-serif; color: var(--c); }
+#p-actividad .af-comp-tabs button small { font-size: 12.5px; color: #4A5A73; }
+#p-actividad .af-comp-tabs button:hover { transform: translateY(-1px); }
+#p-actividad .af-comp-tabs button.on { border-color: var(--c); background: #fff; box-shadow: 0 12px 26px -20px var(--c); }
+#p-actividad .af-comp-tabs button.on i { background: var(--c); color: #fff; }
+#p-actividad .af-comp-tabs .c-nota { --c: #142E59; --f: #EAEFF6; }
+#p-actividad .af-comp-tabs .c-agenda { --c: #8A6A2F; --f: #F5EDDC; }
+#p-actividad .af-comp-tabs .c-horas { --c: #3D6B6B; --f: #E6F0EE; }
+#p-actividad .af-comp-b { border: 1px solid var(--border); border-radius: 16px; background: #fff; padding: 16px; }
+#p-actividad .af-comp-b[data-comp="nota"] { border-top: 4px solid #142E59; }
+#p-actividad .af-comp-b[data-comp="actividad"] { border-top: 4px solid #8A6A2F; }
+#p-actividad .af-comp-b[data-comp="horas"] { border-top: 4px solid #3D6B6B; }
+.xa-ejemplos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+.xa-ejemplos span { font: 600 12px 'Inter', sans-serif; color: var(--ash); margin-right: 2px; }
+.xa-ejemplos button { padding: 5px 11px; border-radius: 99px; border: 1px solid #E2D3AE; background: #FBF6EA; font: 500 12.5px 'Inter', sans-serif; color: #6E5A3A; cursor: pointer; }
+.xa-ejemplos button:hover { border-color: #8A6A2F; color: #8A6A2F; }
+.xa-agenda { margin-bottom: 16px; padding: 16px 18px; border-radius: 18px; background: #F5EDDC; border: 1px solid #E8D9B6; }
+.xa-agenda-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.xa-agenda-h b { display: inline-flex; align-items: center; gap: 7px; font: 600 15px 'Sora', sans-serif; color: #6E5A3A; }
+.xa-agenda-h a { font: 600 13.5px 'Inter', sans-serif; color: var(--e); text-decoration: none; }
+.xa-agenda-h a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.xa-eventos { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.xa-ev { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: #fff; text-decoration: none; color: var(--fog); min-width: 0; }
+.xa-ev:hover { box-shadow: 0 8px 20px -14px rgba(138,106,47,.6); }
+.xa-ev > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xa-ev b { font: 600 13.5px 'Inter', sans-serif; color: var(--e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xa-ev small { font-size: 12px; color: var(--ash); }
+.xa-dia { width: 40px; flex-shrink: 0; text-align: center; line-height: 1; }
+.xa-dia b { display: block; font: 600 20px 'Sora', sans-serif; color: #8A6A2F; }
+.xa-dia small { font: 600 10px 'Inter', sans-serif; letter-spacing: .08em; color: var(--ash); }
+/* Bitácora: cada movimiento con el color de su tipo */
+#p-actividad .af-it { margin: 8px 0; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--ib) 60%, #fff); border-left: 4px solid var(--ic); }
+#p-actividad .af-it .af-ico { background: #fff; color: var(--ic); }
+#p-actividad .af-dia { margin-top: 18px; }
+
+@media (max-width: 860px) {
+  #p-actividad .af-comp-tabs { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  #p-actividad .af-comp-tabs button { padding: 10px 12px; }
+  #p-actividad .af-comp-tabs button i { width: 38px; height: 38px; }
+  .xr-links { gap: 10px; }
+}

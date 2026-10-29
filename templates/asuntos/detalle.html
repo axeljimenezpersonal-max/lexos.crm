@@ -129,7 +129,7 @@
     </article>
 
     <article class="xp-card xp-sigue">
-      <div class="xp-card-h"><h2>Lo que sigue</h2><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">+ Agendar</a></div>
+      <div class="xp-card-h"><h2>Lo que sigue</h2><span class="xr-links"><a href="{{ url_for('calendario.index', asunto=asunto.id) }}">Ver en calendario</a><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">+ Agendar</a></span></div>
       <div class="xp-card-b">
         {% for e in eventos %}
         <div class="xp-paso"><span class="marca evento" title="{{ e.etiqueta }}"></span>
@@ -288,12 +288,24 @@
 
     <!-- ── Actividad ──────────────────────────────────────────────── -->
     <section class="xp-panel" id="p-actividad" role="tabpanel">
+<div class="xa-agenda">
+  <div class="xa-agenda-h"><b>{{ ic('cal', 16) }} Agenda de este expediente</b>
+    <a href="{{ url_for('calendario.index', asunto=asunto.id) }}">Ver en el calendario →</a></div>
+  {% if eventos %}
+  <div class="xa-eventos">
+    {% for e in eventos %}
+    <a class="xa-ev" href="{{ url_for('calendario.index', asunto=asunto.id) }}"><span class="xa-dia"><b>{{ e.dia.split(' ')[0] }}</b><small>{{ e.dia.split(' ')[1] | upper }}</small></span>
+      <span><b>{{ e.titulo }}</b><small>{{ e.etiqueta }}{% if e.hora and e.hora != '00:00' %} · {{ e.hora }}{% endif %}</small></span></a>
+    {% endfor %}
+  </div>
+  {% else %}<p class="as-empty">No hay audiencias ni términos agendados. Agrega uno abajo con «Audiencia o pendiente».</p>{% endif %}
+</div>
 <div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
       <div class="af-comp">
         <div class="af-comp-tabs">
-          <button type="button" class="on" data-comp="nota">{{ ic('note', 14) }} Nota</button>
-          <button type="button" data-comp="actividad">{{ ic('cal', 14) }} Audiencia o pendiente</button>
-          <button type="button" data-comp="horas">{{ ic('clock', 14) }} Horas</button>
+          <button type="button" class="on c-nota" data-comp="nota"><i>{{ ic('note', 22) }}</i><span><b>Nota</b><small>Qué pasó o qué acordaron</small></span></button>
+          <button type="button" class="c-agenda" data-comp="actividad"><i>{{ ic('cal', 22) }}</i><span><b>Audiencia o pendiente</b><small>Se agenda en el calendario</small></span></button>
+          <button type="button" class="c-horas" data-comp="horas"><i>{{ ic('clock', 22) }}</i><span><b>Horas</b><small>Tiempo trabajado</small></span></button>
         </div>
         <form class="af-comp-b on" data-comp="nota" id="fNota">
           <textarea name="contenido" rows="3" maxlength="5000" placeholder="Escribe una nota: qué pasó, qué acordaron, qué sigue…" required></textarea>
@@ -301,6 +313,9 @@
         </form>
         <form class="af-comp-b" data-comp="actividad" id="fActividad">
           <div class="af-row">
+            <div class="xa-ejemplos" style="grid-column:1 / -1"><span>Ejemplos:</span>
+              {% for t, tipo in [('Audiencia de pruebas y alegatos', 'audiencia'), ('Contestar la demanda', 'vencimiento'), ('Presentar alegatos', 'vencimiento'), ('Emplazamiento', 'diligencia'), ('Cita con el cliente', 'reunion'), ('Firma ante notario', 'reunion')] %}
+              <button type="button" data-ej="{{ t }}" data-tipo="{{ tipo }}">{{ t }}</button>{% endfor %}</div>
             <div style="grid-column:span 2"><label class="as-label" for="acTitulo">Qué es</label><input class="as-input" id="acTitulo" name="titulo" required maxlength="200" placeholder="Ej. Audiencia de pruebas y alegatos"></div>
             <div><label class="as-label" for="acTipo">Tipo</label>
               <select class="as-select" id="acTipo" name="tipo">
@@ -646,6 +661,9 @@
     document.querySelectorAll('.af-comp-tabs button').forEach(x => x.classList.toggle('on', x === b));
     document.querySelectorAll('.af-comp-b').forEach(f => f.classList.toggle('on', f.dataset.comp === b.dataset.comp));
     document.querySelector(`.af-comp-b[data-comp="${b.dataset.comp}"] :is(input,textarea)`)?.focus();
+  }));
+  document.querySelectorAll('.xa-ejemplos [data-ej]').forEach(b => b.addEventListener('click', () => {
+    $('#acTitulo').value = b.dataset.ej; $('#acTipo').value = b.dataset.tipo; const fp = $('#acFecha')._flatpickr; fp ? fp.open() : $('#acFecha').focus();
   }));
   const manana = new Date(Date.now() + 864e5); manana.setHours(10, 0, 0, 0);
   $('#acFecha').value = new Date(manana - manana.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);

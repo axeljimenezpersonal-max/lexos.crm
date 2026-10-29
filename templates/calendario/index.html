@@ -28,6 +28,15 @@
   </button>
 </div>
 
+{% set asunto_f = (asuntos | selectattr('id', 'equalto', request.args.get('asunto') | int) | list | first) if request.args.get('asunto') else None %}
+{% if asunto_f %}
+<div class="cal-solo">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+  <span>Solo la agenda de <b>{{ asunto_f.numero_expediente or '' }} {{ asunto_f.titulo }}</b></span>
+  <a href="{{ url_for('asuntos.detalle', id=asunto_f.id) }}">Volver al expediente</a>
+  <a href="{{ url_for('calendario.index') }}">Ver todo el calendario</a>
+</div>
+{% endif %}
 <div class="cal-busca">
   {% from "components/buscador.html" import buscador %}
   {{ buscador(en='agenda', placeholder='Busca en la agenda: «audiencias de la próxima semana», «términos vencidos», «Fuentes»',
@@ -87,7 +96,7 @@
       <select class="cal-filter-sel" id="filterAsunto" onchange="reloadEvents()">
         <option value="">Todos los asuntos</option>
         {% for a in asuntos %}
-        <option value="{{ a.id }}">{{ a.numero_expediente or a.titulo }}</option>
+        <option value="{{ a.id }}"{% if request.args.get('asunto') == a.id | string %} selected{% endif %}>{{ a.numero_expediente or a.titulo }}</option>
         {% endfor %}
       </select>
     </section>
@@ -498,7 +507,7 @@ const HOUR_H     = 64; /* px per hour */
 
 /* ── State ───────────────────────────────────── */
 let currentDate  = new Date(TODAY);
-let currentView  = (() => { try { return localStorage.getItem("lexos_cal_view"); } catch (_) { return null; } })()
+let currentView  = {% if request.args.get('asunto') %}"agenda"{% else %}null{% endif %} || (() => { try { return localStorage.getItem("lexos_cal_view"); } catch (_) { return null; } })()
                  || (window.innerWidth < 700 ? "agenda" : "week");
 let events       = [];
 let editingId    = null;

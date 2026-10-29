@@ -358,3 +358,9 @@
   .cp-cal { width: auto; }
 }
 .cal-busca{margin:18px 0 6px}
+.cal-solo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0 0;padding:12px 16px;border-radius:14px;background:var(--edim);border:1px solid #E2D3AE;color:#3B4A61;font-size:14px}
+.cal-solo svg{color:#8A6A2F;flex:none}
+.cal-solo b{color:var(--e)}
+.cal-solo a{margin-left:auto;font-weight:600;color:var(--e);text-decoration:none;font-size:13.5px}
+.cal-solo a + a{margin-left:0}
+.cal-solo a:hover{text-decoration:underline;text-decoration-color:var(--dorado);text-underline-offset:3px}

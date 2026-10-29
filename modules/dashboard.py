@@ -208,6 +208,73 @@ def index():
         alcance_p,
     ).fetchone()[0]
 
+    # ── Insights: lo que hoy importa, en números con una lectura ──
+    semana = (hoy + timedelta(days=7)).isoformat()
+    def eventos_rango(tipos):
+        marcas = ",".join("?" * len(tipos))
+        return tdb.execute(
+            f"""SELECT e.titulo, e.fecha_inicio FROM eventos_calendario e
+                WHERE e.estado = 'pendiente' AND e.tipo IN ({marcas}) AND date(e.fecha_inicio) BETWEEN ? AND ?{filtro_ev}
+                ORDER BY e.fecha_inicio""", (*tipos, hoy_iso, semana, *filtro_p)).fetchall()
+    def cuando(f):
+        d = (f - hoy).days
+        return "hoy" if d == 0 else ("mañana" if d == 1 else f"el {DIAS[f.weekday()]} {f.day}")
+    terminos_sem = eventos_rango(TERMINO_TIPOS)
+    audiencias_sem = eventos_rango(("audiencia", "diligencia"))
+    vencidos_n = tdb.execute(
+        f"""SELECT COUNT(*) FROM eventos_calendario e WHERE e.estado='pendiente' AND e.tipo IN ({terminos})
+            AND date(e.fecha_inicio) < ?{filtro_ev}""", (*TERMINO_TIPOS, hoy_iso, *filtro_p)).fetchone()[0]
+    from modules import cobranzas
+    alc_c, pc = cobranzas._alcance()
+    cartera = tdb.execute(
+        f"""SELECT COALESCE(SUM({cobranzas.SALDO}), 0),
+                   COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) < ? THEN {cobranzas.SALDO} ELSE 0 END), 0),
+                   COUNT(DISTINCT CASE WHEN date(co.fecha_vencimiento) < ? THEN co.cliente_id END)
+            FROM cobros co WHERE {cobranzas.ABIERTO_SQL} AND {alc_c}""", (hoy_iso, hoy_iso, *pc)).fetchone()
+    usuarios = _usuarios()
+    carga = []
+    if not _solo_lo_suyo():
+        for r in tdb.execute(
+            f"""SELECT a.abogado_responsable AS uid, COUNT(*) AS n FROM asuntos a
+                WHERE a.estado IN ({abiertos}) GROUP BY a.abogado_responsable ORDER BY n DESC LIMIT 4""",
+            ABIERTOS).fetchall():
+            u = usuarios.get(r["uid"]) or {}
+            carga.append({"nombre": u.get("corto") or "Sin responsable", "iniciales": u.get("iniciales", "?"),
+                          "color": u.get("color", "#9AA3B2"), "n": r["n"]})
+        tope = max((c["n"] for c in carga), default=1)
+        for c in carga:
+            c["pct"] = round(c["n"] / tope * 100)
+    nuevos_mes = tdb.execute(
+        f"SELECT COUNT(*) FROM asuntos a WHERE {alcance} AND date(COALESCE(a.fecha_inicio, a.fecha_alta)) >= ?",
+        (*alcance_p, hoy.replace(day=1).isoformat())).fetchone()[0]
+
+    def primero(filas):
+        if not filas:
+            return ""
+        f = _fecha(filas[0]["fecha_inicio"])
+        return f"El primero: {filas[0]['titulo']}, {cuando(f)}." if f else ""
+
+    insights = [
+        {"clave": "terminos", "n": len(terminos_sem), "titulo": "Términos en 7 días",
+         "lectura": primero(terminos_sem) or "Ningún término vence esta semana.",
+         "extra": f"{vencidos_n} ya vencido{'s' if vencidos_n != 1 else ''}" if vencidos_n else "",
+         "tono": "rojo" if vencidos_n or any((_fecha(t["fecha_inicio"]) - hoy).days <= 2 for t in terminos_sem) else "",
+         "url": url_for("buscador.resultados", q="términos próximos días")},
+        {"clave": "audiencias", "n": len(audiencias_sem), "titulo": "Audiencias y diligencias",
+         "lectura": primero(audiencias_sem).replace("El primero", "La primera") or "No hay audiencias en los próximos 7 días.",
+         "extra": "", "tono": "", "url": url_for("buscador.resultados", q="audiencias próximos días")},
+        {"clave": "cobro", "n": f"${cartera[0]:,.0f}", "titulo": "Por cobrar",
+         "lectura": ((f"Todo ya está vencido; son {cartera[2]} cliente{'s' if cartera[2] != 1 else ''}." if cartera[1] >= cartera[0]
+                      else f"${cartera[1]:,.0f} ya vencieron, de {cartera[2]} cliente{'s' if cartera[2] != 1 else ''}.") if cartera[1]
+                     else ("Todo va al corriente." if cartera[0] else "No hay cobros pendientes.")),
+         "extra": "", "tono": "rojo" if cartera[1] else "", "url": url_for("cobranzas.index", grupo="vencidos" if cartera[1] else None)},
+        {"clave": "parados", "n": sin_movimiento, "titulo": "Sin movimiento",
+         "lectura": ("Llevan más de 30 días sin notas, documentos ni audiencias. Conviene revisarlos." if sin_movimiento
+                     else "Todos los expedientes en curso se han movido en el último mes."),
+         "extra": f"{nuevos_mes} nuevo{'s' if nuevos_mes != 1 else ''} este mes" if nuevos_mes else "",
+         "tono": "ambar" if sin_movimiento else "", "url": url_for("asuntos.index", atencion="sin_mov")},
+    ]
+
     nombre = (session.get("user") or {}).get("nombre", "")
     return render_template(
         "dashboard/index.html",
@@ -216,6 +283,7 @@ def index():
         archivados=archivados,
         actividad=actividad,
         sugerencias=sugerencias,
+        insights=insights, carga=carga,
         hoy_txt=f"{DIAS[hoy.weekday()]} {hoy.day} de {MESES_LARGOS[hoy.month - 1]}",
         vencimientos=vencimientos,
         terminos_pronto=terminos_pronto,
