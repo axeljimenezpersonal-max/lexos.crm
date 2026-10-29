@@ -122,7 +122,7 @@ def eventos_demo() -> None:
         return
     hoy, creados = date.today(), 0
     try:
-        abiertos = {r[0] for r in tdb.execute("SELECT id FROM asuntos WHERE estado='activo'")}
+        abiertos = {r[0] for r in tdb.execute("SELECT id FROM asuntos WHERE estado NOT IN ('completado','cerrado','archivado')")}
         for asunto_id, titulo, tipo, dias, hora, lugar in EVENTOS_DEMO:
             if asunto_id not in abiertos:
                 continue
