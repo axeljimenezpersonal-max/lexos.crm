@@ -116,7 +116,7 @@
 <!-- ── Resumen ─────────────────────────────────────────────── -->
 <section class="xp-panel on" id="p-resumen" role="tabpanel">
   <div class="xr-fila uno">
-    <article class="xp-card xr-resumen">
+    <article class="xp-card xr-resumen b-resumen">
       <div class="xp-card-h"><h2>{{ ic('spark', 17) }} Resumen inteligente</h2><small>Se escribe solo con lo que registra el equipo</small></div>
       <div class="xp-card-b">
         {% for p in resumen.parrafos if p %}<p>{{ p }}</p>{% endfor %}
@@ -128,7 +128,7 @@
       </div>
     </article>
 
-    <article class="xp-card xp-sigue">
+    <article class="xp-card xp-sigue b-agenda">
       <div class="xp-card-h"><h2>Lo que sigue</h2><span class="xr-links"><a href="{{ url_for('calendario.index', asunto=asunto.id) }}">Ver en calendario</a><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">+ Agendar</a></span></div>
       <div class="xp-card-b">
         {% for e in eventos %}
@@ -147,7 +147,7 @@
   </div>
 
   <div class="xr-fila">
-    <article class="xp-card xr-notas">
+    <article class="xp-card xr-notas b-notas">
       <div class="xp-card-h"><h2>Notas</h2><button type="button" class="link" data-ir="actividad">Ver todo →</button></div>
       <div class="xp-card-b">
         <form class="xr-nota-nueva" id="fNotaRapida">
@@ -161,7 +161,7 @@
       </div>
     </article>
 
-    <article class="xp-card">
+    <article class="xp-card b-docs">
       <div class="xp-card-h"><h2>Documentos recientes</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
       <div class="xp-card-b">
         {% set recientes = (documentos[:3] | list) %}
@@ -182,7 +182,7 @@
   </div>
 
   {% if not abierto or asunto.resultado %}
-  <article class="xp-card xr-ancho">
+  <article class="xp-card xr-ancho b-resultado">
     <div class="xp-card-h"><h2>Resultado</h2></div>
     <div class="xp-card-b">
       <div class="as-res" id="pcRes">
@@ -195,7 +195,7 @@
   {% endif %}
 
   <div class="xr-fila">
-    <article class="xp-card">
+    <article class="xp-card b-dinero">
       <div class="xp-card-h"><h2>Cobranza</h2><a href="{{ url_for('cobranzas.index', asunto=asunto.id, grupo='todos') }}">Ver cobros →</a></div>
       <div class="xp-card-b">
         {% set base_ = dinero.pactados or dinero.facturado %}
@@ -208,13 +208,13 @@
         {% endif %}
       </div>
     </article>
-    <article class="xp-card">
+    <article class="xp-card b-resultado">
       <div class="xp-card-h"><h2>Casos parecidos</h2><a href="{{ url_for('insights.index') }}">Precedentes →</a></div>
       <div class="xp-card-b" id="pcCasos"><p class="as-empty">Buscando precedentes…</p></div>
     </article>
   </div>
 
-  <article class="xp-card xr-ancho xr-partes">
+  <article class="xp-card xr-ancho xr-partes b-equipo">
     <div class="xp-card-h"><h2>Partes y equipo</h2>{% if asunto.cliente_id %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">Ver ficha del cliente →</a>{% endif %}</div>
     <div class="xp-card-b">
       <div class="xr-personas">

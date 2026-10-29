@@ -312,7 +312,10 @@ def crear_respaldo(destino, bases_dir: str | None = None, boveda_dir: str | None
         tamanio = os.path.getsize(cifrado)
         destino.subir(cifrado, nombre)
 
-    borrados = aplicar_retencion(destino)
+    # Con RESPALDO_RETENCION=nube el bucket borra lo viejo por su cuenta (regla de ciclo de vida)
+    # y las credenciales del servidor no tienen permiso de borrar: un intruso no podría eliminar respaldos.
+    nube = os.environ.get("RESPALDO_RETENCION", "").strip().lower() == "nube"
+    borrados = [] if nube else aplicar_retencion(destino)
     resumen = {"nombre": nombre, "bytes": tamanio, "bases": len(manifiesto["bases"]),
                "archivos": len(manifiesto["boveda"]), "destino": destino.descripcion, "borrados": borrados}
     log(f"Respaldo listo: {nombre} ({tamanio / 1024 / 1024:.1f} MB, {resumen['bases']} bases, "

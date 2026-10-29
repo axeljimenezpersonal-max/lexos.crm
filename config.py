@@ -36,6 +36,8 @@ class Config:
     RESPALDO_S3_REGION = os.environ.get("RESPALDO_S3_REGION", "auto")
     # Token para pedir un respaldo por HTTP (cron de Railway). Sin él, la ruta no existe.
     RESPALDO_TOKEN = os.environ.get("RESPALDO_TOKEN", "")
+    # "nube": el bucket borra las copias viejas (ver docs/aws-respaldos.md); vacío: las borra el script.
+    RESPALDO_RETENCION = os.environ.get("RESPALDO_RETENCION", "")
 
     # ─── Asistente jurídico ─────────────────────────────────────────────────
     ASISTENTE_NOMBRE = os.environ.get("ASISTENTE_NOMBRE", "Dictum")

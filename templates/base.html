@@ -322,6 +322,7 @@
   </style>
 
   {% block head %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bandas.css') }}">
 </head>
 
 <body>
@@ -417,7 +418,7 @@
 
   <header class="topbar-main" id="topbarMain">
     <a href="{{ url_for('dashboard.index') }}" class="tb-marca" aria-label="Habeas Corpus, inicio">
-      {{ logo_mark(30) }}
+      {{ logo_mark(30, on='dark') }}
       <span class="tb-marca-nombre">Habeas <span>Corpus</span></span>
       {% if tenant %}<span class="tb-marca-sep" aria-hidden="true"></span><span class="tb-marca-desp" title="{{ tenant.nombre_despacho }}">{{ tenant.nombre_despacho }}</span>{% endif %}
     </a>

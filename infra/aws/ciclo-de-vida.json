@@ -1,0 +1,12 @@
+{
+  "Rules": [
+    {
+      "ID": "respaldos-35-dias",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "produccion/" },
+      "Expiration": { "Days": 36 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 1 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 2 }
+    }
+  ]
+}

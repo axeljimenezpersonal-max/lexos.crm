@@ -56,6 +56,7 @@ Si `RESPALDO_DESTINO` no está puesta, el script **avisa y no hace nada**; no tr
 | `RESPALDO_S3_REGION` | Región del bucket (en R2: `auto`) |
 | `RESPALDO_S3_ACCESS_KEY` / `RESPALDO_S3_SECRET_KEY` | Credenciales del bucket. Que solo puedan leer y escribir en ese bucket |
 | `RESPALDO_TOKEN` | Contraseña larga y aleatoria para pedir el respaldo por internet (ver 2.1) |
+| `RESPALDO_RETENCION` | `nube` si el bucket borra solo las copias viejas (así se usa en AWS: ver `docs/aws-respaldos.md`) |
 | `BOVEDA_MASTER_KEY` | La llave. Ya existe; los respaldos usan la misma |
 
 ### Comandos
