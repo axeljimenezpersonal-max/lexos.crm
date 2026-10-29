@@ -39,40 +39,43 @@
 <a class="xp-volver" href="{{ url_for('asuntos.index') }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Expedientes</a>
 
 <header class="xp2-head">
-  <div class="xp2-ceja">
-    <span class="xp2-pestana">{{ asunto.numero_expediente or ('#' ~ asunto.id) }}</span>
-    <a class="xp2-dictum" href="#preguntar" data-ir="preguntar" data-rastreo="Preguntar a Dictum (carpeta)">
-      <i aria-hidden="true">{{ ic('spark', 21) }}</i>
-      <span><b>Preguntar a {{ config.ASISTENTE_NOMBRE }}</b><small class="xp2-dictum-largo">Puntos clave y descubrimientos</small></span>
-      {% if hallazgos %}<em title="Puntos guardados en la memoria del caso">{{ hallazgos | length }}</em>{% endif %}
-    </a>
-  </div>
+  <span class="xp2-pestana">{{ asunto.numero_expediente or ('#' ~ asunto.id) }}</span>
   <div class="xp2-cuerpo">
-    <div class="xp2-top">
-      <span class="xp2-materia"><i></i>{{ ti.label }}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo | capitalize }}{% endif %}</span>
-      <div class="af-estado xp-estado">
-        <button type="button" class="xp-estado-btn e-{{ asunto.estado }}" id="afEstadoBtn"{% if not puede_editar %} disabled{% endif %} aria-haspopup="true"><i></i>{{ ei.label }}{% if puede_editar %} {{ ic('down', 14) }}{% endif %}</button>
-        {% if puede_editar %}
-        <div class="af-menu" id="afEstadoMenu" role="menu">
-          {% for k in estados_menu %}{% set e = estados[k] %}
-          <button type="button" data-estado="{{ k }}" role="menuitem"><span class="as-dot" style="--d:{{ e.color }}"></span>{{ e.label }}{% if asunto.estado == k or (k == 'cerrado' and asunto.estado == 'completado') %}<span class="ok">{{ ic('check', 14) }}</span>{% endif %}</button>
-          {% endfor %}
+    <div class="xp2-arriba">
+      <div class="xp2-arriba-tx">
+        <div class="xp2-top">
+          <span class="xp2-materia"><i></i>{{ ti.label }}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo | capitalize }}{% endif %}</span>
+          <div class="af-estado xp-estado">
+            <button type="button" class="xp-estado-btn e-{{ asunto.estado }}" id="afEstadoBtn"{% if not puede_editar %} disabled{% endif %} aria-haspopup="true"><i></i>{{ ei.label }}{% if puede_editar %} {{ ic('down', 14) }}{% endif %}</button>
+            {% if puede_editar %}
+            <div class="af-menu" id="afEstadoMenu" role="menu">
+              {% for k in estados_menu %}{% set e = estados[k] %}
+              <button type="button" data-estado="{{ k }}" role="menuitem"><span class="as-dot" style="--d:{{ e.color }}"></span>{{ e.label }}{% if asunto.estado == k or (k == 'cerrado' and asunto.estado == 'completado') %}<span class="ok">{{ ic('check', 14) }}</span>{% endif %}</button>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% if asunto.privado %}<span class="xp2-priv" title="{{ config.ASISTENTE_NOMBRE }} nunca envía información de este expediente fuera del servidor">{{ ic('lock', 13) }} Privado</span>{% endif %}
+          {% if asunto.prioridad == 'alta' %}<span class="xp2-prio">Prioridad alta</span>{% endif %}
         </div>
-        {% endif %}
+        <div class="af-tags xp2-tags" id="afTags">
+          {% for et in etiquetas %}<span class="af-tag" style="--t:{{ et.color }}">{{ et.nombre }}<button type="button" data-et="{{ et.id }}" aria-label="Quitar etiqueta {{ et.nombre }}">×</button></span>{% endfor %}
+          <button type="button" class="af-tag-add" id="afTagAdd">+ Etiqueta</button>
+          <form id="afTagForm" hidden>
+            <input class="as-input" id="afTagInput" list="afTagList" maxlength="30" placeholder="Ej. Urgente, Apelación…">
+            <datalist id="afTagList">{% for et in todas_etiquetas %}<option value="{{ et.nombre }}">{% endfor %}</datalist>
+            <button class="btn btn-primary btn-sm">Agregar</button>
+          </form>
+        </div>
+        <h1 class="xp2-titulo" id="afTitulo"{% if puede_editar %} contenteditable="true" spellcheck="false" title="Clic para editar el título"{% endif %}>{{ asunto.titulo }}</h1>
       </div>
-      {% if asunto.privado %}<span class="xp2-priv" title="{{ config.ASISTENTE_NOMBRE }} nunca envía información de este expediente fuera del servidor">{{ ic('lock', 13) }} Privado</span>{% endif %}
-      {% if asunto.prioridad == 'alta' %}<span class="xp2-prio">Prioridad alta</span>{% endif %}
+      <a class="xp2-dictum" href="#preguntar" data-ir="preguntar" data-rastreo="Preguntar a Dictum (carpeta)">
+        <i aria-hidden="true">{{ ic('spark', 21) }}</i>
+        <span><b>Preguntar a {{ config.ASISTENTE_NOMBRE }}</b><small class="xp2-dictum-largo">Puntos clave y descubrimientos</small></span>
+        {% if hallazgos %}<em title="Puntos guardados en la memoria del caso">{{ hallazgos | length }} guardado{{ 's' if hallazgos | length != 1 }}</em>{% endif %}
+        <strong class="xp2-dictum-ir" aria-hidden="true">Abrir chat <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></strong>
+      </a>
     </div>
-    <div class="af-tags xp2-tags" id="afTags">
-      {% for et in etiquetas %}<span class="af-tag" style="--t:{{ et.color }}">{{ et.nombre }}<button type="button" data-et="{{ et.id }}" aria-label="Quitar etiqueta {{ et.nombre }}">×</button></span>{% endfor %}
-      <button type="button" class="af-tag-add" id="afTagAdd">+ Etiqueta</button>
-      <form id="afTagForm" hidden>
-        <input class="as-input" id="afTagInput" list="afTagList" maxlength="30" placeholder="Ej. Urgente, Apelación…">
-        <datalist id="afTagList">{% for et in todas_etiquetas %}<option value="{{ et.nombre }}">{% endfor %}</datalist>
-        <button class="btn btn-primary btn-sm">Agregar</button>
-      </form>
-    </div>
-    <h1 class="xp2-titulo" id="afTitulo"{% if puede_editar %} contenteditable="true" spellcheck="false" title="Clic para editar el título"{% endif %}>{{ asunto.titulo }}</h1>
     <div class="xp2-quien">
       <div class="xp2-cli">
         <span class="xp2-av">{{ (asunto.cliente or '?')[:1] }}{{ ((asunto.cliente or '').split()[1] if (asunto.cliente or '').split() | length > 1 else '')[:1] }}</span>
@@ -948,8 +951,8 @@
       const n = lista.querySelectorAll('.xm-it').length, link = document.querySelector('.xp2-dictum');
       let em = link.querySelector('em');
       if (!n) { em?.remove(); return; }
-      if (!em) { em = document.createElement('em'); link.append(em); }
-      em.textContent = n;
+      if (!em) { em = document.createElement('em'); link.querySelector('.xp2-dictum-ir').before(em); }
+      em.textContent = `${n} guardado${n !== 1 ? 's' : ''}`;
     };
     function pintar(items) {
       lista.innerHTML = items.length ? items.map(h => `

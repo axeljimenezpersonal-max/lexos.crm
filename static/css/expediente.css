@@ -270,29 +270,33 @@
   .xr-links { gap: 10px; }
 }
 
-/* ── Botón de Dictum junto a la pestaña de la carpeta ─────────── */
-.xp2-head:has(.xp2-ceja) { padding-top: 64px; }
-.xp2-ceja { position: absolute; top: 0; left: 0; right: 0; height: 70px; display: flex; align-items: flex-end; gap: 36px; }
-.xp2-ceja .xp2-pestana { position: relative; white-space: nowrap; flex: none; }
-.xp2-dictum { display: inline-flex; align-items: center; gap: 14px; height: 60px; margin-bottom: 12px; padding: 0 22px 0 9px; border-radius: 16px;
-  background: linear-gradient(135deg, #142E59, #1F4479); color: #fff; text-decoration: none; min-width: 0;
-  box-shadow: 0 8px 20px -8px rgba(20,46,89,.55); transition: transform .15s, box-shadow .15s; }
-.xp2-dictum:hover, .xp2-dictum.on { transform: translateY(-1px); box-shadow: 0 12px 26px -8px rgba(20,46,89,.6); color: #fff; }
-.xp2-dictum.on { outline: 2px solid #AD9060; outline-offset: 2px; }
-.xp2-dictum i { width: 42px; height: 42px; flex: none; border-radius: 10px; display: grid; place-items: center; background: rgba(173,144,96,.28); color: #F1E3C4; }
-.xp2-dictum > span { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.xp2-dictum b { font: 600 18px 'Sora', sans-serif; white-space: nowrap; letter-spacing: -.01em; }
-.xp2-dictum small { font: 500 13px 'Inter', sans-serif; color: rgba(255,255,255,.72); white-space: nowrap; margin-top: 2px; }
-.xp2-dictum em { font-style: normal; font: 700 13px 'Inter', sans-serif; color: #142E59; background: #E9DCC0; border-radius: 99px; padding: 3px 9px; }
-@media (max-width: 640px) {
-  .xp2-head:has(.xp2-ceja) { padding-top: 54px; }
-  .xp2-ceja { height: 60px; gap: 20px; }
-  .xp2-ceja .xp2-pestana { padding: 0 16px 6px 12px; font-size: 12.5px; }
-  .xp2-dictum { height: 50px; padding: 0 14px 0 6px; gap: 9px; margin-bottom: 10px; }
-  .xp2-dictum i { width: 36px; height: 36px; }
-  .xp2-dictum b { font-size: 15px; }
-  .xp2-dictum-largo { display: none; }
+/* ── Botón de Dictum: barra ancha dentro de la carpeta, bajo el título ─ */
+.xp2-arriba { display: flex; flex-direction: column; gap: 18px; }
+.xp2-arriba-tx { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.xp2-dictum { display: flex; align-items: center; gap: 18px; width: 100%; min-height: 84px; padding: 12px 26px 12px 14px; border-radius: 20px;
+  background: linear-gradient(120deg, #142E59 0%, #1F4479 60%, #2A5594 100%); color: #fff; text-decoration: none;
+  box-shadow: 0 14px 30px -14px rgba(20,46,89,.65); transition: transform .15s, box-shadow .15s; }
+.xp2-dictum:hover, .xp2-dictum.on { transform: translateY(-2px); box-shadow: 0 18px 36px -14px rgba(20,46,89,.7); color: #fff; }
+.xp2-dictum.on { outline: 2px solid #AD9060; outline-offset: 3px; }
+.xp2-dictum i { width: 58px; height: 58px; flex: none; border-radius: 16px; display: grid; place-items: center; background: rgba(173,144,96,.3); color: #F1E3C4; }
+.xp2-dictum i svg { width: 26px; height: 26px; }
+.xp2-dictum > span { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; flex: 1; }
+.xp2-dictum b { font: 600 23px 'Sora', sans-serif; letter-spacing: -.015em; }
+.xp2-dictum small { font: 500 14.5px 'Inter', sans-serif; color: rgba(255,255,255,.75); margin-top: 4px; }
+.xp2-dictum em { flex: none; font-style: normal; font: 700 13px 'Inter', sans-serif; color: #142E59; background: #E9DCC0; border-radius: 99px; padding: 5px 12px; white-space: nowrap; }
+.xp2-dictum-ir { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 58px; padding: 0 30px; border-radius: 14px;
+  background: #AD9060; color: #fff; font: 700 19px 'Sora', sans-serif; letter-spacing: -.01em; white-space: nowrap; box-shadow: 0 6px 14px -6px rgba(0,0,0,.35); }
+.xp2-dictum-ir svg { width: 22px; height: 22px; }
+.xp2-dictum:hover .xp2-dictum-ir { background: #9A7F52; }
+@media (max-width: 860px) {
+  .xp2-dictum { min-height: 72px; gap: 14px; padding: 10px 16px 10px 10px; }
+  .xp2-dictum i { width: 48px; height: 48px; }
+  .xp2-dictum b { font-size: 19px; }
+  .xp2-dictum small { font-size: 13px; }
+  .xp2-dictum { flex-wrap: wrap; }
+  .xp2-dictum-ir { width: 100%; height: 52px; font-size: 17px; }
 }
+@media (max-width: 480px) { .xp2-dictum { gap: 10px; padding: 10px 12px 10px 8px; min-height: 68px; } .xp2-dictum i { width: 40px; height: 40px; border-radius: 12px; } .xp2-dictum i svg { width: 20px; height: 20px; } .xp2-dictum em { display: none; } .xp2-dictum b { font-size: 16px; white-space: nowrap; } .xp2-dictum small { font-size: 12.5px; } .xp2-dictum-ir { height: 48px; font-size: 16px; } }
 
 /* ── Chat del equipo: quién preguntó y guardar en la memoria ──── */
 .xc-quien { align-self: flex-end; margin: 4px 4px -8px 0; font: 600 11.5px 'Inter', sans-serif; color: var(--ash); }
