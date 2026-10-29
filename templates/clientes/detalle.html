@@ -126,7 +126,7 @@
 <!-- ── Resumen ─────────────────────────────────────────────── -->
 <section class="xp-panel on" id="p-resumen" role="tabpanel">
   <div class="xr-fila uno">
-    <article class="xp-card xr-resumen">
+    <article class="xp-card xr-resumen b-resumen">
       <div class="xp-card-h"><h2>{{ ic('spark', 17) }} Resumen inteligente</h2><small>Se escribe solo con lo que registra el equipo</small></div>
       <div class="xp-card-b">
         {% for p in resumen.parrafos if p %}<p>{{ p }}</p>{% endfor %}
@@ -137,7 +137,7 @@
         {% endif %}
       </div>
     </article>
-    <article class="xp-card xp-sigue">
+    <article class="xp-card xp-sigue b-agenda">
       <div class="xp-card-h"><h2>Lo que sigue</h2><a href="{{ url_for('calendario.index') }}">Calendario →</a></div>
       <div class="xp-card-b">
         {% for e in eventos %}
@@ -150,7 +150,7 @@
   </div>
 
   <div class="xr-fila">
-    <article class="xp-card">
+    <article class="xp-card b-equipo">
       <div class="xp-card-h"><h2>Sus expedientes</h2><button type="button" class="link" data-ir="expedientes">Ver todos →</button></div>
       <div class="xp-card-b">
         {% for a in asuntos[:4] %}
@@ -165,7 +165,7 @@
         {% endfor %}
       </div>
     </article>
-    <article class="xp-card">
+    <article class="xp-card b-notas">
       <div class="xp-card-h"><h2>Bitácora</h2><button type="button" class="link" data-ir="bitacora">Ver todo →</button></div>
       <div class="xp-card-b">
         <form class="xr-nota-nueva" id="fNotaRapida">
@@ -183,7 +183,7 @@
   </div>
 
   <div class="xr-fila">
-    <article class="xp-card">
+    <article class="xp-card b-dinero">
       <div class="xp-card-h"><h2>Cobranza</h2><button type="button" class="link" data-ir="cobranza">Ver cobros →</button></div>
       <div class="xp-card-b">
         <div class="xr-barra-cobro"><b>{{ dinero.cobrado | dinero(decimales=False) }}</b><span>pagado de {{ dinero.facturado | dinero(decimales=False) if dinero.facturado else 'nada facturado aún' }}</span>
@@ -192,7 +192,7 @@
         {% if dinero.vencido %}<div class="xp-kv"><span>Vencido</span><b style="color:#A23B33">{{ dinero.vencido | dinero }}</b></div>{% endif %}
       </div>
     </article>
-    <article class="xp-card">
+    <article class="xp-card b-docs">
       <div class="xp-card-h"><h2>Documentos personales</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
       <div class="xp-card-b">
         <div class="xr-docs">
@@ -208,7 +208,7 @@
   </div>
 
   {% if cliente.notas %}
-  <article class="xp-card xr-ancho">
+  <article class="xp-card xr-ancho b-notas">
     <div class="xp-card-h"><h2>Notas internas</h2>{% if puede_editar %}<button type="button" class="link" data-editar>Editar</button>{% endif %}</div>
     <div class="xp-card-b"><p style="margin:0;font-size:14.5px;color:#3B4A61;line-height:1.6;white-space:pre-line">{{ cliente.notas }}</p></div>
   </article>
