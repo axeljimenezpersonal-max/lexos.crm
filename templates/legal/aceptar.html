@@ -1,0 +1,67 @@
+{% extends "legal/base_legal.html" %}
+{% block titulo %}Antes de continuar{% endblock %}
+{% block estilos %}
+.acepta{max-width:620px;margin:0 auto;padding:48px 20px 64px}
+.acepta article{padding:40px 44px}
+.acepta h1{font-size:clamp(26px,4vw,32px)}
+.resumen{list-style:none;padding:0;margin:20px 0 24px;display:flex;flex-direction:column;gap:12px}
+.resumen li{display:flex;gap:12px;margin:0;font-size:15px;line-height:1.55}
+.resumen li::before{content:"";flex:none;width:20px;height:20px;margin-top:1px;border-radius:50%;background:var(--dorado) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2'%3E%3Cpath d='m6 12 4 4 8-9'/%3E%3C/svg%3E") center/12px no-repeat}
+.docs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 24px}
+.docs a{display:block;border:1px solid var(--borde);border-radius:12px;padding:14px 16px;text-decoration:none;color:var(--azul);font-weight:600;font-size:14.5px;background:#FAF8F4}
+.docs a small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:2px}
+.docs a:hover{border-color:var(--dorado)}
+.casilla{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1px solid var(--borde);border-radius:12px;cursor:pointer;font-size:14.5px;line-height:1.5}
+.casilla input{flex:none;width:20px;height:20px;margin:1px 0 0;accent-color:var(--azul)}
+.casilla.error{border-color:var(--rojo);background:#FBF1F0}
+.msg-error{color:var(--rojo);font-size:13.5px;margin:8px 0 0}
+.acciones{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:24px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:12px;background:var(--azul);color:#fff;font:600 15px Inter,sans-serif;padding:14px 26px;cursor:pointer;min-height:48px}
+.btn:hover{background:var(--azul-h)}
+.salir{color:var(--muted);font-size:14px}
+@media (max-width:520px){
+  .acepta{padding:20px 16px 40px}
+  .acepta article{padding:26px 18px}
+  .docs{grid-template-columns:1fr}
+  .acciones{flex-direction:column-reverse;align-items:stretch;text-align:center}
+}
+{% endblock %}
+{% block cuerpo %}
+<main class="acepta">
+<article>
+  <p class="eyebrow">Antes de continuar</p>
+  {% if actualizacion %}
+  <h1>Actualizamos nuestros términos</h1>
+  <p>{{ nombre }}, publicamos una nueva versión de los términos y condiciones y del aviso de privacidad. Para seguir usando Habeas Corpus necesitamos que los aceptes. Solo te lo pediremos esta vez.</p>
+  {% else %}
+  <h1>Términos y aviso de privacidad</h1>
+  <p>{{ nombre }}, para seguir usando Habeas Corpus necesitamos que leas y aceptes estos documentos. Solo te lo pediremos esta vez.</p>
+  {% endif %}
+
+  <ul class="resumen">
+    <li><span>La información de tu despacho es tuya. Nosotros solo la guardamos y procesamos para darte el servicio.</span></li>
+    <li><span>Todo es confidencial y tus documentos se guardan cifrados, con respaldos automáticos.</span></li>
+    <li><span>Dictum es un apoyo: no sustituye el criterio del abogado y sus respuestas deben revisarse.</span></li>
+    <li><span>Puedes llevarte tu información cuando quieras, sin costo.</span></li>
+  </ul>
+
+  <div class="docs">
+    <a href="{{ url_for('legal.terminos') }}" target="_blank" rel="noopener">Términos y condiciones<small>Se abre en otra pestaña</small></a>
+    <a href="{{ url_for('legal.privacidad') }}" target="_blank" rel="noopener">Aviso de privacidad<small>Se abre en otra pestaña</small></a>
+  </div>
+
+  <form method="POST" action="{{ url_for('legal.aceptar') }}">
+    <input type="hidden" name="next" value="{{ siguiente }}">
+    <label class="casilla {{ 'error' if error }}">
+      <input type="checkbox" name="acepto" value="1" required>
+      <span>He leído y acepto los términos y condiciones y el aviso de privacidad de Habeas Corpus.</span>
+    </label>
+    {% if error %}<p class="msg-error">Marca la casilla para continuar.</p>{% endif %}
+    <div class="acciones">
+      <a class="salir" href="{{ url_for('auth.logout') }}">Salir sin aceptar</a>
+      <button type="submit" class="btn">Acepto y continuar</button>
+    </div>
+  </form>
+</article>
+</main>
+{% endblock %}

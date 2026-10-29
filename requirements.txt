@@ -30,3 +30,6 @@ anthropic>=0.70
 
 # Servidor de producción
 gunicorn>=23.0
+
+# Respaldos en un bucket S3-compatible (scripts/respaldo.py)
+boto3>=1.35

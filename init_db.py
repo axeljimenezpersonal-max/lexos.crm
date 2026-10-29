@@ -114,6 +114,22 @@ CREATE TABLE IF NOT EXISTS user_integrations (
     created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_user_integrations ON user_integrations(user_id, tenant_id, servicio);
+
+-- ── Aceptación de términos y aviso de privacidad ───────────────────────────────
+-- Sin llaves foráneas a propósito: la constancia se conserva aunque se borre el usuario.
+CREATE TABLE IF NOT EXISTS aceptaciones_legales (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id             INTEGER NOT NULL,
+    tenant_id           INTEGER NOT NULL,
+    email               TEXT    NOT NULL,
+    terminos_version    TEXT    NOT NULL,
+    privacidad_version  TEXT    NOT NULL,
+    origen              TEXT    NOT NULL DEFAULT 'login',
+    ip                  TEXT,
+    user_agent          TEXT,
+    fecha               DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_aceptaciones_usuario ON aceptaciones_legales(user_id, terminos_version, privacidad_version);
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -736,6 +752,14 @@ def init_global():
     conn.commit()
     conn.close()
     print(f"     ✓ {Config.GLOBAL_DB}")
+
+
+def asegurar_global():
+    """Crea en la base global las tablas que falten, sin tocar las que ya existen (idempotente)."""
+    conn = sqlite3.connect(Config.GLOBAL_DB)
+    conn.executescript(GLOBAL_SCHEMA)
+    conn.commit()
+    conn.close()
 
 
 def init_tenant(slug: str):

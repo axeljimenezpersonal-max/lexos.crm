@@ -1,0 +1,16 @@
+{# Dato de la empresa que todavía no existe: debe llenarlo y revisarlo un abogado antes de publicar. #}
+{% macro pd(que) -%}<span class="pd">[POR DEFINIR: {{ que }}]</span>{%- endmacro %}
+
+{% macro indice(secciones) -%}
+<aside class="indice">
+  <details open>
+    <summary>Contenido</summary>
+    <b>Contenido</b>
+    <ol>{% for id, titulo in secciones %}<li><a href="#{{ id }}">{{ titulo }}</a></li>{% endfor %}</ol>
+  </details>
+</aside>
+{%- endmacro %}
+
+{% macro aviso_borrador(borrador) -%}
+{% if borrador %}<p class="aviso"><strong>Versión preliminar.</strong> Este texto está pendiente de revisión por un abogado y los datos marcados como «por definir» se completarán antes de su publicación definitiva.</p>{% endif %}
+{%- endmacro %}

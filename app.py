@@ -235,6 +235,8 @@ def create_app(env="default"):
     from modules.insights import insights_bp
     from modules.revision import revision_bp
     from modules.buscador import buscador_bp
+    from modules.legal import legal_bp
+    from modules.respaldos import respaldos_bp
 
     app.register_blueprint(auth_bp,         url_prefix="/auth")
     app.register_blueprint(dashboard_bp,    url_prefix="/")
@@ -258,6 +260,8 @@ def create_app(env="default"):
     app.register_blueprint(insights_bp, url_prefix="/precedentes")
     app.register_blueprint(revision_bp, url_prefix="/revision")
     app.register_blueprint(buscador_bp, url_prefix="/buscar")
+    app.register_blueprint(legal_bp, url_prefix="/legal")
+    app.register_blueprint(respaldos_bp)
 
     # ─── Modo revisión: el sitio de pruebas no debe aparecer en buscadores ───
     @app.after_request

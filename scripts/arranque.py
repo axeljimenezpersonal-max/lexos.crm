@@ -30,6 +30,10 @@ def main() -> None:
         import init_db
         sys.argv = ["init_db.py"]
         init_db.main()
+    else:
+        # Tablas globales nuevas (p. ej. aceptaciones_legales) que aún no existan en el volumen
+        import init_db
+        init_db.asegurar_global()
 
     clave = os.environ.get("DEMO_PASSWORD", "")
     if clave:

@@ -334,6 +334,8 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 .form input:focus,.form textarea:focus,.form select:focus{border-color:var(--azul);box-shadow:0 0 0 4px var(--azul-s)}
 .form .btn{width:100%;margin-top:18px}
 .trampa{position:absolute;left:-9999px}
+.nota-priv{font-size:12.5px;color:var(--muted);text-align:center;margin-top:12px}
+.nota-priv a{color:var(--azul);text-decoration:underline}
 .gracias{display:none;text-align:center;padding:30px 10px}
 .gracias .ok{width:56px;height:56px;border-radius:50%;background:#EEF1F5;color:var(--verde);display:grid;place-items:center;margin:0 auto 14px}
 .form.enviado .gracias{display:block}.form.enviado .cuerpo{display:none}
@@ -801,6 +803,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
           </div>
           <p class="err" id="contactErr" hidden></p>
           <button class="btn btn-primary" type="submit" id="contactBtn">Quiero una demostración</button>
+          <p class="nota-priv">Usamos tus datos solo para contactarte. Consulta el <a href="{{ url_for('legal.privacidad') }}">aviso de privacidad</a>.</p>
         </form>
       </div>
       <div class="gracias" role="status">
@@ -836,7 +839,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
     </div>
     <div class="pie-b">
       <span>© 2026 Habeas Corpus · Hecho en México</span>
-      <span><a href="#">Aviso de privacidad</a> · <a href="#">Términos</a></span>
+      <span><a href="{{ url_for('legal.privacidad') }}">Aviso de privacidad</a> · <a href="{{ url_for('legal.terminos') }}">Términos y condiciones</a></span>
     </div>
   </div>
 </footer>
