@@ -41,7 +41,11 @@
 <header class="xp2-head">
   <div class="xp2-ceja">
     <span class="xp2-pestana">{{ asunto.numero_expediente or ('#' ~ asunto.id) }}</span>
-    <a class="xp2-dictum" href="#preguntar" data-ir="preguntar" data-rastreo="Preguntar a Dictum (carpeta)">{{ ic('spark', 15) }}<span>Preguntar a {{ config.ASISTENTE_NOMBRE }}<span class="xp2-dictum-largo"> · Puntos clave y descubrimientos</span></span>{% if hallazgos %}<em>{{ hallazgos | length }}</em>{% endif %}</a>
+    <a class="xp2-dictum" href="#preguntar" data-ir="preguntar" data-rastreo="Preguntar a Dictum (carpeta)">
+      <i aria-hidden="true">{{ ic('spark', 21) }}</i>
+      <span><b>Preguntar a {{ config.ASISTENTE_NOMBRE }}</b><small class="xp2-dictum-largo">Puntos clave y descubrimientos</small></span>
+      {% if hallazgos %}<em title="Puntos guardados en la memoria del caso">{{ hallazgos | length }}</em>{% endif %}
+    </a>
   </div>
   <div class="xp2-cuerpo">
     <div class="xp2-top">

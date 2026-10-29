@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from flask import Flask, g, session, request, redirect, url_for, render_template
+from flask import Flask, current_app, g, session, request, redirect, url_for, render_template
 from flask_mail import Mail
 from config import config, Config
 
@@ -18,6 +18,9 @@ def get_global_db():
     return g.global_db
 
 
+_TABLAS_AL_DIA: set[str] = set()
+
+
 def get_tenant_db(slug: str):
     """Retorna conexión a la base de datos del tenant."""
     key = f"tenant_db_{slug}"
@@ -27,8 +30,15 @@ def get_tenant_db(slug: str):
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        # Tablas que llegaron después del alta del despacho: se crean una vez por proceso
+        from init_db import _MIGRATE_COLS, _MIGRATE_TABLES
+        if slug not in _TABLAS_AL_DIA:
+            try:
+                conn.executescript(_MIGRATE_TABLES)
+                _TABLAS_AL_DIA.add(slug)
+            except Exception:
+                current_app.logger.exception("No se pudieron crear las tablas del despacho %s", slug)
         # Auto-migrate: apply any missing columns idempotently
-        from init_db import _MIGRATE_COLS
         for _tbl, _col, _coldef in _MIGRATE_COLS:
             try:
                 conn.execute(f"ALTER TABLE {_tbl} ADD COLUMN {_col} {_coldef}")

@@ -270,17 +270,29 @@
   .xr-links { gap: 10px; }
 }
 
-/* ── Enlace a Dictum junto a la pestaña de la carpeta ─────────── */
-.xp2-ceja { position: absolute; top: 0; left: 0; right: 0; height: 36px; display: flex; align-items: center; gap: 40px; }
-.xp2-ceja .xp2-pestana { position: relative; }
-.xp2-dictum { display: inline-flex; align-items: center; gap: 7px; padding-bottom: 6px; font: 600 14px 'Inter', sans-serif; color: var(--e);
-  text-decoration: underline; text-decoration-color: rgba(173,144,96,.55); text-decoration-thickness: 1.5px; text-underline-offset: 5px; white-space: nowrap; min-width: 0; }
-.xp2-dictum > span { overflow: hidden; text-overflow: ellipsis; }
-.xp2-dictum svg { color: var(--dorado); flex: none; }
-.xp2-dictum:hover, .xp2-dictum.on { text-decoration-color: var(--dorado); color: #0E2246; }
-.xp2-dictum em { font-style: normal; font: 700 11px 'Inter', sans-serif; color: #fff; background: #6B4E71; border-radius: 99px; padding: 1px 7px; text-decoration: none; }
-.xp2-ceja .xp2-pestana { white-space: nowrap; flex: none; }
-@media (max-width: 640px) { .xp2-ceja { gap: 26px; } .xp2-ceja .xp2-pestana { padding: 0 16px 6px 12px; font-size: 12.5px; } .xp2-dictum { font-size: 13px; gap: 5px; } .xp2-dictum-largo { display: none; } }
+/* ── Botón de Dictum junto a la pestaña de la carpeta ─────────── */
+.xp2-head:has(.xp2-ceja) { padding-top: 64px; }
+.xp2-ceja { position: absolute; top: 0; left: 0; right: 0; height: 70px; display: flex; align-items: flex-end; gap: 36px; }
+.xp2-ceja .xp2-pestana { position: relative; white-space: nowrap; flex: none; }
+.xp2-dictum { display: inline-flex; align-items: center; gap: 14px; height: 60px; margin-bottom: 12px; padding: 0 22px 0 9px; border-radius: 16px;
+  background: linear-gradient(135deg, #142E59, #1F4479); color: #fff; text-decoration: none; min-width: 0;
+  box-shadow: 0 8px 20px -8px rgba(20,46,89,.55); transition: transform .15s, box-shadow .15s; }
+.xp2-dictum:hover, .xp2-dictum.on { transform: translateY(-1px); box-shadow: 0 12px 26px -8px rgba(20,46,89,.6); color: #fff; }
+.xp2-dictum.on { outline: 2px solid #AD9060; outline-offset: 2px; }
+.xp2-dictum i { width: 42px; height: 42px; flex: none; border-radius: 10px; display: grid; place-items: center; background: rgba(173,144,96,.28); color: #F1E3C4; }
+.xp2-dictum > span { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.xp2-dictum b { font: 600 18px 'Sora', sans-serif; white-space: nowrap; letter-spacing: -.01em; }
+.xp2-dictum small { font: 500 13px 'Inter', sans-serif; color: rgba(255,255,255,.72); white-space: nowrap; margin-top: 2px; }
+.xp2-dictum em { font-style: normal; font: 700 13px 'Inter', sans-serif; color: #142E59; background: #E9DCC0; border-radius: 99px; padding: 3px 9px; }
+@media (max-width: 640px) {
+  .xp2-head:has(.xp2-ceja) { padding-top: 54px; }
+  .xp2-ceja { height: 60px; gap: 20px; }
+  .xp2-ceja .xp2-pestana { padding: 0 16px 6px 12px; font-size: 12.5px; }
+  .xp2-dictum { height: 50px; padding: 0 14px 0 6px; gap: 9px; margin-bottom: 10px; }
+  .xp2-dictum i { width: 36px; height: 36px; }
+  .xp2-dictum b { font-size: 15px; }
+  .xp2-dictum-largo { display: none; }
+}
 
 /* ── Chat del equipo: quién preguntó y guardar en la memoria ──── */
 .xc-quien { align-self: flex-end; margin: 4px 4px -8px 0; font: 600 11.5px 'Inter', sans-serif; color: var(--ash); }
