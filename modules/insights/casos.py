@@ -26,7 +26,7 @@ RESULTADOS = {
 SENTIDOS = {"favorable": "Favorable", "parcial": "Parcial", "desfavorable": "Desfavorable"}
 
 UMBRAL = 0.42          # puntaje mínimo para considerar un asunto "parecido"
-UMBRAL_TEXTO = 0.50    # similitud mínima pregunta → asunto (Tribuno)
+UMBRAL_TEXTO = 0.50    # similitud mínima pregunta → asunto (Dictum)
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS insights_huellas (
@@ -201,7 +201,7 @@ def similares(app, tdb, asunto_id: int, limite: int = 5) -> dict:
 
 
 def por_texto(app, tdb, consulta: str, limite: int = 3, incluir_privados: bool = True) -> list[dict]:
-    """Precedentes del despacho que tienen que ver con una pregunta escrita (para Tribuno)."""
+    """Precedentes del despacho que tienen que ver con una pregunta escrita (para Dictum)."""
     asegurar(tdb)
     candidatos = [a for a in _asuntos(tdb) if a["resultado"] and (incluir_privados or not a["privado"])]
     if not candidatos or not consulta.strip():
@@ -213,7 +213,7 @@ def por_texto(app, tdb, consulta: str, limite: int = 3, incluir_privados: bool =
 
 
 def texto_para_modelo(f: dict) -> str:
-    """Lo que Tribuno lee de un precedente: datos del caso y cómo terminó, sin datos del cliente."""
+    """Lo que Dictum lee de un precedente: datos del caso y cómo terminó, sin datos del cliente."""
     lineas = [
         f"Materia: {f['tipo_asunto'] or 'no indicada'}{' / ' + f['sub_tipo'] if f['sub_tipo'] else ''}",
         f"Resultado para el despacho: {f['resultado_info']['label'] if f['resultado_info'] else 'sin registrar'}",

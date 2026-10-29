@@ -43,7 +43,7 @@ def index():
         "asistente/index.html",
         conversaciones=almacen.listar(tdb, g.tenant_slug, _uid()),
         asuntos=asuntos,
-        nombre=current_app.config.get("ASISTENTE_NOMBRE", "Tribuno"),
+        nombre=current_app.config.get("ASISTENTE_NOMBRE", "Dictum"),
         conectado=bool(current_app.config.get("ANTHROPIC_API_KEY")),
         conversacion_id=request.args.get("c", type=int),
         asunto_inicial=request.args.get("asunto", type=int),

@@ -4,6 +4,7 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expediente.css') }}">
 {% endblock %}
 
 {% macro ic(n, s=16) -%}
@@ -34,13 +35,14 @@
 {% block content %}
 {% set ti = asunto.tipo_info %}{% set ei = asunto.estado_info %}
 {% set n_bit = namespace(n=0) %}{% for gr in bitacora %}{% set n_bit.n = n_bit.n + gr['items'] | length %}{% endfor %}
-<a class="xp-volver" href="{{ url_for('asuntos.index') }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Volver a expedientes</a>
+<div class="xp2" style="--m:{{ ti.color }}">
+<a class="xp-volver" href="{{ url_for('asuntos.index') }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Expedientes</a>
 
-<header class="xp-head">
-  <div style="flex:1;min-width:280px">
-    <p class="xp-id">Expediente · <b>{{ asunto.numero_expediente or 'Sin número' }}</b>{% if asunto.privado %} · <span title="{{ config.ASISTENTE_NOMBRE }} nunca envía información de este expediente fuera del servidor">Privado</span>{% endif %}{% if asunto.prioridad == 'alta' %} · Prioridad alta{% endif %}</p>
-    <div class="xp-titulo-fila">
-      <h1 class="xp-titulo" id="afTitulo"{% if puede_editar %} contenteditable="true" spellcheck="false" title="Clic para editar"{% endif %}>{{ asunto.titulo }}</h1>
+<header class="xp2-head">
+  <span class="xp2-pestana">{{ asunto.numero_expediente or ('#' ~ asunto.id) }}</span>
+  <div class="xp2-cuerpo">
+    <div class="xp2-top">
+      <span class="xp2-materia"><i></i>{{ ti.label }}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo | capitalize }}{% endif %}</span>
       <div class="af-estado xp-estado">
         <button type="button" class="xp-estado-btn e-{{ asunto.estado }}" id="afEstadoBtn"{% if not puede_editar %} disabled{% endif %} aria-haspopup="true"><i></i>{{ ei.label }}{% if puede_editar %} {{ ic('down', 14) }}{% endif %}</button>
         {% if puede_editar %}
@@ -51,76 +53,82 @@
         </div>
         {% endif %}
       </div>
+      {% if asunto.privado %}<span class="xp2-priv" title="{{ config.ASISTENTE_NOMBRE }} nunca envía información de este expediente fuera del servidor">{{ ic('lock', 13) }} Privado</span>{% endif %}
+      {% if asunto.prioridad == 'alta' %}<span class="xp2-prio">Prioridad alta</span>{% endif %}
     </div>
-    <div class="xp-linea">
-      <span>{{ ic('user', 16) }}{% if asunto.cliente_id and asunto.cliente %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">{{ asunto.cliente }}</a>{% else %}Sin cliente{% endif %}</span>
-      <span>{{ ic('doc', 16) }}{{ ti.label }}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo | capitalize }}{% endif %}</span>
-      {% if asunto.juzgado %}<span>{{ ic('gavel', 16) }}{{ asunto.juzgado }}</span>{% endif %}
-      {% if asunto.contrario_nombre %}<span>{{ ic('vs', 16) }}vs. {{ asunto.contrario_nombre }}</span>{% endif %}
+    <div class="af-tags xp2-tags" id="afTags">
+      {% for et in etiquetas %}<span class="af-tag" style="--t:{{ et.color }}">{{ et.nombre }}<button type="button" data-et="{{ et.id }}" aria-label="Quitar etiqueta {{ et.nombre }}">×</button></span>{% endfor %}
+      <button type="button" class="af-tag-add" id="afTagAdd">+ Etiqueta</button>
+      <form id="afTagForm" hidden>
+        <input class="as-input" id="afTagInput" list="afTagList" maxlength="30" placeholder="Ej. Urgente, Apelación…">
+        <datalist id="afTagList">{% for et in todas_etiquetas %}<option value="{{ et.nombre }}">{% endfor %}</datalist>
+        <button class="btn btn-primary btn-sm">Agregar</button>
+      </form>
     </div>
-  </div>
-  <div class="xp-meta">
-    <div><small>Fecha de apertura</small><b>{{ apertura or '—' }}</b></div>
-    <div><small>Última actividad</small><b>{{ ultima_actividad or '—' }}</b></div>
-    <div><small>Responsable</small><b>{{ responsable.nombre if responsable else 'Sin asignar' }}</b></div>
-  </div>
-</header>
-
-<div class="xp-barra">
-  <div class="xp-tabs" role="tablist">
-    <button class="xp-tab on" data-tab="resumen" role="tab">Resumen</button>
-    <button class="xp-tab" data-tab="documentos" role="tab">Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
-    <button class="xp-tab" data-tab="preguntar" role="tab">Preguntar</button>
-    <button class="xp-tab" data-tab="actividad" role="tab">Actividad<span>{{ n_bit.n }}</span></button>
-    <button class="xp-tab" data-tab="datos" role="tab">Datos</button>
-    <button class="xp-tab" data-tab="estrategia" role="tab">Estrategia</button>
-    <button class="xp-tab" data-tab="horas" role="tab">Horas<span>{{ horas_total | round(1) }}</span></button>
-  </div>
-  <div class="xp-acciones">
-    <button type="button" class="btn btn-primary" id="xpSubir"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir documento</button>
-    <div class="af-estado">
-      <button type="button" class="btn btn-ghost" id="afMasBtn" aria-label="Más acciones" aria-haspopup="true" style="padding:0 14px">{{ ic('more', 18) }}</button>
-      <div class="af-menu" id="afMasMenu" role="menu">
-        <a href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 15) }} Generar escrito desde machote</a>
-        <a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">{{ ic('cal', 15) }} Agendar audiencia o término</a>
-        <a href="{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}">{{ ic('doc', 15) }} Descargar resumen en PDF</a>
-        <button type="button" id="afCopiar">{{ ic('link', 15) }} Copiar enlace</button>
-        {% if session.get('role') in ('super_admin', 'admin', 'abogado') %}
-        <button type="button" id="afPrivado" data-privado="{{ 1 if asunto.privado else 0 }}">{{ ic('lock', 15) }} {{ 'Quitar privado' if asunto.privado else 'Marcar como privado' }}</button>
-        {% endif %}
-        {% if puede_editar and asunto.estado != 'archivado' %}
-        <hr><button type="button" class="peligro" id="afArchivar">{{ ic('archive', 15) }} Archivar expediente</button>
-        {% endif %}
+    <h1 class="xp2-titulo" id="afTitulo"{% if puede_editar %} contenteditable="true" spellcheck="false" title="Clic para editar el título"{% endif %}>{{ asunto.titulo }}</h1>
+    <div class="xp2-quien">
+      <div class="xp2-cli">
+        <span class="xp2-av">{{ (asunto.cliente or '?')[:1] }}{{ ((asunto.cliente or '').split()[1] if (asunto.cliente or '').split() | length > 1 else '')[:1] }}</span>
+        <span><small>Cliente</small>{% if asunto.cliente_id and asunto.cliente %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">{{ asunto.cliente }}</a>{% else %}<b>Sin cliente</b>{% endif %}</span>
       </div>
+      {% if asunto.contrario_nombre %}<span class="xp2-vs">vs.</span>
+      <div class="xp2-cli contra"><span class="xp2-av">{{ asunto.contrario_nombre[:1] }}</span><span><small>Contraparte</small><b>{{ asunto.contrario_nombre }}</b></span></div>{% endif %}
     </div>
-  </div>
-</div>
-
-<!-- ── Resumen ─────────────────────────────────────────────── -->
-<section class="xp-panel on" id="p-resumen" role="tabpanel">
-  <div class="xp-resumen">
-    <div class="xp-card">
-      <div class="xp-card-h"><h2>Resumen del expediente</h2>{% if puede_editar %}<button type="button" class="link" data-ir="datos">{{ ic('pen', 14) }} Editar</button>{% endif %}</div>
-      <div class="xp-card-b xp-resumen-b">
-        {% if asunto.descripcion %}<p class="desc">{{ asunto.descripcion }}</p>
-        {% else %}<p class="desc vacio">Aún no hay descripción. Escribe los hechos principales en Datos para que todo el equipo, y {{ config.ASISTENTE_NOMBRE }}, tengan el contexto.</p>{% endif %}
-        <div class="xp-hechos">
-          <div><small>Tipo de asunto</small><b>{{ (asunto.sub_tipo or ti.label) | capitalize }}</b><em>{{ ti.label }}</em></div>
-          <div class="{{ 'rojo' if proximo and proximo.semaforo == 'rojo' }}"><small>Lo que sigue</small>
-            {% if proximo %}<b>{{ proximo.tipo }} · {{ proximo.corta }}</b><em>{{ proximo.cuando }}</em>
-            {% elif abierto %}<b>Nada agendado</b><em><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}" style="color:inherit">Agendar</a></em>
-            {% else %}<b>{{ ei.label }}</b><em>{{ (asunto.fecha_cierre or '')[:10] or 'Sin fecha de cierre' }}</em>{% endif %}</div>
-          <div><small>{{ 'Tiempo en curso' if abierto else 'Duró' }}</small>
-            {% if dias_llevamos is not none %}<b>{% if dias_llevamos >= 60 %}{{ (dias_llevamos / 30.44) | round(1) }} meses{% else %}{{ dias_llevamos }} días{% endif %}</b><em>desde {{ apertura }}</em>
-            {% else %}<b>—</b><em>sin fecha de inicio</em>{% endif %}</div>
-          <div><small>Honorarios cobrados</small>
-            {% if dinero.pactados or dinero.facturado %}<b>{{ dinero.cobrado | dinero }}</b><em>de {{ (dinero.pactados or dinero.facturado) | dinero }}</em>
-            {% else %}<b>—</b><em>sin honorarios pactados</em>{% endif %}</div>
+    <dl class="xp2-datos">
+      <div><dt>{{ ic('gavel', 14) }} Juzgado o autoridad</dt><dd>{{ asunto.juzgado or '—' }}{% if asunto.numero_juicio %} · Juicio {{ asunto.numero_juicio }}{% endif %}</dd></div>
+      <div><dt>{{ ic('user', 14) }} Responsable</dt><dd>{{ responsable.nombre if responsable else 'Sin asignar' }}</dd></div>
+      <div><dt>{{ ic('cal', 14) }} Abierto el</dt><dd>{{ apertura or '—' }}</dd></div>
+      <div><dt>{{ ic('clock', 14) }} Última actividad</dt><dd>{{ ultima_actividad or '—' }}</dd></div>
+    </dl>
+    <div class="xp2-acciones">
+      {% if puede_editar %}<button type="button" class="btn btn-ghost" id="xpEditar">{{ ic('pen', 15) }} Datos generales</button>{% endif %}
+      <button type="button" class="btn btn-primary" id="xpSubir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir documento</button>
+      <div class="af-estado">
+        <button type="button" class="btn btn-ghost" id="afMasBtn" aria-label="Más acciones" aria-haspopup="true" style="padding:0 12px">{{ ic('more', 18) }}</button>
+        <div class="af-menu" id="afMasMenu" role="menu">
+          <a href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 15) }} Generar escrito desde machote</a>
+          <a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">{{ ic('cal', 15) }} Agendar audiencia o término</a>
+          <a href="{{ url_for('asuntos.exportar_pdf', id=asunto.id) }}">{{ ic('doc', 15) }} Descargar resumen en PDF</a>
+          <button type="button" id="afCopiar">{{ ic('link', 15) }} Copiar enlace</button>
+          {% if session.get('role') in ('super_admin', 'admin', 'abogado') %}
+          <button type="button" id="afPrivado" data-privado="{{ 1 if asunto.privado else 0 }}">{{ ic('lock', 15) }} {{ 'Quitar privado' if asunto.privado else 'Marcar como privado' }}</button>
+          {% endif %}
+          {% if puede_editar and asunto.estado != 'archivado' %}
+          <hr><button type="button" class="peligro" id="afArchivar">{{ ic('archive', 15) }} Archivar expediente</button>
+          {% endif %}
         </div>
       </div>
     </div>
+  </div>
+</header>
 
-    <div class="xp-card xp-sigue">
+<nav class="xp-barra xp2-tabs" aria-label="Secciones del expediente">
+  <div class="xp-tabs" role="tablist">
+    <button class="xp-tab on" data-tab="resumen" role="tab">{{ ic('doc', 15) }}Resumen</button>
+    <button class="xp-tab" data-tab="documentos" role="tab">{{ ic('doc', 15) }}Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
+    <button class="xp-tab" data-tab="preguntar" role="tab">{{ ic('spark', 15) }}Preguntar</button>
+    <button class="xp-tab" data-tab="actividad" role="tab">{{ ic('note', 15) }}Actividad<span>{{ n_bit.n }}</span></button>
+    <button class="xp-tab" data-tab="estrategia" role="tab">{{ ic('scale', 15) }}Estrategia</button>
+    <button class="xp-tab" data-tab="horas" role="tab">{{ ic('clock', 15) }}Horas<span>{{ horas_total | round(1) }}</span></button>
+  </div>
+</nav>
+
+<!-- ── Resumen ─────────────────────────────────────────────── -->
+<section class="xp-panel on" id="p-resumen" role="tabpanel">
+  <div class="xr-fila uno">
+    <article class="xp-card xr-resumen">
+      <div class="xp-card-h"><h2>{{ ic('spark', 17) }} Resumen inteligente</h2><small>Se escribe solo con lo que registra el equipo</small></div>
+      <div class="xp-card-b">
+        {% for p in resumen.parrafos if p %}<p>{{ p }}</p>{% endfor %}
+        {% if resumen.atencion %}
+        <ul class="xr-atencion" aria-label="Puntos de atención">
+          {% for a in resumen.atencion %}<li class="t-{{ a.tono }}"><i aria-hidden="true"></i>{{ a.texto }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="xp-card xp-sigue">
       <div class="xp-card-h"><h2>Lo que sigue</h2><a href="{{ url_for('calendario.index') }}#nuevo-asunto-{{ asunto.id }}">+ Agendar</a></div>
       <div class="xp-card-b">
         {% for e in eventos %}
@@ -135,16 +143,84 @@
         {% endfor %}
         {% if not eventos and not pendientes %}<p class="as-empty">Nada pendiente. Agenda la siguiente audiencia o término para que nadie lo pierda de vista.</p>{% endif %}
       </div>
-    </div>
+    </article>
   </div>
 
-  <div class="xp-fila2">
-    <div class="xp-card">
-      <div class="xp-card-h"><h2>Partes y equipo</h2>{% if asunto.cliente_id %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">Ver ficha del cliente →</a>{% endif %}</div>
+  <div class="xr-fila">
+    <article class="xp-card xr-notas">
+      <div class="xp-card-h"><h2>Notas</h2><button type="button" class="link" data-ir="actividad">Ver todo →</button></div>
       <div class="xp-card-b">
+        <form class="xr-nota-nueva" id="fNotaRapida">
+          <textarea name="contenido" rows="2" maxlength="5000" placeholder="Escribe una nota: qué pasó, qué acordaron, qué sigue…" required></textarea>
+          <button class="btn btn-primary btn-sm">Guardar</button>
+        </form>
+        {% for n in notas[:3] %}
+        <div class="xr-nota"><span class="as-av" style="background:{{ n.color }}">{{ n.iniciales }}</span>
+          <div><p>{{ n.texto if n.texto | length < 220 else n.texto[:217] ~ '…' }}</p><small>{{ n.autor }} · {{ n.cuando }}</small></div></div>
+        {% else %}<p class="as-empty">Todavía no hay notas en este expediente.</p>{% endfor %}
+      </div>
+    </article>
+
+    <article class="xp-card">
+      <div class="xp-card-h"><h2>Documentos recientes</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
+      <div class="xp-card-b">
+        {% set recientes = (documentos[:3] | list) %}
+        <div class="xr-docs">
+          {% for d in recientes %}{% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+          <a class="xr-doc t-{{ d.ext or 'doc' }}" href="{{ d.archivo_url if enlace else '#documentos' }}"{% if enlace %} target="_blank" rel="noopener"{% endif %} title="{{ d.nombre }}">
+            <span class="xr-hoja"><em>{{ (d.ext or 'doc') | upper }}</em><i></i><i></i><i></i></span><b>{{ d.nombre }}</b><small>{{ d.dia }}</small></a>
+          {% endfor %}
+          {% for s_ in sentencias[:3 - recientes | length] %}
+          <a class="xr-doc t-res" href="#documentos" data-ir="documentos" title="{{ s_.titulo }}"><span class="xr-hoja"><em>RES</em><i></i><i></i><i></i></span><b>{{ s_.titulo }}</b><small>{{ s_.etiqueta }}</small></a>
+          {% endfor %}
+          {% if not documentos and not sentencias %}
+          <button type="button" class="xr-doc nuevo" data-subir><span class="xr-hoja"><b>+</b></span><b>Subir el primero</b><small>Se guarda cifrado</small></button>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+  </div>
+
+  {% if not abierto or asunto.resultado %}
+  <article class="xp-card xr-ancho">
+    <div class="xp-card-h"><h2>Resultado</h2></div>
+    <div class="xp-card-b">
+      <div class="as-res" id="pcRes">
+        {% for clave, info in resultados.items() %}<button type="button" data-res="{{ clave }}" class="{{ 'on' if asunto.resultado == clave }}" style="--rc:{{ info.color }};--rf:{{ info.fondo }}">{{ info.label }}</button>{% endfor %}
+      </div>
+      <textarea class="as-textarea pc-notas" id="pcNotas" maxlength="3000" rows="3" placeholder="¿Qué argumento o estrategia funcionó? ¿Qué harías distinto?">{{ asunto.resultado_notas or '' }}</textarea>
+      <div class="pc-hint" id="pcHint">{{ 'Se usa como precedente para asuntos parecidos.' if asunto.resultado else 'Regístralo: alimenta los precedentes del despacho.' }}</div>
+    </div>
+  </article>
+  {% endif %}
+
+  <div class="xr-fila">
+    <article class="xp-card">
+      <div class="xp-card-h"><h2>Cobranza</h2><a href="{{ url_for('cobranzas.index', asunto=asunto.id, grupo='todos') }}">Ver cobros →</a></div>
+      <div class="xp-card-b">
+        {% set base_ = dinero.pactados or dinero.facturado %}
+        <div class="xr-barra-cobro"><b>{{ dinero.cobrado | dinero(decimales=False) }}</b><span>cobrado de {{ base_ | dinero(decimales=False) if base_ else 'sin honorarios pactados' }}</span>
+          <div class="xr-progreso"><i style="width:{{ dinero.pct }}%"></i></div></div>
+        <div class="xp-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
+        <div class="xp-kv"><span>Por cobrar</span><b style="color:{{ '#8A6A2F' if dinero.pendiente else 'var(--e)' }}">{{ dinero.pendiente | dinero }}</b></div>
+        {% if session.get('role') in ('super_admin', 'admin', 'abogado', 'asistente') %}
+        <a class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px" href="{{ url_for('cobranzas.index') }}#nuevo-asunto-{{ asunto.id }}">+ Nuevo cobro</a>
+        {% endif %}
+      </div>
+    </article>
+    <article class="xp-card">
+      <div class="xp-card-h"><h2>Casos parecidos</h2><a href="{{ url_for('insights.index') }}">Precedentes →</a></div>
+      <div class="xp-card-b" id="pcCasos"><p class="as-empty">Buscando precedentes…</p></div>
+    </article>
+  </div>
+
+  <article class="xp-card xr-ancho xr-partes">
+    <div class="xp-card-h"><h2>Partes y equipo</h2>{% if asunto.cliente_id %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">Ver ficha del cliente →</a>{% endif %}</div>
+    <div class="xp-card-b">
+      <div class="xr-personas">
         {% if asunto.cliente %}
         <div class="xp-parte"><span class="av">{{ asunto.cliente.split()[0][0] }}{{ (asunto.cliente.split()[1] if asunto.cliente.split() | length > 1 else '')[:1] }}</span>
-          <div><em>Cliente{{ ' · persona moral' if asunto.cliente_tipo == 'persona_moral' }}</em><b>{% if asunto.cliente_id %}<a href="{{ url_for('clientes.detalle', id=asunto.cliente_id) }}">{{ asunto.cliente }}</a>{% else %}{{ asunto.cliente }}{% endif %}</b>
+          <div><em>Cliente{{ ' · persona moral' if asunto.cliente_tipo == 'persona_moral' }}</em><b>{{ asunto.cliente }}</b>
             {% if asunto.cliente_tel %}<span><a href="tel:{{ asunto.cliente_tel }}">Tel. {{ asunto.cliente_tel }}</a></span>{% endif %}
             {% if asunto.cliente_email %}<span><a href="mailto:{{ asunto.cliente_email }}">{{ asunto.cliente_email }}</a></span>{% endif %}</div></div>
         {% endif %}
@@ -159,117 +235,53 @@
         {% endif %}
         {% for c in colaboradores %}
         <div class="xp-parte"><span class="av" style="background:{{ c.color }}">{{ c.iniciales }}</span>
-          <div><em>Colabora</em><b>{{ c.nombre }}</b>{% if es_admin %}<span><button type="button" class="btn btn-ghost btn-sm" data-quitar="{{ c.id }}" style="margin-top:6px">Quitar del expediente</button></span>{% endif %}</div></div>
+          <div><em>Colabora</em><b>{{ c.nombre }}</b>{% if es_admin %}<span><button type="button" class="link" data-quitar="{{ c.id }}">Quitar</button></span>{% endif %}</div></div>
         {% endfor %}
-        {% if es_admin %}
-        {% set ya = colaboradores | map(attribute='id') | list %}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
-          <select class="as-select" id="eqAgregar" aria-label="Agregar al equipo">
-            <option value="">+ Agregar colaborador…</option>
-            {% for ab in abogados if (not responsable or ab.id != responsable.id) and ab.id not in ya %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
-          </select>
-          <select class="as-select" id="eqResponsable" aria-label="Cambiar responsable">
-            <option value="">Cambiar responsable…</option>
-            {% for ab in abogados if not responsable or ab.id != responsable.id %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
-          </select>
-        </div>
-        {% endif %}
       </div>
-    </div>
-
-    <div class="xp-card">
-      <div class="xp-card-h"><h2>Documentos recientes</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
-      <div class="xp-card-b">
-        {% if documentos %}
-        <table class="xp-docs">
-          <thead><tr><th>Nombre</th><th>Fecha</th><th>Por</th><th>Estado</th></tr></thead>
-          <tbody>
-          {% for d in documentos[:5] %}
-          {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
-          <tr>
-            <td class="n">{% if enlace %}<a href="{{ d.archivo_url }}" target="_blank" rel="noopener">{% endif %}<span class="ext {{ d.ext }}">{{ d.ext or 'doc' }}</span>{{ d.nombre }}{% if enlace %}</a>{% endif %}</td>
-            <td>{{ d.dia }}</td>
-            <td>{{ d.autor or '—' }}</td>
-            <td>{% if enlace %}<span class="estado"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg>Guardado</span>{% else %}<span class="estado">Sin archivo</span>{% endif %}</td>
-          </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <p class="as-empty">Aún no hay documentos. Súbelos y quedan cifrados y disponibles para {{ config.ASISTENTE_NOMBRE }}.</p>
-        <button type="button" class="btn btn-ghost btn-sm" data-subir style="margin-top:10px">Subir documento</button>
-        {% endif %}
+      {% if es_admin %}
+      {% set ya = colaboradores | map(attribute='id') | list %}
+      <div class="xr-equipo-acc">
+        <select class="as-select" id="eqAgregar" aria-label="Agregar al equipo">
+          <option value="">+ Agregar colaborador…</option>
+          {% for ab in abogados if (not responsable or ab.id != responsable.id) and ab.id not in ya %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+        </select>
+        <select class="as-select" id="eqResponsable" aria-label="Cambiar responsable">
+          <option value="">Cambiar responsable…</option>
+          {% for ab in abogados if not responsable or ab.id != responsable.id %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+        </select>
       </div>
+      {% endif %}
     </div>
-  </div>
-
-  <div class="xp-fila3">
-    {% if not abierto or asunto.resultado %}
-    <div class="xp-card">
-      <div class="xp-card-h"><h2>Resultado</h2></div>
-      <div class="xp-card-b">
-        <div class="as-res" id="pcRes">
-          {% for clave, info in resultados.items() %}<button type="button" data-res="{{ clave }}" class="{{ 'on' if asunto.resultado == clave }}" style="--rc:{{ info.color }};--rf:{{ info.fondo }}">{{ info.label }}</button>{% endfor %}
-        </div>
-        <textarea class="as-textarea pc-notas" id="pcNotas" maxlength="3000" rows="3" placeholder="¿Qué argumento o estrategia funcionó? ¿Qué harías distinto?">{{ asunto.resultado_notas or '' }}</textarea>
-        <div class="pc-hint" id="pcHint">{{ 'Se usa como precedente para asuntos parecidos.' if asunto.resultado else 'Regístralo: alimenta los precedentes del despacho.' }}</div>
-      </div>
-    </div>
-    {% endif %}
-    <div class="xp-card">
-      <div class="xp-card-h"><h2>Cobranza</h2><a href="{{ url_for('cobranzas.index', asunto=asunto.id, grupo='todos') }}">Ver cobros →</a></div>
-      <div class="xp-card-b">
-        <div class="xp-kv"><span>Honorarios pactados</span><b>{{ dinero.pactados | dinero }}</b></div>
-        <div class="xp-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
-        <div class="xp-kv"><span>Cobrado</span><b>{{ dinero.cobrado | dinero }}</b></div>
-        <div class="xp-kv"><span>Por cobrar</span><b style="color:{{ '#8A6A2F' if dinero.pendiente else 'var(--e)' }}">{{ dinero.pendiente | dinero }}</b></div>
-        {% if session.get('role') in ('super_admin', 'admin', 'abogado', 'asistente') %}
-        <a class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px" href="{{ url_for('cobranzas.index') }}#nuevo-asunto-{{ asunto.id }}">+ Nuevo cobro</a>
-        {% endif %}
-      </div>
-    </div>
-    <div class="xp-card">
-      <div class="xp-card-h"><h2>Casos parecidos</h2><a href="{{ url_for('insights.index') }}">Precedentes →</a></div>
-      <div class="xp-card-b" id="pcCasos"><p class="as-empty">Buscando precedentes…</p></div>
-    </div>
-    <div class="xp-card">
-      <div class="xp-card-h"><h2>Etiquetas</h2></div>
-      <div class="xp-card-b">
-        <div class="af-tags" id="afTags">
-          {% for et in etiquetas %}<span class="af-tag" style="--t:{{ et.color }}">{{ et.nombre }}<button type="button" data-et="{{ et.id }}" aria-label="Quitar etiqueta {{ et.nombre }}">×</button></span>{% endfor %}
-          <button type="button" class="af-tag-add" id="afTagAdd">+ Etiqueta</button>
-        </div>
-        <form id="afTagForm" hidden style="margin-top:8px;gap:6px">
-          <input class="as-input" id="afTagInput" list="afTagList" maxlength="30" placeholder="Ej. Urgente, Apelación…" style="flex:1">
-          <datalist id="afTagList">{% for et in todas_etiquetas %}<option value="{{ et.nombre }}">{% endfor %}</datalist>
-          <button class="btn btn-primary btn-sm">Agregar</button>
-        </form>
-      </div>
-    </div>
-  </div>
+  </article>
 </section>
 
-<!-- ── Preguntar ───────────────────────────────────────────── -->
+<!-- ── Preguntar: mini chat con memoria ────────────────────── -->
 <section class="xp-panel" id="p-preguntar" role="tabpanel">
-  <div class="xp-preguntar">
-    <h2 style="font:600 24px 'Sora',sans-serif;letter-spacing:-.02em;color:var(--e);margin:0">Pregúntale a {{ config.ASISTENTE_NOMBRE }} sobre este expediente</h2>
-    <p style="font-size:15px;color:var(--ash);margin:8px 0 14px">Cada dato de la respuesta indica de qué documento o artículo sale, para que puedas comprobarlo.</p>
-    <div class="xp-alcance"><span>Busca en:</span><span class="on">{{ ic('check', 13) }} Este expediente · {{ documentos | length }} documento{{ 's' if documentos | length != 1 }}</span><span class="on">{{ ic('check', 13) }} Leyes federales</span></div>
-    <form class="xp-caja" id="xpPregunta" action="{{ url_for('asistente.index') }}" method="get">
-      <input type="hidden" name="asunto" value="{{ asunto.id }}">
-      <textarea name="q" id="xpQ" rows="2" maxlength="500" placeholder="Ej. ¿Cuándo nos notificaron la demanda y cuántos días tenemos para contestar?" required></textarea>
-      <button class="btn btn-primary">Preguntar</button>
-    </form>
-    <div class="xp-sugerencias">
-      <button type="button" data-q="Resume los hechos principales del expediente y señala sus fuentes.">Resume los hechos principales y señala sus fuentes</button>
-      <button type="button" data-q="¿Qué plazo o término sigue en este expediente y en qué artículo se funda?">¿Qué plazo sigue y en qué artículo se funda?</button>
-      <button type="button" data-q="¿Qué documentos mencionan fechas importantes (firma, notificación, audiencia)?">¿Qué documentos mencionan fechas importantes?</button>
-      <button type="button" data-q="¿Qué información o documentos faltan para avanzar este expediente?">¿Qué información o documentos faltan?</button>
+  <div class="xc" id="xc">
+    <div class="xc-h">
+      <div><b>{{ ic('spark', 16) }} {{ config.ASISTENTE_NOMBRE }} · este expediente</b>
+        <small>Recuerda esta conversación: si vuelves mañana, sigue aquí. Busca en {{ documentos | length + sentencias | length }} documento{{ 's' if (documentos | length + sentencias | length) != 1 }} del expediente y en las leyes federales.</small></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="xcNueva">Nueva conversación</button>
     </div>
+    <div class="xc-feed" id="xcFeed" aria-live="polite">
+      <div class="xc-hola" id="xcHola">
+        <p>Pregúntame lo que quieras de <b>{{ asunto.titulo }}</b>. Cada dato de la respuesta dice de dónde sale.</p>
+        <div class="xc-sug">
+          <button type="button" data-q="Resume los hechos principales del expediente y señala sus fuentes.">Resume los hechos y señala sus fuentes</button>
+          <button type="button" data-q="¿Qué plazo o término sigue en este expediente y en qué artículo se funda?">¿Qué plazo sigue y en qué artículo se funda?</button>
+          <button type="button" data-q="¿Qué documentos mencionan fechas importantes (firma, notificación, audiencia)?">¿Qué documentos mencionan fechas importantes?</button>
+          <button type="button" data-q="¿Qué información o documentos faltan para avanzar este expediente?">¿Qué información o documentos faltan?</button>
+        </div>
+      </div>
+    </div>
+    <form class="xc-caja" id="xcForm">
+      <textarea id="xcTexto" rows="1" maxlength="4000" placeholder="Escribe tu pregunta sobre este expediente…" aria-label="Pregunta"></textarea>
+      <button class="xc-enviar" id="xcEnviar" type="submit" aria-label="Enviar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
     {% if asunto.privado %}
     <div class="xp-aviso-ia">{{ ic('lock', 16) }}<span>Este expediente es <b>privado</b>: {{ config.ASISTENTE_NOMBRE }} solo busca en el servidor del despacho y nada de su contenido se envía al servicio de IA.</span></div>
     {% elif not config.ANTHROPIC_API_KEY %}
-    <div class="xp-aviso-ia">{{ ic('spark', 16) }}<span>{{ config.ASISTENTE_NOMBRE }} está en <b>modo búsqueda</b>: te muestra los pasajes de tus documentos y de la ley que responden a tu pregunta, pero todavía no redacta respuestas. La redacción se activa al conectar el servicio de IA.</span></div>
+    <div class="xp-aviso-ia">{{ ic('spark', 16) }}<span>{{ config.ASISTENTE_NOMBRE }} está en <b>modo búsqueda</b>: te muestra los pasajes de tus documentos y de la ley que responden, pero todavía no redacta. La redacción se activa al conectar el servicio de IA.</span></div>
     {% endif %}
   </div>
 </section>
@@ -357,96 +369,98 @@
 </div></div>
     </section>
 
-    <!-- ── Documentos ─────────────────────────────────────────────── -->
-    <section class="xp-panel" id="p-documentos" role="tabpanel">
-<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
-      <div class="af-docs-h"><h4>Documentos del expediente</h4>
-        <a class="btn btn-secondary btn-sm" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 13) }} Generar desde machote</a></div>
-      {% for d in documentos %}
-      {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
-      <div class="af-doc">
-        <span class="af-ext {{ d.ext }}">{{ d.ext or 'doc' }}</span>
-        <div class="af-doc-b">
-          {% if enlace %}<a href="{{ d.archivo_url }}" target="_blank" rel="noopener">{{ d.nombre }}</a>{% else %}<b>{{ d.nombre }}</b>{% endif %}
-          <small>{{ d.dia }}{% if d.autor %} · {{ d.autor }}{% endif %}{% if d.tamanio %} · {{ (d.tamanio / 1024) | round | int }} KB{% endif %}</small>
-        </div>
-        {% if enlace %}<a class="btn btn-ghost btn-sm" href="{{ d.archivo_url }}?descargar=1">Descargar</a>{% endif %}
+<!-- ── Documentos ─────────────────────────────────────────────── -->
+<section class="xp-panel" id="p-documentos" role="tabpanel">
+  <div class="xd-h"><h2>Documentos del expediente <span>{{ documentos | length }}</span></h2>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 13) }} Generar desde machote</a></div>
+  <div class="xd-grid">
+    <label class="xd-subir" id="afDrop">
+      <input type="file" id="afArchivo" hidden multiple>
+      <span class="xd-mas">+</span><b>Subir documentos</b><small>Arrastra aquí o haz clic. Se guardan cifrados y {{ config.ASISTENTE_NOMBRE }} los lee.</small>
+    </label>
+    {% for d in documentos %}
+    {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+    <article class="dc-doc">
+      <a class="dc-hoja t-{{ d.ext or 'doc' }}" href="{{ d.archivo_url if enlace else '#documentos' }}"{% if enlace %} target="_blank" rel="noopener"{% endif %}>
+        <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ (d.ext or 'doc') | upper }}</span>
+        <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </a>
+      <div class="dc-info">
+        <b title="{{ d.nombre }}">{{ d.nombre }}</b>
+        <span class="dc-exp">{{ d.dia }}{% if d.autor %} · {{ d.autor }}{% endif %}{% if d.tamanio %} · {{ (d.tamanio / 1024) | round | int }} KB{% endif %}</span>
+        {% if enlace %}<span class="dc-pie"><a class="link" href="{{ d.archivo_url }}" target="_blank" rel="noopener">Abrir</a><a class="link" href="{{ d.archivo_url }}?descargar=1">Descargar</a></span>{% endif %}
       </div>
-      {% else %}<p class="as-empty">Aún no hay documentos en este asunto.</p>{% endfor %}
-      <label class="af-drop" id="afDrop">
-        <input type="file" id="afArchivo" hidden multiple>
-        <b>Arrastra archivos aquí</b> o haz clic para subirlos · Se guardan cifrados y se agregan a la memoria del despacho
-      </label>
+    </article>
+    {% endfor %}
+  </div>
 
-      <div class="af-docs-h" style="margin-top:24px"><h4>Resoluciones y sentencias</h4>
-        <button type="button" class="btn btn-secondary btn-sm" id="afNuevaRes">+ Agregar resolución</button></div>
-      {% for s in sentencias %}
-      <div class="af-doc">
-        <span class="af-ext" style="background:#F6F1E6;color:#6E5A3A">{{ ic('scale', 16) }}</span>
-        <div class="af-doc-b">
-          {% if s.archivo_url and s.archivo_url.startswith('/archivos/') %}<a href="{{ s.archivo_url }}" target="_blank" rel="noopener">{{ s.titulo }}</a>{% else %}<b>{{ s.titulo }}</b>{% endif %}
-          <small>{{ s.etiqueta }}{% if s.fecha_emision %} · {{ s.fecha_emision[:10] }}{% endif %}{% if s.sentido_label %} · {{ s.sentido_label }}{% endif %}</small>
-        </div>
+  <div class="xd-h"><h2>Resoluciones y sentencias <span>{{ sentencias | length }}</span></h2>
+    <button type="button" class="btn btn-ghost btn-sm" id="afNuevaRes">+ Agregar resolución</button></div>
+  {% if sentencias %}
+  <div class="xd-grid">
+    {% for s in sentencias %}
+    {% set enlace = s.archivo_url and s.archivo_url.startswith('/archivos/') %}
+    <article class="dc-doc">
+      <a class="dc-hoja t-res" href="{{ s.archivo_url if enlace else '#documentos' }}"{% if enlace %} target="_blank" rel="noopener"{% endif %}>
+        <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ s.etiqueta | upper }}</span>
+        <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </a>
+      <div class="dc-info">
+        <b title="{{ s.titulo }}">{{ s.titulo }}</b>
+        <span class="dc-exp">{{ s.dia }}</span>
+        {% if s.sentido_label %}<span class="dc-pie"><span class="as-chip" style="--c-c:{{ resultados[s.sentido].color }};--c-f:{{ resultados[s.sentido].fondo }}">{{ s.sentido_label }}</span></span>{% endif %}
       </div>
-      {% else %}<p class="as-empty">Sin resoluciones registradas. Anotar si fueron favorables alimenta los precedentes del despacho.</p>{% endfor %}
-</div></div>
-    </section>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}<p class="as-empty">Sin resoluciones registradas. Anotar si fueron favorables alimenta los precedentes del despacho.</p>{% endif %}
+</section>
 
-    <!-- ── Datos ──────────────────────────────────────────────────── -->
-    <section class="xp-panel" id="p-datos" role="tabpanel">
-<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
-      <form class="af-form" id="fDatos">
-        <h4>El asunto</h4>
-        <div><label class="as-label" for="dTipo">Materia</label>
-          <select class="as-select" id="dTipo" name="tipo_asunto">{% for k, t in tipos_derecho.items() %}<option value="{{ k }}"{% if asunto.tipo_asunto == k %} selected{% endif %}>{{ t.label }}</option>{% endfor %}</select></div>
-        <div><label class="as-label" for="dSub">Tipo de juicio o trámite</label><input class="as-input" id="dSub" name="sub_tipo" value="{{ asunto.sub_tipo or '' }}" list="dSubOpc" maxlength="80"><datalist id="dSubOpc">{% for st in ti.subtypes %}<option value="{{ st }}">{% endfor %}</datalist></div>
-        <div><label class="as-label" for="dCliente">Cliente</label>
-          <select class="as-select" id="dCliente" name="cliente_id"><option value="">Sin cliente</option>{% for c in clientes %}<option value="{{ c.id }}"{% if asunto.cliente_id == c.id %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}</select></div>
-        <div><label class="as-label" for="dPrioridad">Prioridad</label>
-          <select class="as-select" id="dPrioridad" name="prioridad">{% for p, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<option value="{{ p }}"{% if asunto.prioridad == p %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
-        <div><label class="as-label" for="dIni">Fecha de inicio</label><input class="as-input" type="date" id="dIni" name="fecha_inicio" value="{{ (asunto.fecha_inicio or '')[:10] }}"></div>
-        <div><label class="as-label" for="dLim">Fecha límite <small>(si la hay)</small></label><input class="as-input" type="date" id="dLim" name="fecha_limite" value="{{ (asunto.fecha_limite or '')[:10] }}"></div>
-        <div class="full"><label class="as-label" for="dDesc">Hechos y descripción</label><textarea class="as-textarea" id="dDesc" name="descripcion" rows="4" maxlength="5000">{{ asunto.descripcion or '' }}</textarea></div>
-
-        <h4>El juicio</h4>
-        <div><label class="as-label" for="dExp">Expediente interno</label><input class="as-input" id="dExp" name="numero_expediente" value="{{ asunto.numero_expediente or '' }}" maxlength="60"></div>
-        <div><label class="as-label" for="dJui">Número de juicio <small>(del juzgado)</small></label><input class="as-input" id="dJui" name="numero_juicio" value="{{ asunto.numero_juicio or '' }}" maxlength="60"></div>
-        <div class="full"><label class="as-label" for="dJuz">Juzgado o autoridad</label><input class="as-input" id="dJuz" name="juzgado" value="{{ asunto.juzgado or '' }}" maxlength="200"></div>
-
-        <h4>La contraparte</h4>
-        <div class="full"><label class="as-label" for="dCon">Nombre</label><input class="as-input" id="dCon" name="contrario_nombre" value="{{ asunto.contrario_nombre or '' }}" maxlength="200"></div>
-        <div><label class="as-label" for="dConAb">Su abogado</label><input class="as-input" id="dConAb" name="contrario_abogado" value="{{ asunto.contrario_abogado or '' }}" maxlength="200"></div>
-        <div><label class="as-label" for="dConDes">Su despacho</label><input class="as-input" id="dConDes" name="contrario_despacho" value="{{ asunto.contrario_despacho or '' }}" maxlength="200"></div>
-
-        <h4>Dinero</h4>
-        <div><label class="as-label" for="dMonto">Monto en litigio</label><input class="as-input" type="number" min="0" step="0.01" id="dMonto" name="monto_estimado" value="{{ asunto.monto_estimado or '' }}"></div>
-        <div><label class="as-label" for="dHon">Honorarios pactados</label><input class="as-input" type="number" min="0" step="0.01" id="dHon" name="honorarios_pactados" value="{{ asunto.honorarios_pactados or '' }}"></div>
-        <div><label class="as-label" for="dForma">Forma de cobro</label>
-          <select class="as-select" id="dForma" name="forma_cobro">{% for f, l in [('fijo','Cuota fija'),('por_hora','Por hora'),('por_evento','Por etapa o evento')] %}<option value="{{ f }}"{% if asunto.forma_cobro == f %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
-      </form>
-      <div class="af-guardar" id="fDatosBar"><div>Tienes cambios sin guardar <button type="button" class="btn btn-ghost btn-sm" id="fDatosDeshacer">Deshacer</button><button type="button" class="btn btn-primary btn-sm" id="fDatosGuardar">Guardar cambios</button></div></div>
-</div></div>
-    </section>
-
-    <!-- ── Estrategia ─────────────────────────────────────────────── -->
-    <section class="xp-panel" id="p-estrategia" role="tabpanel">
-<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
-      <p class="as-empty" style="margin-bottom:12px">La estrategia del caso en un solo lugar. Escribe un argumento o un riesgo por renglón.</p>
-      <form class="af-form" id="fFicha">
-        <div class="full"><label class="as-label" for="eObj">Qué quiere lograr el cliente</label><textarea class="as-textarea" id="eObj" name="objetivo_cliente" rows="2" maxlength="2000">{{ ficha.objetivo_cliente if ficha else '' }}</textarea></div>
-        <div><label class="as-label" for="eVia">Vía procesal</label><input class="as-input" id="eVia" name="via_procesal" maxlength="200" value="{{ ficha.via_procesal if ficha else '' }}" placeholder="Ej. Juicio ordinario mercantil"></div>
-        <div><label class="as-label">Probabilidad de éxito</label>
-          <div class="af-prob" id="eProb">{% set pv = ficha.probabilidad_exito if ficha else '' %}{% for v, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<button type="button" data-v="{{ v }}" class="{{ 'on' if pv == v }}">{{ l }}</button>{% endfor %}</div></div>
-        <div class="full"><label class="as-label" for="eJus">Por qué esa vía</label><textarea class="as-textarea" id="eJus" name="justificacion_via" rows="2" maxlength="2000">{{ ficha.justificacion_via if ficha else '' }}</textarea></div>
-        <div><label class="as-label" for="eArg">Argumentos clave</label><textarea class="as-textarea" id="eArg" name="argumentos_clave" rows="5" maxlength="4000">{{ (ficha.argumentos_clave | join('\n')) if ficha else '' }}</textarea></div>
-        <div><label class="as-label" for="eRie">Riesgos</label><textarea class="as-textarea" id="eRie" name="riesgos" rows="5" maxlength="4000">{{ (ficha.riesgos | join('\n')) if ficha else '' }}</textarea></div>
-      </form>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
-        <a href="{{ url_for('asistente.index', asunto=asunto.id) }}" style="display:inline-flex;gap:6px;align-items:center;font:600 13px Inter;color:var(--e);text-decoration:none">{{ ic('spark', 14) }} Pídele a {{ config.ASISTENTE_NOMBRE }} que revise la estrategia</a>
-        <button type="button" class="btn btn-primary btn-sm" id="fFichaGuardar">Guardar estrategia</button>
-      </div>
-</div></div>
-    </section>
+<!-- ── Estrategia ─────────────────────────────────────────────── -->
+<section class="xp-panel" id="p-estrategia" role="tabpanel">
+  {% set pv = (ficha.probabilidad_exito if ficha else '') or '' %}
+  <form class="xe" id="fFicha">
+    <p class="xe-intro">Responde estas cinco preguntas. Así todo el equipo sabe a dónde va el caso, y {{ config.ASISTENTE_NOMBRE }} lo toma en cuenta.</p>
+    <div class="xe-paso">
+      <span class="xe-n">1</span>
+      <div><label class="xe-t" for="eObj">¿Qué quiere lograr el cliente?</label>
+        <textarea class="as-textarea" id="eObj" name="objetivo_cliente" rows="2" maxlength="2000" placeholder="Ej. Que se deje sin efectos la resolución del SAT y no pagar el crédito fiscal.">{{ ficha.objetivo_cliente if ficha else '' }}</textarea></div>
+    </div>
+    <div class="xe-paso">
+      <span class="xe-n">2</span>
+      <div><label class="xe-t" for="eVia">¿Por qué camino vamos?</label>
+        <input class="as-input" id="eVia" name="via_procesal" maxlength="200" value="{{ ficha.via_procesal if ficha else '' }}" placeholder="Ej. Amparo indirecto">
+        <textarea class="as-textarea" id="eJus" name="justificacion_via" rows="2" maxlength="2000" placeholder="¿Por qué ese camino y no otro?" style="margin-top:8px">{{ ficha.justificacion_via if ficha else '' }}</textarea></div>
+    </div>
+    <div class="xe-paso">
+      <span class="xe-n">3</span>
+      <div><span class="xe-t">¿Qué tan probable es ganar?</span>
+        <div class="xe-prob" id="eProb">
+          {% for v, l, d in [('baja','Baja','Hay obstáculos fuertes'),('media','Media','Puede salir en cualquier sentido'),('alta','Alta','Los argumentos son sólidos')] %}
+          <button type="button" data-v="{{ v }}" class="p-{{ v }}{{ ' on' if pv == v }}"><b>{{ l }}</b><small>{{ d }}</small></button>
+          {% endfor %}
+        </div></div>
+    </div>
+    <div class="xe-paso">
+      <span class="xe-n">4</span>
+      <div><span class="xe-t">Argumentos a favor</span>
+        <ul class="xe-lista favor" data-lista="eArg">{% for x in (ficha.argumentos_clave if ficha else []) %}<li><span>{{ x }}</span><button type="button" aria-label="Quitar">×</button></li>{% endfor %}</ul>
+        <input class="as-input xe-agregar" data-para="eArg" maxlength="400" placeholder="Escribe un argumento y presiona Enter">
+        <textarea id="eArg" name="argumentos_clave" hidden>{{ (ficha.argumentos_clave | join('\n')) if ficha else '' }}</textarea></div>
+    </div>
+    <div class="xe-paso">
+      <span class="xe-n">5</span>
+      <div><span class="xe-t">Riesgos</span>
+        <ul class="xe-lista riesgo" data-lista="eRie">{% for x in (ficha.riesgos if ficha else []) %}<li><span>{{ x }}</span><button type="button" aria-label="Quitar">×</button></li>{% endfor %}</ul>
+        <input class="as-input xe-agregar" data-para="eRie" maxlength="400" placeholder="Escribe un riesgo y presiona Enter">
+        <textarea id="eRie" name="riesgos" hidden>{{ (ficha.riesgos | join('\n')) if ficha else '' }}</textarea></div>
+    </div>
+    <div class="xe-pie">
+      <button type="button" class="link" id="xeRevisar">{{ ic('spark', 14) }} Pídele a {{ config.ASISTENTE_NOMBRE }} que revise la estrategia</button>
+      <button type="button" class="btn btn-primary" id="fFichaGuardar">Guardar estrategia</button>
+    </div>
+  </form>
+</section>
 
     <!-- ── Horas ──────────────────────────────────────────────────── -->
     <section class="xp-panel" id="p-horas" role="tabpanel">
@@ -457,6 +471,41 @@
       {% else %}<p class="as-empty">Sin horas registradas. Regístralas desde la pestaña Actividad.</p>{% endfor %}
 </div></div>
     </section>
+
+</div>
+
+<!-- ── Datos generales (panel lateral) ─────────────────────── -->
+<div class="xg-fondo" id="xgFondo"></div>
+<aside class="xg" id="xg" aria-label="Datos generales del expediente" aria-hidden="true">
+  <div class="xg-h"><b>Datos generales</b><button type="button" class="btn-icon" id="xgCerrar" aria-label="Cerrar">×</button></div>
+  <form class="af-form xg-b" id="fDatos">
+    <h4>El asunto</h4>
+    <div><label class="as-label" for="dTipo">Materia</label>
+      <select class="as-select" id="dTipo" name="tipo_asunto">{% for k, t in tipos_derecho.items() %}<option value="{{ k }}"{% if asunto.tipo_asunto == k %} selected{% endif %}>{{ t.label }}</option>{% endfor %}</select></div>
+    <div><label class="as-label" for="dSub">Tipo de juicio o trámite</label><input class="as-input" id="dSub" name="sub_tipo" value="{{ asunto.sub_tipo or '' }}" list="dSubOpc" maxlength="80"><datalist id="dSubOpc">{% for st in asunto.tipo_info.subtypes %}<option value="{{ st }}">{% endfor %}</datalist></div>
+    <div><label class="as-label" for="dCliente">Cliente</label>
+      <select class="as-select" id="dCliente" name="cliente_id"><option value="">Sin cliente</option>{% for c in clientes %}<option value="{{ c.id }}"{% if asunto.cliente_id == c.id %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}</select></div>
+    <div><label class="as-label" for="dPrioridad">Prioridad</label>
+      <select class="as-select" id="dPrioridad" name="prioridad">{% for p, l in [('alta','Alta'),('media','Media'),('baja','Baja')] %}<option value="{{ p }}"{% if asunto.prioridad == p %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div><label class="as-label" for="dIni">Fecha de inicio</label><input class="as-input" type="date" id="dIni" name="fecha_inicio" value="{{ (asunto.fecha_inicio or '')[:10] }}"></div>
+    <div><label class="as-label" for="dLim">Fecha límite <small>(si la hay)</small></label><input class="as-input" type="date" id="dLim" name="fecha_limite" value="{{ (asunto.fecha_limite or '')[:10] }}"></div>
+    <div class="full"><label class="as-label" for="dDesc">Hechos y descripción</label><textarea class="as-textarea" id="dDesc" name="descripcion" rows="4" maxlength="5000" placeholder="Qué pasó, qué pide el cliente, fechas clave…">{{ asunto.descripcion or '' }}</textarea></div>
+    <h4>El juicio</h4>
+    <div><label class="as-label" for="dExp">Expediente interno</label><input class="as-input" id="dExp" name="numero_expediente" value="{{ asunto.numero_expediente or '' }}" maxlength="60"></div>
+    <div><label class="as-label" for="dJui">Número de juicio <small>(del juzgado)</small></label><input class="as-input" id="dJui" name="numero_juicio" value="{{ asunto.numero_juicio or '' }}" maxlength="60"></div>
+    <div class="full"><label class="as-label" for="dJuz">Juzgado o autoridad</label><input class="as-input" id="dJuz" name="juzgado" value="{{ asunto.juzgado or '' }}" maxlength="200"></div>
+    <h4>La contraparte</h4>
+    <div class="full"><label class="as-label" for="dCon">Nombre</label><input class="as-input" id="dCon" name="contrario_nombre" value="{{ asunto.contrario_nombre or '' }}" maxlength="200"></div>
+    <div><label class="as-label" for="dConAb">Su abogado</label><input class="as-input" id="dConAb" name="contrario_abogado" value="{{ asunto.contrario_abogado or '' }}" maxlength="200"></div>
+    <div><label class="as-label" for="dConDes">Su despacho</label><input class="as-input" id="dConDes" name="contrario_despacho" value="{{ asunto.contrario_despacho or '' }}" maxlength="200"></div>
+    <h4>Dinero</h4>
+    <div><label class="as-label" for="dMonto">Monto en litigio</label><input class="as-input" type="number" min="0" step="0.01" id="dMonto" name="monto_estimado" value="{{ asunto.monto_estimado or '' }}"></div>
+    <div><label class="as-label" for="dHon">Honorarios pactados</label><input class="as-input" type="number" min="0" step="0.01" id="dHon" name="honorarios_pactados" value="{{ asunto.honorarios_pactados or '' }}"></div>
+    <div class="full"><label class="as-label" for="dForma">Forma de cobro</label>
+      <select class="as-select" id="dForma" name="forma_cobro">{% for f, l in [('fijo','Cuota fija'),('por_hora','Por hora'),('por_evento','Por etapa o evento')] %}<option value="{{ f }}"{% if asunto.forma_cobro == f %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  </form>
+  <div class="xg-f"><span id="xgEstado">Sin cambios</span><button type="button" class="btn btn-ghost" id="fDatosDeshacer">Cancelar</button><button type="button" class="btn btn-primary" id="fDatosGuardar" disabled>Guardar cambios</button></div>
+</aside>
 
 <div class="as-modal" id="resModal" role="dialog" aria-modal="true" aria-labelledby="resTitulo">
   <div class="as-modal-c">
@@ -513,7 +562,6 @@
   document.querySelectorAll('.xp-tab').forEach(t => t.addEventListener('click', () => irA(t.dataset.tab)));
   document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => irA(b.dataset.ir)));
   document.querySelectorAll('#xpSubir, [data-subir]').forEach(b => b.addEventListener('click', () => { irA('documentos'); document.getElementById('afArchivo').click(); }));
-  document.querySelectorAll('.xp-sugerencias [data-q]').forEach(b => b.addEventListener('click', () => { const q = document.getElementById('xpQ'); q.value = b.dataset.q; document.getElementById('xpPregunta').requestSubmit(); }));
   if (location.hash) abrirTab(tabActual());
   window.addEventListener('hashchange', () => abrirTab(tabActual()));
 
@@ -670,29 +718,158 @@
     recargar('documentos');
   });
 
-  /* Datos del asunto */
-  const fDatos = $('#fDatos'), barra = $('#fDatosBar');
-  const leer = () => Object.fromEntries(new FormData(fDatos));
-  const base = JSON.stringify(leer());
-  fDatos.addEventListener('input', () => barra.classList.toggle('on', JSON.stringify(leer()) !== base));
-  $('#fDatosDeshacer').addEventListener('click', () => { fDatos.reset(); barra.classList.remove('on'); });
-  $('#fDatosGuardar').addEventListener('click', async () => {
-    const r = await post(`/asuntos/${ID}/editar-campo`, { campo: 'multi', valor: leer() });
-    if (!r.ok) { showToast('No se pudieron guardar los cambios', 'error'); return; }
-    recargar('datos');
+  /* Datos generales (panel lateral) */
+  const xg = $('#xg'), xgFondo = $('#xgFondo'), fDatos = $('#fDatos');
+  if (fDatos) {
+    const leer = () => Object.fromEntries(new FormData(fDatos));
+    let base = JSON.stringify(leer());
+    const sucio = () => JSON.stringify(leer()) !== base;
+    const marcar = () => { const s = sucio(); $('#fDatosGuardar').disabled = !s; $('#xgEstado').textContent = s ? 'Tienes cambios sin guardar' : 'Sin cambios'; };
+    const abrirXg = () => { xg.classList.add('open'); xgFondo.classList.add('open'); xg.setAttribute('aria-hidden', 'false'); setTimeout(() => $('#dDesc').focus(), 200); };
+    const cerrarXg = () => {
+      if (sucio() && !confirm('Tienes cambios sin guardar. ¿Cerrar de todos modos?')) return;
+      fDatos.reset();
+      // El calendario de fechas guarda su propio texto: se vuelve a poner la fecha original
+      fDatos.querySelectorAll('input').forEach(i => i._flatpickr && i._flatpickr.setDate(i.defaultValue || null, false));
+      marcar(); xg.classList.remove('open'); xgFondo.classList.remove('open'); xg.setAttribute('aria-hidden', 'true');
+    };
+    $('#xpEditar')?.addEventListener('click', abrirXg);
+    $('#xgCerrar').addEventListener('click', cerrarXg);
+    $('#fDatosDeshacer').addEventListener('click', cerrarXg);
+    xgFondo.addEventListener('click', cerrarXg);
+    ['input', 'change'].forEach(ev => fDatos.addEventListener(ev, marcar));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && xg.classList.contains('open')) cerrarXg(); });
+    $('#fDatosGuardar').addEventListener('click', async () => {
+      const btn = $('#fDatosGuardar'); btn.disabled = true; btn.textContent = 'Guardando…';
+      const r = await post(`/asuntos/${ID}/editar-campo`, { campo: 'multi', valor: leer() });
+      if (!r.ok) { showToast('No se pudieron guardar los cambios', 'error'); btn.disabled = false; btn.textContent = 'Guardar cambios'; return; }
+      base = JSON.stringify(leer());
+      try { sessionStorage.setItem('xpToast', 'Datos guardados'); } catch (_) {}
+      recargar(tabActual() === 'datos' ? '' : tabActual());
+    });
+    if (location.hash === '#datos') abrirXg();
+  }
+  try { const t = sessionStorage.getItem('xpToast'); if (t) { sessionStorage.removeItem('xpToast'); showToast(t); } } catch (_) {}
+
+  /* Nota rápida desde el resumen */
+  $('#fNotaRapida')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button'); btn.disabled = true;
+    const r = await post(`/asuntos/${ID}/notas`, { contenido: new FormData(e.target).get('contenido') });
+    btn.disabled = false;
+    if (!r.ok) { showToast('No se pudo guardar la nota', 'error'); return; }
+    try { sessionStorage.setItem('xpToast', 'Nota guardada'); } catch (_) {}
+    recargar('');
   });
 
-  /* Estrategia */
+  /* Estrategia: listas de argumentos y riesgos */
+  function syncLista(ul) { $('#' + ul.dataset.lista).value = [...ul.querySelectorAll('li span')].map(x => x.textContent.trim()).filter(Boolean).join('\n'); }
+  function agregarALista(inp) {
+    const v = inp.value.trim(); if (!v) return;
+    const ul = document.querySelector(`.xe-lista[data-lista="${inp.dataset.para}"]`);
+    const li = document.createElement('li'); li.append(Object.assign(document.createElement('span'), { textContent: v }));
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Quitar'); li.append(x);
+    ul.append(li); inp.value = ''; syncLista(ul);
+  }
+  document.querySelectorAll('.xe-lista').forEach(ul => ul.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; b.parentElement.remove(); syncLista(ul); }));
+  document.querySelectorAll('.xe-agregar').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); agregarALista(inp); } }));
   let prob = {{ ((ficha.probabilidad_exito if ficha else '') or '') | tojson }};
   $('#eProb').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; prob = b.dataset.v; $('#eProb').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
   const lineas = t => (t || '').split('\n').map(s => s.trim()).filter(Boolean);
   $('#fFichaGuardar').addEventListener('click', async () => {
+    document.querySelectorAll('.xe-agregar').forEach(agregarALista);
     const fd = new FormData($('#fFicha'));
     const r = await post(`/asuntos/${ID}/ficha`, {
       objetivo_cliente: fd.get('objetivo_cliente'), via_procesal: fd.get('via_procesal'), justificacion_via: fd.get('justificacion_via'),
-      argumentos_clave: lineas(fd.get('argumentos_clave')), riesgos: lineas(fd.get('riesgos')), probabilidad_exito: prob || 'media', insights: [],
+      argumentos_clave: lineas($('#eArg').value), riesgos: lineas($('#eRie').value), probabilidad_exito: prob || 'media', insights: [],
     });
     r.ok ? showToast('Estrategia guardada') : showToast('No se pudo guardar la estrategia', 'error');
+  });
+
+  /* Preguntar: mini chat con memoria (la conversación se guarda cifrada y sigue al volver) */
+  const chat = (() => {
+    const feed = $('#xcFeed'), hola = $('#xcHola'), texto = $('#xcTexto'), enviar = $('#xcEnviar');
+    const TIPO = { despacho: 'Documento del despacho', caso: 'Precedente', dof: 'Diario Oficial' };
+    let conv = {{ conv_id | tojson }}, ocupado = false, n = 0;
+    const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+    function render(md, k) {
+      return esc(md).split(/\n{2,}/).map(b => {
+        const l = b.split('\n');
+        if (l.every(x => /^\s*[-*•]\s+/.test(x))) return '<ul>' + l.map(x => '<li>' + x.replace(/^\s*[-*•]\s+/, '') + '</li>').join('') + '</ul>';
+        return '<p>' + l.join('<br>') + '</p>';
+      }).join('').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\[(\d{1,2})\]/g, (m, i) => `<a class="xc-cita" href="#xcf-${k}-${i}">${i}</a>`);
+    }
+    function fuentes(fs, k) {
+      const box = el('details', 'xc-fuentes'); box.append(el('summary', null, `Fuentes (${fs.length})`));
+      fs.forEach((f, i) => {
+        const d = el('div', 'xc-fuente'); d.id = `xcf-${k}-${i + 1}`;
+        d.append(el('i', null, String(i + 1)));
+        const t = el('span'); t.append(el('b', null, [f.titulo, f.referencia].filter(Boolean).join(' · ')), el('small', null, TIPO[f.tipo] || f.detalle || 'Ley federal'));
+        if (f.extracto) t.append(el('em', null, f.extracto.length > 260 ? f.extracto.slice(0, 257) + '…' : f.extracto));
+        if (f.url) { const a = el('a', null, 'Abrir'); a.href = f.url; a.target = '_blank'; a.rel = 'noopener'; t.append(a); }
+        d.append(t); box.append(d);
+      });
+      return box;
+    }
+    const abajo = () => { feed.scrollTop = feed.scrollHeight; };
+    function yo(t) { hola.hidden = true; feed.append(el('div', 'xc-msg yo', t)); abajo(); }
+    function bot(t, fs) {
+      hola.hidden = true;
+      const k = ++n, box = el('div', 'xc-msg bot'), cuerpo = el('div');
+      box.append(cuerpo); feed.append(box);
+      if (t != null) cuerpo.innerHTML = render(t, k);
+      if (fs && fs.length) box.append(fuentes(fs, k));
+      abajo();
+      return { k, box, cuerpo };
+    }
+    async function cargar() {
+      if (!conv) return;
+      const r = await fetch(`/asistente/conversaciones/${conv}`);
+      if (!r.ok) { conv = null; return; }
+      const j = await r.json();
+      j.mensajes.forEach(m => m.rol === 'usuario' ? yo(m.texto) : bot(m.texto, m.fuentes));
+    }
+    async function preguntar(q) {
+      q = (q || '').trim();
+      if (ocupado || !q) return;
+      ocupado = true; enviar.disabled = true; texto.value = ''; texto.style.height = '';
+      yo(q);
+      const b = bot(null); const pens = el('div', 'xc-pensando'); pens.append(el('span'), el('span'), el('span')); b.cuerpo.append(pens);
+      let txt = '', fs = [];
+      try {
+        const r = await fetch('/asistente/preguntar', { method: 'POST', headers: JSONH, body: JSON.stringify({ pregunta: q, conversacion_id: conv, asunto_id: ID }) });
+        if (!r.ok || !r.body) throw new Error();
+        const lector = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+        for (;;) {
+          const { done, value } = await lector.read(); if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const partes = buf.split('\n\n'); buf = partes.pop();
+          for (const p of partes) {
+            if (!p.startsWith('data: ')) continue;
+            const ev = JSON.parse(p.slice(6));
+            if (ev.tipo === 'conversacion') conv = ev.id;
+            else if (ev.tipo === 'fuentes') fs = ev.fuentes;
+            else if (ev.tipo === 'texto') { txt += ev.texto; b.cuerpo.innerHTML = render(txt, b.k); abajo(); }
+            else if (ev.tipo === 'error') { b.cuerpo.replaceChildren(el('p', 'xc-error', ev.mensaje)); }
+          }
+        }
+        if (!txt && !b.cuerpo.querySelector('.xc-error')) b.cuerpo.innerHTML = fs.length ? '<p>Esto es lo que encontré en tus documentos y en la ley:</p>' : '<p>No encontré información para responder eso.</p>';
+        if (fs.length) { const f = fuentes(fs, b.k); if (!txt) f.open = true; b.box.append(f); }
+      } catch (_) {
+        b.cuerpo.replaceChildren(el('p', 'xc-error', 'No se pudo enviar la pregunta. Revisa tu conexión e intenta de nuevo.'));
+      } finally { ocupado = false; enviar.disabled = false; abajo(); }
+    }
+    $('#xcForm').addEventListener('submit', e => { e.preventDefault(); preguntar(texto.value); });
+    texto.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); preguntar(texto.value); } });
+    texto.addEventListener('input', () => { texto.style.height = ''; texto.style.height = Math.min(texto.scrollHeight, 160) + 'px'; });
+    feed.addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) preguntar(b.dataset.q); });
+    $('#xcNueva').addEventListener('click', () => { conv = null; feed.querySelectorAll('.xc-msg').forEach(m => m.remove()); hola.hidden = false; texto.focus(); });
+    cargar();
+    return { preguntar };
+  })();
+  $('#xeRevisar').addEventListener('click', () => {
+    irA('preguntar');
+    chat.preguntar('Revisa la estrategia de este expediente: ¿los argumentos tienen sustento legal y qué riesgos falta considerar?');
   });
 
   /* Equipo */
@@ -713,7 +890,7 @@
 
   /* Etiquetas */
   const tagForm = $('#afTagForm');
-  $('#afTagAdd').addEventListener('click', () => { tagForm.hidden = !tagForm.hidden; tagForm.style.display = tagForm.hidden ? 'none' : 'flex'; if (!tagForm.hidden) $('#afTagInput').focus(); });
+  $('#afTagAdd').addEventListener('click', () => { tagForm.hidden = !tagForm.hidden; if (!tagForm.hidden) $('#afTagInput').focus(); });
   tagForm.addEventListener('submit', async e => {
     e.preventDefault(); const nombre = $('#afTagInput').value.trim(); if (!nombre) return;
     const r = await post(`/asuntos/${ID}/etiquetas`, { nombre });

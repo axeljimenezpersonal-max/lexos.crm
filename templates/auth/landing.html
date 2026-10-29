@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/favicon.svg') }}">
 <title>Habeas Corpus — El sistema legal para despachos de México</title>
-<meta name="description" content="Asuntos, términos, clientes, cobranza y documentos cifrados en un solo sistema, con Tribuno: un asistente que responde con leyes mexicanas y los precedentes de tu despacho. Prueba 10 días gratis.">
+<meta name="description" content="Asuntos, términos, clientes, cobranza y documentos cifrados en un solo sistema, con Dictum: un asistente que responde con leyes mexicanas y los precedentes de tu despacho. Prueba 10 días gratis.">
 <meta name="theme-color" content="#142E59">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -139,7 +139,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 .puntos{display:flex;justify-content:center;gap:3px;margin-top:5px;height:6px}
 .puntos i{width:6px;height:6px;border-radius:50%}
 
-/* Escena 2: Tribuno */
+/* Escena 2: Dictum */
 .chat{max-width:640px;margin:14px auto 0;display:flex;flex-direction:column;gap:12px}
 .preg{align-self:flex-end;background:var(--azul);color:#fff;border-radius:16px 16px 4px 16px;padding:11px 15px;font-size:14px;max-width:85%;min-height:44px}
 .preg .cursor{display:inline-block;width:2px;height:15px;background:#fff;margin-left:2px;vertical-align:-2px;animation:parpadea .8s steps(1) infinite}
@@ -252,7 +252,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 .caja.oscura .linea b{color:#fff}
 .pct{font:600 12px Inter;color:var(--verde);background:#EEF1F5;border-radius:99px;padding:2px 8px}
 
-/* Tribuno */
+/* Dictum */
 .oscuro{background:radial-gradient(900px 500px at 85% 0%,rgba(173,144,96,.16),transparent 60%),var(--tinta);color:#fff}
 .oscuro h2{color:#fff}
 .oscuro .lead{color:rgba(255,255,255,.68)}
@@ -403,7 +403,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
     </a>
     <nav class="nav-links" aria-label="Secciones">
       <a href="#producto">Producto</a>
-      <a href="#tribuno">Tribuno</a>
+      <a href="#dictum">Dictum</a>
       <a href="#seguridad">Seguridad</a>
       <a href="#precios">Precios</a>
       <a href="#contacto">Nosotros</a>
@@ -436,7 +436,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
     <div class="hero-txt">
       <span class="chip sube" style="animation-delay:.1s"><i></i>Hecho para despachos de México</span>
       <h1 class="sube" style="animation-delay:.25s">Cada término a tiempo.<br><em>Cada asunto en orden.</em></h1>
-      <p class="lead sube" style="animation-delay:.4s">Expedientes, agenda, clientes, cobranza y documentos cifrados en un solo sistema, con Tribuno: un asistente que responde con la ley mexicana y la experiencia de tu propio despacho.</p>
+      <p class="lead sube" style="animation-delay:.4s">Expedientes, agenda, clientes, cobranza y documentos cifrados en un solo sistema, con Dictum: un asistente que responde con la ley mexicana y la experiencia de tu propio despacho.</p>
       <div class="hero-cta sube" style="animation-delay:.55s">
         <a class="btn btn-primary" href="{{ url_for('auth.register_tenant') }}">Prueba 10 días gratis
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
@@ -459,7 +459,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
           <aside class="demo-side" aria-hidden="true">
             <div class="m">{{ logo_mark(22) }}Habeas Corpus</div>
             <span data-menu="0" class="on"><i></i>Agenda</span>
-            <span data-menu="1"><i></i>Tribuno</span>
+            <span data-menu="1"><i></i>Dictum</span>
             <span data-menu="2"><i></i>Cobranza</span>
             <span data-menu="3"><i></i>Documentos</span>
             <span><i></i>Asuntos</span>
@@ -492,14 +492,14 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
               </div>
             </div>
 
-            <!-- 2. Tribuno -->
+            <!-- 2. Dictum -->
             <div class="escena" data-esc="1">
-              <div class="esc-h"><b>Tribuno</b><small>Asistente jurídico del despacho</small></div>
+              <div class="esc-h"><b>Dictum</b><small>Asistente jurídico del despacho</small></div>
               <div class="chat">
                 <div class="preg"><span id="tipeo"></span><span class="cursor"></span></div>
                 <div class="pensando" id="pensando" hidden><i></i><i></i><i></i></div>
                 <div class="tarjeta resp" id="respuesta" hidden>
-                  <div class="quien"><i></i>Tribuno</div>
+                  <div class="quien"><i></i>Dictum</div>
                   <p class="anim" style="--d:.1s">Por regla general tienes <b>15 días hábiles</b><sup>1</sup>, contados a partir del día siguiente a aquel en que surta efectos la notificación del acto reclamado<sup>2</sup>.</p>
                   <p class="anim" style="--d:.5s">Tu despacho ganó un caso parecido en 2025: la clave fue acreditar la fecha real de notificación<sup>3</sup>.</p>
                   <div class="fuentes anim" style="--d:.9s">
@@ -540,7 +540,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
                 <div class="tarjeta pasos">
                   <div class="paso" data-paso="0"><i></i><span><b>Cifrado con la llave de tu despacho</b>Nadie fuera de tu equipo puede abrirlo</span></div>
                   <div class="paso" data-paso="1"><i></i><span><b>Leído página por página</b>También escaneos y fotos</span></div>
-                  <div class="paso" data-paso="2"><i></i><span><b>Listo para Tribuno</b>“¿Qué dice la cláusula de penalización?”</span></div>
+                  <div class="paso" data-paso="2"><i></i><span><b>Listo para Dictum</b>“¿Qué dice la cláusula de penalización?”</span></div>
                 </div>
               </div>
             </div>
@@ -550,7 +550,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
       </div>
 
       <div class="capitulos" role="tablist" aria-label="Capítulos del recorrido">
-        {% for t, s in [('Términos', 'Nada se te pasa'), ('Tribuno', 'Respuestas con fuente'), ('Cobranza', 'Cobra sin perseguir'), ('Documentos', 'Cifrados y consultables')] %}
+        {% for t, s in [('Términos', 'Nada se te pasa'), ('Dictum', 'Respuestas con fuente'), ('Cobranza', 'Cobra sin perseguir'), ('Documentos', 'Cifrados y consultables')] %}
         <button class="cap{{ ' on' if loop.first }}" role="tab" data-cap="{{ loop.index0 }}" aria-selected="{{ 'true' if loop.first else 'false' }}"><span class="prog"><i></i></span>{{ t }}<small>{{ s }}</small></button>
         {% endfor %}
       </div>
@@ -629,7 +629,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
       <div class="caja c3 oscura rv" style="transition-delay:.1s">
         <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/></svg></span>
         <h3>Memoria del despacho</h3>
-        <p>Todo lo que subes se lee y se indexa, incluso escaneos. Pregunta por un contrato de hace tres años y Tribuno lo encuentra.</p>
+        <p>Todo lo que subes se lee y se indexa, incluso escaneos. Pregunta por un contrato de hace tres años y Dictum lo encuentra.</p>
         <div class="mini lineas">
           <div class="linea">Documentos leídos<b>2,418</b></div>
           <div class="linea">Páginas consultables<b>31,907</b></div>
@@ -639,17 +639,17 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
   </div>
 </section>
 
-<!-- ═══ TRIBUNO ════════════════════════════════════════════════════════ -->
-<section class="sec oscuro" id="tribuno">
+<!-- ═══ DICTUM ═════════════════════════════════════════════════════════ -->
+<section class="sec oscuro" id="dictum">
   <div class="wrap tri">
     <div class="rv">
-      <span class="chip"><i></i>Tribuno de Habeas Corpus</span>
+      <span class="chip"><i></i>Dictum de Habeas Corpus</span>
       <h2 style="margin-top:16px">Pregunta como abogado. Responde con fuentes.</h2>
-      <p class="lead">Tribuno conoce la legislación mexicana y la experiencia de tu despacho. Cada respuesta dice de dónde sale para que la verifiques en segundos.</p>
+      <p class="lead">Dictum conoce la legislación mexicana y la experiencia de tu despacho. Cada respuesta dice de dónde sale para que la verifiques en segundos.</p>
       <div class="tri-lista">
         <div><span class="n">1</span><span><b>Base legal mexicana al día</b><p>Constitución, códigos, leyes federales y tesis, consultados en cada respuesta.</p></span></div>
         <div><span class="n">2</span><span><b>Lo que tu despacho ya sabe</b><p>Tus escritos, contratos y casos concluidos también son fuente.</p></span></div>
-        <div><span class="n">3</span><span><b>Tú decides</b><p>Tribuno te ahorra la búsqueda; el criterio jurídico siempre es tuyo.</p></span></div>
+        <div><span class="n">3</span><span><b>Tú decides</b><p>Dictum te ahorra la búsqueda; el criterio jurídico siempre es tuyo.</p></span></div>
       </div>
     </div>
     <div class="rv" style="transition-delay:.15s">
@@ -657,7 +657,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
         <div class="chat">
           <div class="preg">¿Qué ha funcionado en nuestros juicios de pensión alimenticia?</div>
           <div class="tarjeta resp">
-            <div class="quien"><i></i>Tribuno</div>
+            <div class="quien"><i></i>Dictum</div>
             <p>En los <b>4 juicios concluidos</b> del despacho, los 3 favorables tuvieron en común la prueba de ingresos reales del deudor mediante informe del patrón<sup>1</sup>.</p>
             <p>El Código Civil establece que los alimentos son proporcionales a la posibilidad de quien debe darlos y a la necesidad de quien los recibe<sup>2</sup>.</p>
             <div class="fuentes">
@@ -728,7 +728,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
     </div>
     {% set feats = {
       'starter': ['Hasta 2 usuarios', 'Asuntos, clientes y agenda', 'Términos con aviso', 'Documentos cifrados'],
-      'pro': ['Usuarios ilimitados', 'Todo lo de Starter', 'Tribuno con fuentes y precedentes', 'Cobranza y portal de clientes', 'Machotes y memoria del despacho'],
+      'pro': ['Usuarios ilimitados', 'Todo lo de Starter', 'Dictum con fuentes y precedentes', 'Cobranza y portal de clientes', 'Machotes y memoria del despacho'],
       'enterprise': ['Todo lo de Pro', 'Varias oficinas y equipos', 'Permisos avanzados y bitácora', 'Migración de tus expedientes', 'Acompañamiento dedicado']
     } %}
     {% set descs = {
@@ -762,7 +762,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
       <details><summary>¿Cómo funciona la prueba de 10 días?</summary><p>Registras tu despacho, invitas a tu equipo y usas todo sin restricciones durante 10 días. No pedimos tarjeta. Al terminar eliges un plan o sigues en el gratuito sin perder lo que capturaste.</p></details>
       <details><summary>¿Puedo traer mis expedientes actuales?</summary><p>Sí. Importas tus clientes desde Excel y subes tus documentos; el sistema los lee y los deja consultables. En el plan Enterprise hacemos la migración por ti.</p></details>
       <details><summary>¿Quién puede ver la información de mis clientes?</summary><p>Solo las personas de tu despacho a las que les des acceso. Cada despacho tiene su propia base de datos y los documentos se guardan cifrados con una llave exclusiva.</p></details>
-      <details><summary>¿Tribuno sustituye mi criterio?</summary><p>No. Te ahorra la búsqueda y te muestra la fuente de cada respuesta para que la verifiques. La decisión jurídica siempre es tuya. Y lo que marques como privado nunca sale del servidor.</p></details>
+      <details><summary>¿Dictum sustituye mi criterio?</summary><p>No. Te ahorra la búsqueda y te muestra la fuente de cada respuesta para que la verifiques. La decisión jurídica siempre es tuya. Y lo que marques como privado nunca sale del servidor.</p></details>
       <details><summary>¿Emite facturas (CFDI)?</summary><p>Habeas Corpus lleva tu cobranza y te deja adjuntar el PDF y el XML de cada factura que emites con tu proveedor de facturación. El estado de cuenta que genera es informativo.</p></details>
       <details><summary>¿Funciona en el celular?</summary><p>Sí. Funciona en el navegador de cualquier computadora, tableta o celular, sin instalar nada.</p></details>
     </div>
@@ -830,7 +830,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
     <div class="pie-g">
       <a class="marca" href="#inicio">{{ logo_mark(30, 'dark', '#142E59') }}<span><b>Habeas <span>Corpus</span></b><small>SISTEMA LEGAL</small></span></a>
       <nav aria-label="Pie de página">
-        <a href="#producto">Producto</a><a href="#tribuno">Tribuno</a><a href="#seguridad">Seguridad</a>
+        <a href="#producto">Producto</a><a href="#dictum">Dictum</a><a href="#seguridad">Seguridad</a>
         <a href="#precios">Precios</a><a href="#contacto">Nosotros</a><a href="{{ url_for('portal.cliente_login') }}">Portal de clientes</a>
       </nav>
     </div>

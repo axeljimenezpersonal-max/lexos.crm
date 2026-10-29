@@ -149,7 +149,7 @@ def responder(app, config, slug: str, tdb, pregunta: str, historial: list[dict],
     fuentes = _buscar(app, config, slug, tdb, plan["consulta"], " ".join(plan["terminos"]) or pregunta, asunto_id)
     yield _evento("fuentes", fuentes=publicas(fuentes))
 
-    sistema = SISTEMA.format(nombre=config.get("ASISTENTE_NOMBRE", "Tribuno"))
+    sistema = SISTEMA.format(nombre=config.get("ASISTENTE_NOMBRE", "Dictum"))
     mensajes: list[dict] = []
     for m in historial[-HISTORIAL:]:
         rol = "user" if m["rol"] == "usuario" else "assistant"

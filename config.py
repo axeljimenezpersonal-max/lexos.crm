@@ -25,7 +25,7 @@ class Config:
     BOVEDA_MASTER_KEY = os.environ.get("BOVEDA_MASTER_KEY", "")
 
     # ─── Asistente jurídico ─────────────────────────────────────────────────
-    ASISTENTE_NOMBRE = os.environ.get("ASISTENTE_NOMBRE", "Tribuno")
+    ASISTENTE_NOMBRE = os.environ.get("ASISTENTE_NOMBRE", "Dictum")
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
     ASISTENTE_MODELO = os.environ.get("ASISTENTE_MODELO", "claude-sonnet-5-5")
     ASISTENTE_MODELO_RAPIDO = os.environ.get("ASISTENTE_MODELO_RAPIDO", "claude-haiku-5-5")

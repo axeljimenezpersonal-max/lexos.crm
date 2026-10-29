@@ -673,6 +673,123 @@ def _bitacora(tdb, id: int, asunto: dict, usuarios: dict) -> list[dict]:
     return grupos
 
 
+def _dinero_txt(v: float) -> str:
+    return f"${v:,.0f}"
+
+
+def _hace_txt(dt: datetime | None) -> str:
+    if not dt:
+        return ""
+    dias = (_hoy() - dt.date()).days
+    if dias <= 0:
+        return f"hoy a las {dt:%H:%M}"
+    if dias == 1:
+        return "ayer"
+    if dias < 30:
+        return f"hace {dias} días"
+    return f"el {dt.day} de {_MESES[dt.month - 1]}"
+
+
+def _resumen_inteligente(asunto, responsable, abierto, dias, eventos, pendientes, proximo,
+                         documentos, sentencias, dinero, vencido, notas, ficha, sin_mov) -> dict:
+    """Resumen que se escribe solo con lo que el equipo va registrando. No se edita a mano."""
+    ti = asunto["tipo_info"]
+    tipo = (asunto.get("sub_tipo") or "").strip()
+    if not tipo or tipo.lower() == ti["label"].lower():
+        que = ti["label"]
+    elif asunto.get("tipo_asunto") in ("amparo", "notarial"):
+        que = f"{ti['label']} {tipo.lower()}"
+    else:
+        que = f"{tipo} en materia {ti['label'].lower()}"
+    p1 = que[:1].upper() + que[1:]
+    if asunto.get("cliente"):
+        p1 += f" de {asunto['cliente']}"
+    if asunto.get("contrario_nombre"):
+        p1 += f" contra {asunto['contrario_nombre']}"
+    if asunto.get("juzgado"):
+        juz = asunto["juzgado"].strip()
+        p1 += f", ante el {juz}" if juz.split(" ")[0].lower() in ("juzgado", "tribunal") else f", ante {juz}"
+    p1 += "."
+    desc = " ".join((asunto.get("descripcion") or "").split())
+    if desc:
+        p1 += " " + (desc if len(desc) <= 260 else desc[:257].rsplit(" ", 1)[0] + "…")
+
+    partes2 = []
+    if abierto:
+        if dias is not None:
+            tiempo = f"{round(dias / 30.44)} meses" if dias >= 60 else (f"{dias} días" if dias != 1 else "1 día")
+            partes2.append(f"Lleva {tiempo} en trámite" + (f", a cargo de {responsable['nombre']}" if responsable else "") + ".")
+        elif responsable:
+            partes2.append(f"Lo lleva {responsable['nombre']}.")
+        siguientes = [(e["etiqueta"].lower(), e["titulo"], e["dia"]) for e in eventos[:2]]
+        if siguientes:
+            t, tit, dia = siguientes[0]
+            frase = f"Lo siguiente es «{tit}» el {dia}"
+            if proximo and proximo.get("cuando"):
+                frase += f" ({proximo['cuando'].lower()})"
+            if len(siguientes) > 1:
+                frase += f"; después, «{siguientes[1][1]}» el {siguientes[1][2]}"
+            partes2.append(frase + ".")
+        elif pendientes:
+            partes2.append(f"Hay {len(pendientes)} pendiente{'s' if len(pendientes) != 1 else ''} sin fecha en el calendario.")
+        else:
+            partes2.append("No hay audiencias ni términos agendados.")
+    else:
+        res = precedentes.RESULTADOS.get(asunto.get("resultado") or "")
+        cierre = _fecha(asunto.get("fecha_cierre"))
+        partes2.append("El asunto ya concluyó" + (f" el {cierre.day} de {_MESES[cierre.month - 1]} de {cierre.year}" if cierre else "")
+                       + (f", con resultado {res['label'].lower()}" if res else "") + ".")
+        if asunto.get("resultado_notas"):
+            nota = " ".join(asunto["resultado_notas"].split())
+            partes2.append("Lo que funcionó: " + (nota if len(nota) <= 220 else nota[:217].rsplit(" ", 1)[0] + "…"))
+    if notas:
+        n = notas[0]
+        texto = n["texto"] if len(n["texto"]) <= 160 else n["texto"][:157].rsplit(" ", 1)[0] + "…"
+        partes2.append(f"La última nota es de {n['autor']} ({n['cuando']}): «{texto}»")
+
+    partes3 = []
+    nd, ns = len(documentos), len(sentencias)
+    if nd or ns:
+        trozos = []
+        if nd:
+            trozos.append(f"{nd} documento{'s' if nd != 1 else ''}")
+        if ns:
+            trozos.append(f"{ns} resolución{'es' if ns != 1 else ''}")
+        partes3.append("El expediente tiene " + " y ".join(trozos) + ".")
+    base = dinero["pactados"] or dinero["facturado"]
+    if base:
+        frase = f"Se han cobrado {_dinero_txt(dinero['cobrado'])} de {_dinero_txt(base)} en honorarios"
+        if vencido:
+            frase += f"; {_dinero_txt(vencido)} ya están vencidos"
+        elif dinero["pendiente"]:
+            frase += f"; faltan {_dinero_txt(dinero['pendiente'])}"
+        partes3.append(frase + ".")
+    if ficha and (ficha.get("via_procesal") or ficha.get("objetivo_cliente")):
+        frase = "La estrategia"
+        if ficha.get("via_procesal"):
+            frase += f" va por {ficha['via_procesal'][0].lower() + ficha['via_procesal'][1:]}"
+        if ficha.get("probabilidad_exito"):
+            frase += f", con probabilidad de éxito {ficha['probabilidad_exito']}"
+        partes3.append(frase + ".")
+
+    atencion = []
+    if abierto and proximo and proximo["dias"] is not None and proximo["dias"] <= 3:
+        atencion.append({"tono": "rojo", "texto": f"{proximo['tipo']} {proximo['cuando'].lower()}: {proximo['titulo']}"})
+    if vencido:
+        atencion.append({"tono": "rojo", "texto": f"Hay {_dinero_txt(vencido)} de honorarios vencidos"})
+    if abierto and sin_mov:
+        atencion.append({"tono": "ambar", "texto": "Más de 30 días sin movimiento"})
+    if abierto and not nd:
+        atencion.append({"tono": "ambar", "texto": "Aún no tiene documentos: súbelos para que el asistente los pueda leer"})
+    if abierto and not (ficha and (ficha.get("via_procesal") or ficha.get("argumentos_clave"))):
+        atencion.append({"tono": "gris", "texto": "Falta escribir la estrategia"})
+    if not desc:
+        atencion.append({"tono": "gris", "texto": "Falta describir los hechos en los datos generales"})
+    if not abierto and not asunto.get("resultado"):
+        atencion.append({"tono": "ambar", "texto": "Registra cómo terminó para que sirva de precedente"})
+    return {"parrafos": [p1, " ".join(partes2), " ".join(partes3)], "atencion": atencion[:4]}
+
+
 @asuntos_bp.route("/<int:id>")
 @login_required
 @tenant_required
@@ -733,11 +850,14 @@ def detalle(id: int):
         (id,)).fetchall()]
     for d in documentos:
         d["ext"] = (d["archivo_nombre"] or d["archivo_url"] or "").rsplit(".", 1)[-1].lower()[:4]
-        d["dia"] = (_local(d["fecha_subida"]) or datetime.now()).strftime("%d/%m/%Y")
+        dt = _local(d["fecha_subida"]) or datetime.now()
+        d["dia"] = f"{dt.day} {_MESES[dt.month - 1][:3]} {dt.year}"
         d["autor"] = (usuarios.get(d["subido_por"]) or {}).get("corto", "")
     for s in sentencias:
         s["etiqueta"] = SENTENCIA_LABEL.get(s["tipo"], "Resolución")
         s["sentido_label"] = precedentes.SENTIDOS.get(s["sentido"] or "")
+        f = _fecha(s.get("fecha_emision"))
+        s["dia"] = f"{f.day} {_MESES[f.month - 1][:3]} {f.year}" if f else ""
 
     horas = [dict(h) for h in tdb.execute(
         "SELECT * FROM asunto_horas WHERE asunto_id=? ORDER BY fecha DESC, id DESC", (id,)).fetchall()]
@@ -790,6 +910,33 @@ def detalle(id: int):
     bitacora = _bitacora(tdb, id, asunto, usuarios)
     ultimo = _ultimos_movimientos(tdb, [id]).get(id)
 
+    # Notas recientes (las del muro del expediente y las notas sueltas)
+    notas = []
+    for r in tdb.execute(
+        """SELECT contenido AS texto, creado_por, fecha FROM asunto_notas WHERE asunto_id=?
+           UNION ALL SELECT COALESCE(NULLIF(titulo,'') || ': ', '') || contenido, creado_por, fecha_alta FROM notas WHERE asunto_id=?
+           ORDER BY 3 DESC LIMIT 5""", (id, id)).fetchall():
+        u = usuarios.get(r["creado_por"]) or {}
+        notas.append({"texto": " ".join(str(r["texto"] or "").split()), "autor": u.get("corto") or "Alguien del despacho",
+                      "iniciales": u.get("iniciales", "·"), "color": u.get("color", "#60718D"),
+                      "cuando": _hace_txt(_local(r["fecha"]))})
+
+    hoy_iso = _hoy().isoformat()
+    vencido = sum(max((_safe_float(c.get("total")) or _safe_float(c.get("monto"))) - _safe_float(c.get("monto_abonado")), 0)
+                  for c in cobros if c["estado"] in ("pendiente", "abono", "vencido") and (c.get("fecha_vencimiento") or "9") < hoy_iso)
+    sin_mov = bool(ultimo and (_hoy() - ultimo).days > 30)
+    resumen = _resumen_inteligente(asunto, responsable, abierto, dias_llevamos, eventos, pendientes, proximo,
+                                   documentos, sentencias, dinero, vencido, notas, ficha, sin_mov)
+
+    # La conversación con el asistente sobre este expediente sigue donde se quedó
+    conv_id = None
+    try:
+        fila = tdb.execute("SELECT id FROM asistente_conversaciones WHERE user_id=? AND asunto_id=? ORDER BY id DESC LIMIT 1",
+                           (uid, id)).fetchone()
+        conv_id = fila["id"] if fila else None
+    except Exception:
+        pass
+
     es_admin = rol in ("super_admin", "admin")
     return render_template(
         "asuntos/detalle.html",
@@ -804,7 +951,7 @@ def detalle(id: int):
         tipos_actividad=TIPOS_ACTIVIDAD, actividad_label=ACTIVIDAD_LABEL,
         tipos_sentencia=TIPOS_SENTENCIA, sentencia_label=SENTENCIA_LABEL,
         resultados=precedentes.RESULTADOS, sentidos=precedentes.SENTIDOS,
-        es_admin=es_admin,
+        es_admin=es_admin, notas=notas, resumen=resumen, conv_id=conv_id,
         puede_editar=es_admin or uid == asunto.get("abogado_responsable") or uid in col_ids
                      or uid == asunto.get("creado_por"),
         recien_creado=request.args.get("nuevo") == "1",
