@@ -159,23 +159,22 @@ def create_app(env="default"):
             except Exception:
                 pass
 
-        # Notificaciones (próximos eventos en 3 días)
+        # Avisos de la campana: lo que el usuario aún no ha leído
         notif_count = 0
         notif_items = []
+        hoy_agenda = 0
         if user and tenant and hasattr(g, "tenant_db"):
             try:
-                rows = g.tenant_db.execute(
-                    """SELECT titulo, fecha_inicio, tipo
-                       FROM eventos_calendario
-                       WHERE fecha_inicio >= datetime('now')
-                         AND fecha_inicio <= datetime('now', '+3 days')
-                         AND estado = 'pendiente'
-                       ORDER BY fecha_inicio LIMIT 5"""
-                ).fetchall()
-                notif_items = [dict(r) for r in rows]
-                notif_count = len(rows)
+                from modules.avisos import avisos as _avisos
+                from datetime import datetime as _dtz
+                from modules.dashboard import ZONA as _ZONA
+                notif_items = _avisos(g.tenant_db, session.get("user_id"))
+                notif_count = sum(1 for n in notif_items if not n["leido"])
+                hoy_agenda = g.tenant_db.execute(
+                    "SELECT COUNT(*) FROM eventos_calendario WHERE estado='pendiente' AND date(fecha_inicio)=?",
+                    (_dtz.now(_ZONA).date().isoformat(),)).fetchone()[0]
             except Exception:
-                pass
+                app.logger.exception("No se pudieron calcular los avisos")
 
         from datetime import datetime as _dt
         return {
@@ -186,6 +185,7 @@ def create_app(env="default"):
             "onboarding_pct": onboarding_pct,
             "notif_count": notif_count,
             "notif_items": notif_items,
+            "hoy_agenda": hoy_agenda,
             "now": _dt.now,
             "today_str": _dt.now().strftime("%Y-%m-%d"),
         }
@@ -235,6 +235,7 @@ def create_app(env="default"):
     from modules.insights import insights_bp
     from modules.revision import revision_bp
     from modules.buscador import buscador_bp
+    from modules.avisos import avisos_bp
 
     app.register_blueprint(auth_bp,         url_prefix="/auth")
     app.register_blueprint(dashboard_bp,    url_prefix="/")
@@ -258,6 +259,7 @@ def create_app(env="default"):
     app.register_blueprint(insights_bp, url_prefix="/precedentes")
     app.register_blueprint(revision_bp, url_prefix="/revision")
     app.register_blueprint(buscador_bp, url_prefix="/buscar")
+    app.register_blueprint(avisos_bp, url_prefix="/avisos")
 
     # ─── Modo revisión: el sitio de pruebas no debe aparecer en buscadores ───
     @app.after_request

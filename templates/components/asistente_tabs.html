@@ -1,17 +1,26 @@
 {# Pestañas del asistente: preguntar, investigar, consultar la base legal y los precedentes #}
 {%- set ep_ = request.endpoint or '' -%}
 <style>
-.at-bar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:-6px 0 18px;border-bottom:1px solid var(--border-m)}
-.at-marca{display:flex;align-items:center;gap:10px;padding-bottom:12px;font:600 15px 'Sora',sans-serif;color:var(--e)}
-.at-marca span{font-weight:300;color:var(--ash)}
-.at-marca i{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--e);color:#E9DCC0}
-.at-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
-.at-tabs a{position:relative;display:inline-flex;align-items:center;gap:7px;padding:12px 14px;font:500 14.5px 'Inter',sans-serif;color:var(--ash);text-decoration:none;white-space:nowrap}
-.at-tabs a:hover{color:var(--e)}
-.at-tabs a.on{color:var(--e);font-weight:600}
-.at-tabs a.on::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--dorado);border-radius:2px}
-.at-tabs svg{width:16px;height:16px}
-@media (max-width:860px){.at-marca{display:none}.at-bar{margin-top:-4px}.at-tabs a{padding:11px 10px;font-size:14px}}
+/* Banda azul con las secciones al centro: se ve desde cualquier sección cómo moverse entre ellas */
+.at-bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin:-6px 0 20px;padding:10px 14px;
+  background:linear-gradient(135deg,#142E59,#1B3B6F);border-radius:16px;box-shadow:0 6px 18px rgba(20,46,89,.18)}
+.at-marca{display:flex;align-items:center;gap:10px;font:600 15px 'Sora',sans-serif;color:#fff;white-space:nowrap}
+.at-marca span{font-weight:300;color:rgba(255,255,255,.62)}
+.at-marca i{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:rgba(173,144,96,.22);color:#E9DCC0}
+.at-tabs{display:flex;justify-content:center;gap:6px;padding:4px;background:rgba(255,255,255,.08);border-radius:12px;overflow-x:auto;scrollbar-width:none}
+.at-tabs::-webkit-scrollbar{display:none}
+.at-tabs a{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:9px;font:500 14.5px 'Inter',sans-serif;
+  color:rgba(255,255,255,.78);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s}
+.at-tabs a:hover{color:#fff;background:rgba(255,255,255,.1)}
+.at-tabs a.on{color:#142E59;background:#fff;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.16)}
+.at-tabs a.on svg{color:#AD9060}
+.at-tabs svg{width:16px;height:16px;flex:none}
+@media (max-width:1100px){.at-bar{grid-template-columns:auto 1fr}.at-bar>span{display:none}.at-tabs{justify-self:center}}
+@media (max-width:860px){.at-bar{display:flex;justify-content:center;padding:8px;margin-top:-4px;border-radius:14px}.at-marca{display:none}
+  .at-bar>span{display:none}.at-tabs{background:none;padding:0;gap:4px;justify-content:flex-start;max-width:100%}
+  .at-tabs a:first-child{margin-left:auto}.at-tabs a:last-child{margin-right:auto}.at-tabs a{padding:9px 12px;font-size:14px}}
+@media (max-width:560px){.at-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%;gap:6px}
+  .at-tabs a{justify-content:center;margin:0!important;padding:10px 8px;background:rgba(255,255,255,.08)}}
 </style>
 <div class="at-bar">
   <div class="at-marca"><i aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></i>{{ config.ASISTENTE_NOMBRE }} <span>de Habeas Corpus</span></div>
@@ -21,4 +30,5 @@
     <a href="{{ url_for('corpus.index') }}" class="{{ 'on' if ep_.startswith('corpus') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 19V6a2 2 0 0 1 2-2h12v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h12"/><path d="M9 8h5"/></svg>Base legal</a>
     <a href="{{ url_for('insights.index') }}" class="{{ 'on' if ep_.startswith('insights') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z"/></svg>Precedentes</a>
   </nav>
+  <span aria-hidden="true"></span>
 </div>

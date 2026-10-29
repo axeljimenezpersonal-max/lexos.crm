@@ -117,6 +117,35 @@
   .mm-grupo { padding: 16px 12px 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ash); }
 
   .tb-dd-wrap { position: relative; }
+  .tb-dropdown.av-panel { width: 380px; max-width: calc(100vw - 24px); padding: 0; overflow: hidden; }
+  .av-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: #142E59; color: #fff; }
+  .av-head b { font: 600 15px 'Sora', sans-serif; margin-right: auto; }
+  .av-head button { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.22);
+    background: rgba(255,255,255,.08); color: #fff; font: 500 12.5px 'Inter', sans-serif; cursor: pointer; }
+  .av-head button:hover { background: rgba(255,255,255,.16); }
+  .av-sonido[aria-pressed="false"] { opacity: .55; text-decoration: line-through; }
+  .av-permiso { display: block; width: 100%; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--border); background: #F6F0E4; color: #6E5226;
+    font: 500 13px 'Inter', sans-serif; text-align: left; cursor: pointer; }
+  .av-lista { max-height: min(60vh, 440px); overflow-y: auto; padding: 6px; }
+  .av-it { position: relative; display: flex; gap: 11px; padding: 10px 12px 10px 10px; border-radius: 10px; text-decoration: none; color: var(--fog); }
+  .av-it:hover { background: #F1EEE8; }
+  .av-it:not(.leido)::after { content: ''; position: absolute; top: 15px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: #B4412F; }
+  .av-it.leido { opacity: .62; }
+  .av-ico { width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; background: #E8EDF5; color: #142E59; }
+  .av-it.t-audiencia .av-ico { background: #F4ECDD; color: #8A6A2F; }
+  .av-it.t-termino .av-ico, .av-it.t-ahora .av-ico { background: #F8E4E0; color: #B4412F; }
+  .av-it.t-cobro .av-ico { background: #E2EEEC; color: #3D6B6B; }
+  .av-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-right: 14px; }
+  .av-tx b { font: 600 13.5px 'Inter', sans-serif; color: var(--fog); }
+  .av-tx small { font-size: 12.5px; color: var(--ash); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .av-tx em { font: 600 12px 'Inter', sans-serif; font-style: normal; color: #142E59; }
+  .av-it.urgente:not(.leido) .av-tx em { color: #B4412F; }
+  .av-vacio { padding: 26px 18px; text-align: center; font-size: 13.5px; color: var(--ash); }
+  .av-pie { display: block; padding: 11px; border-top: 1px solid var(--border); text-align: center; font: 600 13px 'Inter', sans-serif; color: #142E59; text-decoration: none; }
+  .av-pie:hover { background: #F1EEE8; }
+  #notifToggle.suena svg { animation: avCampana .9s ease; transform-origin: 50% 10%; }
+  @keyframes avCampana { 0%,100% { transform: rotate(0) } 20% { transform: rotate(16deg) } 40% { transform: rotate(-13deg) } 60% { transform: rotate(8deg) } 80% { transform: rotate(-4deg) } }
+  @media (max-width: 860px) { .tb-dropdown.av-panel { position: fixed; top: calc(var(--top-h) + 6px); left: 12px; right: 12px; width: auto; max-width: none; } }
   .tb-nav .tb-dd-wrap { display: flex; }
   .tb-nav .tb-dropdown { top: calc(100% - 4px); left: -14px; right: auto; }
   .tb-dropdown .td-item > .nav-icon { color: var(--ash); margin-top: 1px; }
@@ -242,6 +271,9 @@
   .lex-toast.leaving { animation: toastOut .25s ease-in both; }
   .lex-toast.success::before { content: '✓'; color: var(--ok); font-weight: 700; }
   .lex-toast.error::before { content: '✕'; color: var(--danger); font-weight: 700; }
+  .lex-toast.info::before { content: '🔔'; font-size: 13px; }
+  .lex-toast.warning { border-left: 3px solid #B4412F; }
+  .lex-toast.warning::before { content: '🔔'; font-size: 13px; }
   @keyframes toastIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
   @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(16px); } }
 
@@ -273,7 +305,7 @@
   @media (max-width: 860px) {
     :root { --top-h: 60px; }
     .topbar-main { padding: 0 12px; gap: 8px; }
-    .tb-sep, #notifWrap, .tb-menu-btn, .tb-user-btn > svg { display: none; }
+    .tb-sep, .tb-menu-btn, .tb-user-btn > svg { display: none; }
     .tb-marca-nombre { font-size: 17px; }
     .page { padding: 18px 16px 96px; }
     .ob-banner { width: calc(100% - 32px); margin-top: 12px; }
@@ -394,7 +426,7 @@
       <a href="{{ url_for('dashboard.index') }}" class="tb-link{% if ep.startswith('dashboard') %} active{% endif %}">{{ ico('home') }}Inicio</a>
       <a href="{{ url_for('asuntos.index') }}" class="tb-link{% if ep.startswith('asuntos') %} active{% endif %}">{{ ico('folder') }}Expedientes</a>
       <a href="{{ url_for('clientes.index') }}" class="tb-link{% if ep.startswith('clientes') or ep.startswith('contrapartes') %} active{% endif %}">{{ ico('users') }}Personas</a>
-      <a href="{{ url_for('calendario.index') }}" class="tb-link{% if ep.startswith('calendario') %} active{% endif %}">{{ ico('cal') }}Calendario{% if notif_count > 0 %}<span class="nav-badge">{{ notif_count }}</span>{% endif %}</a>
+      <a href="{{ url_for('calendario.index') }}" class="tb-link{% if ep.startswith('calendario') %} active{% endif %}">{{ ico('cal') }}Calendario{% if hoy_agenda %}<span class="nav-badge" title="Hoy en la agenda">{{ hoy_agenda }}</span>{% endif %}</a>
       <a href="{{ url_for('biblioteca.index') }}" class="tb-link{% if ep.startswith('biblioteca') %} active{% endif %}">{{ ico('doc') }}Documentos</a>
       <a href="{{ url_for('asistente.index') }}" class="tb-link{% if es_asistente %} active{% endif %}">{{ ico('spark') }}{{ config.ASISTENTE_NOMBRE }}</a>
       <div class="tb-dd-wrap" id="masWrap">
@@ -408,26 +440,28 @@
       <button class="btn-icon" id="searchTriggerBtn" type="button" aria-label="Buscar (⌘K)" title="Buscar (⌘K)">{{ ico('search', 19) }}</button>
 
       <div class="tb-dd-wrap" id="notifWrap">
-        <button class="btn-icon" id="notifToggle" aria-label="Avisos">
+        <button class="btn-icon" id="notifToggle" aria-label="Avisos" title="Avisos" data-api="{{ url_for('avisos.api') }}" data-leer="{{ url_for('avisos.leer') }}">
           {{ ico('bell', 19) }}
-          {% if notif_count > 0 %}<span class="notif-dot">{{ notif_count if notif_count < 10 else '9+' }}</span>{% endif %}
+          <span class="notif-dot" id="notifDot"{% if not notif_count %} hidden{% endif %}>{{ notif_count if notif_count < 10 else '9+' }}</span>
         </button>
-        <div class="tb-dropdown" id="notifDropdown" style="min-width:300px">
-          <div class="td-header">Próximos 3 días</div>
-          {% if notif_items %}
+        <div class="tb-dropdown av-panel" id="notifDropdown">
+          <div class="av-head">
+            <b>Avisos</b>
+            <button type="button" class="av-sonido" id="avSonido" aria-pressed="true" title="Sonido de los avisos">{{ ico('bell', 15) }}<span>Sonido</span></button>
+            <button type="button" class="av-todos" id="avTodos">Marcar leídos</button>
+          </div>
+          <button type="button" class="av-permiso" id="avPermiso" hidden>Avisarme aunque tenga otra pestaña abierta</button>
+          <div class="av-lista" id="avLista">
             {% for n in notif_items %}
-            <a href="{{ url_for('calendario.index') }}" class="td-item">
-              <span class="td-item-icon">{{ ico('gavel' if n.tipo in ('audiencia','diligencia') else ('alert' if n.tipo in ('plazo','vencimiento','fecha_limite') else 'cal'), 16) }}</span>
-              <span class="td-item-body">
-                <span class="td-item-title" style="display:block">{{ n.titulo }}</span>
-                <span class="td-item-sub" style="display:block">{{ n.fecha_inicio[:16] | replace('T', ' ') if n.fecha_inicio else '' }}</span>
-              </span>
+            <a href="{{ n.url }}" class="av-it t-{{ n.tipo }}{{ ' urgente' if n.urgente }}{{ ' leido' if n.leido }}" data-clave="{{ n.clave }}">
+              <span class="av-ico" aria-hidden="true">{{ ico('gavel' if n.tipo == 'audiencia' else ('alert' if n.tipo in ('termino','ahora') else ('money' if n.tipo == 'cobro' else 'cal')), 16) }}</span>
+              <span class="av-tx"><b>{{ n.titulo }}</b>{% if n.detalle %}<small>{{ n.detalle }}</small>{% endif %}<em>{{ n.cuando }}</em></span>
             </a>
+            {% else %}
+            <div class="av-vacio">Todo al día. Aquí te avisaremos de audiencias, términos y cobros.</div>
             {% endfor %}
-            <a href="{{ url_for('calendario.index') }}" class="td-footer">Abrir calendario</a>
-          {% else %}
-            <div class="td-empty">Nada en los próximos 3 días</div>
-          {% endif %}
+          </div>
+          <a href="{{ url_for('calendario.index') }}" class="av-pie">Abrir calendario</a>
         </div>
       </div>
 
@@ -530,6 +564,7 @@
 
 <!-- ── Scripts ─────────────────────────────────────────────── -->
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/avisos.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/buscador.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>

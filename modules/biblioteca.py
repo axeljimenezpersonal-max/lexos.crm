@@ -147,6 +147,8 @@ def _documentos_de_expedientes(tdb):
         where.append(_FILTRO_PROPIOS)
         params += [uid, uid, uid]
     w = " AND ".join(where)
+    # La tabla del lector nace con el primer archivo; un despacho nuevo aún no la tiene
+    lector.indice.asegurar_esquema(tdb)
     filas = [dict(r, origen="documento") for r in tdb.execute(
         f"""SELECT d.id, d.nombre, d.archivo_url, d.archivo_nombre, d.tamanio, d.fecha_subida, d.subido_por,
                    d.tipo_documento AS clase, a.id AS asunto_id, a.titulo AS asunto, a.numero_expediente,

@@ -1,7 +1,7 @@
 /* Habeas Corpus — main.js */
 "use strict";
 
-// ── Topbar dropdowns (notifications + user avatar) ────────────────────────────
+// ── Topbar dropdowns ────────────────────────────
 function toggleTopbarDropdown(id, triggerEl) {
   const dropdown = document.getElementById(id);
   if (!dropdown) return;
@@ -15,18 +15,7 @@ function closeAllDropdowns() {
 }
 
 (function () {
-  const notifToggle = document.getElementById("notifToggle");
-  const tbUserToggle = document.getElementById("tbUserToggle");
-
-  notifToggle?.addEventListener("click", e => {
-    e.stopPropagation();
-    toggleTopbarDropdown("notifDropdown");
-  });
-  tbUserToggle?.addEventListener("click", e => {
-    e.stopPropagation();
-    toggleTopbarDropdown("tbUserDropdown");
-  });
-
+  // La campana y el menú del usuario se abren desde base.html; aquí solo se cierran al hacer clic fuera
   document.addEventListener("click", e => {
     const wraps = document.querySelectorAll(".tb-dd-wrap");
     let inside = false;
