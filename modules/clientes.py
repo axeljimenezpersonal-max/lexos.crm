@@ -22,8 +22,8 @@ from flask import (
 
 from modules import boveda, cobranzas, lector
 from modules.asuntos import (
-    ABIERTOS, ESTADOS as ESTADOS_ASUNTO, TIPOS_DERECHO, _FILTRO_PROPIOS,
-    _fecha, _hoy, _local, _solo_lo_suyo, _usuarios,
+    ABIERTOS, ESTADOS as ESTADOS_ASUNTO, EVENTO_LABEL, TIPOS_DERECHO, _FILTRO_PROPIOS, _MESES,
+    _fecha, _hace as _hace_asunto, _hoy, _local, _proximos, _solo_lo_suyo, _ultimos_movimientos, _usuarios,
 )
 from modules.auth import login_required, role_required, tenant_required
 
@@ -573,6 +573,73 @@ def _bitacora(tdb, id: int, usuarios: dict, cobros_ids: list) -> list:
     return grupos
 
 
+def _dinero(v: float) -> str:
+    return f"${v:,.0f}"
+
+
+def _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultimo, documentos) -> dict:
+    """Resumen que se escribe solo con lo que el despacho sabe de esta persona."""
+    nombre = cliente["nombre_v"]
+    es_empresa = cliente.get("tipo") == "persona_moral"
+    p1 = f"{nombre} es cliente del despacho"
+    if (cliente.get("estatus") or "activo") == "prospecto":
+        p1 = f"{nombre} es un prospecto"
+    if alta:
+        p1 += f" desde el {alta.day} de {_MESES[alta.month - 1]} de {alta.year}"
+    if responsable:
+        p1 += f"; lo atiende {responsable['nombre']}"
+    p1 += "."
+    if es_empresa and cliente.get("contacto_principal"):
+        p1 += f" El contacto es {cliente['contacto_principal']}."
+    en_curso = [a for a in asuntos if a["abierto"]]
+    if en_curso:
+        nombres = ", ".join(f"«{a['titulo']}»" for a in en_curso[:2])
+        p1 += f" Tiene {len(en_curso)} expediente{'s' if len(en_curso) != 1 else ''} en curso: {nombres}"
+        p1 += f" y {len(en_curso) - 2} más." if len(en_curso) > 2 else "."
+    elif asuntos:
+        p1 += f" Sus {len(asuntos)} expediente{'s' if len(asuntos) != 1 else ''} ya concluyeron."
+    else:
+        p1 += " Todavía no tiene expedientes."
+
+    p2 = []
+    if eventos:
+        e = eventos[0]
+        cuando = "hoy" if e["dias"] == 0 else ("mañana" if e["dias"] == 1 else f"en {e['dias']} días")
+        p2.append(f"Lo siguiente es «{e['titulo']}» el {e['dia']} ({cuando}).")
+    if dinero["saldo"]:
+        frase = f"Debe {_dinero(dinero['saldo'])}"
+        if dinero["vencido"] >= dinero["saldo"]:
+            frase += " y todo ya está vencido."
+        elif dinero["vencido"]:
+            frase += f", de los cuales {_dinero(dinero['vencido'])} ya vencieron."
+        else:
+            frase += " y va al corriente."
+        p2.append(frase)
+    elif dinero["facturado"]:
+        p2.append(f"Está al corriente: ha pagado {_dinero(dinero['cobrado'])}.")
+    if ultimo:
+        dias = (_hoy() - ultimo["cuando"].date()).days if ultimo.get("cuando") else None
+        quien = f" con {ultimo['autor']['corto']}" if ultimo.get("autor") else ""
+        tipo = BITACORA.get(ultimo["tipo"], "contacto").lower()
+        hace = "hoy" if dias == 0 else ("ayer" if dias == 1 else f"hace {dias} días") if dias is not None else ""
+        p2.append(f"El último contacto fue {('una ' if tipo in ('nota', 'llamada', 'reunión') else 'por ') + tipo}{quien} {hace}.".replace("  ", " "))
+
+    atencion = []
+    if dinero["vencido"]:
+        atencion.append({"tono": "rojo", "texto": f"{_dinero(dinero['vencido'])} vencidos por cobrar"})
+    if eventos and eventos[0]["dias"] <= 2:
+        atencion.append({"tono": "rojo", "texto": f"{eventos[0]['etiqueta']} {('hoy' if eventos[0]['dias'] == 0 else 'mañana' if eventos[0]['dias'] == 1 else 'en 2 días')}: {eventos[0]['titulo']}"})
+    if en_curso and (not ultimo or (ultimo.get("cuando") and (_hoy() - ultimo["cuando"].date()).days > 30)):
+        atencion.append({"tono": "ambar", "texto": "Más de 30 días sin contacto con el cliente"})
+    if not (cliente.get("celular") or cliente.get("telefono") or cliente.get("email")):
+        atencion.append({"tono": "ambar", "texto": "No tiene celular ni correo registrados"})
+    if not cliente.get("rfc"):
+        atencion.append({"tono": "gris", "texto": "Falta su RFC (lo necesitas para facturar)"})
+    if not documentos and en_curso:
+        atencion.append({"tono": "gris", "texto": "Sin identificación ni documentos personales guardados"})
+    return {"parrafos": [p1, " ".join(p2)], "atencion": atencion[:4]}
+
+
 @clientes_bp.route("/<int:id>")
 @login_required
 @tenant_required
@@ -601,6 +668,40 @@ def detalle(id: int):
         a["responsable"] = usuarios.get(a.get("abogado_responsable"))
         a["abierto"] = a["estado"] in ABIERTOS
         asuntos.append(a)
+    # Lo que sigue y el último movimiento de cada expediente (para las carpetas)
+    abiertos_ = [a for a in asuntos if a["abierto"]]
+    prox = _proximos(tdb, [a["id"] for a in abiertos_], {a["id"]: a["fecha_limite"] for a in abiertos_})
+    movs = _ultimos_movimientos(tdb, [a["id"] for a in asuntos])
+    ndocs = {}
+    if asuntos:
+        marcas = ",".join("?" * len(asuntos))
+        ndocs = dict(tdb.execute(
+            f"""SELECT asunto_id, COUNT(*) FROM (SELECT asunto_id FROM documentos WHERE asunto_id IN ({marcas})
+                UNION ALL SELECT asunto_id FROM asunto_sentencias WHERE asunto_id IN ({marcas})) GROUP BY asunto_id""",
+            [a["id"] for a in asuntos] * 2).fetchall())
+    for a in asuntos:
+        a["proximo"] = prox.get(a["id"])
+        a["movimiento"] = _hace_asunto(movs.get(a["id"]))
+        a["documentos"] = ndocs.get(a["id"], 0)
+
+    # Próximas fechas en los expedientes del cliente
+    eventos = []
+    ids_ = [a["id"] for a in asuntos]
+    marcas = ",".join("?" * len(ids_)) or "NULL"
+    for e in tdb.execute(
+        f"""SELECT e.id, e.titulo, e.tipo, e.fecha_inicio, e.todo_el_dia, e.asunto_id, a.titulo AS asunto
+            FROM eventos_calendario e LEFT JOIN asuntos a ON a.id = e.asunto_id
+            WHERE e.estado = 'pendiente' AND date(e.fecha_inicio) >= date('now', '-1 day')
+              AND (e.asunto_id IN ({marcas}) OR e.cliente_id = ?)
+            ORDER BY e.fecha_inicio LIMIT 5""", (*ids_, id)).fetchall():
+        f = _fecha(e["fecha_inicio"])
+        if not f:
+            continue
+        hora = "" if e["todo_el_dia"] or len(str(e["fecha_inicio"])) < 16 else str(e["fecha_inicio"])[11:16]
+        eventos.append({"titulo": e["titulo"], "etiqueta": EVENTO_LABEL.get(e["tipo"], "Evento"), "asunto": e["asunto"],
+                        "dia": f"{f.day} {_MESES[f.month - 1][:3]}", "hora": hora, "dias": (f - hoy).days,
+                        "url": url_for("asuntos.detalle", id=e["asunto_id"]) if e["asunto_id"] else url_for("calendario.index")})
+
     ocultos = 0
     if _solo_lo_suyo():
         ocultos = tdb.execute("SELECT COUNT(*) FROM asuntos WHERE cliente_id=?", (id,)).fetchone()[0] - len(asuntos)
@@ -639,11 +740,13 @@ def detalle(id: int):
         cliente.get("estado"), cliente.get("cp") and f"C.P. {cliente['cp']}") if x)
 
     alta = _local(cliente.get("fecha_alta"))
+    responsable = usuarios.get(cliente.get("abogado_id"))
+    resumen = _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultimo, documentos)
     return render_template(
         "clientes/detalle.html",
         cliente=cliente, asuntos=asuntos, ocultos=ocultos, cobros=cobros, dinero=dinero,
         documentos=documentos, bitacora=bitacora, ultimo=ultimo, bitacora_tipos=BITACORA,
-        responsable=usuarios.get(cliente.get("abogado_id")), abogados=_get_abogados(),
+        responsable=responsable, abogados=_get_abogados(), eventos=eventos, resumen=resumen,
         whatsapp=_whatsapp(cliente, f"Hola{' ' + saludo if saludo else ''}, le saludamos de {despacho}. "),
         domicilio=domicilio, tipos=TIPOS, estatus=ESTATUS, estados_mx=ESTADOS_MX, origenes=ORIGENES,
         en_curso=sum(1 for a in asuntos if a["abierto"]), alta_txt=_fecha_txt(alta), alta_hace=_hace(alta),

@@ -471,3 +471,52 @@ a.doc-n:hover > span:last-child { text-decoration: underline; text-decoration-co
   .dc-lineas { top: 58px; }
   .dc-info { padding: 10px 12px 12px; }
 }
+
+/* ── Documentos: Estudio y Formatos ─────────────────────────────── */
+.es { margin-top: 20px; }
+.es-intro { margin: 0 0 14px; font-size: 14.5px; color: var(--ash); }
+.es-barra { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.es-barra .es-buscar { flex: 1 1 420px; }
+.es-barra .btn { height: 48px; }
+.es-buscar .bz-caja { height: 50px; }
+.es-tipo { flex-shrink: 0; height: 36px; padding: 0 30px 0 12px; border: 1px solid var(--border); border-radius: 9px; background: #fff; font: 500 13px 'Inter', sans-serif; color: #3B4A61; max-width: 190px; }
+.es-espacio { display: flex; align-items: center; gap: 14px; margin-top: 12px; font-size: 12.5px; color: var(--ash); }
+.es-espacio .xr-progreso { flex: 0 0 200px; margin: 0; height: 6px; }
+.xr-progreso { height: 8px; border-radius: 99px; background: #EEE9DF; overflow: hidden; }
+.xr-progreso i { display: block; height: 100%; border-radius: 99px; background: var(--dorado); }
+.es-carpetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.es-carp-w { position: relative; }
+.es-carp { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 16px; border-radius: 16px; background: var(--c); border: 1px solid var(--border); text-decoration: none; color: var(--fog); text-align: left; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.es-carp:hover { border-color: var(--border-m); }
+.es-carp.on { border-color: var(--e); background: var(--edim); }
+.es-carp-ico { color: #B8955A; margin-bottom: 6px; }
+.es-carp b { font: 600 14.5px 'Sora', sans-serif; color: var(--e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.es-carp small { font-size: 12.5px; color: var(--ash); }
+.es-carp.nueva { border-style: dashed; border-color: #D9CBA9; background: #FBF8F2; }
+.es-carp.nueva .es-carp-ico { width: 40px; height: 40px; display: grid; place-items: center; font: 300 28px 'Sora', sans-serif; color: var(--dorado); }
+.es-carp-acc { position: absolute; top: 10px; right: 10px; display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.es-carp-w:hover .es-carp-acc, .es-carp-w:focus-within .es-carp-acc { opacity: 1; }
+.es-carp-acc button { width: 28px; height: 28px; border: 0; border-radius: 8px; background: #fff; color: var(--ash); display: grid; place-items: center; cursor: pointer; }
+.es-carp-acc button:hover { color: var(--e); }
+.es-acc { display: flex; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px dashed #E2DDD2; }
+.es-acc a, .es-acc button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--ash); display: grid; place-items: center; cursor: pointer; text-decoration: none; }
+.es-acc a:hover, .es-acc button:hover { background: #F4F1EA; color: var(--e); }
+.es-acc .peligro:hover { background: #F8EDEA; color: var(--danger); }
+.es-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0; }
+.es-chips span { font: 600 11px 'Inter', sans-serif; padding: 2px 8px; border-radius: 99px; background: #EEF1F5; color: #3D5A80; }
+.es-chips span.dorado { background: var(--edim); color: #8A6A2F; }
+.es-llenar { margin-top: 8px; justify-content: center; }
+.xd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.xd-subir { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 236px; padding: 18px; text-align: center; border: 1.5px dashed #D9CBA9; border-radius: 16px; background: #FBF8F2; cursor: pointer; transition: border-color .15s, background .15s; }
+.xd-subir:hover, .xd-subir.sobre { border-color: var(--dorado); background: #F6EFE0; }
+.xd-mas { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--e); color: #fff; font: 300 30px/1 'Sora', sans-serif; margin-bottom: 6px; }
+.xd-subir b { font: 600 15px 'Sora', sans-serif; color: var(--e); }
+.xd-subir small { font-size: 12.5px; color: var(--ash); line-height: 1.45; }
+@media (max-width: 860px) {
+  .es-barra .btn { flex: 1; }
+  .es-tipo { display: none; }
+  .es-carpetas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .xd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .xd-subir { min-height: 180px; }
+}
+.es-formatos{margin-top:18px}

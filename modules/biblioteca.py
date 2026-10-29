@@ -231,7 +231,8 @@ def index():
 
     # ── Estudio data ──
     carpetas = tdb.execute(
-        "SELECT * FROM biblioteca_carpetas ORDER BY nombre"
+        "SELECT c.*, (SELECT COUNT(*) FROM biblioteca_archivos a WHERE a.carpeta_id = c.id) AS n "
+        "FROM biblioteca_carpetas c ORDER BY c.nombre"
     ).fetchall()
     carpetas = [dict(c) for c in carpetas]
 

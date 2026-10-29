@@ -113,130 +113,77 @@
      SECTION 1 — ESTUDIO
      ══════════════════════════════════════════════════════════════════════════ -->
 {% if seccion == 'estudio' %}
-<div class="bib-estudio">
-
-  <!-- Metrics bar -->
-  <div class="bib-metrics">
-    <div class="bib-metric">
-      <div class="bib-metric-val">{{ total_archivos }}</div>
-      <div class="bib-metric-label">Archivos</div>
-    </div>
-    <div class="bib-metric">
-      <div class="bib-metric-val">{{ '%.1f' | format(espacio_usado / (1024*1024)) }} MB</div>
-      <div class="bib-metric-label">Espacio usado</div>
-    </div>
-    <div class="bib-metric">
-      <div class="bib-metric-val">{{ '%.0f' | format(espacio_limite / (1024*1024)) }} MB</div>
-      <div class="bib-metric-label">Límite del plan</div>
-    </div>
-    <div class="bib-metric" style="flex:2">
-      <div class="bib-usage-bar">
-        <div class="bib-usage-fill" style="width:{{ [(espacio_usado / espacio_limite * 100)|round(1), 100]|min }}%"></div>
+{% set pct = [(espacio_usado / espacio_limite * 100) | round(1), 100] | min if espacio_limite else 0 %}
+<div class="es">
+  <p class="es-intro">Archivos del despacho que no son de un expediente: doctrina, jurisprudencia impresa, contratos tipo, papeles administrativos.</p>
+  <div class="es-barra">
+    <form method="GET" class="bz es-buscar" role="search">
+      <input type="hidden" name="seccion" value="estudio">
+      {% if carpeta_id %}<input type="hidden" name="carpeta" value="{{ carpeta_id }}">{% endif %}
+      <div class="bz-caja">
+        <svg class="bz-lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input class="bz-input" type="search" name="q" value="{{ q }}" placeholder="Buscar en el estudio…" aria-label="Buscar archivos">
+        <select name="tipo" class="es-tipo" onchange="this.form.submit()" aria-label="Tipo de archivo">
+          <option value="">Todos los tipos</option>
+          {% for ext in ['pdf','docx','xlsx','png','jpg'] %}<option value="{{ ext }}" {{ 'selected' if tipo_f == ext }}>{{ ext | upper }}</option>{% endfor %}
+        </select>
       </div>
-      <div class="bib-metric-label">{{ '%.1f' | format(espacio_usado / espacio_limite * 100) }}% utilizado</div>
-    </div>
+    </form>
+    <button class="btn btn-ghost" onclick="abrirCrearCarpeta()">+ Nueva carpeta</button>
+    <button class="btn btn-primary" onclick="abrirUpload()">Subir archivos</button>
   </div>
+  <div class="es-espacio"><span>{{ '%.1f' | format(espacio_usado / (1024*1024)) }} MB de {{ '%.0f' | format(espacio_limite / (1024*1024)) }} MB usados · {{ total_archivos }} archivo{{ 's' if total_archivos != 1 }}</span><div class="xr-progreso"><i style="width:{{ pct }}%"></i></div></div>
 
-  <div class="bib-estudio-grid">
-    <!-- Left: Carpetas -->
-    <div class="bib-sidebar">
-      <div class="bib-sidebar-header">
-        <span style="font-weight:700; font-size:.84rem">Carpetas</span>
-        <button class="btn btn-ghost btn-sm" onclick="abrirCrearCarpeta()">+ Nueva</button>
-      </div>
-      <a class="bib-folder {{ 'active' if not carpeta_id }}"
-         href="{{ url_for('biblioteca.index', seccion='estudio') }}">
-        {{ icon_folder(14, 14) }} Todos los archivos
+  <div class="dc-sec-h"><h2>Carpetas</h2></div>
+  <div class="es-carpetas">
+    <a class="es-carp{{ ' on' if not carpeta_id }}" href="{{ url_for('biblioteca.index', seccion='estudio') }}">
+      <span class="es-carp-ico"><svg width="40" height="40" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M4 13a3 3 0 0 1 3-3h11l4 4h19a3 3 0 0 1 3 3v21a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".2"/><path d="M4 19h40v19a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".6"/></svg></span>
+      <b>Todos los archivos</b><small>{{ total_archivos }} archivo{{ 's' if total_archivos != 1 }}</small>
+    </a>
+    {% for c in carpetas %}
+    <div class="es-carp-w">
+      <a class="es-carp{{ ' on' if carpeta_id == c.id }}" href="{{ url_for('biblioteca.index', seccion='estudio', carpeta=c.id) }}">
+        <span class="es-carp-ico"><svg width="40" height="40" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M4 13a3 3 0 0 1 3-3h11l4 4h19a3 3 0 0 1 3 3v21a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".2"/><path d="M4 19h40v19a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".6"/></svg></span>
+        <b>{{ c.nombre }}</b><small>{{ c.n }} archivo{{ 's' if c.n != 1 }}</small>
       </a>
-      {% for c in carpetas %}
-      <div class="bib-folder-row">
-        <a class="bib-folder {{ 'active' if carpeta_id == c.id }}"
-           href="{{ url_for('biblioteca.index', seccion='estudio', carpeta=c.id) }}">
-          {{ icon_folder(13, 13) }} {{ c.nombre }}
-        </a>
-        <div class="bib-folder-actions">
-          <button class="btn-icon" onclick="renombrarCarpeta({{ c.id }}, '{{ c.nombre | replace("'","\\'") }}')" title="Renombrar">{{ icon_edit(13, 13) }}</button>
-          <button class="btn-icon" onclick="eliminarCarpeta({{ c.id }})" title="Eliminar">{{ icon_trash(13, 13) }}</button>
-        </div>
+      <div class="es-carp-acc">
+        <button type="button" onclick="renombrarCarpeta({{ c.id }}, '{{ c.nombre | replace("'","\\'") }}')" title="Renombrar" aria-label="Renombrar {{ c.nombre }}">{{ icon_edit(13, 13) }}</button>
+        <button type="button" onclick="eliminarCarpeta({{ c.id }})" title="Eliminar" aria-label="Eliminar {{ c.nombre }}">{{ icon_trash(13, 13) }}</button>
       </div>
-      {% endfor %}
     </div>
-
-    <!-- Right: Files -->
-    <div class="bib-main">
-      <!-- Toolbar -->
-      <div class="bib-toolbar">
-        <form method="GET" class="bib-search-form">
-          <input type="hidden" name="seccion" value="estudio">
-          {% if carpeta_id %}<input type="hidden" name="carpeta" value="{{ carpeta_id }}">{% endif %}
-          <div class="bib-search-wrap">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input type="text" name="q" value="{{ q }}" placeholder="Buscar archivos…" class="bib-search-input">
-          </div>
-          <select name="tipo" onchange="this.form.submit()">
-            <option value="">Todos los tipos</option>
-            {% for ext in ['pdf','docx','xlsx','png','jpg'] %}
-            <option value="{{ ext }}" {{ 'selected' if tipo_f == ext }}>.{{ ext }}</option>
-            {% endfor %}
-          </select>
-        </form>
-        <button class="btn btn-primary btn-sm" onclick="abrirUpload()">⬆ Subir archivos</button>
-      </div>
-
-      <!-- Drop zone -->
-      <div class="bib-dropzone" id="mainDropzone"
-           ondragover="event.preventDefault(); this.classList.add('active')"
-           ondragleave="this.classList.remove('active')"
-           ondrop="handleMainDrop(event)">
-        <div class="bib-dz-icon">{{ icon_folder(32, 32) }}</div>
-        <div class="bib-dz-text">Arrastra archivos aquí o haz clic en "Subir archivos"</div>
-        <div class="bib-dz-sub">PDF, DOCX, XLSX, imágenes — Máx. 16 MB cada uno</div>
-      </div>
-
-      <!-- Files grid -->
-      {% if archivos %}
-      <div class="bib-files-grid">
-        {% for a in archivos %}
-        <div class="bib-file-card" id="file-{{ a.id }}">
-          <div class="bib-file-icon">
-            {% if a.extension in ('pdf',) %}{{ icon_file_text(28, 28) }}
-            {% elif a.extension in ('doc','docx') %}{{ icon_file_text(28, 28) }}
-            {% elif a.extension in ('xls','xlsx') %}{{ icon_file(28, 28) }}
-            {% elif a.extension in ('png','jpg','jpeg','gif','webp') %}{{ icon_image(28, 28) }}
-            {% elif a.extension in ('ppt','pptx') %}{{ icon_file(28, 28) }}
-            {% else %}{{ icon_file(28, 28) }}{% endif %}
-          </div>
-          <div class="bib-file-info">
-            <div class="bib-file-name" title="{{ a.nombre_original or a.nombre }}">
-              {{ (a.nombre_original or a.nombre) | truncate(28, true, '…') }}
-            </div>
-            <div class="bib-file-meta">
-              .{{ a.extension }} · {{ '%.1f' | format((a.tamanio or 0) / 1024) }} KB
-              {% if a.carpeta_nombre %} · {{ a.carpeta_nombre }}{% endif %}
-            </div>
-          </div>
-          <div class="bib-file-actions">
-            {% if a.extension == 'pdf' %}
-            <button class="btn-icon" onclick="previewPdf('{{ a.archivo_url }}')" title="Vista previa">{{ icon_eye(13, 13) }}</button>
-            {% endif %}
-            <a href="{{ a.archivo_url }}" download class="btn-icon" title="Descargar">⬇</a>
-            <button class="btn-icon" onclick="compartirArchivo({{ a.id }})" title="Compartir">{{ icon_link(13, 13) }}</button>
-            <button class="btn-icon" onclick="vincularArchivo({{ a.id }})" title="Vincular a asunto/cliente">{{ icon_paperclip(13, 13) }}</button>
-            <button class="btn-icon" onclick="eliminarArchivo({{ a.id }})" title="Eliminar">{{ icon_trash(13, 13) }}</button>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="bib-empty">
-        <div class="bib-empty-icon">{{ icon_folder(36, 36) }}</div>
-        <p>No hay archivos{% if carpeta_id %} en esta carpeta{% endif %}.</p>
-      </div>
-      {% endif %}
-    </div>
+    {% endfor %}
+    <button type="button" class="es-carp nueva" onclick="abrirCrearCarpeta()"><span class="es-carp-ico">+</span><b>Nueva carpeta</b><small>Para ordenar el estudio</small></button>
   </div>
+
+  <div class="dc-sec-h dc-docs-h"><h2>{% if carpeta_id %}Archivos de esta carpeta{% else %}Archivos{% endif %} <span>{{ archivos | length }}</span></h2></div>
+  <div class="xd-grid">
+    <div class="xd-subir" id="mainDropzone" role="button" tabindex="0" onclick="abrirUpload()"
+         ondragover="event.preventDefault(); this.classList.add('sobre')"
+         ondragleave="this.classList.remove('sobre')"
+         ondrop="handleMainDrop(event)">
+      <span class="xd-mas">+</span><b>Subir archivos</b><small>Arrastra aquí o haz clic. PDF, Word, Excel o imágenes, hasta 16 MB.</small>
+    </div>
+    {% for a in archivos %}
+    <article class="dc-doc" id="file-{{ a.id }}">
+      <a class="dc-hoja t-{{ a.extension or 'doc' }}" href="{{ a.archivo_url }}" target="_blank" rel="noopener">
+        <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ (a.extension or 'doc') | upper }}</span>
+        <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </a>
+      <div class="dc-info">
+        <b title="{{ a.nombre_original or a.nombre }}">{{ a.nombre_original or a.nombre }}</b>
+        <span class="dc-exp">{{ '%.0f' | format((a.tamanio or 0) / 1024) }} KB{% if a.carpeta_nombre %} · {{ a.carpeta_nombre }}{% endif %}</span>
+        <span class="es-acc">
+          {% if a.extension == 'pdf' %}<button type="button" onclick="previewPdf('{{ a.archivo_url }}')" title="Vista previa" aria-label="Vista previa">{{ icon_eye(14, 14) }}</button>{% endif %}
+          <a href="{{ a.archivo_url }}" download title="Descargar" aria-label="Descargar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+          <button type="button" onclick="compartirArchivo({{ a.id }})" title="Compartir" aria-label="Compartir">{{ icon_link(14, 14) }}</button>
+          <button type="button" onclick="vincularArchivo({{ a.id }})" title="Vincular a un expediente o cliente" aria-label="Vincular">{{ icon_paperclip(14, 14) }}</button>
+          <button type="button" class="peligro" onclick="eliminarArchivo({{ a.id }})" title="Eliminar" aria-label="Eliminar">{{ icon_trash(14, 14) }}</button>
+        </span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% if not archivos and (q or tipo_f or carpeta_id) %}<p class="as-empty" style="margin-top:14px">No hay archivos{% if carpeta_id %} en esta carpeta{% endif %}{% if q or tipo_f %} con esa búsqueda{% endif %}.</p>{% endif %}
 </div>
 {% endif %}
 
@@ -244,68 +191,53 @@
      SECTION 2 — FORMATOS (Plantillas)
      ══════════════════════════════════════════════════════════════════════════ -->
 {% if seccion == 'formatos' %}
-<div class="bib-formatos">
-  <!-- Toolbar -->
-  <div class="bib-toolbar">
-    <form method="GET" class="bib-search-form">
+<div class="es">
+  <p class="es-intro">Tus machotes y formatos. Los de Word se llenan solos con los datos de un expediente: nombres, fechas, montos con letra.</p>
+  <div class="es-barra">
+    <form method="GET" class="bz es-buscar" role="search">
       <input type="hidden" name="seccion" value="formatos">
-      <div class="bib-search-wrap">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input type="text" name="q_pl" value="{{ q_pl }}" placeholder="Buscar plantillas…" class="bib-search-input">
+      <div class="bz-caja">
+        <svg class="bz-lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input class="bz-input" type="search" name="q_pl" value="{{ q_pl }}" placeholder="Buscar formatos…" aria-label="Buscar formatos">
+        <select name="categoria" class="es-tipo" onchange="this.form.submit()" aria-label="Categoría">
+          <option value="">Todas las categorías</option>
+          {% for cat in categorias %}<option value="{{ cat }}" {{ 'selected' if cat_f == cat }}>{{ cat }}</option>{% endfor %}
+        </select>
+        <select name="derecho" class="es-tipo" onchange="this.form.submit()" aria-label="Materia">
+          <option value="">Todas las materias</option>
+          {% for td in tipos_derecho %}<option value="{{ td }}" {{ 'selected' if derecho_f == td }}>{{ td | capitalize }}</option>{% endfor %}
+        </select>
       </div>
-      <select name="categoria" onchange="this.form.submit()">
-        <option value="">Todas las categorías</option>
-        {% for cat in categorias %}
-        <option value="{{ cat }}" {{ 'selected' if cat_f == cat }}>{{ cat }}</option>
-        {% endfor %}
-      </select>
-      <select name="derecho" onchange="this.form.submit()">
-        <option value="">Tipo de derecho</option>
-        {% for td in tipos_derecho %}
-        <option value="{{ td }}" {{ 'selected' if derecho_f == td }}>{{ td }}</option>
-        {% endfor %}
-      </select>
     </form>
-    <button class="btn btn-primary btn-sm" onclick="abrirSubirPlantilla()">⬆ Subir plantilla</button>
+    <button class="btn btn-primary" onclick="abrirSubirPlantilla()">Subir formato</button>
   </div>
 
-  {% if plantillas %}
-  <div class="bib-plantillas-grid">
-    {% for p in plantillas %}
-    <div class="bib-plantilla-card">
-      <div class="bib-pl-icon">
-        {% if p.extension == 'pdf' %}{{ icon_file_text(28, 28) }}{% elif p.extension in ('doc','docx') %}{{ icon_file_text(28, 28) }}{% else %}{{ icon_file(28, 28) }}{% endif %}
-      </div>
-      <div class="bib-pl-body">
-        <div class="bib-pl-name">{{ p.nombre }}</div>
-        <div class="bib-pl-cat">
-          <span class="bib-pl-badge">{{ p.categoria or 'Otro' }}</span>
-          {% if p.tipo_derecho %}<span class="bib-pl-badge bib-pl-badge-tipo">{{ p.tipo_derecho }}</span>{% endif %}
-          {% if p.es_custom %}<span class="bib-pl-badge bib-pl-badge-custom">Personalizada</span>{% endif %}
-        </div>
-        {% if p.descripcion %}
-        <div class="bib-pl-desc">{{ p.descripcion | truncate(60, true, '…') }}</div>
-        {% endif %}
-        <div class="bib-pl-meta">{{ '%.0f' | format((p.tamanio or 0) / 1024) }} KB</div>
-      </div>
-      <div class="bib-pl-actions">
-        <a href="{{ url_for('biblioteca.plantilla_descargar', id=p.id) }}" class="btn btn-secondary btn-sm">⬇ Descargar</a>
-        {% if p.archivo_url and p.archivo_url.endswith('.docx') %}<a href="{{ url_for('insights.machote', pid=p.id) }}" class="btn btn-primary btn-sm">Llenar con un asunto</a>{% endif %}
-        <a href="{{ url_for('biblioteca.editor', plantilla=p.id) }}" class="btn btn-secondary btn-sm">{{ icon_edit(12, 12) }} Usar en editor</a>
-        <button class="btn btn-ghost btn-sm" onclick="eliminarPlantilla({{ p.id }})">{{ icon_trash(12, 12) }}</button>
-      </div>
+  <div class="xd-grid es-formatos">
+    <div class="xd-subir" role="button" tabindex="0" onclick="abrirSubirPlantilla()">
+      <span class="xd-mas">+</span><b>Subir un formato</b><small>Un Word con {{ '{{' }}campos{{ '}}' }} se llena solo con los datos del expediente.</small>
     </div>
+    {% for p in plantillas %}
+    {% set llenable = p.archivo_url and p.archivo_url.endswith('.docx') %}
+    <article class="dc-doc">
+      <a class="dc-hoja t-{{ p.extension or 'doc' }}" href="{{ url_for('insights.machote', pid=p.id) if llenable else url_for('biblioteca.editor', plantilla=p.id) }}">
+        <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ (p.extension or 'doc') | upper }}</span>
+        <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </a>
+      <div class="dc-info">
+        <b title="{{ p.nombre }}">{{ p.nombre }}</b>
+        <span class="es-chips"><span>{{ p.categoria or 'Otro' }}</span>{% if p.tipo_derecho %}<span>{{ p.tipo_derecho | capitalize }}</span>{% endif %}{% if p.es_custom %}<span class="dorado">Del despacho</span>{% endif %}</span>
+        {% if p.descripcion %}<span class="dc-exp" title="{{ p.descripcion }}">{{ p.descripcion }}</span>{% endif %}
+        {% if llenable %}<a class="btn btn-primary btn-sm es-llenar" href="{{ url_for('insights.machote', pid=p.id) }}">Llenar con un expediente</a>{% endif %}
+        <span class="es-acc">
+          <a href="{{ url_for('biblioteca.editor', plantilla=p.id) }}" title="Usar en el editor" aria-label="Usar en el editor">{{ icon_edit(14, 14) }}</a>
+          <a href="{{ url_for('biblioteca.plantilla_descargar', id=p.id) }}" title="Descargar" aria-label="Descargar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+          <button type="button" class="peligro" onclick="eliminarPlantilla({{ p.id }})" title="Eliminar" aria-label="Eliminar">{{ icon_trash(14, 14) }}</button>
+        </span>
+      </div>
+    </article>
     {% endfor %}
   </div>
-  {% else %}
-  <div class="bib-empty">
-    <div class="bib-empty-icon">{{ icon_clipboard(36, 36) }}</div>
-    <p>No hay plantillas{{ ' con esos filtros' if cat_f or derecho_f or q_pl else '' }}.</p>
-    <button class="btn btn-primary btn-sm" onclick="abrirSubirPlantilla()" style="margin-top:8px">⬆ Subir primera plantilla</button>
-  </div>
-  {% endif %}
+  {% if not plantillas and (cat_f or derecho_f or q_pl) %}<p class="as-empty" style="margin-top:14px">No hay formatos con esos filtros.</p>{% endif %}
 </div>
 {% endif %}
 
@@ -321,7 +253,7 @@
       <strong>Consulta de acuerdos y audiencias del CJF</strong><br>
       <span style="font-size:.82rem; color:var(--text-3)">
         La consulta automática del Consejo de la Judicatura Federal se encuentra en desarrollo.
-        Por ahora puedes registrar manualmente tus acuerdos y audiencias para vincularlos a asuntos de CODEX.
+        Por ahora puedes registrar a mano tus acuerdos y audiencias y vincularlos a sus expedientes.
       </span>
     </div>
     <span class="bib-info-badge">Próximamente — API CJF</span>

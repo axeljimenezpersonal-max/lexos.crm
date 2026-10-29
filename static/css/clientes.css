@@ -125,3 +125,40 @@
   .cl-card-num{grid-column:1 / -1;flex-direction:row;justify-content:space-between;border-left:0;border-top:1px solid var(--border);padding:12px 0 0;text-align:left}
   .cl-av.lg{width:46px;height:46px;font-size:15px}
 }
+
+/* ── Ficha de la persona (mismo lenguaje que el expediente) ─────── */
+.pf-head{display:flex;flex-direction:column;gap:16px;padding:26px 30px 24px;background:var(--c);border:1px solid var(--border);border-radius:18px;position:relative;overflow:hidden}
+.pf-head::before{content:'';position:absolute;left:0;top:0;right:0;height:5px;background:linear-gradient(90deg,var(--m),#E6D6B3)}
+.pf-tarjeta{display:flex;gap:22px;align-items:flex-start}
+.pf-av{width:92px;height:92px;flex:none;font:600 30px 'Sora',sans-serif;position:relative;cursor:pointer;box-shadow:0 0 0 5px #F4F1EA}
+.pf-av .cam{position:absolute;inset:auto 0 0;height:26px;background:rgba(20,46,89,.55);display:grid;place-items:center;color:#fff;opacity:0;transition:opacity .15s}
+.pf-av:hover .cam,.pf-av:focus-visible .cam{opacity:1}
+.pf-cuerpo{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.pf-estatus{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:99px;border:0;background:var(--c-f);color:var(--c-c);font:600 13px 'Inter',sans-serif;cursor:pointer}
+.pf-estatus i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.pf-estatus:disabled{cursor:default}
+.pf-sub{margin:-4px 0 0;font-size:14px;color:var(--ash)}
+.pf-contacto{display:flex;gap:8px;flex-wrap:wrap}
+.pf-contacto .btn{height:40px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pf-datos{margin:0}
+.pf-select{width:100%;max-width:260px;height:34px;padding:0 10px;border:1px solid var(--border-m);border-radius:9px;background:#fff;font:500 14px 'Inter',sans-serif;color:var(--fog)}
+.pf-rojo{color:var(--danger)!important;font-weight:600!important}
+.pf-paso{text-decoration:none;color:inherit}
+.pf-paso:hover b{color:var(--ed);text-decoration:underline;text-decoration-color:var(--dorado);text-underline-offset:3px}
+.pf-exp{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--border);text-decoration:none;color:var(--fog)}
+.pf-exp:first-child{border-top:0;padding-top:4px}
+.pf-exp-ico{width:38px;height:38px;flex:none;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--m) 12%,#fff);color:var(--m)}
+.pf-exp-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pf-exp-tx b{font:600 14px 'Inter',sans-serif;color:var(--e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-exp-tx small{font-size:12.5px;color:var(--ash);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-exp:hover b{text-decoration:underline;text-decoration-color:var(--dorado);text-underline-offset:3px}
+.pf-exp .ex-chip{padding:4px 9px;font-size:11.5px}
+.pf-ico{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--ib);color:var(--ic)}
+.pf-borrar{color:var(--danger)}
+.xp2 .cl-bienvenida{margin-bottom:14px}
+@media (max-width:860px){
+  .pf-head{padding:20px 18px}
+  .pf-tarjeta{flex-direction:column;gap:14px}
+  .pf-av{width:72px;height:72px;font-size:24px}
+  .pf-contacto .btn{flex:1 1 auto}
+}

@@ -5,6 +5,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/cobranzas.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/clientes.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expediente.css') }}">
 {% endblock %}
 
 {% macro ic(n, s=16) -%}
@@ -25,276 +27,307 @@
 {%- elif n == 'check' %}<path d="m5 12 5 5 9-10"/>
 {%- elif n == 'cam' %}<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>
 {%- elif n == 'trash' %}<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>
+{%- elif n == 'spark' %}<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/>
+{%- elif n == 'folder' %}<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+{%- elif n == 'cal' %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
+{%- elif n == 'pin' %}<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>
 {%- elif n == 'portal' %}<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>
 {%- endif %}</svg>
 {%- endmacro %}
 
 {% block content %}
 {% set ei = cliente.estatus_info %}
-<nav class="af-migas"><a href="{{ url_for('clientes.index') }}">Clientes</a> / {{ cliente.nombre_v }}</nav>
-
-<header class="af-head">
-  <div class="af-top">
-    <div class="cl-head-top">
-      <label class="cl-av xl" style="--av:{{ cliente.color }}" title="Cambiar foto" tabindex="0">
-        {% if cliente.foto_url %}<img src="{{ cliente.foto_url }}" alt="">{% else %}{{ cliente.iniciales }}{% endif %}
-        {% if puede_editar %}<span class="cam">{{ ic('cam', 13) }}</span><input type="file" id="clFoto" accept=".jpg,.jpeg,.png,.webp" hidden>{% endif %}
-      </label>
-      <div>
-        <div class="af-meta">
-          <span class="as-chip">{{ tipos[cliente.tipo] if cliente.tipo in tipos else 'Persona física' }}</span>
-          <div class="af-estado">
-            <button type="button" class="af-estado-btn" id="clEstatusBtn" style="--c-c:{{ ei.color }};--c-f:{{ ei.fondo }};padding:4px 10px;font-size:12px"{% if not puede_editar %} disabled{% endif %}>
-              {{ ei.label }}{% if puede_editar %} {{ ic('down', 12) }}{% endif %}
-            </button>
-            {% if puede_editar %}
-            <div class="af-menu" id="clEstatusMenu" role="menu" style="left:0;right:auto">
-              {% for k, e in estatus.items() %}<button type="button" data-estatus="{{ k }}"><span class="as-dot" style="--d:{{ e.color }}"></span>{{ e.label }}{% if (cliente.estatus or 'activo') == k %}<span class="ok">{{ ic('check', 14) }}</span>{% endif %}</button>{% endfor %}
-            </div>
-            {% endif %}
-          </div>
-          {% for t in cliente.etiquetas %}<span class="as-chip" style="--c-c:var(--e);--c-f:var(--edim)">{{ t }}</span>{% endfor %}
-        </div>
-        <h1 class="af-title">{{ cliente.nombre_v }}</h1>
-        <div class="af-datos">
-          {% if cliente.rfc %}<span>RFC {{ cliente.rfc }}</span>{% endif %}
-          {% if cliente.tipo == 'persona_moral' and cliente.contacto_principal %}<span>{{ ic('user', 15) }}{{ cliente.contacto_principal }}</span>{% endif %}
-          <span>{% if responsable %}<span class="as-av" style="background:{{ responsable.color }}">{{ responsable.iniciales }}</span>{{ responsable.nombre }}{% else %}<span class="as-muted">Sin responsable</span>{% endif %}</span>
-          <span class="as-muted">Cliente desde {{ alta_txt }}</span>
-        </div>
-        <div class="cl-contactos">
-          {% if whatsapp %}<a class="btn cb-wa" href="{{ whatsapp }}" target="_blank" rel="noopener">{{ ic('wa', 15) }} WhatsApp</a>{% endif %}
-          {% set tel = cliente.celular or cliente.telefono %}
-          {% if tel %}<a class="btn btn-secondary" href="tel:{{ tel | replace(' ', '') }}">{{ ic('phone', 15) }} Llamar</a>{% endif %}
-          {% if cliente.email %}<a class="btn btn-secondary" href="mailto:{{ cliente.email }}">{{ ic('mail', 15) }} Correo</a>{% endif %}
-          {% if not tel and not cliente.email and puede_editar %}<button type="button" class="btn btn-secondary" data-editar>Agregar celular o correo</button>{% endif %}
-        </div>
-      </div>
-    </div>
-
-    <div class="af-acc">
-      {% if puede_editar %}
-      <a class="btn btn-primary" href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}">+ Nuevo asunto</a>
-      <a class="btn btn-secondary" href="{{ url_for('cobranzas.index') }}#nuevo-cliente-{{ cliente.id }}">{{ ic('money', 15) }} Nuevo cobro</a>
-      {% endif %}
-      <div class="af-estado">
-        <button type="button" class="btn btn-ghost" id="clMasBtn" aria-label="Más acciones" aria-haspopup="true" style="padding:9px 10px">{{ ic('more', 16) }}</button>
-        <div class="af-menu" id="clMasMenu" role="menu">
-          {% if puede_editar %}<button type="button" data-editar>{{ ic('pen', 15) }} Editar datos</button>{% endif %}
-          <a href="{{ url_for('clientes.exportar_pdf', id=cliente.id) }}">{{ ic('doc', 15) }} Ficha en PDF</a>
-          {% if cobros %}<a href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=cliente.id) }}">{{ ic('money', 15) }} Estado de cuenta</a>{% endif %}
-          {% if es_admin %}<hr><button type="button" class="peligro" id="clEliminar">{{ ic('trash', 15) }} Eliminar cliente</button>{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="af-strip">
-    <div>
-      <small>Asuntos en curso</small>
-      <b>{{ en_curso }}</b><span>{% if asuntos | length > en_curso %}{{ asuntos | length - en_curso }} concluido{{ 's' if asuntos | length - en_curso != 1 }}{% elif not asuntos %}Aún sin asuntos{% else %}todos activos{% endif %}</span>
-    </div>
-    <div class="{{ 'rojo' if dinero.vencido }}">
-      <small>Saldo pendiente</small>
-      <b>{{ dinero.saldo | dinero(decimales=False) }}</b><span>{% if dinero.vencido %}{{ dinero.vencido | dinero(decimales=False) }} vencido{% elif dinero.saldo %}al corriente{% else %}no debe nada{% endif %}</span>
-    </div>
-    <div>
-      <small>Honorarios cobrados</small>
-      <b>{{ dinero.cobrado | dinero(decimales=False) }}</b>
-      {% if dinero.facturado %}<div class="af-bar"><i style="width:{{ (dinero.cobrado / dinero.facturado * 100) | round | int }}%"></i></div>{% else %}<span>sin cobros registrados</span>{% endif %}
-    </div>
-    <div>
-      <small>Último contacto</small>
-      {% if ultimo %}<b>{{ bitacora_tipos[ultimo.tipo] }}</b><span>{{ ultimo.cuando.strftime('%d/%m/%Y') }}{% if ultimo.autor %} · {{ ultimo.autor.corto }}{% endif %}</span>
-      {% else %}<b>—</b><span>sin registrar</span>{% endif %}
-    </div>
-  </div>
-</header>
+{% set tel = cliente.celular or cliente.telefono %}
+{% set ns = namespace(n=0) %}{% for gr in bitacora %}{% set ns.n = ns.n + gr['items'] | length %}{% endfor %}
+<div class="xp2" style="--m:{{ cliente.color }}">
+<a class="xp-volver" href="{{ url_for('clientes.index') }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Personas</a>
 
 {% if recien_creado %}
 <div class="cl-bienvenida" id="clBienvenida">
   <span>✓ <b>{{ cliente.nombre_v }}</b> quedó registrado. ¿Qué sigue?</span>
   <div>
-    <a class="btn btn-primary btn-sm" href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}">Abrir su primer asunto</a>
+    <a class="btn btn-primary btn-sm" href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}">Abrir su primer expediente</a>
     <a class="btn btn-secondary btn-sm" href="{{ url_for('cobranzas.index') }}#nuevo-cliente-{{ cliente.id }}">Registrar un cobro</a>
   </div>
 </div>
 {% endif %}
 
-<div class="af-grid">
-  <main class="as-card" style="min-width:0">
-    {% set ns = namespace(n=0) %}{% for gr in bitacora %}{% set ns.n = ns.n + gr['items'] | length %}{% endfor %}
-    <div class="af-tabs" role="tablist">
-      <button class="af-tab on" data-tab="bitacora" role="tab">Bitácora<span>{{ ns.n }}</span></button>
-      <button class="af-tab" data-tab="asuntos" role="tab">Asuntos<span>{{ asuntos | length }}</span></button>
-      <button class="af-tab" data-tab="cobranza" role="tab">Cobranza<span>{{ cobros | length }}</span></button>
-      <button class="af-tab" data-tab="documentos" role="tab">Documentos<span>{{ documentos | length }}</span></button>
-      <button class="af-tab" data-tab="datos" role="tab">Datos</button>
-    </div>
-
-    <!-- ── Bitácora ───────────────────────────────────────────────── -->
-    <section class="af-panel on" id="p-bitacora" role="tabpanel">
-      <form class="af-comp" id="fNota">
-        <div class="af-comp-tabs" id="fNotaTipos">
-          {% for k, l in bitacora_tipos.items() %}<button type="button" data-tipo="{{ k }}" class="{{ 'on' if loop.first }}">{{ l }}</button>{% endfor %}
-        </div>
-        <div class="af-comp-b on">
-          <textarea name="contenido" rows="3" maxlength="5000" placeholder="¿Qué platicaron? Acuerdos, dudas del cliente, lo que sigue…" required></textarea>
-          <div class="af-comp-f"><small>Solo la ve el equipo del despacho.</small><button class="btn btn-primary btn-sm">Guardar</button></div>
-        </div>
-      </form>
-
-      {% set colores = {'nota': ('#F4EEDF','#142E59'), 'llamada': ('#EEF1F5','#3D5A80'), 'reunion': ('#F6F1E6','#6E5A3A'), 'whatsapp': ('#EEF1F5','#2E4766'), 'correo': ('#F7F0E1','#8A6A2F'), 'portal': ('#F1EEE8','#3B4A61'), 'pago': ('#EEF1F5','#3D5A80')} %}
-      {% set iconos = {'nota': 'note', 'llamada': 'phone', 'reunion': 'people', 'whatsapp': 'wa', 'correo': 'mail', 'portal': 'portal', 'pago': 'money'} %}
-      {% for grupo in bitacora %}
-        <div class="af-dia">{{ grupo.dia }}</div>
-        {% for it in grupo['items'] %}{% set c = colores[it.tipo] %}
-        <div class="af-it" style="--ib:{{ c[0] }};--ic:{{ c[1] }}">
-          <span class="af-ico">{{ ic(iconos[it.tipo], 15) }}</span>
-          <div class="af-it-b">
-            <div class="af-it-h">
-              {% if it.tipo in bitacora_tipos %}<em>{{ bitacora_tipos[it.tipo] }}</em><b>{{ it.autor.nombre if it.autor else 'Equipo' }}</b>
-              {% else %}<b>{{ it.titulo }}</b>{% endif %}
-              <small>{{ it.hora }}</small>
-            </div>
-            {% if it.texto %}<p>{% if it.cobro_id %}<a href="{{ url_for('cobranzas.index') }}#cobro-{{ it.cobro_id }}" style="color:inherit">{{ it.texto }}</a>{% else %}{{ it.texto }}{% endif %}</p>{% endif %}
-            {% if it.tipo == 'pago' and it.autor %}<div class="quien">Registró {{ it.autor.corto }}</div>{% endif %}
-            {% if it.borrable %}<button type="button" class="cl-it-borrar" data-nota="{{ it.id }}">Borrar</button>{% endif %}
+<header class="pf-head">
+  <div class="pf-tarjeta">
+    <label class="cl-av pf-av" style="--av:{{ cliente.color }}" title="{{ 'Cambiar foto' if puede_editar else '' }}" tabindex="0">
+      {% if cliente.foto_url %}<img src="{{ cliente.foto_url }}" alt="">{% else %}{{ cliente.iniciales }}{% endif %}
+      {% if puede_editar %}<span class="cam">{{ ic('cam', 14) }}</span><input type="file" id="clFoto" accept=".jpg,.jpeg,.png,.webp" hidden>{% endif %}
+    </label>
+    <div class="pf-cuerpo">
+      <div class="xp2-top">
+        <span class="xp2-materia" style="--m:var(--e)"><i></i>{{ tipos[cliente.tipo] if cliente.tipo in tipos else 'Persona física' }}</span>
+        <div class="af-estado">
+          <button type="button" class="pf-estatus" id="clEstatusBtn" style="--c-c:{{ ei.color }};--c-f:{{ ei.fondo }}"{% if not puede_editar %} disabled{% endif %}><i></i>{{ ei.label }}{% if puede_editar %} {{ ic('down', 13) }}{% endif %}</button>
+          {% if puede_editar %}
+          <div class="af-menu" id="clEstatusMenu" role="menu" style="left:0;right:auto">
+            {% for k, e in estatus.items() %}<button type="button" data-estatus="{{ k }}"><span class="as-dot" style="--d:{{ e.color }}"></span>{{ e.label }}{% if (cliente.estatus or 'activo') == k %}<span class="ok">{{ ic('check', 14) }}</span>{% endif %}</button>{% endfor %}
           </div>
+          {% endif %}
         </div>
-        {% endfor %}
-      {% else %}
-        <p class="as-empty" style="margin-top:14px">Aún no hay nada en la bitácora. Anota la próxima llamada o reunión con el cliente para que todo el equipo sepa en qué van.</p>
-      {% endfor %}
-    </section>
-
-    <!-- ── Asuntos ────────────────────────────────────────────────── -->
-    <section class="af-panel" id="p-asuntos" role="tabpanel">
-      <div class="af-docs-h"><h4>Asuntos del cliente</h4>
-        {% if puede_editar %}<a class="btn btn-secondary btn-sm" href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}">+ Nuevo asunto</a>{% endif %}</div>
-      {% for a in asuntos %}
-      {% if loop.first and a.abierto %}<div class="cl-sub">En curso</div>{% endif %}
-      {% if not a.abierto and (loop.first or loop.previtem.abierto) %}<div class="cl-sub">Concluidos y archivados</div>{% endif %}
-      <a class="cl-asunto" href="{{ url_for('asuntos.detalle', id=a.id) }}">
-        <span class="as-dot" style="--d:{{ a.tipo_info.color }}" title="{{ a.tipo_info.label }}"></span>
-        <div>
-          <b>{{ a.titulo }}{% if a.privado %} 🔒{% endif %}</b>
-          <small>{{ a.numero_expediente or 'Sin expediente' }} · {{ a.tipo_info.label }}{% if a.juzgado %} · {{ a.juzgado }}{% endif %}</small>
-        </div>
-        {% if a.responsable %}<span class="as-av" style="background:{{ a.responsable.color }}" title="{{ a.responsable.nombre }}">{{ a.responsable.iniciales }}</span>{% endif %}
-        <span class="as-chip" style="--c-c:{{ a.estado_info.color }};--c-f:{{ a.estado_info.fondo }}">{{ a.estado_info.label }}</span>
-      </a>
-      {% else %}
-      <p class="as-empty">Este cliente aún no tiene asuntos.{% if puede_editar %} <a href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}" style="color:var(--e);font-weight:600;text-decoration:none">Abrir el primero</a>{% endif %}</p>
-      {% endfor %}
-      {% if ocultos > 0 %}<p class="as-empty" style="margin-top:10px">Hay {{ ocultos }} asunto{{ 's' if ocultos != 1 }} más de este cliente que llevan otros abogados.</p>{% endif %}
-    </section>
-
-    <!-- ── Cobranza ───────────────────────────────────────────────── -->
-    <section class="af-panel" id="p-cobranza" role="tabpanel">
-      <div class="af-docs-h"><h4>Cobros</h4>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          {% if cobros %}<a class="btn btn-ghost btn-sm" href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=cliente.id) }}">Estado de cuenta</a>{% endif %}
-          {% if puede_editar %}<a class="btn btn-secondary btn-sm" href="{{ url_for('cobranzas.index') }}#nuevo-cliente-{{ cliente.id }}">+ Nuevo cobro</a>{% endif %}
-        </div></div>
-      {% if cobros %}
-      <div class="cb-resumen" style="margin-bottom:10px">
-        <div class="cb-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
-        <div class="cb-kv"><span>Pagado</span><b style="color:#3D5A80">{{ dinero.cobrado | dinero }}</b></div>
-        <div class="cb-kv total"><span>Saldo pendiente</span><b{% if dinero.vencido %} style="color:#A23B33"{% endif %}>{{ dinero.saldo | dinero }}</b></div>
+        {% for t in cliente.etiquetas %}<span class="af-tag" style="--t:var(--e)">{{ t }}</span>{% endfor %}
       </div>
-      {% endif %}
-      {% for c in cobros %}
-      <a class="cl-cobro" href="{{ url_for('cobranzas.index') }}#cobro-{{ c.id }}">
-        <b>{{ c.concepto }}</b>
-        <span class="m">{% if c.saldo_v %}{{ c.saldo_v | dinero(c.moneda) }}{% else %}{{ c.total_v | dinero(c.moneda) }}{% endif %}</span>
-        <small>{{ c.folio }}{% if c.asunto_titulo %} · {{ c.asunto_titulo }}{% endif %}</small>
-        <small class="{{ c.vence.tono if c.vence else '' }}" style="text-align:right">{% if c.vence %}{{ c.vence.texto }}{% else %}{{ c.estado_info.label }}{% endif %}</small>
-      </a>
-      {% else %}<p class="as-empty">No hay cobros registrados para este cliente.</p>{% endfor %}
-    </section>
-
-    <!-- ── Documentos ─────────────────────────────────────────────── -->
-    <section class="af-panel" id="p-documentos" role="tabpanel">
-      <div class="af-docs-h"><h4>Documentos del cliente</h4></div>
-      <p class="as-empty" style="margin:-4px 0 8px">Identificaciones, poderes, actas constitutivas, comprobantes de domicilio… Los escritos de cada juicio van en el asunto.</p>
-      {% for d in documentos %}
-      <div class="af-doc">
-        <span class="af-ext {{ d.ext | lower }}">{{ d.ext }}</span>
-        <div class="af-doc-b">
-          <a href="{{ d.archivo_url }}" target="_blank" rel="noopener">{{ d.nombre }}</a>
-          <small>{{ d.fecha_txt }}{% if d.autor %} · {{ d.autor.corto }}{% endif %}{% if d.tamanio %} · {{ (d.tamanio / 1024) | round | int }} KB{% endif %}{% if d.descripcion %} · {{ d.descripcion }}{% endif %}</small>
-        </div>
-        <a class="btn btn-ghost btn-sm" href="{{ d.archivo_url }}?descargar=1">Descargar</a>
-        {% if d.borrable %}<button type="button" class="btn btn-ghost btn-sm" data-doc="{{ d.id }}" aria-label="Borrar {{ d.nombre }}">{{ ic('trash', 14) }}</button>{% endif %}
+      <h1 class="xp2-titulo">{{ cliente.nombre_v }}</h1>
+      <p class="pf-sub">{% if cliente.rfc %}RFC {{ cliente.rfc }} · {% endif %}Cliente desde {{ alta_txt }}{% if cliente.tipo == 'persona_moral' and cliente.contacto_principal %} · Contacto: {{ cliente.contacto_principal }}{% endif %}</p>
+      <div class="pf-contacto">
+        {% if whatsapp %}<a class="btn cb-wa" href="{{ whatsapp }}" target="_blank" rel="noopener">{{ ic('wa', 15) }} WhatsApp</a>{% endif %}
+        {% if tel %}<a class="btn btn-ghost" href="tel:{{ tel | replace(' ', '') }}">{{ ic('phone', 15) }} {{ tel }}</a>{% endif %}
+        {% if cliente.email %}<a class="btn btn-ghost" href="mailto:{{ cliente.email }}">{{ ic('mail', 15) }} {{ cliente.email }}</a>{% endif %}
+        {% if not tel and not cliente.email and puede_editar %}<button type="button" class="btn btn-ghost" data-editar>+ Agregar celular o correo</button>{% endif %}
       </div>
-      {% else %}<p class="as-empty">Aún no hay documentos.</p>{% endfor %}
-      <label class="af-drop" id="clDrop">
-        <input type="file" id="clArchivo" hidden multiple>
-        <b>Arrastra archivos aquí</b> o haz clic para subirlos · Se guardan cifrados y se agregan a la memoria del despacho
-      </label>
-    </section>
-
-    <!-- ── Datos ──────────────────────────────────────────────────── -->
-    <section class="af-panel cl-datos" id="p-datos" role="tabpanel">
-      {% macro dato(label, valor) -%}<div class="cl-dato"><span>{{ label }}</span><b class="{{ '' if valor else 'vacio' }}">{{ valor or 'Sin registrar' }}</b></div>{%- endmacro %}
-      <div class="af-docs-h"><h4 style="margin:0">Identificación</h4>{% if puede_editar %}<button type="button" class="btn btn-secondary btn-sm" data-editar>{{ ic('pen', 13) }} Editar datos</button>{% endif %}</div>
-      {% if cliente.tipo == 'persona_moral' %}
-        {{ dato('Razón social', cliente.razon_social) }}{{ dato('RFC', cliente.rfc) }}{{ dato('Representante legal', cliente.representante_legal) }}{{ dato('Giro', cliente.giro_comercial) }}
-      {% else %}
-        {{ dato('Nombre', cliente.nombre) }}{{ dato('Apellidos', cliente.apellidos) }}{{ dato('RFC', cliente.rfc) }}{{ dato('CURP', cliente.curp) }}{{ dato('Fecha de nacimiento', nacimiento) }}
-      {% endif %}
-      <h4>Contacto</h4>
-      {% if cliente.tipo == 'persona_moral' %}{{ dato('Contacto', cliente.contacto_principal) }}{% endif %}
-      {{ dato('Celular', cliente.celular) }}{{ dato('Otro teléfono', cliente.telefono) }}{{ dato('Correo', cliente.email) }}
-      <h4>Domicilio</h4>
-      {{ dato('Domicilio', domicilio) }}
-      <h4>Relación con el despacho</h4>
-      {{ dato('Responsable', responsable.nombre if responsable else None) }}{{ dato('¿Cómo llegó?', cliente.origen_cliente) }}{{ dato('Cliente desde', alta_txt ~ (' · ' ~ alta_hace | lower if alta_hace else '')) }}
-      {{ dato('Notas internas', cliente.notas) }}
-    </section>
-  </main>
-
-  <aside class="af-side">
-    <section class="as-card">
-      <div class="as-card-h"><h3>Responsable</h3></div>
-      <div class="as-card-b">
-        {% if puede_editar %}
-        <select class="as-select" id="clResp" aria-label="Abogado responsable">
-          <option value="">Sin asignar</option>
-          {% for ab in abogados %}<option value="{{ ab.id }}"{% if cliente.abogado_id == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
-        </select>
-        <p class="pc-hint">Quien atiende la relación con el cliente.</p>
-        {% else %}<p class="as-empty">{{ responsable.nombre if responsable else 'Sin asignar' }}</p>{% endif %}
-      </div>
-    </section>
-
-    <section class="as-card">
-      <div class="as-card-h"><h3>Contacto</h3>{% if puede_editar %}<button type="button" class="as-link" data-editar>Editar</button>{% endif %}</div>
-      <div class="as-card-b">
-        {% if cliente.tipo == 'persona_moral' and cliente.contacto_principal %}<div class="af-kv"><span class="as-muted">Contacto</span><span>{{ cliente.contacto_principal }}</span></div>{% endif %}
-        <div class="af-kv"><span class="as-muted">Celular</span><span>{{ cliente.celular or '—' }}</span></div>
-        {% if cliente.telefono %}<div class="af-kv"><span class="as-muted">Teléfono</span><span>{{ cliente.telefono }}</span></div>{% endif %}
-        <div class="af-kv"><span class="as-muted">Correo</span><span style="overflow-wrap:anywhere;text-align:right">{{ cliente.email or '—' }}</span></div>
-        {% if domicilio %}<div class="af-kv"><span class="as-muted">Domicilio</span><span style="text-align:right">{{ domicilio }}</span></div>{% endif %}
-      </div>
-    </section>
-
-    {% if cliente.notas %}
-    <section class="as-card">
-      <div class="as-card-h"><h3>Notas internas</h3></div>
-      <div class="as-card-b"><p style="font-size:13.5px;color:#3B4A61;line-height:1.55;white-space:pre-line">{{ cliente.notas }}</p></div>
-    </section>
+    </div>
+  </div>
+  <dl class="xp2-datos pf-datos">
+    <div><dt>{{ ic('user', 14) }} Responsable</dt><dd>
+      {% if puede_editar %}
+      <select class="pf-select" id="clResp" aria-label="Abogado responsable">
+        <option value="">Sin asignar</option>
+        {% for ab in abogados %}<option value="{{ ab.id }}"{% if cliente.abogado_id == ab.id %} selected{% endif %}>{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
+      </select>
+      {% else %}{{ responsable.nombre if responsable else 'Sin asignar' }}{% endif %}</dd></div>
+    <div><dt>{{ ic('pin', 14) }} Domicilio</dt><dd>{{ domicilio or '—' }}</dd></div>
+    <div><dt>{{ ic('folder', 14) }} Expedientes</dt><dd>{{ en_curso }} en curso{% if asuntos | length > en_curso %} · {{ asuntos | length - en_curso }} concluido{{ 's' if asuntos | length - en_curso != 1 }}{% endif %}</dd></div>
+    <div><dt>{{ ic('money', 14) }} Saldo</dt><dd class="{{ 'pf-rojo' if dinero.vencido }}">{% if dinero.saldo %}{{ dinero.saldo | dinero(decimales=False) }}{% if dinero.vencido %} · {{ dinero.vencido | dinero(decimales=False) }} vencido{% endif %}{% else %}No debe nada{% endif %}</dd></div>
+  </dl>
+  <div class="xp2-acciones">
+    {% if puede_editar %}
+    <button type="button" class="btn btn-ghost" data-editar>{{ ic('pen', 15) }} Datos generales</button>
+    <a class="btn btn-primary" href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}">+ Nuevo expediente</a>
+    <a class="btn btn-ghost" href="{{ url_for('cobranzas.index') }}#nuevo-cliente-{{ cliente.id }}">{{ ic('money', 15) }} Nuevo cobro</a>
     {% endif %}
-
-    <section class="as-card">
-      <div class="as-card-h"><h3>Preguntar a {{ config.ASISTENTE_NOMBRE }}</h3></div>
-      <div class="as-card-b">
-        <p class="as-empty">{{ config.ASISTENTE_NOMBRE }} conoce los asuntos y documentos de este cliente.</p>
-        <a class="btn btn-secondary btn-sm" style="margin-top:6px" href="{{ url_for('asistente.index') }}?q={{ ('Resúmeme la situación de ' ~ cliente.nombre_v ~ ': asuntos, pendientes y saldo.') | urlencode }}">Resumen del cliente</a>
+    <div class="af-estado">
+      <button type="button" class="btn btn-ghost" id="clMasBtn" aria-label="Más acciones" aria-haspopup="true" style="padding:0 12px">{{ ic('more', 18) }}</button>
+      <div class="af-menu" id="clMasMenu" role="menu">
+        <a href="{{ url_for('clientes.exportar_pdf', id=cliente.id) }}">{{ ic('doc', 15) }} Ficha en PDF</a>
+        {% if cobros %}<a href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=cliente.id) }}">{{ ic('money', 15) }} Estado de cuenta</a>{% endif %}
+        {% if es_admin %}<hr><button type="button" class="peligro" id="clEliminar">{{ ic('trash', 15) }} Eliminar cliente</button>{% endif %}
       </div>
-    </section>
-  </aside>
+    </div>
+  </div>
+</header>
+
+<nav class="xp-barra xp2-tabs" aria-label="Secciones de la persona">
+  <div class="xp-tabs" role="tablist">
+    <button class="xp-tab on" data-tab="resumen" role="tab">{{ ic('spark', 15) }}Resumen</button>
+    <button class="xp-tab" data-tab="expedientes" role="tab">{{ ic('folder', 15) }}Expedientes<span>{{ asuntos | length }}</span></button>
+    <button class="xp-tab" data-tab="bitacora" role="tab">{{ ic('note', 15) }}Bitácora<span>{{ ns.n }}</span></button>
+    <button class="xp-tab" data-tab="cobranza" role="tab">{{ ic('money', 15) }}Cobranza<span>{{ cobros | length }}</span></button>
+    <button class="xp-tab" data-tab="documentos" role="tab">{{ ic('doc', 15) }}Documentos<span>{{ documentos | length }}</span></button>
+  </div>
+</nav>
+
+{% set colores = {'nota': ('#F4EEDF','#142E59'), 'llamada': ('#EEF1F5','#3D5A80'), 'reunion': ('#F6F1E6','#6E5A3A'), 'whatsapp': ('#EEF1F5','#2E4766'), 'correo': ('#F7F0E1','#8A6A2F'), 'portal': ('#F1EEE8','#3B4A61'), 'pago': ('#EEF1F5','#3D5A80')} %}
+{% set iconos = {'nota': 'note', 'llamada': 'phone', 'reunion': 'people', 'whatsapp': 'wa', 'correo': 'mail', 'portal': 'portal', 'pago': 'money'} %}
+
+<!-- ── Resumen ─────────────────────────────────────────────── -->
+<section class="xp-panel on" id="p-resumen" role="tabpanel">
+  <div class="xr-fila uno">
+    <article class="xp-card xr-resumen">
+      <div class="xp-card-h"><h2>{{ ic('spark', 17) }} Resumen inteligente</h2><small>Se escribe solo con lo que registra el equipo</small></div>
+      <div class="xp-card-b">
+        {% for p in resumen.parrafos if p %}<p>{{ p }}</p>{% endfor %}
+        {% if resumen.atencion %}
+        <ul class="xr-atencion" aria-label="Puntos de atención">
+          {% for a in resumen.atencion %}<li class="t-{{ a.tono }}"><i aria-hidden="true"></i>{{ a.texto }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </article>
+    <article class="xp-card xp-sigue">
+      <div class="xp-card-h"><h2>Lo que sigue</h2><a href="{{ url_for('calendario.index') }}">Calendario →</a></div>
+      <div class="xp-card-b">
+        {% for e in eventos %}
+        <a class="xp-paso pf-paso" href="{{ e.url }}"><span class="marca evento"></span>
+          <div><b>{{ e.titulo }}</b><small>{{ e.etiqueta }}{% if e.asunto %} · {{ e.asunto }}{% endif %}</small></div>
+          <span class="cuando">{{ e.dia }}{% if e.hora %}<br>{{ e.hora }}{% endif %}</span></a>
+        {% else %}<p class="as-empty">No hay audiencias ni términos próximos en sus expedientes.</p>{% endfor %}
+      </div>
+    </article>
+  </div>
+
+  <div class="xr-fila">
+    <article class="xp-card">
+      <div class="xp-card-h"><h2>Sus expedientes</h2><button type="button" class="link" data-ir="expedientes">Ver todos →</button></div>
+      <div class="xp-card-b">
+        {% for a in asuntos[:4] %}
+        <a class="pf-exp" href="{{ url_for('asuntos.detalle', id=a.id) }}" style="--m:{{ a.tipo_info.color }}">
+          <span class="pf-exp-ico">{{ ic('folder', 18) }}</span>
+          <span class="pf-exp-tx"><b>{{ a.titulo }}</b><small>{{ a.numero_expediente or 'Sin número' }} · {{ a.tipo_info.label }}{% if a.proximo %} · {{ a.proximo.tipo }} {{ a.proximo.cuando | lower }}{% endif %}</small></span>
+          <span class="ex-chip e-{{ a.estado }}">{{ a.estado_info.label }}</span>
+        </a>
+        {% else %}
+        <p class="as-empty">Todavía no tiene expedientes.</p>
+        {% if puede_editar %}<a class="btn btn-ghost btn-sm" style="margin-top:10px" href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}">+ Abrir el primero</a>{% endif %}
+        {% endfor %}
+      </div>
+    </article>
+    <article class="xp-card">
+      <div class="xp-card-h"><h2>Bitácora</h2><button type="button" class="link" data-ir="bitacora">Ver todo →</button></div>
+      <div class="xp-card-b">
+        <form class="xr-nota-nueva" id="fNotaRapida">
+          <textarea name="contenido" rows="2" maxlength="5000" placeholder="¿Qué platicaron? Acuerdos, dudas, lo que sigue…" required></textarea>
+          <button class="btn btn-primary btn-sm">Guardar</button>
+        </form>
+        {% set ns2 = namespace(n=0) %}
+        {% for grupo in bitacora %}{% for it in grupo['items'] %}{% if ns2.n < 3 %}{% set ns2.n = ns2.n + 1 %}
+        <div class="xr-nota"><span class="af-ico pf-ico" style="--ib:{{ colores[it.tipo][0] }};--ic:{{ colores[it.tipo][1] }}">{{ ic(iconos[it.tipo], 14) }}</span>
+          <div>{% set tx = it.texto or it.titulo or '' %}<p>{{ tx if tx | length < 200 else tx[:197] ~ '…' }}</p>
+            <small>{{ bitacora_tipos[it.tipo] if it.tipo in bitacora_tipos else it.titulo }}{% if it.autor %} · {{ it.autor.corto }}{% endif %} · {{ grupo.dia | lower }}</small></div></div>
+        {% endif %}{% endfor %}{% else %}<p class="as-empty">Aún no hay nada en la bitácora.</p>{% endfor %}
+      </div>
+    </article>
+  </div>
+
+  <div class="xr-fila">
+    <article class="xp-card">
+      <div class="xp-card-h"><h2>Cobranza</h2><button type="button" class="link" data-ir="cobranza">Ver cobros →</button></div>
+      <div class="xp-card-b">
+        <div class="xr-barra-cobro"><b>{{ dinero.cobrado | dinero(decimales=False) }}</b><span>pagado de {{ dinero.facturado | dinero(decimales=False) if dinero.facturado else 'nada facturado aún' }}</span>
+          <div class="xr-progreso"><i style="width:{{ ((dinero.cobrado / dinero.facturado * 100) | round | int) if dinero.facturado else 0 }}%"></i></div></div>
+        <div class="xp-kv"><span>Saldo pendiente</span><b style="color:{{ '#A23B33' if dinero.vencido else 'var(--e)' }}">{{ dinero.saldo | dinero }}</b></div>
+        {% if dinero.vencido %}<div class="xp-kv"><span>Vencido</span><b style="color:#A23B33">{{ dinero.vencido | dinero }}</b></div>{% endif %}
+      </div>
+    </article>
+    <article class="xp-card">
+      <div class="xp-card-h"><h2>Documentos personales</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
+      <div class="xp-card-b">
+        <div class="xr-docs">
+          {% for d in documentos[:3] %}
+          <a class="xr-doc t-{{ d.ext | lower }}" href="{{ d.archivo_url }}" target="_blank" rel="noopener" title="{{ d.nombre }}">
+            <span class="xr-hoja"><em>{{ d.ext }}</em><i></i><i></i><i></i></span><b>{{ d.nombre }}</b><small>{{ d.fecha_txt }}</small></a>
+          {% else %}
+          <button type="button" class="xr-doc nuevo" data-subir><span class="xr-hoja"><b>+</b></span><b>Subir su INE o poder</b><small>Se guarda cifrado</small></button>
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+  </div>
+
+  {% if cliente.notas %}
+  <article class="xp-card xr-ancho">
+    <div class="xp-card-h"><h2>Notas internas</h2>{% if puede_editar %}<button type="button" class="link" data-editar>Editar</button>{% endif %}</div>
+    <div class="xp-card-b"><p style="margin:0;font-size:14.5px;color:#3B4A61;line-height:1.6;white-space:pre-line">{{ cliente.notas }}</p></div>
+  </article>
+  {% endif %}
+</section>
+
+<!-- ── Expedientes en carpetas ─────────────────────────────── -->
+<section class="xp-panel" id="p-expedientes" role="tabpanel">
+  <div class="xd-h"><h2>Expedientes de {{ cliente.nombre_v }} <span>{{ asuntos | length }}</span></h2>
+    {% if puede_editar %}<a class="btn btn-ghost btn-sm" href="{{ url_for('asuntos.nuevo', cliente_id=cliente.id) }}">+ Nuevo expediente</a>{% endif %}</div>
+  {% if asuntos %}
+  <div class="cp-grid" style="margin-top:6px">
+    {% for a in asuntos %}
+    <a class="cp cp-{{ 'abierta' if a.abierto else 'cerrada' }}" href="{{ url_for('asuntos.detalle', id=a.id) }}" style="--m:{{ a.tipo_info.color }}">
+      <span class="cp-pestana"><span>{{ a.numero_expediente or ('#' ~ a.id) }}</span></span>
+      <span class="cp-hoja" aria-hidden="true"></span><span class="cp-hoja dos" aria-hidden="true"></span>
+      <span class="cp-frente">
+        <span class="cp-top"><span class="cp-materia">{{ a.tipo_info.label }}{% if a.sub_tipo %} · {{ a.sub_tipo | capitalize }}{% endif %}</span><span class="ex-chip e-{{ a.estado }}">{{ a.estado_info.label }}</span></span>
+        <b class="cp-tit">{{ a.titulo }}{% if a.privado %} 🔒{% endif %}</b>
+        {% if a.juzgado %}<span class="cp-cli">{{ ic('doc', 14) }}{{ a.juzgado }}</span>{% endif %}
+        {% if a.proximo %}<span class="cp-sigue s-{{ a.proximo.semaforo }}"><i aria-hidden="true"></i><span><b>{{ a.proximo.tipo }} · {{ a.proximo.corta }}</b> {{ a.proximo.cuando | lower }}</span></span>
+        {% else %}<span class="cp-sigue vacio">{{ 'Sin pendientes agendados' if a.abierto else 'Concluido' }}</span>{% endif %}
+        <span class="cp-pie">
+          {% if a.responsable %}<span class="cp-resp"><span class="as-av" style="background:{{ a.responsable.color }}">{{ a.responsable.iniciales }}</span><span>{{ a.responsable.corto }}</span></span>{% else %}<span class="cp-resp as-muted">Sin responsable</span>{% endif %}
+          <span class="cp-datos"><span>{{ ic('doc', 13) }}{{ a.documentos }}</span><span>{{ a.movimiento }}</span></span>
+        </span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}<p class="as-empty">Este cliente aún no tiene expedientes.</p>{% endif %}
+  {% if ocultos > 0 %}<p class="as-empty" style="margin-top:14px">Hay {{ ocultos }} expediente{{ 's' if ocultos != 1 }} más de este cliente que llevan otros abogados.</p>{% endif %}
+</section>
+
+<!-- ── Bitácora ───────────────────────────────────────────────── -->
+<section class="xp-panel" id="p-bitacora" role="tabpanel">
+  <div class="xp-card"><div class="xp-card-b" style="padding-top:20px">
+    <form class="af-comp" id="fNota">
+      <div class="af-comp-tabs" id="fNotaTipos">
+        {% for k, l in bitacora_tipos.items() %}<button type="button" data-tipo="{{ k }}" class="{{ 'on' if loop.first }}">{{ l }}</button>{% endfor %}
+      </div>
+      <div class="af-comp-b on">
+        <textarea name="contenido" rows="3" maxlength="5000" placeholder="¿Qué platicaron? Acuerdos, dudas del cliente, lo que sigue…" required></textarea>
+        <div class="af-comp-f"><small>Solo la ve el equipo del despacho.</small><button class="btn btn-primary btn-sm">Guardar</button></div>
+      </div>
+    </form>
+    {% for grupo in bitacora %}
+      <div class="af-dia">{{ grupo.dia }}</div>
+      {% for it in grupo['items'] %}{% set c = colores[it.tipo] %}
+      <div class="af-it" style="--ib:{{ c[0] }};--ic:{{ c[1] }}">
+        <span class="af-ico">{{ ic(iconos[it.tipo], 15) }}</span>
+        <div class="af-it-b">
+          <div class="af-it-h">
+            {% if it.tipo in bitacora_tipos %}<em>{{ bitacora_tipos[it.tipo] }}</em><b>{{ it.autor.nombre if it.autor else 'Equipo' }}</b>
+            {% else %}<b>{{ it.titulo }}</b>{% endif %}
+            <small>{{ it.hora }}</small>
+          </div>
+          {% if it.texto %}<p>{% if it.cobro_id %}<a href="{{ url_for('cobranzas.index') }}#cobro-{{ it.cobro_id }}" style="color:inherit">{{ it.texto }}</a>{% else %}{{ it.texto }}{% endif %}</p>{% endif %}
+          {% if it.tipo == 'pago' and it.autor %}<div class="quien">Registró {{ it.autor.corto }}</div>{% endif %}
+          {% if it.borrable %}<button type="button" class="cl-it-borrar" data-nota="{{ it.id }}">Borrar</button>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="as-empty" style="margin-top:14px">Aún no hay nada en la bitácora. Anota la próxima llamada o reunión con el cliente para que todo el equipo sepa en qué van.</p>
+    {% endfor %}
+  </div></div>
+</section>
+
+<!-- ── Cobranza ───────────────────────────────────────────────── -->
+<section class="xp-panel" id="p-cobranza" role="tabpanel">
+  <div class="xd-h"><h2>Cobros <span>{{ cobros | length }}</span></h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      {% if cobros %}<a class="btn btn-ghost btn-sm" href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=cliente.id) }}">Estado de cuenta</a>{% endif %}
+      {% if puede_editar %}<a class="btn btn-ghost btn-sm" href="{{ url_for('cobranzas.index') }}#nuevo-cliente-{{ cliente.id }}">+ Nuevo cobro</a>{% endif %}
+    </div></div>
+  <div class="xp-card"><div class="xp-card-b" style="padding-top:18px">
+    {% if cobros %}
+    <div class="cb-resumen" style="margin-bottom:10px">
+      <div class="cb-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
+      <div class="cb-kv"><span>Pagado</span><b style="color:#3D5A80">{{ dinero.cobrado | dinero }}</b></div>
+      <div class="cb-kv total"><span>Saldo pendiente</span><b{% if dinero.vencido %} style="color:#A23B33"{% endif %}>{{ dinero.saldo | dinero }}</b></div>
+    </div>
+    {% endif %}
+    {% for c in cobros %}
+    <a class="cl-cobro" href="{{ url_for('cobranzas.index') }}#cobro-{{ c.id }}">
+      <b>{{ c.concepto }}</b>
+      <span class="m">{% if c.saldo_v %}{{ c.saldo_v | dinero(c.moneda) }}{% else %}{{ c.total_v | dinero(c.moneda) }}{% endif %}</span>
+      <small>{{ c.folio }}{% if c.asunto_titulo %} · {{ c.asunto_titulo }}{% endif %}</small>
+      <small class="{{ c.vence.tono if c.vence else '' }}" style="text-align:right">{% if c.vence %}{{ c.vence.texto }}{% else %}{{ c.estado_info.label }}{% endif %}</small>
+    </a>
+    {% else %}<p class="as-empty">No hay cobros registrados para este cliente.</p>{% endfor %}
+  </div></div>
+</section>
+
+<!-- ── Documentos ─────────────────────────────────────────────── -->
+<section class="xp-panel" id="p-documentos" role="tabpanel">
+  <div class="xd-h"><h2>Documentos personales <span>{{ documentos | length }}</span></h2></div>
+  <p class="as-empty" style="margin:-6px 0 14px">Identificaciones, poderes, actas constitutivas, comprobantes de domicilio… Los escritos de cada juicio van en su expediente.</p>
+  <div class="xd-grid">
+    <label class="xd-subir" id="clDrop">
+      <input type="file" id="clArchivo" hidden multiple>
+      <span class="xd-mas">+</span><b>Subir documentos</b><small>Arrastra aquí o haz clic. Se guardan cifrados.</small>
+    </label>
+    {% for d in documentos %}
+    <article class="dc-doc">
+      <a class="dc-hoja t-{{ d.ext | lower }}" href="{{ d.archivo_url }}" target="_blank" rel="noopener">
+        <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ d.ext }}</span>
+        <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </a>
+      <div class="dc-info">
+        <b title="{{ d.nombre }}">{{ d.nombre }}</b>
+        <span class="dc-exp">{{ d.fecha_txt }}{% if d.autor %} · {{ d.autor.corto }}{% endif %}{% if d.tamanio %} · {{ (d.tamanio / 1024) | round | int }} KB{% endif %}</span>
+        <span class="dc-pie"><a class="link" href="{{ d.archivo_url }}?descargar=1">Descargar</a>{% if d.borrable %}<button type="button" class="link pf-borrar" data-doc="{{ d.id }}" aria-label="Borrar {{ d.nombre }}">Borrar</button>{% endif %}</span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
 </div>
 
 {% include "clientes/_form_modal.html" %}
@@ -321,14 +354,21 @@
   }
 
   // Pestañas (con #hash para ligas directas)
-  const tabs = document.querySelectorAll('.af-tab');
+  const tabs = document.querySelectorAll('.xp-tab');
   function mostrar(t) {
-    if (!document.getElementById('p-' + t)) t = 'bitacora';
+    if (!document.getElementById('p-' + t)) t = 'resumen';
     tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-    document.querySelectorAll('.af-panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + t));
+    document.querySelectorAll('.xp-panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + t));
   }
-  tabs.forEach(b => b.addEventListener('click', () => { mostrar(b.dataset.tab); history.replaceState(null, '', '#' + b.dataset.tab); }));
-  const porHash = () => { const h = location.hash.slice(1); if (h === 'notas' || h === 'historial') mostrar('bitacora'); else if (h === 'facturas') mostrar('cobranza'); else if (h === 'info') mostrar('datos'); else if (h) mostrar(h); };
+  const ir = t => { mostrar(t); history.replaceState(null, '', '#' + t); };
+  tabs.forEach(b => b.addEventListener('click', () => ir(b.dataset.tab)));
+  document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => ir(b.dataset.ir)));
+  const porHash = () => {
+    const h = location.hash.slice(1);
+    const alias = { notas: 'bitacora', historial: 'bitacora', facturas: 'cobranza', asuntos: 'expedientes' };
+    if (h === 'datos' || h === 'info') { mostrar('resumen'); abrirCliente(ID); }
+    else if (h) mostrar(alias[h] || h);
+  };
   window.addEventListener('hashchange', porHash); porHash();
 
   // Menús
@@ -369,6 +409,12 @@
     const d = await post(`/clientes/${ID}/notas`, { headers: JSONH, body: JSON.stringify({ contenido: fNota.contenido.value, tipo: tipoNota }) });
     if (d) recargar('Guardado en la bitácora', 'bitacora');
   });
+  $('#fNotaRapida')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const d = await post(`/clientes/${ID}/notas`, { headers: JSONH, body: JSON.stringify({ contenido: e.target.contenido.value, tipo: 'nota' }) });
+    if (d) recargar('Guardado en la bitácora', 'resumen');
+  });
+  document.querySelectorAll('[data-subir]').forEach(b => b.addEventListener('click', () => { ir('documentos'); $('#clArchivo').click(); }));
   document.querySelectorAll('[data-nota]').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('¿Borrar esta nota?')) return;
     if (await post(`/clientes/${ID}/notas/${b.dataset.nota}/borrar`)) recargar('Nota borrada', 'bitacora');
@@ -389,7 +435,7 @@
       if (await post(`/clientes/${ID}/documentos`, { body: fd })) n++;
     }
     if (n) recargar(`${n} documento${n === 1 ? '' : 's'} guardado${n === 1 ? '' : 's'}`, 'documentos');
-    else drop.querySelector('b').textContent = 'Arrastra archivos aquí';
+    else drop.querySelector('b').textContent = 'Subir documentos';
   }
   document.querySelectorAll('[data-doc]').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('¿Borrar este documento? No se puede deshacer.')) return;
