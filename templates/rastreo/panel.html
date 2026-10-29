@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Uso de la plataforma{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
+<style>
+.us { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.us-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.us-head h1 { font: 600 34px 'Sora', sans-serif; letter-spacing: -.02em; color: var(--e); margin: 0; }
+.us-head p { margin: 6px 0 0; color: var(--ash); font-size: 15px; }
+.us-filtros { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
+  background: linear-gradient(135deg, #142E59, #1B3B6F); border-radius: 16px; padding: 8px; box-shadow: 0 6px 18px rgba(20,46,89,.16); }
+.us-filtros a { padding: 9px 16px; border-radius: 10px; color: rgba(255,255,255,.8); text-decoration: none; font: 500 14px 'Inter', sans-serif; }
+.us-filtros a:hover { background: rgba(255,255,255,.1); color: #fff; }
+.us-filtros a.on { background: #fff; color: #142E59; font-weight: 600; }
+.us-filtros select { height: 38px; border-radius: 10px; border: 0; padding: 0 12px; font: 500 14px 'Inter', sans-serif; color: #142E59; }
+.us-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.us-kpi { background: var(--c); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.us-kpi small { display: block; font-size: 13px; color: var(--ash); }
+.us-kpi b { display: block; font: 600 28px 'Sora', sans-serif; color: var(--e); margin-top: 4px; }
+.us-kpi em { font-style: normal; font-size: 12.5px; color: var(--ash); }
+.us-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.us-ancho { grid-column: 1 / -1; }
+.us-tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.us-tabla th { text-align: left; font: 600 11.5px 'Inter', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ash); padding: 6px 8px; }
+.us-tabla td { padding: 9px 8px; border-top: 1px solid var(--border); color: var(--fog); vertical-align: middle; }
+.us-tabla td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.us-barra { position: relative; height: 8px; background: #EEF1F6; border-radius: 4px; min-width: 60px; }
+.us-barra i { position: absolute; left: 0; top: 0; bottom: 0; background: #142E59; border-radius: 4px; }
+.us-flujo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.us-flujo span { padding: 3px 9px; border-radius: 7px; background: #EEF1F6; font-size: 13px; }
+.us-flujo svg { color: var(--dorado); flex: none; }
+.us-dias { display: flex; align-items: flex-end; gap: 2px; height: 180px; padding-top: 10px; }
+.us-dia { flex: 1; height: 100%; display: flex; align-items: flex-end; position: relative; }
+.us-dia i { display: block; width: 100%; background: #142E59; border-radius: 4px 4px 0 0; min-height: 2px; }
+.us-dia i.cero { background: #E3E7EE; }
+.us-dia:hover i { background: #AD9060; }
+.us-dia .tip { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap;
+  background: #142E59; color: #fff; font-size: 12.5px; padding: 6px 9px; border-radius: 8px; z-index: 2; pointer-events: none; }
+.us-dia:hover .tip { display: block; }
+.us-ejes { display: flex; justify-content: space-between; font-size: 12px; color: var(--ash); margin-top: 6px; }
+.us-disp { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.us-disp div { background: #F6F7FA; border-radius: 12px; padding: 12px; text-align: center; }
+.us-disp b { display: block; font: 600 22px 'Sora', sans-serif; color: var(--e); }
+.us-disp small { color: var(--ash); font-size: 13px; }
+.us-embudo { display: flex; flex-direction: column; gap: 8px; }
+.us-embudo div { display: grid; grid-template-columns: 170px 1fr 48px; gap: 10px; align-items: center; font-size: 14px; }
+.us-vacio { padding: 40px 20px; text-align: center; color: var(--ash); }
+.us-nota { font-size: 13px; color: var(--ash); margin: 0; }
+@media (max-width: 1080px) { .us-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .us-grid { grid-template-columns: 1fr; } .us-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .us-head h1 { font-size: 28px; } .us-embudo div { grid-template-columns: 120px 1fr 40px; } .us-tabla { font-size: 13.5px; } }
+</style>
+{% endblock %}
+
+{% macro min_txt(ms) -%}
+{%- if not ms -%}—{%- elif ms < 60000 -%}{{ (ms / 1000) | round | int }} s{%- else -%}{{ (ms / 60000) | round(1) }} min{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+<div class="us">
+  <div class="us-head">
+    <div>
+      <h1>Uso de la plataforma</h1>
+      <p>Qué pantallas se abren, a dónde va la gente después y cuánto tiempo se queda. Solo cuenta a quien aceptó las cookies de medición.</p>
+    </div>
+  </div>
+
+  <nav class="us-filtros" aria-label="Periodo y despacho">
+    {% for d in (7, 30, 90) %}<a href="{{ url_for('rastreo.panel', dias=d, despacho=despacho or None) }}" class="{{ 'on' if dias == d }}">Últimos {{ d }} días</a>{% endfor %}
+    <select aria-label="Despacho" onchange="location.href=this.value">
+      <option value="{{ url_for('rastreo.panel', dias=dias) }}">Todos los despachos</option>
+      {% for d in despachos %}<option value="{{ url_for('rastreo.panel', dias=dias, despacho=d) }}"{% if d == despacho %} selected{% endif %}>{{ nombres.get(d, d) }}</option>{% endfor %}
+    </select>
+  </nav>
+
+  {% if not tot.vistas %}
+  <article class="xp-card"><div class="us-vacio">
+    <b>Todavía no hay datos en este periodo.</b>
+    <p>Se empiezan a juntar en cuanto alguien acepta las cookies y navega por el sistema.</p>
+  </div></article>
+  {% else %}
+  <section class="us-kpis" aria-label="Resumen">
+    <div class="us-kpi"><small>Personas distintas</small><b>{{ tot.visitantes }}</b><em>{{ tot.usuarios }} con sesión</em></div>
+    <div class="us-kpi"><small>Visitas (sesiones)</small><b>{{ tot.sesiones }}</b></div>
+    <div class="us-kpi"><small>Pantallas vistas</small><b>{{ tot.vistas }}</b><em>{{ por_sesion.paginas | round(1) if por_sesion.paginas else 0 }} por visita</em></div>
+    <div class="us-kpi"><small>Tiempo por visita</small><b>{{ min_txt(por_sesion.ms) }}</b></div>
+    <div class="us-kpi"><small>Tiempo por pantalla</small><b>{{ min_txt(tot.ms) }}</b></div>
+  </section>
+
+  <article class="xp-card b-resumen">
+    <div class="xp-card-h"><h2>Pantallas vistas por día</h2><small>Pasa el cursor sobre un día para ver el detalle</small></div>
+    <div class="xp-card-b">
+      <div class="us-dias" role="img" aria-label="Pantallas vistas por día en los últimos {{ dias }} días">
+        {% for s in serie %}
+        <div class="us-dia"><i class="{{ 'cero' if not s.vistas }}" style="height:{{ (s.vistas / max_dia * 100) | round(1) }}%"></i>
+          <span class="tip">{{ s.dia[8:10] }}/{{ s.dia[5:7] }} · {{ s.vistas }} pantalla{{ 's' if s.vistas != 1 }} · {{ s.visitantes }} persona{{ 's' if s.visitantes != 1 }}</span></div>
+        {% endfor %}
+      </div>
+      <div class="us-ejes"><span>{{ serie[0].dia[8:10] }}/{{ serie[0].dia[5:7] }}</span><span>Hoy</span></div>
+    </div>
+  </article>
+
+  <div class="us-grid">
+    <article class="xp-card b-resumen">
+      <div class="xp-card-h"><h2>Pantallas más usadas</h2></div>
+      <div class="xp-card-b">
+        <table class="us-tabla">
+          <thead><tr><th>Pantalla</th><th></th><th style="text-align:right">Vistas</th><th style="text-align:right">Tiempo</th></tr></thead>
+          <tbody>
+          {% for s in secciones %}
+          <tr><td>{{ s.seccion }}</td><td style="width:30%"><span class="us-barra"><i style="width:{{ (s.vistas / max_seccion * 100) | round(1) }}%"></i></span></td>
+            <td class="n">{{ s.vistas }}</td><td class="n">{{ min_txt(s.ms) }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="xp-card b-agenda">
+      <div class="xp-card-h"><h2>A dónde van después</h2></div>
+      <div class="xp-card-b">
+        <table class="us-tabla">
+          <tbody>
+          {% for f in flujos %}
+          <tr><td><span class="us-flujo"><span>{{ f.desde }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>{{ f.seccion }}</span></span></td><td class="n">{{ f.n }}</td></tr>
+          {% else %}<tr><td class="us-nota">Aún no hay recorridos.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="xp-card b-notas">
+      <div class="xp-card-h"><h2>Por dónde entran y dónde se van</h2></div>
+      <div class="xp-card-b us-grid" style="gap:18px">
+        <table class="us-tabla"><thead><tr><th>Entran por</th><th></th></tr></thead><tbody>
+          {% for e in entradas %}<tr><td>{{ e.seccion }}</td><td class="n">{{ e.n }}</td></tr>{% endfor %}</tbody></table>
+        <table class="us-tabla"><thead><tr><th>Se van desde</th><th></th></tr></thead><tbody>
+          {% for e in salidas %}<tr><td>{{ e.seccion }}</td><td class="n">{{ e.n }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </article>
+
+    <article class="xp-card b-docs">
+      <div class="xp-card-h"><h2>Pestañas y botones</h2></div>
+      <div class="xp-card-b">
+        <table class="us-tabla"><tbody>
+        {% for a in acciones %}
+        <tr><td>{{ a.detalle or ('Buscador' if a.tipo == 'busqueda' else '—') }}<br><small style="color:var(--ash)">{{ a.seccion }}</small></td><td class="n">{{ a.n }}</td></tr>
+        {% else %}<tr><td class="us-nota">Aún no hay clics registrados.</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </article>
+
+    <article class="xp-card b-dinero">
+      <div class="xp-card-h"><h2>Desde qué aparato</h2></div>
+      <div class="xp-card-b">
+        {% set total_d = dispositivos.values() | sum or 1 %}
+        <div class="us-disp">
+          {% for k, nombre in (('computadora', 'Computadora'), ('tablet', 'Tablet'), ('telefono', 'Teléfono')) %}
+          <div><b>{{ ((dispositivos.get(k, 0) / total_d) * 100) | round | int }}%</b><small>{{ nombre }} · {{ dispositivos.get(k, 0) }} visita{{ 's' if dispositivos.get(k, 0) != 1 }}</small></div>
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+
+    <article class="xp-card b-resultado">
+      <div class="xp-card-h"><h2>De la portada a usar el sistema</h2></div>
+      <div class="xp-card-b">
+        {% set tope = [publicas.values() | max if publicas else 0, 1] | max %}
+        <div class="us-embudo">
+          {% for k in ('Página principal', 'Iniciar sesión', 'Registro de despacho', 'Inicio') %}
+          <div><span>{{ 'Inicio (ya dentro)' if k == 'Inicio' else k }}</span><span class="us-barra"><i style="width:{{ (publicas.get(k, 0) / tope * 100) | round(1) }}%"></i></span><b class="n" style="text-align:right">{{ publicas.get(k, 0) }}</b></div>
+          {% endfor %}
+        </div>
+        <p class="us-nota" style="margin-top:12px">Personas distintas que vieron cada pantalla en el periodo.</p>
+      </div>
+    </article>
+
+    <article class="xp-card b-equipo">
+      <div class="xp-card-h"><h2>Por despacho</h2></div>
+      <div class="xp-card-b">
+        <table class="us-tabla"><thead><tr><th>Despacho</th><th style="text-align:right">Pantallas</th><th style="text-align:right">Usuarios</th></tr></thead><tbody>
+        {% for d in por_despacho %}<tr><td>{{ nombres.get(d.despacho, d.despacho) }}</td><td class="n">{{ d.vistas }}</td><td class="n">{{ d.usuarios }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </article>
+
+    <article class="xp-card b-equipo">
+      <div class="xp-card-h"><h2>Personas más activas</h2></div>
+      <div class="xp-card-b">
+        <table class="us-tabla"><thead><tr><th>Persona</th><th style="text-align:right">Visitas</th><th style="text-align:right">Pantallas</th></tr></thead><tbody>
+        {% for p in personas %}<tr><td>{{ p.usuario }}<br><small style="color:var(--ash)">{{ nombres.get(p.despacho, p.despacho) }}</small></td><td class="n">{{ p.sesiones }}</td><td class="n">{{ p.vistas }}</td></tr>
+        {% else %}<tr><td class="us-nota">Nadie con sesión en este periodo.</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </article>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

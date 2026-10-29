@@ -27,7 +27,7 @@ class Config:
     # ─── Términos y aviso de privacidad ─────────────────────────────────────
     # Al cambiar el texto, sube la versión: cada usuario tendrá que aceptarla otra vez.
     TERMINOS_VERSION = "2026-10"
-    PRIVACIDAD_VERSION = "2026-10"
+    PRIVACIDAD_VERSION = "2026-10-29"
 
     # ─── Respaldos (scripts/respaldo.py) ────────────────────────────────────
     # Destino: una carpeta ("/respaldos") o un bucket S3-compatible ("s3://bucket/prefijo").
@@ -41,6 +41,12 @@ class Config:
 
     # ─── Asistente jurídico ─────────────────────────────────────────────────
     ASISTENTE_NOMBRE = os.environ.get("ASISTENTE_NOMBRE", "Dictum")
+
+    # ─── Medición de uso ────────────────────────────────────────────────────
+    # Correos (separados por coma) que ven el panel «Uso de la plataforma» de todos los despachos.
+    PLATAFORMA_ADMINS = os.environ.get("PLATAFORMA_ADMINS", "")
+    # Google Analytics (G-XXXXXXX): solo en páginas públicas y solo si la persona acepta cookies.
+    GA_MEASUREMENT_ID = os.environ.get("GA_MEASUREMENT_ID", "")
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
     ASISTENTE_MODELO = os.environ.get("ASISTENTE_MODELO", "claude-sonnet-5-5")
     ASISTENTE_MODELO_RAPIDO = os.environ.get("ASISTENTE_MODELO_RAPIDO", "claude-haiku-5-5")

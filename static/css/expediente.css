@@ -269,3 +269,44 @@
   #p-actividad .af-comp-tabs button i { width: 38px; height: 38px; }
   .xr-links { gap: 10px; }
 }
+
+/* ── Enlace a Dictum junto a la pestaña de la carpeta ─────────── */
+.xp2-ceja { position: absolute; top: 0; left: 0; right: 0; height: 36px; display: flex; align-items: center; gap: 40px; }
+.xp2-ceja .xp2-pestana { position: relative; }
+.xp2-dictum { display: inline-flex; align-items: center; gap: 7px; padding-bottom: 6px; font: 600 14px 'Inter', sans-serif; color: var(--e);
+  text-decoration: underline; text-decoration-color: rgba(173,144,96,.55); text-decoration-thickness: 1.5px; text-underline-offset: 5px; white-space: nowrap; min-width: 0; }
+.xp2-dictum > span { overflow: hidden; text-overflow: ellipsis; }
+.xp2-dictum svg { color: var(--dorado); flex: none; }
+.xp2-dictum:hover, .xp2-dictum.on { text-decoration-color: var(--dorado); color: #0E2246; }
+.xp2-dictum em { font-style: normal; font: 700 11px 'Inter', sans-serif; color: #fff; background: #6B4E71; border-radius: 99px; padding: 1px 7px; text-decoration: none; }
+.xp2-ceja .xp2-pestana { white-space: nowrap; flex: none; }
+@media (max-width: 640px) { .xp2-ceja { gap: 26px; } .xp2-ceja .xp2-pestana { padding: 0 16px 6px 12px; font-size: 12.5px; } .xp2-dictum { font-size: 13px; gap: 5px; } .xp2-dictum-largo { display: none; } }
+
+/* ── Chat del equipo: quién preguntó y guardar en la memoria ──── */
+.xc-quien { align-self: flex-end; margin: 4px 4px -8px 0; font: 600 11.5px 'Inter', sans-serif; color: var(--ash); }
+.xc-guardar { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; border: 1px solid #D9CDE0;
+  background: #fff; color: #6B4E71; font: 600 12.5px 'Inter', sans-serif; cursor: pointer; }
+.xc-guardar:hover { background: #F5F0F7; }
+
+/* ── Memoria del caso: puntos clave y descubrimientos ─────────── */
+.xm { max-width: 860px; margin: 18px auto 0; }
+.xm-form { display: flex; flex-direction: column; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.xm-tipos { display: flex; gap: 8px; flex-wrap: wrap; }
+.xm-tipos input { position: absolute; opacity: 0; pointer-events: none; }
+.xm-tipos span { display: inline-block; padding: 7px 14px; border-radius: 99px; border: 1px solid var(--border-m); font: 600 13px 'Inter', sans-serif; color: #3B4A61; cursor: pointer; }
+.xm-tipos input:checked + span { background: #6B4E71; border-color: #6B4E71; color: #fff; }
+.xm-tipos input:focus-visible + span { outline: 2px solid var(--dorado); outline-offset: 2px; }
+.xm-form textarea { width: 100%; resize: vertical; min-height: 64px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-m); font: 400 14.5px/1.5 'Inter', sans-serif; color: var(--fog); background: #fff; }
+.xm-form textarea:focus { outline: none; border-color: #6B4E71; box-shadow: 0 0 0 3px rgba(107,78,113,.12); }
+.xm-acciones { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+.xm-acciones small { margin-right: auto; color: #6B4E71; font-size: 12.5px; }
+.xm-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.xm-it { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.xm-it:last-child { border-bottom: 0; }
+.xm-it p { margin: 6px 0 4px; font-size: 14.5px; line-height: 1.55; color: var(--fog); white-space: pre-line; }
+.xm-it small { font-size: 12.5px; color: var(--ash); }
+.xm-chip { display: inline-block; padding: 2px 9px; border-radius: 99px; font: 700 11px 'Inter', sans-serif; letter-spacing: .03em; background: #EFE7F2; color: #6B4E71; }
+.xm-it.t-descubrimiento .xm-chip { background: #F4ECDD; color: #8A6A2F; }
+.xm-borrar { font-size: 12.5px; color: var(--ash); }
+.xm-vacio { padding: 16px 0 4px; font-size: 14px; color: var(--ash); }
+.xc-hola > .xc-msg { margin-bottom: 14px; max-width: 92%; }

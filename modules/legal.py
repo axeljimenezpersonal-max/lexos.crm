@@ -22,7 +22,7 @@ legal_bp = Blueprint("legal", __name__)
 BORRADOR = True
 
 # Páginas que se pueden ver sin haber aceptado (además de /legal/*).
-_LIBRES = {"auth.logout", "auth.landing", "auth.login"}
+_LIBRES = {"auth.logout", "auth.landing", "auth.login", "rastreo.registrar"}
 _PREFIJOS_LIBRES = ("static", "legal.", "revision.", "portal.")
 
 

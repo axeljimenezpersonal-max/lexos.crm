@@ -39,7 +39,10 @@
 <a class="xp-volver" href="{{ url_for('asuntos.index') }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Expedientes</a>
 
 <header class="xp2-head">
-  <span class="xp2-pestana">{{ asunto.numero_expediente or ('#' ~ asunto.id) }}</span>
+  <div class="xp2-ceja">
+    <span class="xp2-pestana">{{ asunto.numero_expediente or ('#' ~ asunto.id) }}</span>
+    <a class="xp2-dictum" href="#preguntar" data-ir="preguntar" data-rastreo="Preguntar a Dictum (carpeta)">{{ ic('spark', 15) }}<span>Preguntar a {{ config.ASISTENTE_NOMBRE }}<span class="xp2-dictum-largo"> · Puntos clave y descubrimientos</span></span>{% if hallazgos %}<em>{{ hallazgos | length }}</em>{% endif %}</a>
+  </div>
   <div class="xp2-cuerpo">
     <div class="xp2-top">
       <span class="xp2-materia"><i></i>{{ ti.label }}{% if asunto.sub_tipo %} · {{ asunto.sub_tipo | capitalize }}{% endif %}</span>
@@ -106,7 +109,6 @@
   <div class="xp-tabs" role="tablist">
     <button class="xp-tab on" data-tab="resumen" role="tab">{{ ic('doc', 15) }}Resumen</button>
     <button class="xp-tab" data-tab="documentos" role="tab">{{ ic('doc', 15) }}Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
-    <button class="xp-tab" data-tab="preguntar" role="tab">{{ ic('spark', 15) }}Preguntar</button>
     <button class="xp-tab" data-tab="actividad" role="tab">{{ ic('note', 15) }}Actividad<span>{{ n_bit.n }}</span></button>
     <button class="xp-tab" data-tab="estrategia" role="tab">{{ ic('scale', 15) }}Estrategia</button>
     <button class="xp-tab" data-tab="horas" role="tab">{{ ic('clock', 15) }}Horas<span>{{ horas_total | round(1) }}</span></button>
@@ -260,12 +262,12 @@
   <div class="xc" id="xc">
     <div class="xc-h">
       <div><b>{{ ic('spark', 16) }} {{ config.ASISTENTE_NOMBRE }} · este expediente</b>
-        <small>Recuerda esta conversación: si vuelves mañana, sigue aquí. Busca en {{ documentos | length + sentencias | length }} documento{{ 's' if (documentos | length + sentencias | length) != 1 }} del expediente y en las leyes federales.</small></div>
-      <button type="button" class="btn btn-ghost btn-sm" id="xcNueva">Nueva conversación</button>
+        <small>Compartido con todo el equipo del expediente: cada quien ve lo que los demás preguntaron. Busca en {{ documentos | length + sentencias | length }} documento{{ 's' if (documentos | length + sentencias | length) != 1 }} del expediente, en las leyes federales y en la memoria del caso.</small></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="xcNueva">Tema nuevo</button>
     </div>
     <div class="xc-feed" id="xcFeed" aria-live="polite">
       <div class="xc-hola" id="xcHola">
-        <p>Pregúntame lo que quieras de <b>{{ asunto.titulo }}</b>. Cada dato de la respuesta dice de dónde sale.</p>
+        <div class="xc-msg bot"><p>Hola, soy {{ config.ASISTENTE_NOMBRE }}. <b>¿Qué te interesa saber de «{{ asunto.titulo }}»?</b></p><p>Te respondo con los documentos del expediente, la ley y lo que el equipo ya guardó en la memoria del caso. Cada dato dice de dónde sale.</p></div>
         <div class="xc-sug">
           <button type="button" data-q="Resume los hechos principales del expediente y señala sus fuentes.">Resume los hechos y señala sus fuentes</button>
           <button type="button" data-q="¿Qué plazo o término sigue en este expediente y en qué artículo se funda?">¿Qué plazo sigue y en qué artículo se funda?</button>
@@ -284,6 +286,32 @@
     <div class="xp-aviso-ia">{{ ic('spark', 16) }}<span>{{ config.ASISTENTE_NOMBRE }} está en <b>modo búsqueda</b>: te muestra los pasajes de tus documentos y de la ley que responden, pero todavía no redacta. La redacción se activa al conectar el servicio de IA.</span></div>
     {% endif %}
   </div>
+
+  <article class="xp-card b-resultado xm" id="xm">
+    <div class="xp-card-h"><h2>{{ ic('spark', 17) }} Puntos clave y descubrimientos</h2><small>La memoria del caso: la ve todo el equipo y {{ config.ASISTENTE_NOMBRE }} la toma en cuenta al responder</small></div>
+    <div class="xp-card-b">
+      <form class="xm-form" id="xmForm">
+        <div class="xm-tipos" role="radiogroup" aria-label="Tipo">
+          <label><input type="radio" name="tipo" value="punto_clave" checked><span>Punto clave</span></label>
+          <label><input type="radio" name="tipo" value="descubrimiento"><span>Descubrimiento</span></label>
+        </div>
+        <textarea id="xmTexto" name="texto" rows="2" maxlength="2000" placeholder="Ej. «El acto reclamado se notificó el 3 de marzo: el plazo corre desde ahí» o «El testigo cambió su versión en la audiencia»" aria-label="Punto clave o descubrimiento"></textarea>
+        <input type="hidden" id="xmOrigen" value="manual">
+        <div class="xm-acciones"><small id="xmDe" hidden>Tomado de una respuesta de {{ config.ASISTENTE_NOMBRE }}; ajústalo si hace falta.</small><button class="btn btn-primary btn-sm" type="submit">Guardar en la memoria</button></div>
+      </form>
+      <ul class="xm-lista" id="xmLista">
+        {% for h in hallazgos %}
+        <li class="xm-it t-{{ h.tipo }}" data-id="{{ h.id }}">
+          <span class="xm-chip">{{ h.tipo_label }}</span>
+          <p>{{ h.texto }}</p>
+          <small>{{ h.autor }}{% if h.origen == 'dictum' %} · desde {{ config.ASISTENTE_NOMBRE }}{% endif %} · {{ h.fecha[8:10] }}/{{ h.fecha[5:7] }}/{{ h.fecha[:4] }}{% if h.puede_borrar %} · <button type="button" class="link xm-borrar">Quitar</button>{% endif %}</small>
+        </li>
+        {% else %}
+        <li class="xm-vacio" id="xmVacio">Todavía no hay nada en la memoria del caso. Guarda aquí lo que descubras para que tus compañeros lo vean sin tener que preguntarte.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </article>
 </section>
 
     <!-- ── Actividad ──────────────────────────────────────────────── -->
@@ -568,10 +596,13 @@
 
   /* Pestañas */
   function abrirTab(nombre) {
-    const btn = document.querySelector(`.xp-tab[data-tab="${nombre}"]`); if (!btn) return;
+    const panel = document.getElementById('p-' + nombre); if (!panel) return;
+    const btn = document.querySelector(`.xp-tab[data-tab="${nombre}"]`);
     document.querySelectorAll('.xp-tab').forEach(t => t.classList.toggle('on', t === btn));
-    document.querySelectorAll('.xp-panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + nombre));
-    btn.scrollIntoView({ block: 'nearest', inline: 'center' });
+    document.querySelectorAll('.xp-panel').forEach(p => p.classList.toggle('on', p === panel));
+    document.querySelector('.xp2-dictum')?.classList.toggle('on', nombre === 'preguntar');
+    if (btn) btn.scrollIntoView({ block: 'nearest', inline: 'center' });
+    else if (nombre === 'preguntar') panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   const irA = n => { abrirTab(n); history.replaceState(null, '', '#' + n); };
   document.querySelectorAll('.xp-tab').forEach(t => t.addEventListener('click', () => irA(t.dataset.tab)));
@@ -811,10 +842,17 @@
     let conv = {{ conv_id | tojson }}, ocupado = false, n = 0;
     const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
     function render(md, k) {
+      // Párrafos y viñetas, aunque la lista venga justo después de una línea de texto
       return esc(md).split(/\n{2,}/).map(b => {
-        const l = b.split('\n');
-        if (l.every(x => /^\s*[-*•]\s+/.test(x))) return '<ul>' + l.map(x => '<li>' + x.replace(/^\s*[-*•]\s+/, '') + '</li>').join('') + '</ul>';
-        return '<p>' + l.join('<br>') + '</p>';
+        let html = '', lineas = [], items = [];
+        const parrafo = () => { if (lineas.length) html += '<p>' + lineas.join('<br>') + '</p>'; lineas = []; };
+        const lista = () => { if (items.length) html += '<ul>' + items.map(x => '<li>' + x + '</li>').join('') + '</ul>'; items = []; };
+        b.split('\n').forEach(x => {
+          if (/^\s*[-*•]\s+/.test(x)) { parrafo(); items.push(x.replace(/^\s*[-*•]\s+/, '')); }
+          else { lista(); lineas.push(x); }
+        });
+        parrafo(); lista();
+        return html;
       }).join('').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\[(\d{1,2})\]/g, (m, i) => `<a class="xc-cita" href="#xcf-${k}-${i}">${i}</a>`);
     }
     function fuentes(fs, k) {
@@ -830,13 +868,24 @@
       return box;
     }
     const abajo = () => { feed.scrollTop = feed.scrollHeight; };
-    function yo(t) { hola.hidden = true; feed.append(el('div', 'xc-msg yo', t)); abajo(); }
+    function yo(t, quien) {
+      hola.hidden = true;
+      if (quien) feed.append(el('div', 'xc-quien', quien + ' preguntó'));
+      feed.append(el('div', 'xc-msg yo', t)); abajo();
+    }
+    // Una respuesta útil se puede guardar como descubrimiento en la memoria del caso
+    function botonGuardar(box, t) {
+      const b = el('button', 'xc-guardar', '+ Guardar en la memoria del caso'); b.type = 'button';
+      b.addEventListener('click', () => memoria.desde(t));
+      box.append(b);
+    }
     function bot(t, fs) {
       hola.hidden = true;
       const k = ++n, box = el('div', 'xc-msg bot'), cuerpo = el('div');
       box.append(cuerpo); feed.append(box);
       if (t != null) cuerpo.innerHTML = render(t, k);
       if (fs && fs.length) box.append(fuentes(fs, k));
+      if (t) botonGuardar(box, t);
       abajo();
       return { k, box, cuerpo };
     }
@@ -845,7 +894,9 @@
       const r = await fetch(`/asistente/conversaciones/${conv}`);
       if (!r.ok) { conv = null; return; }
       const j = await r.json();
-      j.mensajes.forEach(m => m.rol === 'usuario' ? yo(m.texto) : bot(m.texto, m.fuentes));
+      j.mensajes.forEach(m => m.rol === 'usuario'
+        ? yo(m.texto, m.user_id && m.user_id !== j.yo ? (j.autores[m.user_id] || 'Alguien del equipo') : null)
+        : bot(m.texto, m.fuentes));
     }
     async function preguntar(q) {
       q = (q || '').trim();
@@ -855,7 +906,7 @@
       const b = bot(null); const pens = el('div', 'xc-pensando'); pens.append(el('span'), el('span'), el('span')); b.cuerpo.append(pens);
       let txt = '', fs = [];
       try {
-        const r = await fetch('/asistente/preguntar', { method: 'POST', headers: JSONH, body: JSON.stringify({ pregunta: q, conversacion_id: conv, asunto_id: ID }) });
+        const r = await fetch('/asistente/preguntar', { method: 'POST', headers: JSONH, body: JSON.stringify({ pregunta: q, conversacion_id: conv, asunto_id: ID, compartida: true }) });
         if (!r.ok || !r.body) throw new Error();
         const lector = r.body.getReader(), dec = new TextDecoder(); let buf = '';
         for (;;) {
@@ -873,6 +924,7 @@
         }
         if (!txt && !b.cuerpo.querySelector('.xc-error')) b.cuerpo.innerHTML = fs.length ? '<p>Esto es lo que encontré en tus documentos y en la ley:</p>' : '<p>No encontré información para responder eso.</p>';
         if (fs.length) { const f = fuentes(fs, b.k); if (!txt) f.open = true; b.box.append(f); }
+        if (txt) botonGuardar(b.box, txt);
       } catch (_) {
         b.cuerpo.replaceChildren(el('p', 'xc-error', 'No se pudo enviar la pregunta. Revisa tu conexión e intenta de nuevo.'));
       } finally { ocupado = false; enviar.disabled = false; abajo(); }
@@ -881,10 +933,63 @@
     texto.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); preguntar(texto.value); } });
     texto.addEventListener('input', () => { texto.style.height = ''; texto.style.height = Math.min(texto.scrollHeight, 160) + 'px'; });
     feed.addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) preguntar(b.dataset.q); });
-    $('#xcNueva').addEventListener('click', () => { conv = null; feed.querySelectorAll('.xc-msg').forEach(m => m.remove()); hola.hidden = false; texto.focus(); });
+    $('#xcNueva').addEventListener('click', () => { conv = null; feed.querySelectorAll(':scope > .xc-msg, :scope > .xc-quien').forEach(m => m.remove()); hola.hidden = false; texto.focus(); });
     cargar();
     return { preguntar };
   })();
+  /* Memoria del caso: puntos clave y descubrimientos del equipo */
+  const memoria = (() => {
+    const form = $('#xmForm'), texto = $('#xmTexto'), origen = $('#xmOrigen'), de = $('#xmDe'), lista = $('#xmLista');
+    const contador = () => {
+      const n = lista.querySelectorAll('.xm-it').length, link = document.querySelector('.xp2-dictum');
+      let em = link.querySelector('em');
+      if (!n) { em?.remove(); return; }
+      if (!em) { em = document.createElement('em'); link.append(em); }
+      em.textContent = n;
+    };
+    function pintar(items) {
+      lista.innerHTML = items.length ? items.map(h => `
+        <li class="xm-it t-${h.tipo}" data-id="${h.id}">
+          <span class="xm-chip">${esc(h.tipo_label)}</span>
+          <p>${esc(h.texto)}</p>
+          <small>${esc(h.autor)}${h.origen === 'dictum' ? ' · desde {{ config.ASISTENTE_NOMBRE }}' : ''} · ${h.fecha.slice(8, 10)}/${h.fecha.slice(5, 7)}/${h.fecha.slice(0, 4)}${h.puede_borrar ? ' · <button type="button" class="link xm-borrar">Quitar</button>' : ''}</small>
+        </li>`).join('')
+        : '<li class="xm-vacio">Todavía no hay nada en la memoria del caso. Guarda aquí lo que descubras para que tus compañeros lo vean sin tener que preguntarte.</li>';
+      contador();
+    }
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const t = texto.value.trim(); if (!t) { texto.focus(); return; }
+      const btn = form.querySelector('[type=submit]'); btn.disabled = true;
+      const r = await post(`/asistente/asuntos/${ID}/hallazgos`, { texto: t, tipo: form.tipo.value, origen: origen.value });
+      btn.disabled = false;
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { showToast(j.error || 'No se pudo guardar', 'error'); return; }
+      texto.value = ''; origen.value = 'manual'; de.hidden = true;
+      pintar(j.hallazgos);
+      showToast('Guardado en la memoria del caso', 'success');
+    });
+    lista.addEventListener('click', async e => {
+      const b = e.target.closest('.xm-borrar'); if (!b) return;
+      const li = b.closest('.xm-it');
+      if (!confirm('¿Quitar esto de la memoria del caso? El equipo ya no lo verá.')) return;
+      const r = await post(`/asistente/hallazgos/${li.dataset.id}/eliminar`, {});
+      if (!r.ok) { showToast('No se pudo quitar', 'error'); return; }
+      li.remove();
+      if (!lista.querySelector('.xm-it')) pintar([]); else contador();
+    });
+    return {
+      desde(t) {
+        const limpio = t.replace(/\*\*/g, '').replace(/\[\d{1,2}\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+        texto.value = limpio.length > 700 ? limpio.slice(0, 697) + '…' : limpio;
+        form.querySelector('[value=descubrimiento]').checked = true;
+        origen.value = 'dictum'; de.hidden = false;
+        $('#xm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => texto.focus(), 300);
+      },
+    };
+  })();
+
   $('#xeRevisar').addEventListener('click', () => {
     irA('preguntar');
     chat.preguntar('Revisa la estrategia de este expediente: ¿los argumentos tienen sustento legal y qué riesgos falta considerar?');

@@ -236,6 +236,7 @@ def create_app(env="default"):
     from modules.revision import revision_bp
     from modules.buscador import buscador_bp
     from modules.avisos import avisos_bp
+    from modules.rastreo import rastreo_bp
     from modules.legal import legal_bp
     from modules.respaldos import respaldos_bp
 
@@ -262,6 +263,9 @@ def create_app(env="default"):
     app.register_blueprint(revision_bp, url_prefix="/revision")
     app.register_blueprint(buscador_bp, url_prefix="/buscar")
     app.register_blueprint(avisos_bp, url_prefix="/avisos")
+    app.register_blueprint(rastreo_bp, url_prefix="/rastreo")
+    from modules.rastreo import puede_ver_panel
+    app.jinja_env.globals["puede_ver_uso"] = puede_ver_panel
     app.register_blueprint(legal_bp, url_prefix="/legal")
     app.register_blueprint(respaldos_bp)
 

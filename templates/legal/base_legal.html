@@ -94,5 +94,6 @@ strong{color:var(--text);font-weight:600}
 // En teléfono el índice empieza cerrado
 if (matchMedia('(max-width:900px)').matches) document.querySelectorAll('.indice details').forEach(d => d.open = false);
 </script>
+{% from "components/cookies.html" import cookies %}{{ cookies(publica=True) }}
 </body>
 </html>

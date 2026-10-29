@@ -493,6 +493,10 @@
           {% if is_admin %}
           <a href="{{ url_for('equipo.index') }}" class="td-item"><span class="td-item-icon">{{ ico('team', 16) }}</span><span class="td-item-body"><span class="td-item-title">Equipo y permisos</span></span></a>
           {% endif %}
+          {% if puede_ver_uso() %}
+          <a href="{{ url_for('rastreo.panel') }}" class="td-item"><span class="td-item-icon">{{ ico('chart', 16) }}</span><span class="td-item-body"><span class="td-item-title">Uso de la plataforma</span></span></a>
+          {% endif %}
+          <a href="#" class="td-item" data-cookies><span class="td-item-icon">{{ ico('gear', 16) }}</span><span class="td-item-body"><span class="td-item-title">Preferencias de cookies</span></span></a>
           <div class="td-divider"></div>
           <a href="{{ url_for('auth.logout') }}" class="td-item danger"><span class="td-item-icon" style="color:inherit">{{ ico('logout', 16) }}</span><span class="td-item-body"><span class="td-item-title">Cerrar sesión</span></span></a>
         </div>
@@ -717,5 +721,6 @@ if (typeof showToast === 'undefined') {
   };
 }
 </script>
+{% from "components/cookies.html" import cookies %}{{ cookies() }}
 </body>
 </html>

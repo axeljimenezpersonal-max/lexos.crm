@@ -928,14 +928,14 @@ def detalle(id: int):
     resumen = _resumen_inteligente(asunto, responsable, abierto, dias_llevamos, eventos, pendientes, proximo,
                                    documentos, sentencias, dinero, vencido, notas, ficha, sin_mov)
 
-    # La conversación con el asistente sobre este expediente sigue donde se quedó
-    conv_id = None
-    try:
-        fila = tdb.execute("SELECT id FROM asistente_conversaciones WHERE user_id=? AND asunto_id=? ORDER BY id DESC LIMIT 1",
-                           (uid, id)).fetchone()
-        conv_id = fila["id"] if fila else None
-    except Exception:
-        pass
+    # La conversación del equipo con el asistente sobre este expediente y la memoria del caso
+    from modules.asistente import almacen
+    conv_id = almacen.compartida_del_asunto(tdb, id)
+    equipo = _usuarios()
+    hallazgos = [{**h, "tipo_label": almacen.TIPOS_HALLAZGO.get(h["tipo"], "Punto clave"),
+                  "autor": equipo.get(h["autor_id"], {}).get("nombre", "Alguien del equipo"),
+                  "puede_borrar": h["autor_id"] == uid or rol in ("super_admin", "admin")}
+                 for h in almacen.hallazgos(tdb, g.tenant_slug, id)]
 
     es_admin = rol in ("super_admin", "admin")
     return render_template(
@@ -951,7 +951,7 @@ def detalle(id: int):
         tipos_actividad=TIPOS_ACTIVIDAD, actividad_label=ACTIVIDAD_LABEL,
         tipos_sentencia=TIPOS_SENTENCIA, sentencia_label=SENTENCIA_LABEL,
         resultados=precedentes.RESULTADOS, sentidos=precedentes.SENTIDOS,
-        es_admin=es_admin, notas=notas, resumen=resumen, conv_id=conv_id,
+        es_admin=es_admin, notas=notas, resumen=resumen, conv_id=conv_id, hallazgos=hallazgos,
         puede_editar=es_admin or uid == asunto.get("abogado_responsable") or uid in col_ids
                      or uid == asunto.get("creado_por"),
         recien_creado=request.args.get("nuevo") == "1",

@@ -314,5 +314,6 @@ document.getElementById('rfc').addEventListener('input', function () {
 });
 </script>
 {% if config.REVISION_ACTIVA %}{% include "components/revision.html" %}{% endif %}
+{% from "components/cookies.html" import cookies %}{{ cookies(publica=True) }}
 </body>
 </html>

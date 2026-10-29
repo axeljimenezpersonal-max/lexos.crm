@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Iterator
 
+from modules.asistente import almacen
 from modules.asistente import proveedor as proveedores
 from modules.corpus import indice as corpus
 from modules.insights import casos as precedentes
@@ -166,6 +167,12 @@ def responder(app, config, slug: str, tdb, pregunta: str, historial: list[dict],
         encabezado = (f"Contexto: la consulta es sobre el asunto «{asunto['titulo']}»"
                       f"{' (expediente ' + asunto['numero_expediente'] + ')' if asunto.get('numero_expediente') else ''}"
                       f", materia {asunto.get('tipo_asunto') or 'no indicada'}.\n\n")
+        recuerdos = almacen.hallazgos(tdb, slug, asunto_id, limite=20)
+        if recuerdos:
+            encabezado += ("MEMORIA DEL CASO (puntos clave y descubrimientos que el equipo guardó; tómalos en cuenta, "
+                           "pero no los cites como fuente legal):\n"
+                           + "\n".join(f"- [{almacen.TIPOS_HALLAZGO.get(h['tipo'], 'Punto clave')}] {h['texto'][:500]}"
+                                        for h in reversed(recuerdos)) + "\n\n")
     mensajes.append({"role": "user", "content": f"{encabezado}FUENTES:\n{_bloque_fuentes(fuentes)}\n\nPREGUNTA: {pregunta}"})
     try:
         for trozo in proveedor.responder(sistema, mensajes):
