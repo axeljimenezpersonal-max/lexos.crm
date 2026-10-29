@@ -40,6 +40,7 @@ def main() -> None:
         print(f"[arranque] Contraseña de demostración aplicada a {n} usuarios", flush=True)
 
     cuenta_compartida()
+    eventos_demo()
 
     if primera_vez:
         # Casos concluidos, sentencias y machotes de ejemplo (no detiene el arranque si falla)
@@ -82,6 +83,70 @@ def cuenta_compartida() -> None:
     tdb.commit()
     tdb.close()
     print(f"[arranque] Cuenta compartida «{usuario}» lista", flush=True)
+
+
+# Agenda de demostración: (expediente, título, tipo, días hábiles desde hoy, hora o None = todo el día, lugar)
+EVENTOS_DEMO = (
+    (3, "Reunión con cliente — revisión estrategia", "reunion", 1, "17:00", "Oficina"),
+    (2, "Plazo para contestar demanda", "plazo", 2, None, None),
+    (1, "Audiencia inicial — Divorcio Contencioso Fuentes-Gómez", "audiencia", 3, "10:30", "Juzgado Tercero de lo Familiar"),
+    (3, "Vence término para rendir alegatos", "vencimiento", 5, None, None),
+    (1, "Desahogar vista sobre el convenio de custodia", "fecha_limite", 7, None, None),
+    (3, "Audiencia constitucional", "audiencia", 8, "12:00", "Juzgado Segundo de Distrito"),
+    (2, "Diligencia de emplazamiento al tercero", "diligencia", 10, "09:00", None),
+)
+
+
+INHABILES = {(1, 1), (2, 5), (3, 21), (5, 1), (9, 16), (11, 2), (11, 20), (12, 25)}
+
+
+def _dia_habil(desde, n: int):
+    """Suma n días hábiles (lunes a viernes, sin los inhábiles fijos)."""
+    from datetime import timedelta
+    d = desde
+    while n > 0:
+        d += timedelta(days=1)
+        if d.weekday() < 5 and (d.month, d.day) not in INHABILES:
+            n -= 1
+    return d
+
+
+def eventos_demo() -> None:
+    """Mantiene la agenda del despacho de demostración en las próximas dos semanas.
+    Solo mueve los eventos de EVENTOS_DEMO que ya pasaron o faltan; no toca lo demás."""
+    from datetime import date
+    import init_db
+    try:
+        tdb = init_db.get_tenant_conn(Config.ACCESO_PRUEBA_DESPACHO)
+    except Exception:
+        return
+    hoy, creados = date.today(), 0
+    try:
+        abiertos = {r[0] for r in tdb.execute("SELECT id FROM asuntos WHERE estado='activo'")}
+        for asunto_id, titulo, tipo, dias, hora, lugar in EVENTOS_DEMO:
+            if asunto_id not in abiertos:
+                continue
+            vigente = tdb.execute(
+                """SELECT 1 FROM eventos_calendario WHERE asunto_id=? AND titulo=? AND estado='pendiente'
+                   AND date(fecha_inicio) >= ?""", (asunto_id, titulo, hoy.isoformat())).fetchone()
+            if vigente:
+                continue
+            viejos = "SELECT id FROM eventos_calendario WHERE asunto_id=? AND titulo=?"
+            tdb.execute(f"DELETE FROM evento_participantes WHERE evento_id IN ({viejos})", (asunto_id, titulo))
+            tdb.execute("DELETE FROM eventos_calendario WHERE asunto_id=? AND titulo=?", (asunto_id, titulo))
+            dia = _dia_habil(hoy, dias).isoformat()
+            ev = tdb.execute(
+                """INSERT INTO eventos_calendario (titulo, tipo, asunto_id, fecha_inicio, todo_el_dia,
+                                                  lugar, recordatorio, creado_por)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (titulo, tipo, asunto_id, f"{dia} {hora or '09:00'}:00", 0 if hora else 1, lugar, 1440, 3)).lastrowid
+            tdb.execute("INSERT INTO evento_participantes (evento_id, user_id) VALUES (?, 3)", (ev,))
+            creados += 1
+        tdb.commit()
+    finally:
+        tdb.close()
+    if creados:
+        print(f"[arranque] Agenda de demostración: {creados} eventos puestos al día", flush=True)
 
 
 if __name__ == "__main__":

@@ -137,7 +137,7 @@ def _iniciales(nombre: str) -> str:
 
 def _color(cid: int) -> str:
     """Avatar del cliente en la familia marino, gris azulado y dorado."""
-    paleta = ("#132238", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
+    paleta = ("#163A7A", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
     return paleta[cid % len(paleta)]
 
 
@@ -970,7 +970,7 @@ def exportar_pdf(id: int):
     cobros = [cobranzas._decorar(r) for r in tdb.execute(
         f"{cobranzas.BASE_SQL} WHERE co.cliente_id=? AND co.estado!='cancelado' AND {alc_c}", (id, *pc)).fetchall()]
 
-    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#132238", "#132238", "#60718D", "#E5E2DB"))
+    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#163A7A", "#163A7A", "#60718D", "#E5E2DB"))
     e = lambda x: html.escape(str(x or "—"))  # noqa: E731
     st = lambda n, **k: ParagraphStyle(n, fontName=k.pop("font", "Helvetica"), **k)  # noqa: E731
     s_h = st("h", font="Helvetica-Bold", fontSize=10.5, textColor=TINTA, spaceBefore=14, spaceAfter=6)

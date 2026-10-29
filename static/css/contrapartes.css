@@ -104,7 +104,7 @@
   font-family: 'DM Mono', monospace;
   font-size: 9px; letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: #132238; color: #080C10;
+  background: #163A7A; color: #080C10;
   border: none; padding: 8px 20px;
   border-radius: 6px; cursor: pointer;
   font-weight: 500; transition: background 0.15s;
@@ -156,7 +156,7 @@
   transition: all 0.15s;
 }
 .sh-tab:hover { color: #EAF0EC; }
-.sh-tab.active { color: #132238; border-bottom-color: #132238; }
+.sh-tab.active { color: #163A7A; border-bottom-color: #163A7A; }
 
 /* ── Split layout ──────────────────────────────────────────────────────────── */
 .cp-split {
@@ -263,7 +263,7 @@
   font-family: 'DM Mono', monospace; font-size: 7px;
   letter-spacing: 0.08em; text-transform: uppercase;
   padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
-  background: rgba(19,34,56,0.1); color: #132238;
+  background: rgba(19,34,56,0.1); color: #163A7A;
   border: 0.5px solid rgba(19,34,56,0.2);
 }
 .badge-resultado-desfavorable {

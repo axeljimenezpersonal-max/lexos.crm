@@ -44,12 +44,12 @@
     </section>
 
     <section class="cal-side-card">
-      <div class="cal-side-title">Términos próximos</div>
+      <div class="cal-side-title">Próximos términos</div>
       {% if terminos %}
       <div class="term-list">
         {% for t in terminos %}
         <button type="button" class="term-row" onclick="jumpTo('{{ t.fecha }}')">
-          <span class="term-dot t-{{ t.tono }}"></span>
+          <span class="term-fecha t-{{ t.tono }}"><b>{{ t.dia }}</b><small>{{ t.mes }}</small></span>
           <span class="term-tx"><b>{{ t.titulo }}</b>{% if t.detalle %}<small>{{ t.detalle }}</small>{% endif %}</span>
           <span class="term-when t-{{ t.tono }}">{{ t.cuando }}</span>
         </button>
@@ -398,7 +398,7 @@
           <div class="cf-g">
             <label>Color (opcional)</label>
             <div class="color-picker" id="colorPicker">
-              {% for c in ['#132238','#4B6585','#34496B','#7A6440','#A23B33','#9A7536','#8A6A2F','#3D5A80','#0F766E','#60718D'] %}
+              {% for c in ['#163A7A','#4B6585','#34496B','#7A6440','#A23B33','#9A7536','#8A6A2F','#3D5A80','#0F766E','#60718D'] %}
               <div class="color-swatch" style="background:{{ c }}" data-color="{{ c }}"
                    onclick="pickColor('{{ c }}')"></div>
               {% endfor %}

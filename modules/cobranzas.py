@@ -30,7 +30,7 @@ cobranzas_bp = Blueprint("cobranzas", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 ESTADOS = {
-    "pendiente": {"label": "Por cobrar",   "color": "#132238", "fondo": "#F4EEDF"},
+    "pendiente": {"label": "Por cobrar",   "color": "#163A7A", "fondo": "#F4EEDF"},
     "abono":     {"label": "Pago parcial", "color": "#3D5A80", "fondo": "#E0F2FE"},
     "vencido":   {"label": "Vencido",      "color": "#A23B33", "fondo": "#F8EDEA"},
     "pagado":    {"label": "Pagado",       "color": "#3D5A80", "fondo": "#EEF1F5"},
@@ -388,7 +388,7 @@ def index():
         deudores.append(d)
 
     # ── Antigüedad del saldo ─────────────────────────────────
-    tramos = [("Al corriente", "#132238"), ("1 a 30 días", "#B08A4A"), ("31 a 90 días", "#9A7536"), ("Más de 90 días", "#A23B33")]
+    tramos = [("Al corriente", "#163A7A"), ("1 a 30 días", "#B08A4A"), ("31 a 90 días", "#9A7536"), ("Más de 90 días", "#A23B33")]
     antig = [0.0, 0.0, 0.0, 0.0]
     for s in tdb.execute(f"""SELECT {SALDO} AS saldo, co.fecha_vencimiento FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
                              WHERE {ABIERTO_SQL} AND {alc}""", ap).fetchall():
@@ -815,13 +815,13 @@ def recordatorio(id: int):
         filas.append(("Fecha de pago", _fecha_txt(co["fecha_vencimiento"])))
     tabla = "".join(
         f'<tr><td style="padding:10px 0;color:#60718D;font-size:13px">{html.escape(k)}</td>'
-        f'<td style="padding:10px 0;text-align:right;font-weight:600;color:#132238;font-size:14px">{html.escape(str(v))}</td></tr>'
+        f'<td style="padding:10px 0;text-align:right;font-weight:600;color:#163A7A;font-size:14px">{html.escape(str(v))}</td></tr>'
         for k, v in filas)
     cuerpo = f"""
     <div style="font-family:Inter,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border:1px solid #E5E2DB;border-radius:14px;overflow:hidden">
-      <div style="background:#132238;padding:22px 26px"><div style="font-size:17px;font-weight:700;color:#fff">{html.escape(despacho)}</div></div>
+      <div style="background:#163A7A;padding:22px 26px"><div style="font-size:17px;font-weight:700;color:#fff">{html.escape(despacho)}</div></div>
       <div style="padding:26px">
-        <p style="font-size:15px;color:#132238;margin:0 0 12px">Hola{html.escape(' ' + saludo if saludo else '')},</p>
+        <p style="font-size:15px;color:#163A7A;margin:0 0 12px">Hola{html.escape(' ' + saludo if saludo else '')},</p>
         <p style="font-size:14px;color:#3B4A61;line-height:1.6;margin:0 0 16px">Le compartimos un recordatorio amable del siguiente saldo pendiente:</p>
         <table style="width:100%;border-collapse:collapse;border-top:1px solid #E5E2DB;border-bottom:1px solid #E5E2DB">{tabla}</table>
         <p style="font-size:14px;color:#3B4A61;line-height:1.6;margin:16px 0 0">Si ya realizó el pago, le agradeceremos responder este correo con el comprobante. Quedamos atentos a cualquier duda.</p>
@@ -987,7 +987,7 @@ def estado_cuenta_pdf(cliente_id: int):
     saldo = sum(c["saldo_v"] for c in cobros)
     vencido = sum(c["saldo_v"] for c in cobros if c["vence"] and (c["vence"]["dias"] or 0) < 0)
 
-    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#132238", "#132238", "#60718D", "#E5E2DB"))
+    AZUL, TINTA, GRIS, LINEA = (colors.HexColor(x) for x in ("#163A7A", "#163A7A", "#60718D", "#E5E2DB"))
     st = lambda n, **k: ParagraphStyle(n, fontName=k.pop("font", "Helvetica"), **k)  # noqa: E731
     s_titulo = st("t", font="Helvetica-Bold", fontSize=18, textColor=TINTA, leading=22)
     s_sub = st("s", fontSize=9, textColor=GRIS, leading=13)

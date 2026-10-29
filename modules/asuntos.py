@@ -72,7 +72,7 @@ SIN_JUICIO = ("notarial",)
 
 ESTADOS = {
     "por_iniciar": {"label": "Por iniciar", "color": "#60718D", "fondo": "#F1EEE8"},
-    "activo":      {"label": "En trámite",      "color": "#132238", "fondo": "#F4EEDF"},
+    "activo":      {"label": "En trámite",      "color": "#163A7A", "fondo": "#F4EEDF"},
     "en_espera":   {"label": "En espera",   "color": "#8A6A2F", "fondo": "#F7F0E1"},
     "suspendido":  {"label": "Suspendido",  "color": "#6E5A3A", "fondo": "#F6F1E6"},
     "completado":  {"label": "Concluido",   "color": "#3D5A80", "fondo": "#EEF1F5"},
@@ -174,7 +174,7 @@ def _usuarios() -> dict[int, dict]:
 
 
 # Avatares en la familia marino, gris azulado y dorado
-_COLORES_PERSONA = ("#132238", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
+_COLORES_PERSONA = ("#163A7A", "#AD9060", "#34496B", "#60718D", "#8A6A2F", "#3D5A80", "#6E5A3A", "#4A5A73")
 
 
 def _persona(r) -> dict:
@@ -848,9 +848,9 @@ def agregar_etiqueta(id):
     tdb = g.tenant_db
     data = request.get_json(force=True)
     nombre = (data.get("nombre") or "").strip()
-    color = data.get("color") or "#132238"
+    color = data.get("color") or "#163A7A"
     if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
-        color = "#132238"
+        color = "#163A7A"
     etiqueta_id = data.get("etiqueta_id")
 
     if not etiqueta_id and not nombre:
@@ -1296,12 +1296,12 @@ def enviar_correo_asunto(id: int):
     cuerpo_h, sender_h = html.escape(cuerpo), html.escape(sender_name)
     html_body = f"""
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #E5E2DB">
-      <div style="background:linear-gradient(135deg,#1A2B44,#334155);padding:24px 28px">
+      <div style="background:linear-gradient(135deg,#12306A,#334155);padding:24px 28px">
         <div style="font-size:18px;font-weight:800;color:#fff">{despacho_h}</div>
         <div style="font-size:11px;color:#9AA4B5;margin-top:3px">Ref: {titulo_h}</div>
       </div>
       <div style="padding:28px">
-        <div style="font-size:15px;font-weight:700;color:#1A2B44;margin-bottom:16px">{asunto_h}</div>
+        <div style="font-size:15px;font-weight:700;color:#12306A;margin-bottom:16px">{asunto_h}</div>
         <div style="font-size:14px;color:#3B4A61;line-height:1.7;white-space:pre-wrap">{cuerpo_h}</div>
       </div>
       <div style="background:#FAF8F4;padding:16px 28px;border-top:1px solid #E5E2DB">

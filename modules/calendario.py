@@ -27,7 +27,7 @@ calendario_bp = Blueprint("calendario", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 TIPOS_EVENTO = {
-    "audiencia":    {"label": "Audiencia",            "color": "#132238", "icon": "gavel"},
+    "audiencia":    {"label": "Audiencia",            "color": "#163A7A", "icon": "gavel"},
     "vencimiento":  {"label": "Término",              "color": "#A23B33", "icon": "clock"},
     "fecha_limite": {"label": "Fecha límite crítica", "color": "#7E2C26", "icon": "alert_triangle"},
     "diligencia":   {"label": "Diligencia",           "color": "#34496B", "icon": "flag"},
@@ -195,10 +195,12 @@ def index():
             cuando, tono = "Mañana", "red"
         else:
             cuando, tono = f"En {dias} días", ("amb" if dias <= 5 else "grn")
+        f = date.fromisoformat(str(r["fecha_inicio"])[:10])
         terminos.append({
             "id": r["id"], "titulo": r["titulo"], "fecha": str(r["fecha_inicio"])[:10],
             "detalle": r["numero_expediente"] or r["asunto"] or "",
             "cuando": cuando, "tono": tono,
+            "dia": f.day, "mes": ("ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC")[f.month - 1],
         })
 
     return render_template(

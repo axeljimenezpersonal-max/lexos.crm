@@ -1,6 +1,6 @@
 {# Marca oficial Habeas Corpus (R1·A). on='light' sobre fondos claros; on='dark' sobre fondos oscuros, con bg = color del fondo. #}
-{% macro logo_mark(size=32, on='light', bg='#132238') -%}
-{%- set m1 = '#132238' if on == 'light' else '#FFFFFF' -%}
+{% macro logo_mark(size=32, on='light', bg='#163A7A') -%}
+{%- set m1 = '#163A7A' if on == 'light' else '#FFFFFF' -%}
 {%- set m2 = '#FFFFFF' if on == 'light' else bg -%}
 <svg width="{{ size }}" height="{{ size }}" viewBox="0 0 64 64" aria-hidden="true" style="flex-shrink:0">
   <path d="M10 54.5V31a22 22 0 0 1 44 0v23.5Z" fill="{{ m1 }}"/>

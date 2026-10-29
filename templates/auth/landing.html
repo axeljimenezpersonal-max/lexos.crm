@@ -6,14 +6,14 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/favicon.svg') }}">
 <title>Habeas Corpus — El sistema legal para despachos de México</title>
 <meta name="description" content="Asuntos, términos, clientes, cobranza y documentos cifrados en un solo sistema, con Tribuno: un asistente que responde con leyes mexicanas y los precedentes de tu despacho. Prueba 10 días gratis.">
-<meta name="theme-color" content="#132238">
+<meta name="theme-color" content="#163A7A">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --azul:#132238; --azul-h:#101D31; --azul-s:#F4EEDF; --tinta:#132238; --tinta-2:#1A2B44; --cielo:#C1A574; --dorado:#AD9060;
-  --bg:#F8F6F2; --text:#132238; --muted:#60718D; --borde:#E5E2DB;
+  --azul:#163A7A; --azul-h:#112E63; --azul-s:#F4EEDF; --tinta:#163A7A; --tinta-2:#12306A; --cielo:#C1A574; --dorado:#AD9060;
+  --bg:#F8F6F2; --text:#163A7A; --muted:#60718D; --borde:#E5E2DB;
   --rojo:#A23B33; --ambar:#8A6A2F; --verde:#3D5A80; --wa:#0B6B3A;
   --r:18px; --ease:cubic-bezier(.2,.7,.2,1);
 }
@@ -34,7 +34,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 22px;border-radius:12px;font:600 15px Inter;border:0;cursor:pointer;transition:transform .2s var(--ease),background .2s,box-shadow .2s;white-space:nowrap}
 .btn:active{transform:scale(.98)}
 .btn-primary{background:var(--azul);color:#fff;box-shadow:0 10px 30px -12px rgba(19,34,56,.55)}
-.hero .btn-primary,.oscuro .btn-primary,.caja.oscura .btn-primary,.nav:not(.solida) .btn-primary{background:var(--dorado);color:#101D31}
+.hero .btn-primary,.oscuro .btn-primary,.caja.oscura .btn-primary,.nav:not(.solida) .btn-primary{background:var(--dorado);color:#112E63}
 .hero .btn-primary:hover,.oscuro .btn-primary:hover,.nav:not(.solida) .btn-primary:hover{background:var(--cielo)}
 .btn-primary:hover{background:var(--azul-h)}
 .btn-ghost{background:rgba(255,255,255,.08);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
@@ -63,7 +63,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 .nav.solida .m-light{display:none}.nav.solida .m-dark{display:block}
 
 /* ── Hero ─────────────────────────────────────────────────── */
-.hero{position:relative;background:radial-gradient(1200px 600px at 50% -10%,#22385A 0%,var(--tinta-2) 38%,var(--tinta) 70%);color:#fff;padding:150px 0 0;overflow:hidden;isolation:isolate}
+.hero{position:relative;background:radial-gradient(1200px 600px at 50% -10%,#1E4690 0%,var(--tinta-2) 38%,var(--tinta) 70%);color:#fff;padding:150px 0 0;overflow:hidden;isolation:isolate}
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse 70% 60% at 50% 30%,#000 30%,transparent 75%)}
 .arco{position:absolute;left:50%;top:40px;width:min(1100px,140vw);transform:translateX(-50%);z-index:-1;pointer-events:none}
 .arco path{fill:none;stroke-linecap:round}
@@ -305,7 +305,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 .plan li svg{color:var(--azul);flex:none;margin-top:3px}
 .plan.dest li svg{color:var(--cielo)}
 .plan .btn{width:100%}
-.plan.dest .btn-line{background:var(--dorado);color:#101D31;box-shadow:none}
+.plan.dest .btn-line{background:var(--dorado);color:#112E63;box-shadow:none}
 .nota-precio{text-align:center;color:var(--muted);font-size:14.5px;margin-top:26px}
 .nota-precio b{color:var(--tinta)}
 
@@ -398,7 +398,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 <header class="nav" id="nav">
   <div class="wrap nav-in">
     <a class="marca" href="#inicio" aria-label="Habeas Corpus, inicio">
-      <span class="m-light">{{ logo_mark(34, 'dark', '#132238') }}</span><span class="m-dark">{{ logo_mark(34) }}</span>
+      <span class="m-light">{{ logo_mark(34, 'dark', '#163A7A') }}</span><span class="m-dark">{{ logo_mark(34) }}</span>
       <span><b>Habeas <span>Corpus</span></b><small>SISTEMA LEGAL</small></span>
     </a>
     <nav class="nav-links" aria-label="Secciones">
@@ -480,7 +480,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
                 <div class="tarjeta semana anim" style="--d:.4s">
                   <h4>Tu semana</h4>
                   <div class="dias">
-                    {% for d, n, pts in [('Lun', 26, []), ('Mar', 27, ['#C1A574']), ('Mié', 28, ['#132238']), ('Jue', 29, ['#A23B33', '#132238']), ('Vie', 30, ['#8A6A2F'])] %}
+                    {% for d, n, pts in [('Lun', 26, []), ('Mar', 27, ['#C1A574']), ('Mié', 28, ['#163A7A']), ('Jue', 29, ['#A23B33', '#163A7A']), ('Vie', 30, ['#8A6A2F'])] %}
                     <div class="dia{{ ' hoy' if n == 28 }}">{{ d }}<b>{{ n }}</b><span class="puntos">{% for p in pts %}<i style="background:{{ p }}"></i>{% endfor %}</span></div>
                     {% endfor %}
                   </div>
@@ -682,12 +682,12 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
         <span style="bottom:8%;right:-6%">Permisos</span>
       </div>
       <svg class="grande" viewBox="0 0 64 64">
-        <path d="M10 54.5V31a22 22 0 0 1 44 0v23.5Z" fill="#132238"/>
+        <path d="M10 54.5V31a22 22 0 0 1 44 0v23.5Z" fill="#163A7A"/>
         <path d="M14.5 31a17.5 17.5 0 0 1 35 0" fill="none" stroke="#fff" stroke-width="1.3" opacity=".9"/>
-        <rect x="7" y="55.8" width="50" height="2.6" rx=".8" fill="#132238"/><rect x="3.5" y="59.6" width="57" height="2.6" rx=".8" fill="#132238"/>
+        <rect x="7" y="55.8" width="50" height="2.6" rx=".8" fill="#163A7A"/><rect x="3.5" y="59.6" width="57" height="2.6" rx=".8" fill="#163A7A"/>
         <path d="M28 7.6h8l-1.5 10h-5Z" fill="#C1A574"/>
         <rect x="23" y="33" width="18" height="15" rx="3" fill="#fff"/><path d="M27 33v-4a5 5 0 0 1 10 0v4" fill="none" stroke="#fff" stroke-width="2.4"/>
-        <circle cx="32" cy="40" r="2.2" fill="#132238"/><rect x="31.2" y="41" width="1.6" height="3.6" rx=".6" fill="#132238"/>
+        <circle cx="32" cy="40" r="2.2" fill="#163A7A"/><rect x="31.2" y="41" width="1.6" height="3.6" rx=".6" fill="#163A7A"/>
       </svg>
     </div>
     <div class="rv" style="transition-delay:.1s">
@@ -828,7 +828,7 @@ h3{font-weight:600;font-size:1.15rem;line-height:1.3}
 <footer class="pie">
   <div class="wrap">
     <div class="pie-g">
-      <a class="marca" href="#inicio">{{ logo_mark(30, 'dark', '#132238') }}<span><b>Habeas <span>Corpus</span></b><small>SISTEMA LEGAL</small></span></a>
+      <a class="marca" href="#inicio">{{ logo_mark(30, 'dark', '#163A7A') }}<span><b>Habeas <span>Corpus</span></b><small>SISTEMA LEGAL</small></span></a>
       <nav aria-label="Pie de página">
         <a href="#producto">Producto</a><a href="#tribuno">Tribuno</a><a href="#seguridad">Seguridad</a>
         <a href="#precios">Precios</a><a href="#contacto">Nosotros</a><a href="{{ url_for('portal.cliente_login') }}">Portal de clientes</a>

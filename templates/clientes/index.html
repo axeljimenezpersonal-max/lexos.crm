@@ -67,7 +67,7 @@
 </div>
 
 <div class="as-toolbar" style="margin-top:12px">
-  <div class="as-seg" aria-label="Estatus">
+  <div class="as-seg as-tabs" aria-label="Estatus">
     {% for k, label in grupos.items() %}
     <a href="{{ liga(estatus=k if k != 'activo' else '') }}" class="{{ 'on' if grupo == k }}">{{ label }}<span>{{ conteos[k] }}</span></a>
     {% endfor %}
