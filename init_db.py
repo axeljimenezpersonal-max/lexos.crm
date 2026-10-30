@@ -830,6 +830,19 @@ _MIGRATE_COLS = [
     ("asunto_sentencias", "sentido",                "TEXT"),
     # ── Cobranza: horas ya cobradas ───────────────────────────────────────────
     ("asunto_horas", "cobro_id",                    "INTEGER"),
+    # ── Bóveda: «¿Qué es?» (modules/tipos_documento.py) y fecha del documento ──
+    ("documentos", "tipo_documento",                "TEXT"),
+    ("documentos", "tipo_estado",                   "TEXT"),
+    ("documentos", "fecha_documento",               "TEXT"),
+    ("asunto_sentencias", "tipo_documento",         "TEXT"),
+    ("asunto_sentencias", "tipo_estado",            "TEXT"),
+    ("asunto_sentencias", "fecha_documento",        "TEXT"),
+    ("cliente_documentos", "tipo_documento",        "TEXT"),
+    ("cliente_documentos", "tipo_estado",           "TEXT"),
+    ("cliente_documentos", "fecha_documento",       "TEXT"),
+    ("biblioteca_archivos", "tipo_documento",       "TEXT"),
+    ("biblioteca_archivos", "tipo_estado",          "TEXT"),
+    ("biblioteca_archivos", "fecha_documento",      "TEXT"),
 ]
 
 _MIGRATE_TABLES = """

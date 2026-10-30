@@ -837,6 +837,11 @@ def subir_documento(id: int):
            VALUES (?,?,?,?,?,?,?,?)""",
         (id, nombre or info["nombre"], descripcion, info["url"], info["nombre"], info["tamanio"], info["mime"],
          session.get("user_id")))
+    # «¿Qué es?» (modules/tipos_documento): lo que eligió la persona o, si no dijo, sugerido por el nombre
+    from modules import tipos_documento
+    tipos_documento.asegurar(tdb)
+    tipos_documento.al_subir(tdb, "cliente_documentos", cur.lastrowid, request.form.get("tipo_documento"),
+                             info["nombre"], request.form.get("fecha_documento"))
     tdb.commit()
     lector.encolar(info["url"], nombre or info["nombre"], "cliente", cur.lastrowid, cliente_id=id)
     return jsonify(ok=True, id=cur.lastrowid)

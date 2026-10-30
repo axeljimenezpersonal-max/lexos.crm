@@ -30,6 +30,7 @@ from flask import (
 
 from modules import boveda
 from modules import lector
+from modules import tipos_documento
 from modules.insights import casos as precedentes
 from modules.auth import log_activity, login_required, role_required, tenant_required
 
@@ -849,8 +850,10 @@ def detalle(id: int):
         t["cuando"] = _cuando(t["dias"]) if f else ""
         t["semaforo"] = _semaforo(t["dias"])
 
+    tipos_documento.asegurar(tdb)
     documentos = [dict(d) for d in tdb.execute(
-        "SELECT id, nombre, archivo_url, archivo_nombre, mime_type, tamanio, fecha_subida, subido_por "
+        "SELECT id, nombre, archivo_url, archivo_nombre, mime_type, tamanio, fecha_subida, subido_por, "
+        "tipo_documento, tipo_estado "
         "FROM documentos WHERE asunto_id=? ORDER BY fecha_subida DESC", (id,)).fetchall()]
     sentencias = [dict(s) for s in tdb.execute(
         "SELECT * FROM asunto_sentencias WHERE asunto_id=? ORDER BY COALESCE(fecha_emision, fecha_alta) DESC",
@@ -860,6 +863,8 @@ def detalle(id: int):
         dt = _local(d["fecha_subida"]) or datetime.now()
         d["dia"] = f"{dt.day} {_MESES[dt.month - 1][:3]} {dt.year}"
         d["autor"] = (usuarios.get(d["subido_por"]) or {}).get("corto", "")
+        d["tipo_label"] = tipos_documento.etiqueta(d["tipo_documento"])
+        d["tipo_sugerido"] = bool(d["tipo_label"]) and d["tipo_estado"] != tipos_documento.CONFIRMADO
     for s in sentencias:
         s["etiqueta"] = SENTENCIA_LABEL.get(s["tipo"], "Resolución")
         s["sentido_label"] = precedentes.SENTIDOS.get(s["sentido"] or "")
@@ -960,7 +965,7 @@ def detalle(id: int):
         dias_llevamos=dias_llevamos, abierto=abierto, clientes=clientes,
         estados=ESTADOS, estados_menu=ESTADOS_MENU, tipos_derecho=TIPOS_DERECHO,
         tipos_actividad=TIPOS_ACTIVIDAD, actividad_label=ACTIVIDAD_LABEL,
-        tipos_sentencia=TIPOS_SENTENCIA, sentencia_label=SENTENCIA_LABEL,
+        tipos_sentencia=TIPOS_SENTENCIA, sentencia_label=SENTENCIA_LABEL, tipos_doc=tipos_documento.por_grupo(),
         resultados=precedentes.RESULTADOS, sentidos=precedentes.SENTIDOS,
         es_admin=es_admin, notas=notas, resumen=resumen, conv_id=conv_id, hallazgos=hallazgos,
         puede_editar=es_admin or uid == asunto.get("abogado_responsable") or uid in col_ids
@@ -1438,6 +1443,13 @@ def agregar_sentencia(id: int):
          request.form.get("fecha_emision") or None,
          archivo_url, archivo_nombre, session.get("user_id")),
     )
+    # La persona eligió el tipo de resolución: queda como su «¿Qué es?» confirmado
+    tipos_documento.asegurar(g.tenant_db)
+    clave = {"sentencia": "sentencia", "resolucion": "resolucion", "auto": "auto", "acuerdo": "acuerdo"}.get(tipo)
+    if clave:
+        tipos_documento.guardar(g.tenant_db, "asunto_sentencias", cur.lastrowid, clave, confirmado=True)
+    else:
+        tipos_documento.al_subir(g.tenant_db, "asunto_sentencias", cur.lastrowid, None, titulo)
     g.tenant_db.commit()
     if archivo_url:
         lector.encolar(archivo_url, titulo, "sentencia", cur.lastrowid, asunto_id=id)
@@ -1506,17 +1518,21 @@ def subir_documento(id: int):
     if not f or not f.filename:
         return jsonify(ok=False, error="Archivo requerido"), 400
 
-    doc_id = _guardar_documento(tdb, id, f, nombre)
+    doc_id = _guardar_documento(tdb, id, f, nombre, tipo=request.form.get("tipo_documento"),
+                                fecha=request.form.get("fecha_documento"))
     if not doc_id:
         return jsonify(ok=False, error="Tipo de archivo no permitido"), 400
     return jsonify(ok=True, id=doc_id)
 
 
-def _guardar_documento(tdb, id: int, f, nombre: str = "") -> int | None:
-    """Cifra el archivo en la bóveda, lo registra en el expediente y lo manda a leer (OCR e índice)."""
+def _guardar_documento(tdb, id: int, f, nombre: str = "", tipo: str | None = None,
+                       fecha: str | None = None) -> int | None:
+    """Cifra el archivo en la bóveda, lo registra en el expediente y lo manda a leer (OCR e índice).
+    `tipo` es la respuesta a «¿Qué es?» (modules/tipos_documento); si no viene, se sugiere por el nombre."""
     info = boveda.guardar(f, "asuntos", id)
     if not info:
         return None
+    tipos_documento.asegurar(tdb)
     cur = tdb.execute(
         """INSERT INTO documentos
            (asunto_id, nombre, archivo_url, archivo_nombre, tamanio, mime_type, subido_por)
@@ -1524,6 +1540,7 @@ def _guardar_documento(tdb, id: int, f, nombre: str = "") -> int | None:
         (id, nombre or info["nombre"], info["url"], info["nombre"],
          info["tamanio"], info["mime"], session.get("user_id")),
     )
+    tipos_documento.al_subir(tdb, "documentos", cur.lastrowid, tipo, info["nombre"], fecha)
     tdb.commit()
     lector.encolar(info["url"], nombre or info["nombre"], "documento", cur.lastrowid, asunto_id=id)
     _log("subir_documento", id, {"nombre": nombre or f.filename})

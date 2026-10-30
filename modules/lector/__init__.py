@@ -30,8 +30,10 @@ def documentos_visibles(tdb) -> dict[int, dict]:
     Los documentos de personas (clientes activos), del estudio sin expediente y los formatos los ve
     todo el equipo, como en sus propias páginas. Lo que ya no existe en su tabla de origen no aparece.
     """
+    from modules import tipos_documento
     from modules.asuntos import _FILTRO_PROPIOS, _solo_lo_suyo
     indice.asegurar_esquema(tdb)
+    tipos_documento.asegurar(tdb)
     alc, p = "1", []
     if _solo_lo_suyo():
         uid = session.get("user_id")
@@ -39,24 +41,29 @@ def documentos_visibles(tdb) -> dict[int, dict]:
     base = ("l.id, l.estado, l.error, l.paginas, l.archivo_url, a.id AS asunto_id, a.titulo AS asunto, "
             f"a.numero_expediente, c.id AS cliente_id, {_NOMBRE_CLIENTE} AS cliente")
     consultas = (
-        ("documento", f"""SELECT {base}, d.nombre, d.fecha_subida AS fecha
+        ("documento", f"""SELECT {base}, d.nombre, COALESCE(d.fecha_documento, d.fecha_subida) AS fecha, d.id AS fila_id,
+                   d.tipo_documento, d.tipo_estado
             FROM lector_documentos l JOIN documentos d ON d.archivo_url = l.archivo_url
             JOIN asuntos a ON a.id = d.asunto_id LEFT JOIN clientes c ON c.id = a.cliente_id
             WHERE {alc}""", p),
-        ("sentencia", f"""SELECT {base}, s.titulo AS nombre, COALESCE(s.fecha_emision, s.fecha_alta) AS fecha
+        ("sentencia", f"""SELECT {base}, s.titulo AS nombre, COALESCE(s.fecha_emision, s.fecha_alta) AS fecha, s.id AS fila_id,
+                   s.tipo_documento, s.tipo_estado
             FROM lector_documentos l JOIN asunto_sentencias s ON s.archivo_url = l.archivo_url
             JOIN asuntos a ON a.id = s.asunto_id LEFT JOIN clientes c ON c.id = a.cliente_id
             WHERE {alc}""", p),
-        ("cliente", f"""SELECT {base}, cd.nombre, cd.fecha_subida AS fecha
+        ("cliente", f"""SELECT {base}, cd.nombre, COALESCE(cd.fecha_documento, cd.fecha_subida) AS fecha, cd.id AS fila_id,
+                   cd.tipo_documento, cd.tipo_estado
             FROM lector_documentos l JOIN cliente_documentos cd ON cd.archivo_url = l.archivo_url
             JOIN clientes c ON c.id = cd.cliente_id AND c.activo = 1
             LEFT JOIN asuntos a ON 0""", []),
-        ("biblioteca", f"""SELECT {base}, COALESCE(b.nombre_original, b.nombre) AS nombre, b.fecha_alta AS fecha
+        ("biblioteca", f"""SELECT {base}, COALESCE(b.nombre, b.nombre_original) AS nombre, COALESCE(b.fecha_documento, b.fecha_alta) AS fecha,
+                   b.id AS fila_id, b.tipo_documento, b.tipo_estado
             FROM lector_documentos l JOIN biblioteca_archivos b ON b.archivo_url = l.archivo_url
             LEFT JOIN asuntos a ON a.id = b.asunto_id
             LEFT JOIN clientes c ON c.id = COALESCE(b.cliente_id, a.cliente_id)
             WHERE b.asunto_id IS NULL OR (a.id IS NOT NULL AND {alc})""", p),
-        ("plantilla", f"""SELECT {base}, pl.nombre, pl.fecha_alta AS fecha
+        ("plantilla", f"""SELECT {base}, pl.nombre, pl.fecha_alta AS fecha, pl.id AS fila_id,
+                   NULL AS tipo_documento, NULL AS tipo_estado
             FROM lector_documentos l JOIN biblioteca_plantillas pl ON pl.archivo_url = l.archivo_url
             LEFT JOIN asuntos a ON 0 LEFT JOIN clientes c ON 0""", []),
     )

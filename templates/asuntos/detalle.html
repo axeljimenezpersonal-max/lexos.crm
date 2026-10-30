@@ -442,6 +442,7 @@
       <div class="dc-info">
         <b title="{{ d.nombre }}">{{ d.nombre }}</b>
         <span class="dc-exp">{{ d.dia }}{% if d.autor %} · {{ d.autor }}{% endif %}{% if d.tamanio %} · {{ (d.tamanio / 1024) | round | int }} KB{% endif %}</span>
+        {% if d.tipo_label %}<span class="dc-tipo-et{{ ' sug' if d.tipo_sugerido }}"{% if d.tipo_sugerido %} title="Sugerido por el nombre o el texto; confírmalo en la Bóveda"{% endif %}>{{ d.tipo_label }}{% if d.tipo_sugerido %} · sugerido{% endif %}</span>{% endif %}
         {% if enlace %}<span class="dc-pie"><a class="link" href="{{ d.archivo_url }}" target="_blank" rel="noopener">Abrir</a><a class="link" href="{{ d.archivo_url }}?descargar=1">Descargar</a></span>{% endif %}
       </div>
     </article>
@@ -739,6 +740,33 @@
   </div>
 </div>
 
+<div class="as-modal" id="docTipoModal" role="dialog" aria-modal="true" aria-labelledby="docTipoT">
+  <style>
+    #docTipoModal .as-modal-c { max-width: 560px; }
+    .dt-ayuda { margin: 0 0 4px; font-size: 13.5px; color: var(--ash); line-height: 1.5; }
+    .dt-fila { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--border); min-width: 0; }
+    .dt-fila:first-child { border-top: 0; }
+    .dt-nombre { font: 600 14px 'Sora', sans-serif; color: var(--e); overflow-wrap: anywhere; }
+    .dt-campos { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 10px; }
+    .dt-campos .as-select.sug { border-color: #D9BF85; background: #FFFCF5; }
+    .dt-sug { margin-left: 6px; padding: 1px 7px; border-radius: 99px; background: var(--edim); color: #6E5A3A; font: 600 11px 'Inter', sans-serif; }
+    .dt-error { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: #F8EDEA; color: #8F322B; font-size: 13.5px; }
+    .dc-tipo-et { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 6px; background: #EEF1F5; color: var(--e); font: 600 11.5px 'Inter', sans-serif; }
+    .dc-tipo-et.sug { background: var(--edim); color: #6E5A3A; border: 1px dashed #D9BF85; }
+    @media (max-width: 560px) { .dt-campos { grid-template-columns: minmax(0, 1fr); } }
+  </style>
+  <form class="as-modal-c" id="fDocTipo" novalidate>
+    <div class="as-modal-h"><h3 id="docTipoT">¿Qué es?</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="as-modal-b">
+      <p class="dt-ayuda">Dinos qué es cada documento: así se encuentra después en la Bóveda con los filtros. Si ya lo sugerimos por el nombre, solo confírmalo.</p>
+      <div id="dtLista"></div>
+      <p class="dt-error" id="dtError" role="alert" hidden></p>
+    </div>
+    <div class="as-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button class="btn btn-primary" id="dtOk">Subir</button></div>
+  </form>
+</div>
+<template id="dtOpciones"><option value="">Elige qué es</option>{% for gr in tipos_doc %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}</template>
+
 <div class="as-modal" id="senModal" role="dialog" aria-modal="true" aria-labelledby="senTitulo">
   <form class="as-modal-c" id="fSentencia">
     <div class="as-modal-h"><h3 id="senTitulo">Agregar resolución</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
@@ -917,22 +945,59 @@
     });
   });
 
-  /* Documentos */
+  /* Documentos: antes de subir se pregunta «¿Qué es?» (con sugerencia por el nombre) */
   const drop = $('#afDrop'), archivo = $('#afArchivo');
-  async function subir(files) {
-    for (const f of files) {
+  const dtModal = $('#docTipoModal'), dtLista = $('#dtLista'), dtError = $('#dtError'), dtOk = $('#dtOk');
+  document.body.appendChild(dtModal);   // sobre la barra inferior del teléfono
+  dtModal.style.zIndex = 1100;
+  let pendientes = [];
+  async function subir(items) {
+    for (const { f, tipo, fecha } of items) {
       const fd = new FormData(); fd.append('archivo', f); fd.append('nombre', f.name.replace(/\.[^.]+$/, ''));
+      fd.append('tipo_documento', tipo); fd.append('fecha_documento', fecha || '');
       showToast(`Subiendo ${f.name}…`);
       const r = await fetch(`/asuntos/${ID}/documentos`, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) { showToast(j.error || `No se pudo subir ${f.name}`, 'error'); return; }
+      if (!r.ok || !j.ok) { showToast(j.error || `No se pudo subir ${f.name}`, 'error'); return false; }
     }
     recargar('documentos');
+    return true;
   }
-  archivo.addEventListener('change', () => archivo.files.length && subir([...archivo.files]));
+  function preguntar(files) {
+    pendientes = files; dtError.hidden = true; dtOk.disabled = false; dtOk.textContent = files.length > 1 ? `Subir ${files.length} documentos` : 'Subir';
+    dtLista.replaceChildren(...files.map((f, i) => {
+      const fila = document.createElement('div'); fila.className = 'dt-fila';
+      fila.innerHTML = `<div class="dt-nombre">${esc(f.name)}</div>
+        <div class="dt-campos">
+          <div><label class="as-label" for="dtTipo${i}">¿Qué es? <span class="dt-sug" hidden>sugerido</span></label>
+            <select class="as-select" id="dtTipo${i}" required>${$('#dtOpciones').innerHTML}</select></div>
+          <div><label class="as-label" for="dtFecha${i}">Fecha del documento <small>(opcional)</small></label>
+            <input class="as-input" type="date" id="dtFecha${i}"></div>
+        </div>`;
+      const sel = fila.querySelector('select'), marca = fila.querySelector('.dt-sug');
+      let sugerido = '';
+      sel.addEventListener('change', () => { const on = !!sugerido && sel.value === sugerido; marca.hidden = !on; sel.classList.toggle('sug', on); });
+      const u = new URL("{{ url_for('biblioteca.tipo_sugerir') }}", location.origin); u.searchParams.set('nombre', f.name);
+      fetch(u).then(r => r.json()).then(j => { if (j.tipo && !sel.value) { sugerido = j.tipo; sel.value = j.tipo; marca.hidden = false; sel.classList.add('sug'); } })
+        .catch(() => {});
+      return fila;
+    }));
+    dtModal.classList.add('open');
+    setTimeout(() => dtLista.querySelector('select')?.focus(), 50);
+  }
+  dtModal.addEventListener('click', e => { if (e.target === dtModal || e.target.closest('[data-cerrar]')) { dtModal.classList.remove('open'); archivo.value = ''; } });
+  $('#fDocTipo').addEventListener('submit', async e => {
+    e.preventDefault();
+    const items = pendientes.map((f, i) => ({ f, tipo: $(`#dtTipo${i}`).value, fecha: $(`#dtFecha${i}`).value }));
+    const falta = items.findIndex(x => !x.tipo);
+    if (falta >= 0) { dtError.textContent = `Dinos qué es «${pendientes[falta].name}».`; dtError.hidden = false; $(`#dtTipo${falta}`).focus(); return; }
+    dtOk.disabled = true; dtOk.textContent = 'Subiendo…';
+    if (!(await subir(items))) { dtOk.disabled = false; dtOk.textContent = 'Subir'; }
+  });
+  archivo.addEventListener('change', () => archivo.files.length && preguntar([...archivo.files]));
   ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('sobre'); }));
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('sobre')));
-  drop.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) subir([...e.dataTransfer.files]); });
+  drop.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) preguntar([...e.dataTransfer.files]); });
 
   /* Resoluciones */
   const senModal = $('#senModal'); let sentido = '';

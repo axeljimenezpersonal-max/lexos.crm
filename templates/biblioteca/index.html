@@ -8,14 +8,45 @@
 
 {% block content %}
 {% from "components/buscador.html" import buscador %}
+{# ── «¿Qué es?»: chips por grupo/tipo y etiqueta de tipo en cada tarjeta ── #}
+{% macro chips_tipo(filtro, base) %}
+{% if filtro and (filtro.grupos or filtro.sin or filtro.activo) %}
+<nav class="tp-chips" aria-label="Filtrar por tipo de documento">
+  <a class="tp-chip{{ ' on' if not filtro.activo }}" href="{{ url_for('biblioteca.index', **dict(base, grupo=None, tipo=None)) }}">Todos</a>
+  {% for gr in filtro.grupos %}
+  <a class="tp-chip{{ ' on' if gr.on }}" href="{{ url_for('biblioteca.index', **dict(base, grupo=None if gr.on and not filtro.tipo else gr.clave, tipo=None)) }}"{% if gr.on %} aria-current="true"{% endif %}>{{ gr.etiqueta }} <span>{{ gr.n }}</span></a>
+  {% endfor %}
+  {% if filtro.sin or filtro.grupo == 'sin' %}<a class="tp-chip tp-sin{{ ' on' if filtro.grupo == 'sin' }}" href="{{ url_for('biblioteca.index', **dict(base, grupo=None if filtro.grupo == 'sin' else 'sin', tipo=None)) }}">Sin clasificar <span>{{ filtro.sin }}</span></a>{% endif %}
+  {% if filtro.confirmar or filtro.grupo == 'confirmar' %}<a class="tp-chip tp-sug{{ ' on' if filtro.grupo == 'confirmar' }}" href="{{ url_for('biblioteca.index', **dict(base, grupo=None if filtro.grupo == 'confirmar' else 'confirmar', tipo=None)) }}">Por confirmar <span>{{ filtro.confirmar }}</span></a>{% endif %}
+</nav>
+{% for gr in filtro.grupos if gr.on and gr.tipos %}
+<nav class="tp-chips tp-sub" aria-label="Tipos de {{ gr.etiqueta }}">
+  {% for t in gr.tipos %}<a class="tp-chip{{ ' on' if t.on }}" href="{{ url_for('biblioteca.index', **dict(base, grupo=gr.clave, tipo=None if t.on else t.clave)) }}">{{ t.etiqueta }} <span>{{ t.n }}</span></a>{% endfor %}
+</nav>
+{% endfor %}
+{% endif %}
+{% endmacro %}
+{% macro tipo_pill(d, tabla, fila_id) %}
+<span class="tp" data-tabla="{{ tabla or '' }}" data-id="{{ fila_id }}" data-tipo="{{ d.tipo or '' }}">
+  {%- if d.tipo %}<span class="tp-et{{ ' sug' if d.tipo_sugerido }}"{% if d.tipo_sugerido %} title="Lo sugirió el sistema por el nombre o el texto: confírmalo o cámbialo"{% endif %}>{{ d.tipo_label }}{% if d.tipo_sugerido %} <i>sugerido</i>{% endif %}</span>{% endif %}
+  {%- if tabla %}
+    {%- if d.tipo_sugerido %}<button type="button" class="tp-ok" data-tipo="{{ d.tipo }}">Confirmar</button>{% endif %}
+    <button type="button" class="tp-cambiar{{ ' tp-falta' if not d.tipo }}">{{ '¿Qué es?' if not d.tipo else 'Cambiar' }}</button>
+  {%- endif %}
+</span>
+{%- endmacro %}
 {# Mientras se busca dentro de los documentos, la página muestra solo los resultados #}
 {% set vista = '' if texto else seccion %}
 <div class="ex-head">
   <div>
     <h1 class="ex-h1">Bóveda</h1>
-    <p class="ex-sub">Todo lo que el despacho tiene guardado y cifrado: documentos de expedientes, archivos del estudio, formatos y acuerdos. Busca dentro de ellos y revísalos uno por uno.</p>
+    <p class="ex-sub">Todo lo que el despacho tiene guardado y cifrado: de expedientes, de personas, el archivo del despacho y los machotes. Cada documento dice qué es, y puedes buscar dentro de ellos uno por uno.</p>
   </div>
-  <a class="btn btn-ghost ex-crear" href="{{ url_for('biblioteca.editor') }}">{{ icon_edit(16, 16) }} Editor de documentos</a>
+  <div class="bv-acciones">
+    <a class="btn btn-ghost" href="{{ url_for('biblioteca.editor') }}">{{ icon_edit(16, 16) }} Editor de documentos</a>
+    <button type="button" class="btn btn-primary bv-subir-btn" data-subir>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir documento</button>
+  </div>
 </div>
 
 <section class="bv-busca" aria-label="Buscar dentro de los documentos">
@@ -46,8 +77,9 @@
 {% if texto %}
 {% set n_docs = en_contenido | length %}
 <section class="bv-res" aria-labelledby="bvResT">
+  {{ chips_tipo(filtro, {'texto': texto, 'seccion': None if seccion == 'expedientes' else seccion}) }}
   <div class="dc-sec-h">
-    <h2 id="bvResT">{% if n_docs %}Encontrado en {{ n_docs }} documento{{ 's' if n_docs != 1 }}{% else %}Sin resultados{% endif %}</h2>
+    <h2 id="bvResT">{% if n_docs %}Encontrado en {{ n_docs }} documento{{ 's' if n_docs != 1 }}{% else %}Sin resultados{% endif %}{% if filtro and filtro.activo %} · con el filtro de tipo{% endif %}</h2>
     <a href="{{ url_for('biblioteca.index', seccion=None if seccion == 'expedientes' else seccion) }}">Cerrar búsqueda</a>
   </div>
   {% for d in en_contenido %}
@@ -57,6 +89,7 @@
       <div class="bv-doc-tx">
         <h3>{% if d.url %}<a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.nombre }}</a>{% else %}{{ d.nombre }}{% endif %}</h3>
         <p class="bv-doc-meta">
+          {{ tipo_pill(d, d.tabla, d.fila_id) }}
           <span>{{ d.origen }}</span>
           {% if d.asunto_id %}<a href="{{ url_for('asuntos.detalle', id=d.asunto_id) }}#documentos"><em>{{ d.numero or ('#' ~ d.asunto_id) }}</em> {{ d.asunto }}</a>{% endif %}
           {% if d.cliente %}{% if d.cliente_id and not d.asunto_id %}<a href="{{ url_for('clientes.detalle', id=d.cliente_id) }}">{{ d.cliente }}</a>{% else %}<span>{{ d.cliente }}</span>{% endif %}{% endif %}
@@ -88,7 +121,10 @@
   </article>
   {% else %}
   <div class="bv-vacio">
-    {% if lectura.leidos %}
+    {% if filtro and filtro.activo %}
+      <h3>No encontré «{{ texto }}» en documentos de ese tipo</h3>
+      <p>Quita el filtro de tipo para buscar en todos tus documentos.</p>
+    {% elif lectura.leidos %}
       <h3>No encontré «{{ texto }}» dentro de tus documentos</h3>
       <p>Prueba con otras palabras o con una frase más corta. Solo se busca en los documentos que ya se leyeron ({{ lectura.leidos }}).</p>
     {% else %}
@@ -102,20 +138,20 @@
 {% endif %}
 
 <div class="ex-tabs bv-tabs">
-  <nav aria-label="Secciones">
-    <a class="{{ 'on' if vista == 'expedientes' }}" href="{{ url_for('biblioteca.index', seccion='expedientes') }}">De expedientes</a>
-    <a class="{{ 'on' if vista == 'estudio' }}" href="{{ url_for('biblioteca.index', seccion='estudio') }}">Estudio</a>
-    <a class="{{ 'on' if vista == 'formatos' }}" href="{{ url_for('biblioteca.index', seccion='formatos') }}">Formatos</a>
-    <a class="{{ 'on' if vista == 'acuerdos' }}" href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">Acuerdos y audiencias</a>
+  <nav aria-label="Secciones de la Bóveda">
+    {% for k, sec in secciones.items() %}
+    <a class="{{ 'on' if vista == k }}" href="{{ url_for('biblioteca.index', seccion=k) }}"{% if vista == k %} aria-current="page"{% endif %}>{{ sec.label }}</a>
+    {% endfor %}
   </nav>
 </div>
+{% if vista in secciones %}<p class="bv-ayuda">{{ secciones[vista].ayuda }}</p>{% endif %}
 
 {% if vista == 'expedientes' %}
 {% set docs_total = conteo_estados.values() | sum %}
 <div class="dc-busca">
   {{ buscador(en='documentos', accion=url_for('biblioteca.index'), valor=request.args.get('q', ''), chips=busqueda.chips, enviar=True,
        placeholder='Filtra por nombre del documento, expediente o cliente: «sentencias de amparo»',
-       ocultos={'seccion': 'expedientes', 'estado': estado_f, 'asunto': busqueda.asunto},
+       ocultos={'seccion': 'expedientes', 'estado': estado_f, 'asunto': busqueda.asunto, 'grupo': filtro.grupo if filtro else None, 'tipo': filtro.tipo if filtro else None},
        sugerencias=[('sentencias', 'Sentencias y resoluciones'), ('amparo', 'Amparo'), ('familiar', 'Familiar'), ('mercantil', 'Mercantil')]
                    + ([('mis', 'De mis expedientes')] if session.get('role') == 'abogado' else [])) }}
   {% if busqueda.sugerencia %}<p class="ex-nota">No encontré «{{ request.args.get('q') }}» tal cual; te muestro resultados de <b>{{ busqueda.sugerencia }}</b>.</p>{% endif %}
@@ -143,14 +179,16 @@
 </section>
 {% endif %}
 
+{% set base_exp = {'seccion': 'expedientes', 'q': request.args.get('q') or None, 'estado': estado_f or None, 'asunto': busqueda.asunto} %}
 <div class="dc-sec-h dc-docs-h">
   <h2>{% if busqueda.asunto %}Documentos de esta carpeta{% else %}Todos los documentos{% endif %} <span>{{ docs_exp | length }}</span></h2>
   <div class="ex-atencion" style="padding:0;margin:0">
     {% for k, l in [('listo','Listos para buscar'),('procesando','Procesando'),('revision','Requieren revisión'),('error','Con error'),('guardado','Solo guardados')] %}
-    {% if conteo_estados[k] or estado_f == k %}<a class="{{ 'on' if estado_f == k }}" href="{{ url_for('biblioteca.index', seccion='expedientes', estado='' if estado_f == k else k, q=request.args.get('q') or None, asunto=busqueda.asunto) }}">{{ conteo_estados[k] }} {{ l | lower }}</a>{% endif %}
+    {% if conteo_estados[k] or estado_f == k %}<a class="{{ 'on' if estado_f == k }}" href="{{ url_for('biblioteca.index', **dict(base_exp, estado=None if estado_f == k else k, grupo=filtro.grupo or None, tipo=filtro.tipo)) }}">{{ conteo_estados[k] }} {{ l | lower }}</a>{% endif %}
     {% endfor %}
   </div>
 </div>
+{{ chips_tipo(filtro, base_exp) }}
 
 {% if docs_exp %}
 <div class="dc-grid">
@@ -165,6 +203,7 @@
     <div class="dc-info">
       <b title="{{ d.nombre }}">{{ d.nombre }}</b>
       <a class="dc-exp" href="{{ url_for('asuntos.detalle', id=d.asunto_id) }}#documentos"><em>{{ d.numero_expediente or '' }}</em> {{ d.asunto }}</a>
+      {{ tipo_pill(d, d.tabla, d.id) }}
       <span class="dc-pie">
         <span class="doc-estado {{ d.grupo }}"{% if d.lectura_error %} title="{{ d.lectura_error }}"{% endif %}>
           {% if d.grupo == 'listo' %}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg>
@@ -180,18 +219,75 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="as-vacio">
-  {% if request.args.get('q') or estado_f or busqueda.asunto %}
+<div class="bv-vacio">
+  {% if request.args.get('q') or estado_f or busqueda.asunto or filtro.activo %}
     <h3>Nada coincide con esa búsqueda</h3><p>Prueba con otras palabras o quita el filtro.</p>
     <a class="btn btn-ghost" href="{{ url_for('biblioteca.index', seccion='expedientes') }}">Limpiar filtros</a>
   {% else %}
     <h3>Todavía no hay documentos en los expedientes</h3>
-    <p>Súbelos desde cada expediente con «Subir documento»: se guardan cifrados y {{ config.ASISTENTE_NOMBRE }} los lee para que puedas buscar en ellos.</p>
-    <a class="btn btn-primary" href="{{ url_for('asuntos.index') }}">Ir a expedientes</a>
+    <p>Usa «Subir documento» y elige el expediente: se guardan cifrados y {{ config.ASISTENTE_NOMBRE }} los lee para que puedas buscar en ellos.</p>
+    <button type="button" class="btn btn-primary" data-subir="expedientes">Subir documento</button>
   {% endif %}
 </div>
 {% endif %}
-<p class="doc-nota">«Listo para buscar» quiere decir que {{ config.ASISTENTE_NOMBRE }} ya leyó el documento. «Guardado» significa que está cifrado en la bóveda pero aún no se ha leído. «Requiere revisión» indica un escaneo sin texto o un formato que todavía no se puede leer.</p>
+{% if n_acuerdos %}<p class="doc-nota">Antes se anotaban acuerdos y audiencias en una lista aparte: ahora son tipos de documento (filtro «Del juzgado o autoridad»). <a href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">Ver los {{ n_acuerdos }} registros anteriores</a>.</p>{% endif %}
+<p class="doc-nota">«Listo para buscar» quiere decir que {{ config.ASISTENTE_NOMBRE }} ya leyó el documento. «Guardado» significa que está cifrado en la bóveda pero aún no se ha leído. «Requiere revisión» indica un escaneo sin texto o un formato que todavía no se puede leer. Un tipo marcado «sugerido» lo propuso el sistema por el nombre o el texto: confírmalo o cámbialo con un clic.</p>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PERSONAS — documentos de clientes que no son de un expediente
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if vista == 'personas' %}
+{% set base_per = {'seccion': 'personas', 'q': request.args.get('q') or None} %}
+<div class="es">
+  <div class="es-barra">
+    <form method="GET" class="es-buscar" role="search" action="{{ url_for('biblioteca.index') }}">
+      <input type="hidden" name="seccion" value="personas">
+      {% if filtro.grupo %}<input type="hidden" name="grupo" value="{{ filtro.grupo }}">{% endif %}
+      {% if filtro.tipo %}<input type="hidden" name="tipo" value="{{ filtro.tipo }}">{% endif %}
+      <div class="bz-caja">
+        <svg class="bz-lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input class="bz-input" type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Filtra por nombre del documento o de la persona…" aria-label="Filtrar documentos de personas">
+      </div>
+    </form>
+    <button type="button" class="btn btn-primary" data-subir="personas">Subir documento</button>
+  </div>
+  <div class="dc-sec-h dc-docs-h"><h2>Documentos de personas <span>{{ docs_personas | length }}</span></h2></div>
+  {{ chips_tipo(filtro, base_per) }}
+  {% if docs_personas %}
+  <div class="dc-grid">
+    {% for d in docs_personas %}
+    {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+    <article class="dc-doc">
+      <a class="dc-hoja t-{{ d.ext or 'doc' }}" href="{{ d.archivo_url if enlace else url_for('clientes.detalle', id=d.cliente_id) }}"{% if enlace %} target="_blank" rel="noopener"{% endif %}>
+        <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ (d.ext or 'doc') | upper }}</span>
+        <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </a>
+      <div class="dc-info">
+        <b title="{{ d.nombre }}">{{ d.nombre }}</b>
+        <a class="dc-exp" href="{{ url_for('clientes.detalle', id=d.cliente_id) }}">{{ d.cliente }}</a>
+        {{ tipo_pill(d, 'cliente_documentos', d.id) }}
+        <span class="dc-pie">
+          <span class="doc-estado {{ d.grupo }}"{% if d.lectura_error %} title="{{ d.lectura_error }}"{% endif %}>{{ d.estado }}</span>
+          <small>{{ d.dia }}{% if d.paginas %} · {{ d.paginas }} pág.{% endif %}</small>
+        </span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bv-vacio">
+    {% if request.args.get('q') or filtro.activo %}
+      <h3>Nada coincide con ese filtro</h3><p>Prueba con otras palabras o quita el filtro.</p>
+      <a class="btn btn-ghost" href="{{ url_for('biblioteca.index', seccion='personas') }}">Limpiar filtros</a>
+    {% else %}
+      <h3>Todavía no hay documentos de personas</h3>
+      <p>Aquí van la INE, el comprobante de domicilio, las actas y los contratos de cada cliente.</p>
+      <button type="button" class="btn btn-primary" data-subir="personas">Subir documento</button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
 {% endif %}
 
 <!-- ══════════════════════════════════════════════════════════════════════════
@@ -199,23 +295,25 @@
      ══════════════════════════════════════════════════════════════════════════ -->
 {% if vista == 'estudio' %}
 {% set pct = [(espacio_usado / espacio_limite * 100) | round(1), 100] | min if espacio_limite else 0 %}
+{% set base_est = {'seccion': 'estudio', 'q': q or None, 'carpeta': carpeta_id, 'ext': tipo_f or None} %}
 <div class="es">
-  <p class="es-intro">Archivos del despacho que no son de un expediente: doctrina, jurisprudencia impresa, contratos tipo, papeles administrativos.</p>
   <div class="es-barra">
-    <form method="GET" class="bz es-buscar" role="search">
+    <form method="GET" class="es-buscar" role="search" action="{{ url_for('biblioteca.index') }}">
       <input type="hidden" name="seccion" value="estudio">
       {% if carpeta_id %}<input type="hidden" name="carpeta" value="{{ carpeta_id }}">{% endif %}
+      {% if filtro.grupo %}<input type="hidden" name="grupo" value="{{ filtro.grupo }}">{% endif %}
+      {% if filtro.tipo %}<input type="hidden" name="tipo" value="{{ filtro.tipo }}">{% endif %}
       <div class="bz-caja">
         <svg class="bz-lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input class="bz-input" type="search" name="q" value="{{ q }}" placeholder="Buscar en el estudio…" aria-label="Buscar archivos">
-        <select name="tipo" class="es-tipo" onchange="this.form.submit()" aria-label="Tipo de archivo">
-          <option value="">Todos los tipos</option>
+        <input class="bz-input" type="search" name="q" value="{{ q }}" placeholder="Filtra por nombre…" aria-label="Filtrar archivos por nombre">
+        <select name="ext" class="es-tipo" onchange="this.form.submit()" aria-label="Formato del archivo">
+          <option value="">Todos los formatos</option>
           {% for ext in ['pdf','docx','xlsx','png','jpg'] %}<option value="{{ ext }}" {{ 'selected' if tipo_f == ext }}>{{ ext | upper }}</option>{% endfor %}
         </select>
       </div>
     </form>
     <button class="btn btn-ghost" onclick="abrirCrearCarpeta()">+ Nueva carpeta</button>
-    <button class="btn btn-primary" onclick="abrirUpload()">Subir archivos</button>
+    <button type="button" class="btn btn-primary" data-subir="estudio">Subir documento</button>
   </div>
   <div class="es-espacio"><span>{{ '%.1f' | format(espacio_usado / (1024*1024)) }} MB de {{ '%.0f' | format(espacio_limite / (1024*1024)) }} MB usados · {{ total_archivos }} archivo{{ 's' if total_archivos != 1 }}</span><div class="xr-progreso"><i style="width:{{ pct }}%"></i></div></div>
 
@@ -237,16 +335,17 @@
       </div>
     </div>
     {% endfor %}
-    <button type="button" class="es-carp nueva" onclick="abrirCrearCarpeta()"><span class="es-carp-ico">+</span><b>Nueva carpeta</b><small>Para ordenar el estudio</small></button>
+    <button type="button" class="es-carp nueva" onclick="abrirCrearCarpeta()"><span class="es-carp-ico">+</span><b>Nueva carpeta</b><small>Para ordenar el archivo</small></button>
   </div>
 
   <div class="dc-sec-h dc-docs-h"><h2>{% if carpeta_id %}Archivos de esta carpeta{% else %}Archivos{% endif %} <span>{{ archivos | length }}</span></h2></div>
+  {{ chips_tipo(filtro, base_est) }}
   <div class="xd-grid">
-    <div class="xd-subir" id="mainDropzone" role="button" tabindex="0" onclick="abrirUpload()"
+    <div class="xd-subir" id="mainDropzone" role="button" tabindex="0" data-subir="estudio"
          ondragover="event.preventDefault(); this.classList.add('sobre')"
          ondragleave="this.classList.remove('sobre')"
          ondrop="handleMainDrop(event)">
-      <span class="xd-mas">+</span><b>Subir archivos</b><small>Arrastra aquí o haz clic. PDF, Word, Excel o imágenes, hasta 16 MB.</small>
+      <span class="xd-mas">+</span><b>Subir documento</b><small>Arrastra aquí o haz clic. PDF, Word, Excel o imágenes, hasta 16 MB.</small>
     </div>
     {% for a in archivos %}
     <article class="dc-doc" id="file-{{ a.id }}">
@@ -255,8 +354,9 @@
         <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       </a>
       <div class="dc-info">
-        <b title="{{ a.nombre_original or a.nombre }}">{{ a.nombre_original or a.nombre }}</b>
-        <span class="dc-exp">{{ '%.0f' | format((a.tamanio or 0) / 1024) }} KB{% if a.carpeta_nombre %} · {{ a.carpeta_nombre }}{% endif %}</span>
+        <b title="{{ a.nombre or a.nombre_original }}">{{ a.nombre or a.nombre_original }}</b>
+        <span class="dc-exp">{{ a.dia }} · {{ '%.0f' | format((a.tamanio or 0) / 1024) }} KB{% if a.carpeta_nombre %} · {{ a.carpeta_nombre }}{% endif %}</span>
+        {{ tipo_pill(a, 'biblioteca_archivos', a.id) }}
         <span class="es-acc">
           {% if a.extension == 'pdf' %}<button type="button" onclick="previewPdf('{{ a.archivo_url }}')" title="Vista previa" aria-label="Vista previa">{{ icon_eye(14, 14) }}</button>{% endif %}
           <a href="{{ a.archivo_url }}" download title="Descargar" aria-label="Descargar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
@@ -268,7 +368,7 @@
     </article>
     {% endfor %}
   </div>
-  {% if not archivos and (q or tipo_f or carpeta_id) %}<p class="as-empty" style="margin-top:14px">No hay archivos{% if carpeta_id %} en esta carpeta{% endif %}{% if q or tipo_f %} con esa búsqueda{% endif %}.</p>{% endif %}
+  {% if not archivos and (q or tipo_f or carpeta_id or filtro.activo) %}<p class="as-empty" style="margin-top:14px">No hay archivos{% if carpeta_id %} en esta carpeta{% endif %}{% if q or tipo_f or filtro.activo %} con ese filtro{% endif %}.</p>{% endif %}
 </div>
 {% endif %}
 
@@ -277,9 +377,8 @@
      ══════════════════════════════════════════════════════════════════════════ -->
 {% if vista == 'formatos' %}
 <div class="es">
-  <p class="es-intro">Tus machotes y formatos. Los de Word se llenan solos con los datos de un expediente: nombres, fechas, montos con letra.</p>
   <div class="es-barra">
-    <form method="GET" class="bz es-buscar" role="search">
+    <form method="GET" class="es-buscar" role="search" action="{{ url_for('biblioteca.index') }}">
       <input type="hidden" name="seccion" value="formatos">
       <div class="bz-caja">
         <svg class="bz-lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -294,13 +393,13 @@
         </select>
       </div>
     </form>
-    <button class="btn btn-primary" onclick="abrirSubirPlantilla()">Subir formato</button>
+    {% if puede_formatos %}<button type="button" class="btn btn-primary" data-subir="formatos">Subir machote</button>{% endif %}
   </div>
 
   <div class="xd-grid es-formatos">
-    <div class="xd-subir" role="button" tabindex="0" onclick="abrirSubirPlantilla()">
-      <span class="xd-mas">+</span><b>Subir un formato</b><small>Un Word con {{ '{{' }}campos{{ '}}' }} se llena solo con los datos del expediente.</small>
-    </div>
+    {% if puede_formatos %}<div class="xd-subir" role="button" tabindex="0" data-subir="formatos">
+      <span class="xd-mas">+</span><b>Subir un machote</b><small>Un Word con {{ '{{' }}campos{{ '}}' }} se llena solo con los datos del expediente.</small>
+    </div>{% endif %}
     {% for p in plantillas %}
     {% set llenable = p.archivo_url and p.archivo_url.endswith('.docx') %}
     <article class="dc-doc">
@@ -331,26 +430,13 @@
      ══════════════════════════════════════════════════════════════════════════ -->
 {% if vista == 'acuerdos' %}
 <div class="bib-acuerdos">
-  <!-- Info banner -->
-  <div class="bib-info-banner">
-    <div class="bib-info-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
-    <div>
-      <strong>Consulta de acuerdos y audiencias del CJF</strong><br>
-      <span style="font-size:.82rem; color:var(--text-3)">
-        La consulta automática del Consejo de la Judicatura Federal se encuentra en desarrollo.
-        Por ahora puedes registrar a mano tus acuerdos y audiencias y vincularlos a sus expedientes.
-      </span>
-    </div>
-    <span class="bib-info-badge">Próximamente — API CJF</span>
-  </div>
-
-  <!-- Tabs -->
+  <div class="dc-sec-h"><h2>Registros anteriores de acuerdos y audiencias</h2><a href="{{ url_for('biblioteca.index', seccion='expedientes', grupo='juzgado') }}">Ver documentos del juzgado</a></div>
+  <p class="bv-ayuda">Esta lista ya no se usa: ahora los acuerdos y las actas de audiencia se suben como documentos del expediente y se encuentran con el filtro «Del juzgado o autoridad». Las audiencias por venir van en el Calendario.</p>
   <div class="bib-ac-tabs">
     <a class="bib-ac-tab {{ 'active' if tab_ac == 'audiencias' }}"
        href="{{ url_for('biblioteca.index', seccion='acuerdos', tab_ac='audiencias') }}">Audiencias</a>
     <a class="bib-ac-tab {{ 'active' if tab_ac == 'acuerdos' }}"
        href="{{ url_for('biblioteca.index', seccion='acuerdos', tab_ac='acuerdos') }}">Acuerdos</a>
-    <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="abrirCrearAcuerdo()">+ Registrar {{ 'audiencia' if tab_ac == 'audiencias' else 'acuerdo' }}</button>
   </div>
 
   {% if acuerdos %}
@@ -405,71 +491,6 @@
      MODALS
      ══════════════════════════════════════════════════════════════════════════ -->
 
-<!-- Upload modal -->
-<div class="modal-overlay" id="uploadModal" onclick="if(event.target===this)cerrarModal('uploadModal')">
-  <div class="modal-box">
-    <div class="modal-header">
-      <span class="modal-title">⬆ Subir archivos al Estudio</span>
-      <button class="modal-close" onclick="cerrarModal('uploadModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <form id="uploadForm" enctype="multipart/form-data">
-        <div class="bib-form-row">
-          <div class="bib-fg" style="flex:2">
-            <label>Carpeta destino</label>
-            <select name="carpeta_id">
-              <option value="">Raíz (sin carpeta)</option>
-              {% for c in carpetas %}
-              <option value="{{ c.id }}" {{ 'selected' if carpeta_id == c.id }}>{{ c.nombre }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="bib-form-row">
-          <div class="bib-fg">
-            <label>Vincular a asunto (opcional)</label>
-            <select name="asunto_id">
-              <option value="">— Ninguno —</option>
-              {% for a in asuntos %}
-              <option value="{{ a.id }}">{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="bib-fg">
-            <label>Vincular a cliente (opcional)</label>
-            <select name="cliente_id">
-              <option value="">— Ninguno —</option>
-              {% for c in clientes %}
-              <option value="{{ c.id }}">{{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="bib-form-row">
-          <div class="bib-fg">
-            <label>Archivos</label>
-            <div class="bib-upload-zone" id="uploadZone"
-                 ondragover="event.preventDefault(); this.classList.add('active')"
-                 ondragleave="this.classList.remove('active')"
-                 ondrop="handleUploadDrop(event)"
-                 onclick="document.getElementById('uploadInput').click()">
-              <div style="color:var(--text-3)">{{ icon_folder(32, 32) }}</div>
-              <div>Arrastra archivos aquí o haz clic</div>
-              <div id="uploadFileNames" class="bib-upload-names"></div>
-            </div>
-            <input type="file" id="uploadInput" name="archivos" multiple style="display:none"
-                   onchange="showUploadNames(this)">
-          </div>
-        </div>
-      </form>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="cerrarModal('uploadModal')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitUpload()">Subir</button>
-    </div>
-  </div>
-</div>
-
 <!-- Create folder modal -->
 <div class="modal-overlay" id="carpetaModal" onclick="if(event.target===this)cerrarModal('carpetaModal')">
   <div class="modal-box" style="max-width:400px">
@@ -488,122 +509,6 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="cerrarModal('carpetaModal')">Cancelar</button>
       <button class="btn btn-primary" onclick="submitCarpeta()">Crear</button>
-    </div>
-  </div>
-</div>
-
-<!-- Upload plantilla modal -->
-<div class="modal-overlay" id="plantillaModal" onclick="if(event.target===this)cerrarModal('plantillaModal')">
-  <div class="modal-box">
-    <div class="modal-header">
-      <span class="modal-title">{{ icon_clipboard(14, 14) }} Subir plantilla</span>
-      <button class="modal-close" onclick="cerrarModal('plantillaModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <form id="plantillaForm" enctype="multipart/form-data">
-        <div class="bib-form-row">
-          <div class="bib-fg" style="flex:2">
-            <label>Nombre <span class="req">*</span></label>
-            <input type="text" name="nombre" required placeholder="Ej. Contrato de arrendamiento">
-          </div>
-          <div class="bib-fg">
-            <label>Categoría</label>
-            <select name="categoria">
-              {% for cat in categorias %}
-              <option value="{{ cat }}">{{ cat }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="bib-form-row">
-          <div class="bib-fg">
-            <label>Tipo de derecho</label>
-            <select name="tipo_derecho">
-              {% for td in tipos_derecho %}
-              <option value="{{ td }}">{{ td }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="bib-fg" style="flex:2">
-            <label>Descripción</label>
-            <input type="text" name="descripcion" placeholder="Breve descripción…">
-          </div>
-        </div>
-        <div class="bib-form-row">
-          <div class="bib-fg">
-            <label>Archivo (DOCX, PDF) <span class="req">*</span></label>
-            <input type="file" name="archivo" accept=".docx,.doc,.pdf,.xlsx" required>
-          </div>
-        </div>
-      </form>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="cerrarModal('plantillaModal')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitPlantilla()">Subir plantilla</button>
-    </div>
-  </div>
-</div>
-
-<!-- Create acuerdo modal -->
-<div class="modal-overlay" id="acuerdoModal" onclick="if(event.target===this)cerrarModal('acuerdoModal')">
-  <div class="modal-box">
-    <div class="modal-header">
-      <span class="modal-title">{{ icon_scale(16, 16) }} Registrar {{ 'audiencia' if tab_ac == 'audiencias' else 'acuerdo' }}</span>
-      <button class="modal-close" onclick="cerrarModal('acuerdoModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <form id="acuerdoForm">
-        <input type="hidden" name="tipo" value="{{ 'audiencia' if tab_ac == 'audiencias' else 'acuerdo' }}">
-        <div class="bib-form-row">
-          <div class="bib-fg">
-            <label>NEUN</label>
-            <input type="text" name="neun" placeholder="Ej. 123456789">
-          </div>
-          <div class="bib-fg">
-            <label>Número de asunto</label>
-            <input type="text" name="numero_asunto" placeholder="Ej. 1234/2026">
-          </div>
-        </div>
-        <div class="bib-form-row">
-          <div class="bib-fg">
-            <label>Órgano</label>
-            <input type="text" name="organo" placeholder="Ej. Juzgado Primero de Distrito">
-          </div>
-          <div class="bib-fg">
-            <label>Circuito</label>
-            <input type="text" name="circuito" placeholder="Ej. Primer Circuito">
-          </div>
-        </div>
-        <div class="bib-form-row">
-          <div class="bib-fg" style="flex:2">
-            <label>Autoridad</label>
-            <input type="text" name="autoridad" placeholder="Nombre de la autoridad">
-          </div>
-          <div class="bib-fg">
-            <label>Fecha</label>
-            <input type="date" name="fecha" value="{{ today_str }}">
-          </div>
-        </div>
-        <div class="bib-form-row">
-          <div class="bib-fg" style="flex:2">
-            <label>Descripción</label>
-            <textarea name="descripcion" rows="2" placeholder="Notas…"></textarea>
-          </div>
-          <div class="bib-fg">
-            <label>Vincular a asunto</label>
-            <select name="asunto_id">
-              <option value="">— Ninguno —</option>
-              {% for a in asuntos %}
-              <option value="{{ a.id }}">{{ a.numero_expediente or '' }} {{ a.titulo }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-      </form>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="cerrarModal('acuerdoModal')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitAcuerdo()">Registrar</button>
     </div>
   </div>
 </div>
@@ -687,6 +592,75 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SUBIR DOCUMENTO — ¿dónde va? ¿qué es?
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="bv-modal" id="subirModal" role="dialog" aria-modal="true" aria-labelledby="subirT" hidden
+     data-asunto="{{ busqueda.asunto or '' }}" data-carpeta="{{ carpeta_id or '' }}">
+  <form class="bv-modal-c" id="subirForm" novalidate>
+    <div class="bv-modal-h"><h3 id="subirT">Subir documento</h3><button type="button" class="bv-x" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="bv-modal-b">
+      <label class="bv-archivo" id="subZona">
+        <input type="file" id="subArchivo" name="archivo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+        <span><b id="subArchNombre">Elige el archivo</b><small>o arrástralo aquí · PDF, Word, Excel o imagen, hasta 16 MB</small></span>
+      </label>
+
+      <fieldset class="bv-campo">
+        <legend>¿Dónde va?</legend>
+        <div class="bv-donde">
+          <label><input type="radio" name="destino" value="expedientes" checked><span><b>A un expediente</b><small>Escritos, acuerdos, sentencias, pruebas</small></span></label>
+          <label><input type="radio" name="destino" value="personas"><span><b>A una persona</b><small>INE, comprobantes, actas, contratos</small></span></label>
+          <label><input type="radio" name="destino" value="estudio"><span><b>Archivo del despacho</b><small>Doctrina, leyes, papeles internos</small></span></label>
+          {% if puede_formatos %}<label><input type="radio" name="destino" value="formatos"><span><b>Machotes y formatos</b><small>Modelos que se llenan solos</small></span></label>{% endif %}
+        </div>
+      </fieldset>
+
+      <div class="bv-campo" data-para="expedientes">
+        <label for="subExpQ">¿De qué expediente?</label>
+        <div class="bv-combo" data-lista="expedientes">
+          <input type="search" id="subExpQ" placeholder="Escribe el número o el nombre del expediente" autocomplete="off" spellcheck="false"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="subExpL">
+          <ul id="subExpL" role="listbox" hidden></ul>
+        </div>
+      </div>
+      <div class="bv-campo" data-para="personas" hidden>
+        <label for="subPerQ">¿De qué persona?</label>
+        <div class="bv-combo" data-lista="personas">
+          <input type="search" id="subPerQ" placeholder="Escribe el nombre de la persona o empresa" autocomplete="off" spellcheck="false"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="subPerL">
+          <ul id="subPerL" role="listbox" hidden></ul>
+        </div>
+      </div>
+      <div class="bv-campo" data-para="estudio" hidden>
+        <label for="subCarpeta">Carpeta <small>(opcional)</small></label>
+        <select id="subCarpeta" name="carpeta_id"><option value="">Sin carpeta</option>{% for c in destinos.carpetas %}<option value="{{ c.id }}">{{ c.t }}</option>{% endfor %}</select>
+      </div>
+
+      <div class="bv-campo" data-para="expedientes personas estudio">
+        <label for="subTipo">¿Qué es? <span class="bv-sug" id="subSug" hidden>sugerido</span></label>
+        <select id="subTipo" name="tipo_documento">
+          <option value="">Elige qué es el documento</option>
+          {% for gr in tipos_grupos %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}
+        </select>
+        <small class="bv-nota" id="subSugNota" hidden>Lo sugerimos por el nombre del archivo. Confírmalo o cámbialo.</small>
+      </div>
+      <div class="bv-campo" data-para="formatos" hidden>
+        <label for="subCat">¿Qué es?</label>
+        <select id="subCat" name="categoria">{% for c in categorias %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
+      </div>
+      <div class="bv-fila">
+        <div class="bv-campo"><label for="subNombre">Nombre <small>(opcional)</small></label><input id="subNombre" name="nombre" maxlength="200" placeholder="Si lo dejas vacío, se usa el del archivo"></div>
+        <div class="bv-campo" data-para="expedientes personas estudio"><label for="subFecha">Fecha del documento <small>(opcional)</small></label><input type="date" id="subFecha" name="fecha_documento"></div>
+      </div>
+      <p class="bv-error" id="subError" role="alert" hidden></p>
+    </div>
+    <div class="bv-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button type="submit" class="btn btn-primary" id="subOk">Subir documento</button></div>
+  </form>
+</div>
+<template id="tpOpciones"><option value="">¿Qué es?</option>{% for gr in tipos_grupos %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}</template>
+<script type="application/json" id="bvDestinos">{{ {'expedientes': destinos.expedientes, 'personas': destinos.personas} | tojson }}</script>
+
 <!-- ══════════════════════════════════════════════
      JAVASCRIPT
      ══════════════════════════════════════════════ -->
@@ -730,42 +704,11 @@ async function eliminarCarpeta(id) {
   location.reload();
 }
 
-/* ── Estudio: upload ────────────────────────── */
-function abrirUpload() { document.getElementById("uploadModal").classList.add("open"); }
-function handleUploadDrop(e) {
-  e.preventDefault();
-  document.getElementById("uploadZone").classList.remove("active");
-  const dt = new DataTransfer();
-  for (const f of e.dataTransfer.files) dt.items.add(f);
-  document.getElementById("uploadInput").files = dt.files;
-  showUploadNames(document.getElementById("uploadInput"));
-}
+/* ── Archivo del despacho: soltar un archivo abre «Subir documento» ── */
 function handleMainDrop(e) {
   e.preventDefault();
-  document.getElementById("mainDropzone").classList.remove("active");
-  const dt = new DataTransfer();
-  for (const f of e.dataTransfer.files) dt.items.add(f);
-  document.getElementById("uploadInput").files = dt.files;
-  abrirUpload();
-  showUploadNames(document.getElementById("uploadInput"));
-}
-function showUploadNames(inp) {
-  const el = document.getElementById("uploadFileNames");
-  el.innerHTML = Array.from(inp.files).map(f =>
-    `<div>${f.name} (${(f.size/1024).toFixed(0)} KB)</div>`
-  ).join("");
-}
-async function submitUpload() {
-  const inp = document.getElementById("uploadInput");
-  if (!inp.files.length) { alert("Selecciona al menos un archivo"); return; }
-  const fd = new FormData(document.getElementById("uploadForm"));
-  const r = await fetch("/biblioteca/upload", {
-    method: "POST", body: fd,
-    headers: {"X-Requested-With": "XMLHttpRequest"},
-  });
-  const j = await r.json();
-  if (j.ok) { cerrarModal("uploadModal"); location.reload(); }
-  else alert(j.error || "Error al subir");
+  document.getElementById("mainDropzone").classList.remove("sobre");
+  if (e.dataTransfer.files.length) window.abrirSubir("estudio", e.dataTransfer.files[0]);
 }
 
 /* ── Estudio: file actions ──────────────────── */
@@ -827,17 +770,6 @@ async function submitVincular() {
 }
 
 /* ── Formatos ───────────────────────────────── */
-function abrirSubirPlantilla() { document.getElementById("plantillaModal").classList.add("open"); }
-async function submitPlantilla() {
-  const fd = new FormData(document.getElementById("plantillaForm"));
-  const r = await fetch("/biblioteca/plantilla/subir", {
-    method: "POST", body: fd,
-    headers: {"X-Requested-With": "XMLHttpRequest"},
-  });
-  const j = await r.json();
-  if (j.ok) { cerrarModal("plantillaModal"); location.reload(); }
-  else alert(j.error || "Error");
-}
 async function eliminarPlantilla(id) {
   if (!confirm("¿Eliminar esta plantilla?")) return;
   await fetch(`/biblioteca/plantilla/${id}/eliminar`, {method: "POST"});
@@ -845,18 +777,6 @@ async function eliminarPlantilla(id) {
 }
 
 /* ── Acuerdos ───────────────────────────────── */
-function abrirCrearAcuerdo() { document.getElementById("acuerdoModal").classList.add("open"); }
-async function submitAcuerdo() {
-  const fd = new FormData(document.getElementById("acuerdoForm"));
-  const data = Object.fromEntries(fd.entries());
-  const r = await fetch("/biblioteca/acuerdo/crear", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(data),
-  });
-  const j = await r.json();
-  if (j.ok) { cerrarModal("acuerdoModal"); location.reload(); }
-  else alert(j.error || "Error");
-}
 async function vincularAcuerdo(id) {
   const asuntoId = prompt("ID del asunto a vincular:");
   if (!asuntoId) return;
@@ -871,6 +791,183 @@ async function eliminarAcuerdo(id) {
   await fetch(`/biblioteca/acuerdo/${id}/eliminar`, {method: "POST"});
   document.getElementById("ac-row-" + id)?.remove();
 }
+
+/* ── Bóveda: «Subir documento» (¿dónde va? ¿qué es?) ── */
+(function () {
+  const modal = document.getElementById("subirModal"), form = document.getElementById("subirForm");
+  document.body.appendChild(modal);   // fuera del contenedor de la página, para quedar sobre la barra inferior del teléfono
+  const archivo = document.getElementById("subArchivo"), zona = document.getElementById("subZona");
+  const tipo = document.getElementById("subTipo"), sug = document.getElementById("subSug"), sugNota = document.getElementById("subSugNota");
+  const error = document.getElementById("subError"), ok = document.getElementById("subOk");
+  const DEST = JSON.parse(document.getElementById("bvDestinos").textContent);
+  const URLS = {
+    expedientes: id => "{{ url_for('asuntos.subir_documento', id=0) }}".replace("/0/", `/${id}/`),
+    personas: id => "{{ url_for('clientes.subir_documento', id=0) }}".replace("/0/", `/${id}/`),
+    estudio: () => "{{ url_for('biblioteca.upload') }}",
+    formatos: () => "{{ url_for('biblioteca.plantilla_subir') }}",
+  };
+  const plano = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  let sugerido = "";
+
+  function combo(caja, lista) {
+    const input = caja.querySelector("input"), ul = caja.querySelector("ul");
+    let elegido = null;
+    const cerrar = () => { ul.hidden = true; input.setAttribute("aria-expanded", "false"); };
+    function pintar() {
+      const q = plano(input.value).trim();
+      const hits = lista.filter(x => !q || q.split(/\s+/).every(p => plano(x.t).includes(p))).slice(0, 8);
+      ul.replaceChildren(...hits.map(x => {
+        const li = document.createElement("li");
+        li.setAttribute("role", "option"); li.dataset.id = x.id; li.textContent = x.t;
+        if (elegido === String(x.id)) li.setAttribute("aria-selected", "true");
+        return li;
+      }));
+      if (!hits.length) { const li = document.createElement("li"); li.className = "vacio"; li.textContent = lista.length ? "Sin coincidencias" : "No hay opciones todavía"; ul.append(li); }
+      ul.hidden = false; input.setAttribute("aria-expanded", "true");
+    }
+    function elegir(id, texto) { elegido = String(id); input.value = texto; caja.classList.add("elegido"); cerrar(); }
+    input.addEventListener("input", () => { elegido = null; caja.classList.remove("elegido"); pintar(); });
+    input.addEventListener("focus", pintar);
+    input.addEventListener("blur", () => setTimeout(cerrar, 150));
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); const li = ul.querySelector("li[data-id]"); if (li) elegir(li.dataset.id, li.textContent); }
+      if (e.key === "Escape") cerrar();
+    });
+    ul.addEventListener("mousedown", e => { const li = e.target.closest("li[data-id]"); if (li) { e.preventDefault(); elegir(li.dataset.id, li.textContent); } });
+    return {
+      valor: () => elegido,
+      poner(id) { const x = lista.find(o => String(o.id) === String(id)); if (x) elegir(x.id, x.t); },
+      limpiar() { elegido = null; input.value = ""; caja.classList.remove("elegido"); },
+    };
+  }
+  const combos = {
+    expedientes: combo(modal.querySelector('[data-lista="expedientes"]'), DEST.expedientes),
+    personas: combo(modal.querySelector('[data-lista="personas"]'), DEST.personas),
+  };
+
+  function destino() { return form.querySelector('input[name="destino"]:checked').value; }
+  function mostrar() {
+    const d = destino();
+    modal.querySelectorAll("[data-para]").forEach(el => { el.hidden = !el.dataset.para.split(" ").includes(d); });
+  }
+  form.querySelectorAll('input[name="destino"]').forEach(r => r.addEventListener("change", mostrar));
+
+  function marcarSugerido(on) { sug.hidden = !on; sugNota.hidden = !on; tipo.classList.toggle("sug", on); }
+  tipo.addEventListener("change", () => marcarSugerido(!!sugerido && tipo.value === sugerido));
+
+  async function alElegirArchivo() {
+    const f = archivo.files[0];
+    document.getElementById("subArchNombre").textContent = f ? f.name : "Elige el archivo";
+    zona.classList.toggle("lleno", !!f);
+    if (!f) return;
+    try {
+      const u = new URL("{{ url_for('biblioteca.tipo_sugerir') }}", location.origin);
+      u.searchParams.set("nombre", f.name);
+      const j = await (await fetch(u)).json();
+      sugerido = j.tipo || "";
+      if (sugerido && (!tipo.value || tipo.classList.contains("sug"))) { tipo.value = sugerido; marcarSugerido(true); }
+    } catch (_) { /* sin sugerencia: la persona elige */ }
+  }
+  archivo.addEventListener("change", alElegirArchivo);
+  ["dragover", "dragenter"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.add("sobre"); }));
+  ["dragleave", "drop"].forEach(ev => zona.addEventListener(ev, () => zona.classList.remove("sobre")));
+  zona.addEventListener("drop", e => {
+    e.preventDefault();
+    if (!e.dataTransfer.files.length) return;
+    const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]); archivo.files = dt.files; alElegirArchivo();
+  });
+
+  function abrir(dest, file) {
+    form.reset(); sugerido = ""; marcarSugerido(false); error.hidden = true;
+    combos.expedientes.limpiar(); combos.personas.limpiar();
+    document.getElementById("subArchNombre").textContent = "Elige el archivo"; zona.classList.remove("lleno");
+    const radio = form.querySelector(`input[name="destino"][value="${dest || "expedientes"}"]`) || form.querySelector('input[name="destino"]');
+    radio.checked = true; mostrar();
+    if (modal.dataset.asunto) combos.expedientes.poner(modal.dataset.asunto);
+    if (modal.dataset.carpeta) document.getElementById("subCarpeta").value = modal.dataset.carpeta;
+    if (file) { const dt = new DataTransfer(); dt.items.add(file); archivo.files = dt.files; alElegirArchivo(); }
+    modal.hidden = false; document.body.classList.add("bv-modal-abierto");
+    setTimeout(() => (file ? tipo : archivo).focus(), 50);
+  }
+  function cerrar() { modal.hidden = true; document.body.classList.remove("bv-modal-abierto"); }
+  window.abrirSubir = abrir;
+  document.addEventListener("click", e => { const b = e.target.closest("[data-subir]"); if (b) abrir(b.dataset.subir || "{{ seccion if seccion in secciones else 'expedientes' }}"); });
+  document.addEventListener("keydown", e => {
+    const b = e.target.closest && e.target.closest(".xd-subir[data-subir]");
+    if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrir(b.dataset.subir); }
+    if (e.key === "Escape" && !modal.hidden) cerrar();
+  });
+  modal.addEventListener("click", e => { if (e.target === modal || e.target.closest("[data-cerrar]")) cerrar(); });
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const d = destino(), f = archivo.files[0];
+    const falta = msg => { error.textContent = msg; error.hidden = false; };
+    if (!f) return falta("Elige el archivo que quieres subir.");
+    let id = null;
+    if (d === "expedientes" && !(id = combos.expedientes.valor())) return falta("Elige de qué expediente es.");
+    if (d === "personas" && !(id = combos.personas.valor())) return falta("Elige de qué persona es.");
+    if (d !== "formatos" && !tipo.value) return falta("Dinos qué es el documento: así se encuentra después con los filtros.");
+    const nombre = document.getElementById("subNombre").value.trim();
+    const fd = new FormData();
+    if (d === "estudio") {
+      fd.append("archivos", f); fd.append("carpeta_id", document.getElementById("subCarpeta").value);
+    } else {
+      fd.append("archivo", f);
+    }
+    if (d === "formatos") {
+      fd.append("nombre", nombre || f.name.replace(/\.[^.]+$/, "")); fd.append("categoria", document.getElementById("subCat").value);
+    } else {
+      fd.append("nombre", nombre); fd.append("tipo_documento", tipo.value);
+      fd.append("fecha_documento", document.getElementById("subFecha").value);
+    }
+    ok.disabled = true; ok.textContent = "Subiendo…"; error.hidden = true;
+    try {
+      const r = await fetch(URLS[d](id), { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" }, body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || (d === "estudio" && !j.count)) throw new Error(j.error || "No se pudo subir. Revisa el tipo de archivo e inténtalo de nuevo.");
+      showToast("Documento guardado y cifrado. En unos segundos se podrá buscar dentro de él.");
+      const destinoSec = d === "formatos" ? "formatos" : d;
+      const u = new URL(location.href);
+      ["texto", "grupo", "tipo", "estado", "q"].forEach(k => u.searchParams.delete(k));
+      u.searchParams.set("seccion", destinoSec);
+      if (d === "expedientes") u.searchParams.set("asunto", id); else u.searchParams.delete("asunto");
+      location.href = u.toString();
+    } catch (err) {
+      falta(err.message); ok.disabled = false; ok.textContent = "Subir documento";
+    }
+  });
+})();
+
+/* ── «¿Qué es?» en cada tarjeta: confirmar la sugerencia o elegir el tipo ── */
+(function () {
+  const OPC = document.getElementById("tpOpciones");
+  const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  async function guardar(caja, tipo) {
+    const r = await fetch("{{ url_for('biblioteca.tipo_guardar') }}", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+      body: JSON.stringify({ tabla: caja.dataset.tabla, id: caja.dataset.id, tipo }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { showToast(j.error || "No se pudo guardar el tipo", "error"); return; }
+    caja.dataset.tipo = j.tipo;
+    caja.innerHTML = `<span class="tp-et">${esc(j.etiqueta)}</span><button type="button" class="tp-cambiar">Cambiar</button>`;
+    showToast(`Guardado como «${j.etiqueta}»`);
+  }
+  document.addEventListener("click", e => {
+    const okb = e.target.closest(".tp-ok");
+    if (okb) { guardar(okb.closest(".tp"), okb.dataset.tipo); return; }
+    const b = e.target.closest(".tp-cambiar");
+    if (!b || !OPC) return;
+    const caja = b.closest(".tp");
+    const sel = document.createElement("select");
+    sel.className = "tp-sel"; sel.setAttribute("aria-label", "¿Qué es este documento?");
+    sel.innerHTML = OPC.innerHTML; sel.value = caja.dataset.tipo || "";
+    caja.querySelector(".tp-ok")?.remove();
+    b.replaceWith(sel); sel.focus();
+    sel.addEventListener("change", () => { if (sel.value) guardar(caja, sel.value); });
+  });
+})();
 
 /* ── Bóveda: volver a leer lo pendiente (solo administradores) ── */
 (function () {

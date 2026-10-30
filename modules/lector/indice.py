@@ -238,6 +238,13 @@ def procesar(app, slug: str, doc_id: int) -> None:
             _estado(conn, doc_id, "listo", paginas=len(resultado.paginas), caracteres=resultado.caracteres,
                     uso_ocr=int(resultado.uso_ocr), error=None)
             _cache_vectores.pop(slug, None)
+            try:
+                # «¿Qué es?»: si nadie lo ha confirmado, se sugiere por el inicio del texto
+                from modules import tipos_documento
+                tipos_documento.asegurar(conn)
+                tipos_documento.sugerir_por_texto(conn, doc["archivo_url"], " ".join(f.texto for f in frags[:4]))
+            except Exception as exc:
+                log.warning("Lector: no se pudo sugerir el tipo del documento %s: %s", doc_id, type(exc).__name__)
         except Exception as exc:
             # Nunca se registra el contenido del documento, solo el tipo de error.
             log.warning("Lector: falló documento %s del despacho %s: %s", doc_id, slug, type(exc).__name__)

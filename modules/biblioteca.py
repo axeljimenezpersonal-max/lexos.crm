@@ -22,6 +22,7 @@ from markupsafe import Markup, escape
 
 from modules import boveda
 from modules import lector
+from modules import tipos_documento as tipos
 from modules.insights import machotes
 from modules.auth import login_required, role_required, tenant_required
 
@@ -152,19 +153,22 @@ def _documentos_de_expedientes(tdb):
     w = " AND ".join(where)
     # La tabla del lector nace con el primer archivo; un despacho nuevo aún no la tiene
     lector.indice.asegurar_esquema(tdb)
-    filas = [dict(r, origen="documento") for r in tdb.execute(
+    filas = [dict(r, origen="documento", tabla="documentos") for r in tdb.execute(
         f"""SELECT d.id, d.nombre, d.archivo_url, d.archivo_nombre, d.tamanio, d.fecha_subida, d.subido_por,
-                   d.tipo_documento AS clase, a.id AS asunto_id, a.titulo AS asunto, a.numero_expediente,
+                   d.tipo_documento AS clase, d.tipo_documento, d.tipo_estado, d.fecha_documento,
+                   a.id AS asunto_id, a.titulo AS asunto, a.numero_expediente,
                    a.tipo_asunto, a.abogado_responsable, a.estado AS asunto_estado,
                    l.estado AS lectura, l.error AS lectura_error, l.paginas
             FROM documentos d
             JOIN asuntos a ON a.id = d.asunto_id
             LEFT JOIN lector_documentos l ON l.archivo_url = d.archivo_url
             WHERE {w}""", params).fetchall()]
-    filas += [dict(r, origen="resolucion", archivo_nombre=None, tamanio=None, lectura=None, lectura_error=None, paginas=None)
+    filas += [dict(r, origen="resolucion", tabla="asunto_sentencias", archivo_nombre=None, tamanio=None,
+                   lectura=None, lectura_error=None, paginas=None)
               for r in tdb.execute(
         f"""SELECT s.id, s.titulo AS nombre, s.archivo_url, COALESCE(s.fecha_emision, s.fecha_alta) AS fecha_subida,
-                   s.creado_por AS subido_por, s.tipo AS clase, s.contenido, a.id AS asunto_id, a.titulo AS asunto,
+                   s.creado_por AS subido_por, s.tipo AS clase, s.contenido, s.tipo_documento, s.tipo_estado,
+                   NULL AS fecha_documento, a.id AS asunto_id, a.titulo AS asunto,
                    a.numero_expediente, a.tipo_asunto, a.abogado_responsable, a.estado AS asunto_estado
             FROM asunto_sentencias s JOIN asuntos a ON a.id = s.asunto_id
             WHERE {w}""", params).fetchall()]
@@ -183,7 +187,7 @@ def _documentos_de_expedientes(tdb):
             filas = [d for d in filas if d["abogado_responsable"] == uid]
         for d in filas:
             d["_pajar"] = buscador.normalizar(" ".join(str(v or "") for v in (
-                d["nombre"], d["archivo_nombre"], d["clase"], d["asunto"], d["numero_expediente"],
+                d["nombre"], d["archivo_nombre"], tipos.etiqueta(d["tipo_documento"]), d["asunto"], d["numero_expediente"],
                 TIPOS_DERECHO.get(d["tipo_asunto"] or "otro", {}).get("label"), (d.get("contenido") or "")[:400])))
         filas, corregido = buscador._filtrar(filas, inter["tokens"])
         sugerencia = " ".join(corregido) if corregido else None
@@ -202,11 +206,8 @@ def _documentos_de_expedientes(tdb):
         d["ext"] = nombre_arch.rsplit(".", 1)[-1].lower()[:4] if "." in nombre_arch else ""
         d["tipo_txt"] = "Resolución" if d["origen"] == "resolucion" else (d["ext"].upper() or "Documento")
         d["autor"] = (usuarios.get(d["subido_por"]) or {}).get("corto", "")
-        try:
-            f = date.fromisoformat(str(d["fecha_subida"] or "")[:10])
-            d["dia"] = f"{f.day} {_MESES_CORTOS[f.month - 1]} {f.year}"
-        except ValueError:
-            d["dia"] = ""
+        d["dia"] = _dia(d.get("fecha_documento") or d["fecha_subida"])
+        _con_tipo(d)
         conteo[d["grupo"]] += 1
         c = carpetas.setdefault(d["asunto_id"], {"id": d["asunto_id"], "titulo": d["asunto"], "n": 0,
                                                  "numero": d["numero_expediente"] or f"#{d['asunto_id']}",
@@ -223,6 +224,148 @@ def _documentos_de_expedientes(tdb):
     return docs, conteo, {"chips": chips, "sugerencia": sugerencia, "carpetas": carpetas_l, "asunto": asunto_f}
 
 
+# ── Bóveda: «¿Qué es?» — tipo de cada documento y filtros por grupo/tipo ────────
+
+SECCIONES = {
+    "expedientes": {"label": "Expedientes",
+                    "ayuda": "Escritos, acuerdos, sentencias y pruebas de cada expediente. Para agregar uno: "
+                             "«Subir documento» y elige el expediente (o súbelo desde el propio expediente)."},
+    "personas":    {"label": "Personas",
+                    "ayuda": "Identificaciones, comprobantes, actas y contratos de tus clientes que no son de un "
+                             "expediente. Para agregar uno: «Subir documento» y elige la persona."},
+    "estudio":     {"label": "Archivo del despacho",
+                    "ayuda": "Doctrina, jurisprudencia, leyes y papeles internos que no son de ningún expediente. "
+                             "Para agregar: «Subir documento» → «Archivo del despacho»."},
+    "formatos":    {"label": "Machotes y formatos",
+                    "ayuda": "Modelos de escritos y contratos que se llenan solos con los datos de un expediente. "
+                             "Para agregar: «Subir documento» → «Machotes y formatos»."},
+}
+# «Acuerdos y audiencias» ya no es pestaña: los acuerdos y las actas de audiencia son tipos de documento
+# (filtro «Del juzgado o autoridad»). Los registros viejos siguen en ?seccion=acuerdos.
+
+
+def _con_tipo(d: dict) -> dict:
+    """Agrega a la fila su tipo legible: etiqueta, grupo y si solo es sugerido."""
+    clave = tipos.valido(d.get("tipo_documento"))
+    d["tipo"] = clave
+    d["tipo_label"] = tipos.etiqueta(clave)
+    d["tipo_grupo"] = tipos.grupo_de(clave)
+    d["tipo_sugerido"] = bool(clave) and d.get("tipo_estado") != tipos.CONFIRMADO
+    return d
+
+
+def _filtro_tipos(filas: list[dict]) -> tuple[list[dict], dict]:
+    """Chips por grupo (con conteo), que se abren en sus tipos; más «Sin clasificar» y «Por confirmar».
+    Se combinan con la sección, el filtro por nombre y la búsqueda dentro de los documentos."""
+    grupo_f = request.args.get("grupo", "")
+    tipo_f = tipos.valido(request.args.get("tipo"))
+    if tipo_f:
+        grupo_f = tipos.grupo_de(tipo_f)
+    por_grupo, por_tipo, sin, confirmar = {}, {}, 0, 0
+    for d in filas:
+        if d.get("tipo"):
+            por_grupo[d["tipo_grupo"]] = por_grupo.get(d["tipo_grupo"], 0) + 1
+            por_tipo[d["tipo"]] = por_tipo.get(d["tipo"], 0) + 1
+            confirmar += d["tipo_sugerido"]
+        else:
+            sin += 1
+    grupos = []
+    for gr in tipos.por_grupo():
+        n = por_grupo.get(gr["clave"], 0)
+        if not n and grupo_f != gr["clave"]:
+            continue
+        grupos.append({"clave": gr["clave"], "etiqueta": gr["etiqueta"], "n": n, "on": grupo_f == gr["clave"],
+                       "tipos": [{"clave": t["clave"], "etiqueta": t["etiqueta"], "n": por_tipo.get(t["clave"], 0),
+                                  "on": tipo_f == t["clave"]}
+                                 for t in gr["tipos"] if por_tipo.get(t["clave"]) or tipo_f == t["clave"]]})
+    if tipo_f:
+        filas = [d for d in filas if d.get("tipo") == tipo_f]
+    elif grupo_f == "sin":
+        filas = [d for d in filas if not d.get("tipo")]
+    elif grupo_f == "confirmar":
+        filas = [d for d in filas if d.get("tipo_sugerido")]
+    elif grupo_f in tipos.GRUPO_LABEL:
+        filas = [d for d in filas if d.get("tipo_grupo") == grupo_f]
+    else:
+        grupo_f = ""
+    return filas, {"grupos": grupos, "sin": sin, "confirmar": confirmar, "grupo": grupo_f, "tipo": tipo_f,
+                   "activo": bool(grupo_f or tipo_f)}
+
+
+def _documentos_de_personas(tdb) -> list[dict]:
+    """Documentos de las personas (clientes activos), con su estado de lectura y su tipo."""
+    from modules.asuntos import _usuarios
+    lector.indice.asegurar_esquema(tdb)
+    filas = [dict(r, origen="cliente", tabla="cliente_documentos") for r in tdb.execute(
+        """SELECT cd.id, cd.nombre, cd.archivo_url, cd.archivo_nombre, cd.tamanio, cd.fecha_subida, cd.subido_por,
+                  cd.fecha_documento, cd.tipo_documento, cd.tipo_estado, c.id AS cliente_id,
+                  COALESCE(NULLIF(c.razon_social, ''), TRIM(COALESCE(c.nombre,'') || ' ' || COALESCE(c.apellidos,''))) AS cliente,
+                  l.estado AS lectura, l.error AS lectura_error, l.paginas
+           FROM cliente_documentos cd JOIN clientes c ON c.id = cd.cliente_id AND c.activo = 1
+           LEFT JOIN lector_documentos l ON l.archivo_url = cd.archivo_url
+           ORDER BY COALESCE(cd.fecha_documento, cd.fecha_subida) DESC""").fetchall()]
+    q = _plano(request.args.get("q") or "")
+    if q:
+        filas = [d for d in filas if all(t in _plano(" ".join(str(v or "") for v in (
+            d["nombre"], d["archivo_nombre"], d["cliente"], tipos.etiqueta(d["tipo_documento"])))) for t in q.split())]
+    usuarios = _usuarios()
+    for d in filas:
+        info = ESTADOS_LECTURA.get(d["lectura"] or "")
+        d["estado"] = info["label"] if info else "Guardado"
+        d["grupo"] = info["grupo"] if info else "guardado"
+        nombre_arch = d["archivo_nombre"] or d["archivo_url"] or ""
+        d["ext"] = nombre_arch.rsplit(".", 1)[-1].lower()[:4] if "." in nombre_arch else ""
+        d["autor"] = (usuarios.get(d["subido_por"]) or {}).get("corto", "")
+        d["dia"] = _dia(d["fecha_documento"] or d["fecha_subida"])
+        _con_tipo(d)
+    return filas
+
+
+def _puede_clasificar(tdb, tabla: str, fila_id: int) -> bool:
+    """Misma regla que para verlos: lo de un expediente, solo quien puede ver ese expediente."""
+    from modules.asuntos import puede_ver
+    if tabla not in tipos.TABLAS:
+        return False
+    if tabla == "cliente_documentos":
+        return bool(tdb.execute("SELECT 1 FROM cliente_documentos cd JOIN clientes c ON c.id = cd.cliente_id "
+                                "WHERE cd.id=? AND c.activo=1", (fila_id,)).fetchone())
+    fila = tdb.execute(f"SELECT asunto_id FROM {tabla} WHERE id=?", (fila_id,)).fetchone()
+    if not fila:
+        return False
+    if fila["asunto_id"] is None:
+        return tabla == "biblioteca_archivos"
+    return puede_ver(tdb, fila["asunto_id"])
+
+
+@biblioteca_bp.route("/tipo", methods=["POST"])
+@login_required
+@tenant_required
+def tipo_guardar():
+    """Clasificar un documento desde su tarjeta: «¿Qué es?». Queda confirmado por la persona."""
+    data = request.get_json(silent=True) or request.form
+    tabla = data.get("tabla", "")
+    fila_id = _safe_int(data.get("id"))
+    clave = tipos.valido(data.get("tipo"))
+    if not clave:
+        return jsonify(ok=False, error="Elige qué es el documento"), 400
+    if not fila_id or not _puede_clasificar(g.tenant_db, tabla, fila_id):
+        return jsonify(ok=False, error="No encontré ese documento"), 404
+    tipos.guardar(g.tenant_db, tabla, fila_id, clave, confirmado=True)
+    g.tenant_db.commit()
+    _log("clasificar_documento", fila_id, {"tabla": tabla, "tipo": clave})
+    return jsonify(ok=True, tipo=clave, etiqueta=tipos.etiqueta(clave),
+                   grupo=tipos.GRUPO_LABEL.get(tipos.grupo_de(clave), ""))
+
+
+@biblioteca_bp.route("/tipo/sugerir")
+@login_required
+@tenant_required
+def tipo_sugerir():
+    """Sugerencia por el nombre del archivo (la misma que usa el servidor al guardar)."""
+    clave = tipos.sugerir((request.args.get("nombre") or "")[:200])
+    return jsonify(ok=True, tipo=clave, etiqueta=tipos.etiqueta(clave))
+
+
 # ── Bóveda: búsqueda dentro del contenido de los documentos ──────────────────
 
 ORIGEN_TXT = {"documento": "Documento del expediente", "sentencia": "Resolución", "cliente": "Documento de la persona",
@@ -230,6 +373,8 @@ ORIGEN_TXT = {"documento": "Documento del expediente", "sentencia": "Resolución
 _VACIAS = {"de", "la", "el", "los", "las", "del", "que", "por", "con", "una", "uno", "para", "en", "se", "su", "sus",
            "al", "lo", "un", "y", "o", "a", "es", "no", "como", "sobre", "entre", "este", "esta"}
 MAX_PASAJES = 4
+_TABLA_DE_ORIGEN = {"documento": "documentos", "sentencia": "asunto_sentencias", "cliente": "cliente_documentos",
+                    "biblioteca": "biblioteca_archivos"}
 
 
 def _plano(t: str) -> str:
@@ -292,7 +437,10 @@ def _buscar_en_contenido(tdb, consulta: str, visibles: dict[int, dict]) -> list[
                 "cliente_id": d["cliente_id"], "cliente": (d["cliente"] or "").strip() or None,
                 "paginas": d["paginas"], "pasajes": [], "seccion": "formatos" if d["origen"] == "plantilla" else
                 ("estudio" if d["origen"] == "biblioteca" else None),
+                "tabla": _TABLA_DE_ORIGEN.get(d["origen"]), "fila_id": d["fila_id"],
+                "tipo_documento": d["tipo_documento"], "tipo_estado": d["tipo_estado"],
             }
+            _con_tipo(grupo)
         grupo["pasajes"].append({"pagina": h["pagina"] or 1, "orden": h["fragmento_id"],
                                  "html": _resaltar(h["resumen"], terminos)})
     salida = list(grupos.values())
@@ -306,19 +454,30 @@ def _buscar_en_contenido(tdb, consulta: str, visibles: dict[int, dict]) -> list[
 @login_required
 @tenant_required
 def index():
+    from modules.asuntos import _FILTRO_PROPIOS, _solo_lo_suyo
     tdb = g.tenant_db
     seccion = request.args.get("seccion", "expedientes")
-    if seccion not in ("expedientes", "estudio", "formatos", "acuerdos"):
+    if seccion not in (*SECCIONES, "acuerdos"):
         seccion = "expedientes"
+    # Documentos que nunca se han clasificado: se sugiere su tipo una sola vez (queda «sugerido»)
+    tipos.clasificar_pendientes(tdb, g.tenant_slug)
 
     # ── Búsqueda dentro de los documentos y estado de lectura (solo lo que la persona puede ver) ──
     texto = (request.args.get("texto") or "").strip()[:300]
     visibles = lector.documentos_visibles(tdb)
     lectura = lector.conteo_lectura(visibles)
     lectura["reintentar"] = lector.puede_reintentar() and lectura["reintentables"] > 0
+    filtro = None
     en_contenido = _buscar_en_contenido(tdb, texto, visibles) if texto else []
-    docs_exp, conteo_estados, busqueda = (_documentos_de_expedientes(tdb) if seccion == "expedientes"
+    if texto:
+        en_contenido, filtro = _filtro_tipos(en_contenido)
+    docs_exp, conteo_estados, busqueda = (_documentos_de_expedientes(tdb) if seccion == "expedientes" and not texto
                                           else ([], {}, {"chips": [], "sugerencia": None, "carpetas": [], "asunto": None}))
+    if seccion == "expedientes" and not texto:
+        docs_exp, filtro = _filtro_tipos(docs_exp)
+    docs_personas = []
+    if seccion == "personas" and not texto:
+        docs_personas, filtro = _filtro_tipos(_documentos_de_personas(tdb))
 
     # ── Estudio data ──
     carpetas = tdb.execute(
@@ -329,9 +488,14 @@ def index():
 
     carpeta_id = _safe_int(request.args.get("carpeta"))
     q = request.args.get("q", "").strip()
-    tipo_f = request.args.get("tipo", "")
+    tipo_f = request.args.get("ext", "")
 
     where, params = ["1"], []
+    if _solo_lo_suyo():
+        # Un archivo vinculado a un expediente solo lo ve quien puede ver ese expediente
+        uid = session.get("user_id")
+        where.append(f"(a.asunto_id IS NULL OR a.asunto_id IN (SELECT a.id FROM asuntos a WHERE {_FILTRO_PROPIOS}))")
+        params += [uid, uid, uid]
     if carpeta_id:
         where.append("a.carpeta_id=?")
         params.append(carpeta_id)
@@ -348,7 +512,11 @@ def index():
         f"WHERE {' AND '.join(where)} ORDER BY a.fecha_alta DESC LIMIT 200",
         params,
     ).fetchall()
-    archivos = [dict(a) for a in archivos]
+    archivos = [_con_tipo(dict(a)) for a in archivos]
+    for a in archivos:
+        a["dia"] = _dia(a.get("fecha_documento") or a.get("fecha_alta"))
+    if seccion == "estudio" and not texto:
+        archivos, filtro = _filtro_tipos(archivos)
 
     espacio_usado = _espacio_usado(tdb)
     espacio_limite = _plan_limit_bytes()
@@ -374,7 +542,8 @@ def index():
     ).fetchall()
     plantillas = [dict(p) for p in plantillas]
 
-    # ── Acuerdos data ──
+    # ── Acuerdos y audiencias (registros anteriores; ya no es pestaña) ──
+    n_acuerdos = tdb.execute("SELECT COUNT(*) FROM biblioteca_acuerdos").fetchone()[0]
     tab_ac = request.args.get("tab_ac", "audiencias")
     acuerdos = tdb.execute(
         "SELECT ba.*, a.titulo as asunto_titulo FROM biblioteca_acuerdos ba "
@@ -384,19 +553,32 @@ def index():
     ).fetchall()
     acuerdos = [dict(a) for a in acuerdos]
 
-    # ── Lists for selects ──
+    # ── Listas para «¿Dónde va?» (solo los expedientes que la persona puede ver) ──
+    alc, alc_p = ("1", [])
+    if _solo_lo_suyo():
+        uid = session.get("user_id")
+        alc, alc_p = _FILTRO_PROPIOS, [uid, uid, uid]
     asuntos = tdb.execute(
-        "SELECT id, titulo, numero_expediente FROM asuntos WHERE estado NOT IN ('archivado','cerrado') ORDER BY titulo"
+        f"SELECT a.id, a.titulo, a.numero_expediente, a.estado FROM asuntos a WHERE a.estado != 'archivado' AND {alc} "
+        "ORDER BY CASE WHEN a.estado IN ('cerrado','completado') THEN 1 ELSE 0 END, a.titulo", alc_p
     ).fetchall()
     clientes = tdb.execute(
-        "SELECT id, nombre, apellidos, razon_social FROM clientes WHERE activo=1 ORDER BY nombre LIMIT 300"
+        "SELECT id, nombre, apellidos, razon_social FROM clientes WHERE activo=1 ORDER BY nombre LIMIT 1000"
     ).fetchall()
+    destinos = {
+        "expedientes": [{"id": a["id"], "t": f"{a['numero_expediente'] or '#' + str(a['id'])} · {a['titulo']}"} for a in asuntos],
+        "personas": [{"id": c["id"], "t": (c["razon_social"] or f"{c['nombre'] or ''} {c['apellidos'] or ''}").strip()}
+                     for c in clientes],
+        "carpetas": [{"id": c["id"], "t": c["nombre"]} for c in carpetas],
+    }
 
     resp = make_response(render_template(
         "biblioteca/index.html",
         texto=texto, en_contenido=en_contenido, lectura=lectura,
         max_pasajes=MAX_PASAJES,
-        seccion=seccion,
+        seccion=seccion, secciones=SECCIONES, filtro=filtro, docs_personas=docs_personas,
+        tipos_grupos=tipos.por_grupo(), destinos=destinos, n_acuerdos=n_acuerdos,
+        puede_formatos=session.get("role") in ("super_admin", "admin", "abogado"),
         docs_exp=docs_exp, conteo_estados=conteo_estados, estado_f=request.args.get("estado", ""), busqueda=busqueda,
         estados_lectura=ESTADOS_LECTURA,
         # Estudio
@@ -477,10 +659,14 @@ def carpeta_eliminar(id):
 @login_required
 @tenant_required
 def upload():
+    from modules.asuntos import puede_ver
     tdb = g.tenant_db
+    tipos.asegurar(tdb)
     carpeta_id = _safe_int(request.form.get("carpeta_id"))
     asunto_id = _safe_int(request.form.get("asunto_id"))
     cliente_id = _safe_int(request.form.get("cliente_id"))
+    if asunto_id and not puede_ver(tdb, asunto_id):
+        return jsonify(ok=False, error="No encontré ese expediente"), 404
 
     # Check space
     usado = _espacio_usado(tdb)
@@ -488,6 +674,8 @@ def upload():
 
     uploaded = []
     files = request.files.getlist("archivos")
+    # Desde «Subir documento» llega un solo archivo y puede traer un nombre propio
+    nombre_propio = (request.form.get("nombre") or "").strip()[:200] if len(files) == 1 else ""
     for f in files:
         if usado >= limite:
             break
@@ -501,7 +689,7 @@ def upload():
                VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
                 carpeta_id,
-                info["nombre_original"],
+                nombre_propio or info["nombre_original"],
                 info["nombre_original"],
                 info["url"],
                 info["tamanio"],
@@ -512,6 +700,9 @@ def upload():
             ),
         )
         usado += info["tamanio"]
+        # «¿Qué es?»: lo que eligió la persona (confirmado) o, si no dijo, sugerido por el nombre
+        tipos.al_subir(tdb, "biblioteca_archivos", cur.lastrowid, request.form.get("tipo_documento"),
+                       info["nombre_original"], request.form.get("fecha_documento"))
         uploaded.append({"id": cur.lastrowid, "nombre": info["nombre_original"], "url": info["url"]})
     tdb.commit()
     for u in uploaded:
