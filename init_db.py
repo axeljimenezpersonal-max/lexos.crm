@@ -830,6 +830,14 @@ _MIGRATE_COLS = [
     ("asunto_sentencias", "sentido",                "TEXT"),
     # ── Cobranza: horas ya cobradas ───────────────────────────────────────────
     ("asunto_horas", "cobro_id",                    "INTEGER"),
+    # ── Cobranza: retenciones de una persona moral e igualas que se repiten ──
+    ("cobros", "ret_iva_pct",                       "REAL DEFAULT 0"),
+    ("cobros", "ret_iva_monto",                     "REAL DEFAULT 0"),
+    ("cobros", "ret_isr_pct",                       "REAL DEFAULT 0"),
+    ("cobros", "ret_isr_monto",                     "REAL DEFAULT 0"),
+    ("cobros", "repetir",                           "TEXT"),
+    ("cobros", "repetir_dia",                       "INTEGER"),
+    ("cobros", "repetido_de",                       "INTEGER"),
     # ── Bóveda: «¿Qué es?» (modules/tipos_documento.py) y fecha del documento ──
     ("documentos", "tipo_documento",                "TEXT"),
     ("documentos", "tipo_estado",                   "TEXT"),

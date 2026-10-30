@@ -32,6 +32,7 @@ GRUPOS: list[tuple[str, str]] = [
     ("persona", "De la persona"),
     ("pagos", "Facturas y pagos"),
     ("correspondencia", "Correspondencia"),
+    ("despacho", "Del despacho"),
     ("otro", "Otro"),
 ]
 
@@ -133,6 +134,18 @@ _CATALOGO: list[tuple[str, str, str, str, tuple[str, ...]]] = [
      ("carta", "oficio", "memorandum", "memo", "comunicado", "aviso")),
     ("requerimiento", "Requerimiento", "correspondencia", "requerimiento",
      ("requerimiento", "requerimiento de pago", "carta de requerimiento", "intimacion", "se le requiere")),
+    # Del despacho (archivo del despacho: no es de un expediente ni de una persona)
+    ("doctrina", "Doctrina o artículo", "despacho", "otro",
+     ("doctrina", "articulo", "ensayo", "revista", "libro", "capitulo", "tesis", "jurisprudencia", "criterio")),
+    ("legislacion", "Legislación o compilación", "despacho", "otro",
+     ("ley", "codigo", "reglamento", "legislacion", "compilacion", "constitucion", "norma", "nom", "decreto", "dof")),
+    ("formato_interno", "Formato interno", "despacho", "otro",
+     ("formato interno", "checklist", "lista de verificacion", "procedimiento", "manual", "politica", "protocolo interno")),
+    ("administrativo", "Administrativo del despacho", "despacho", "otro",
+     ("administrativo", "nomina", "renta", "arrendamiento oficina", "proveedor", "inventario", "presupuesto",
+      "contabilidad", "declaracion", "acta de asamblea del despacho")),
+    ("capacitacion", "Capacitación", "despacho", "otro",
+     ("capacitacion", "curso", "diplomado", "taller", "presentacion", "seminario", "constancia de curso", "webinar")),
     # Otro
     ("otro", "Otro", "otro", "otro", ()),
 ]
@@ -142,6 +155,35 @@ TIPOS: dict[str, dict] = {
     for clave, etiqueta, grupo, acto, palabras in _CATALOGO
 }
 GRUPO_LABEL = dict(GRUPOS)
+
+# «¿Qué es?» según a dónde va el documento: los grupos que tienen sentido en cada destino.
+# «Otro» siempre está, y el formulario deja «Ver todos los tipos» por si hace falta otro.
+DESTINOS: dict[str, list[str]] = {
+    "expedientes": ["escritos", "juzgado", "recursos", "pruebas", "contratos", "correspondencia", "otro"],
+    "personas":    ["persona", "contratos", "notariales", "pagos", "correspondencia", "otro"],
+    "estudio":     ["despacho", "otro"],
+}
+# De qué destino es cada tabla (para sugerir el tipo de lo que ya existe)
+DESTINO_DE_TABLA = {"documentos": "expedientes", "asunto_sentencias": "expedientes",
+                    "cliente_documentos": "personas", "biblioteca_archivos": "estudio"}
+
+
+def tipos_de_destino(destino: str | None) -> list[str]:
+    """Claves de los tipos que se ofrecen primero para ese destino (todas si no hay destino)."""
+    grupos = DESTINOS.get(destino or "")
+    if not grupos:
+        return list(TIPOS)
+    return [k for k, t in TIPOS.items() if t["grupo"] in grupos]
+
+
+def para_formulario() -> dict:
+    """Todo lo que el formulario de subida necesita, desde el catálogo (fuente única)."""
+    return {
+        "grupos": [{"clave": g["clave"], "etiqueta": g["etiqueta"],
+                    "tipos": [{"clave": t["clave"], "etiqueta": t["etiqueta"]} for t in g["tipos"]]}
+                   for g in por_grupo()],
+        "destinos": DESTINOS,
+    }
 CONFIRMADO, SUGERIDO = "confirmado", "sugerido"
 
 # Las tablas de documentos con archivo que llevan tipo (tabla → columna con el nombre visible)
@@ -207,8 +249,9 @@ def _puntajes(texto_plano: str, peso: float = 1.0) -> dict[str, float]:
     return puntos
 
 
-def sugerir(nombre: str | None = None, texto: str | None = None) -> str | None:
+def sugerir(nombre: str | None = None, texto: str | None = None, destino: str | None = None) -> str | None:
     """Tipo más probable a partir del nombre del archivo y, si ya se leyó, del inicio del texto.
+    Con `destino` se prefieren los tipos de ese destino; si ninguno tiene pistas, se usa el mejor de todos.
     Devuelve None si no hay pistas suficientes (queda «Sin clasificar»)."""
     puntos: dict[str, float] = {}
     if nombre:
@@ -223,8 +266,15 @@ def sugerir(nombre: str | None = None, texto: str | None = None) -> str | None:
             puntos[k] = puntos.get(k, 0) + v
     if not puntos:
         return None
-    mejor = max(puntos, key=lambda k: (puntos[k], -list(TIPOS).index(k)))
-    return mejor if puntos[mejor] >= 2 else None
+    del_destino = set(tipos_de_destino(destino)) if destino in DESTINOS else set()
+    candidatos = {k: v for k, v in puntos.items() if k in del_destino and v >= 2}
+    if not candidatos:
+        # Fuera del destino solo con una pista clara (p. ej. «INE» en un expediente), no por palabras sueltas
+        candidatos = {k: v for k, v in puntos.items() if not del_destino or v >= 6}
+    if not candidatos:
+        return None
+    mejor = max(candidatos, key=lambda k: (candidatos[k], -list(TIPOS).index(k)))
+    return mejor if candidatos[mejor] >= 2 else None
 
 
 # ── Base de datos ─────────────────────────────────────────────────────────────
@@ -258,7 +308,7 @@ def al_subir(tdb, tabla: str, fila_id: int, elegido: str | None, nombre: str | N
     if clave:
         guardar(tdb, tabla, fila_id, clave, confirmado=True)
     else:
-        sugerido = sugerir(nombre)
+        sugerido = sugerir(nombre, destino=DESTINO_DE_TABLA.get(tabla))
         if sugerido:
             guardar(tdb, tabla, fila_id, sugerido, confirmado=False)
     f = fecha_valida(fecha)
@@ -280,7 +330,7 @@ def sugerir_por_texto(conn, archivo_url: str, texto: str) -> None:
         except sqlite3.OperationalError:
             continue
         for f in filas:
-            clave = sugerir(f[1], texto)
+            clave = sugerir(f[1], texto, DESTINO_DE_TABLA.get(tabla))
             if clave:
                 conn.execute(f"UPDATE {tabla} SET tipo_documento=?, tipo_estado='sugerido' WHERE id=?", (clave, f[0]))
     conn.commit()
@@ -316,7 +366,8 @@ def clasificar_pendientes(tdb, slug: str | None = None) -> int:
             viejo = (f["tipo_documento"] or "").strip().lower()
             if viejo and viejo not in TIPOS and viejo not in _EQUIVALENTES:
                 viejo = ""
-            clave = valido(viejo) or _EQUIVALENTES.get(viejo) or sugerir(f["nombre"], _texto_inicial(tdb, slug, f["archivo_url"]))
+            clave = valido(viejo) or _EQUIVALENTES.get(viejo) or sugerir(f["nombre"], _texto_inicial(tdb, slug, f["archivo_url"]),
+                                                                          DESTINO_DE_TABLA.get(tabla))
             if clave:
                 tdb.execute(f"UPDATE {tabla} SET tipo_documento=?, tipo_estado='sugerido' WHERE id=?", (clave, f["id"]))
                 n += 1

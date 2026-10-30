@@ -139,7 +139,7 @@
 .xc .xp-aviso-ia { margin: 0; border-radius: 0; border: 0; border-top: 1px solid var(--border); }
 
 /* ── Documentos en cuadros ────────────────────────────────────── */
-.xd-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 14px; }
+.xd-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 14px; flex-wrap: wrap; }
 .xd-h + .xd-grid ~ .xd-h, .xd-grid + .xd-h { margin-top: 30px; }
 .xd-h h2 { margin: 0; font: 600 18px 'Sora', sans-serif; color: var(--e); }
 .xd-h h2 span { font: 500 14px 'Inter', sans-serif; color: var(--ash); margin-left: 6px; }
@@ -521,3 +521,15 @@
   .pl-vacio { flex-direction: column; align-items: stretch; }
   .pl-pie .btn { flex: 1; }
 }
+
+/* ── Bóveda del expediente: escritos del equipo ── */
+.xd-h-acc { display: flex; gap: 8px; flex-wrap: wrap; }
+.xd-escritos { margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--c); }
+.xd-escritos h3 { margin: 0 0 8px; font: 600 15px 'Sora', sans-serif; color: var(--e); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.xd-escritos h3 span { font: 400 12.5px 'Inter', sans-serif; color: var(--ash); }
+.xd-escritos-l { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.xd-escritos-l a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; background: #fff;
+  border: 1px solid var(--border); text-decoration: none; }
+.xd-escritos-l a:hover { border-color: #C9A86A; }
+.xd-escritos-l b { font: 600 14px 'Inter', sans-serif; color: var(--e); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xd-escritos-l small { font-size: 12.5px; color: var(--ash); }

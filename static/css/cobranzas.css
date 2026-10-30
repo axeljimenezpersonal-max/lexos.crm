@@ -158,6 +158,37 @@
 .cb-hora small{font-size:12px;color:var(--ash)}
 .cb-horas-lista{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow:auto}
 
+/* Nuevo cobro: buscador de cliente, errores, retenciones e igualas */
+.cb-form>*{min-width:0}
+.cb-combo{position:relative}
+.cb-combo .as-input{padding-right:34px}
+.cb-combo-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;border:0;border-radius:7px;background:none;color:var(--ash);font-size:18px;line-height:1;cursor:pointer}
+.cb-combo-x:hover{background:#EFECE6;color:var(--tinta)}
+.cb-combo-lista{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;margin:0;padding:4px;list-style:none;background:var(--c);
+  border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(19,34,56,.14);max-height:264px;overflow:auto}
+.cb-combo-lista li{padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:1px}
+.cb-combo-lista li b{font:600 13.5px 'Inter',sans-serif;color:var(--fog);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cb-combo-lista li small{font-size:11.5px;color:var(--ash)}
+.cb-combo-lista li[aria-selected=true],.cb-combo-lista li[role=option]:hover{background:var(--edim)}
+.cb-combo-lista li.vacio{cursor:default;font-size:13px;color:var(--ash);display:block}
+.cb-combo-lista li.vacio a{color:var(--e);font-weight:600}
+.cb-err{font-size:12.5px;color:#A23B33;font-weight:600;margin-top:5px;line-height:1.4}
+.cb-form [aria-invalid=true]{border-color:#A23B33!important;box-shadow:0 0 0 3px rgba(162,59,51,.12)}
+.cb-link{background:none;border:0;padding:0;color:var(--e);font-family:inherit;font-weight:600;font-size:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.cb-ret-hint{background:#F4EEDF;border-radius:10px;padding:8px 11px;margin-top:-4px;color:#6E5A3A}
+.cb-check{flex-wrap:wrap}
+.cb-check>span{flex:1;min-width:0}
+.cb-check select{width:auto;max-width:100%;margin-left:auto}
+.cb-repite{display:inline-block;font:600 10.5px 'Inter',sans-serif;color:#6E5A3A;background:#F4EEDF;border-radius:99px;padding:2px 7px;margin-left:6px;white-space:nowrap}
+.as-tit small .cb-repite{margin-left:0;margin-right:2px}
+.cb-aviso-rep{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#F8F6F2;border:1px solid #EFE6D2;border-radius:12px;padding:10px 12px}
+.cb-aviso-rep .ic{width:28px;height:28px;border-radius:8px;background:#F4EEDF;color:#8A6A2F;display:grid;place-items:center;font-weight:700;flex:none}
+.cb-aviso-rep>div{flex:1;min-width:180px}
+.cb-aviso-rep b{display:block;font:600 13.5px 'Inter',sans-serif;color:var(--fog)}
+.cb-aviso-rep small{font-size:12px;color:var(--ash)}
+.cb-aviso-rep a{color:var(--e);font-weight:600;text-decoration:none}
+.cb-resumen .cb-kv b{white-space:nowrap}
+
 /* ── Responsivo ─────────────────────────────────────────────────────────── */
 @media(max-width:1180px){
   .cb-grid{grid-template-columns:minmax(0,1fr)}

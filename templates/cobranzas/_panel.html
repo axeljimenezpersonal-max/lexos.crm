@@ -3,7 +3,7 @@
       data-concepto="{{ co.concepto }}" data-cliente="{{ co.cliente or 'Sin cliente' }}"></span>
 <div class="cb-dr-h">
   <div style="min-width:0">
-    <span class="as-chip" style="--c-c:{{ co.estado_info.color }};--c-f:{{ co.estado_info.fondo }}">{{ co.estado_info.label }}</span><span class="cb-folio">{{ co.folio }}</span>
+    <span class="as-chip" style="--c-c:{{ co.estado_info.color }};--c-f:{{ co.estado_info.fondo }}">{{ co.estado_info.label }}</span><span class="cb-folio">{{ co.folio }}</span>{% if co.repite %}<span class="cb-repite" title="Iguala que se repite cada mes">↻ Cada mes</span>{% endif %}
     <h2>{{ co.concepto }}</h2>
     <p>
       {% if cli %}<a href="{{ url_for('clientes.detalle', id=cli.id) }}">{{ co.cliente }}</a>{% else %}Sin cliente{% endif %}
@@ -26,6 +26,22 @@
   <section class="cb-saldo pagado"><small>Pagado completo</small><b>{{ co.total_v | dinero(co.moneda) }}</b><span>{% if pagos %}Último pago el {{ pagos[0].fecha_txt }}{% endif %}</span></section>
   {% endif %}
 
+  {% if repeticion %}
+  <div class="cb-aviso-rep">
+    <span class="ic" aria-hidden="true">↻</span>
+    <div>
+      {% if repeticion.siguiente %}
+        <b>El cobro del mes siguiente ya se creó</b>
+        <small><a href="#cobro-{{ repeticion.siguiente.id }}">Ver {{ repeticion.siguiente.numero_factura or ('#' ~ repeticion.siguiente.id) }}</a> · cada mes se crea uno nuevo con los mismos datos.</small>
+      {% else %}
+        <b>Se repite cada mes</b>
+        <small>El {{ repeticion.cuando }} se crea el cobro del mes siguiente con los mismos datos.</small>
+      {% endif %}
+    </div>
+    {% if puede and co.repite %}<button type="button" class="btn btn-ghost btn-sm" data-acc="no-repetir">Dejar de repetir</button>{% endif %}
+  </div>
+  {% endif %}
+
   {% if puede and co.estado != 'cancelado' %}
   <div class="cb-botones">
     {% if co.saldo_v %}
@@ -45,10 +61,14 @@
   <section>
     <h3>Desglose</h3>
     <div class="cb-kv"><span>Honorarios</span><b>{{ desglose.honorarios | dinero(co.moneda) }}</b></div>
-    {% if desglose.descuento %}<div class="cb-kv"><span>Descuento</span><b>−{{ desglose.descuento | dinero(co.moneda) }}</b></div>{% endif %}
+    {% if desglose.descuento %}<div class="cb-kv"><span>Descuento</span><b>−{{ desglose.descuento | dinero(co.moneda) }}</b></div>
+    <div class="cb-kv"><span>Subtotal</span><b>{{ desglose.subtotal | dinero(co.moneda) }}</b></div>{% endif %}
     <div class="cb-kv"><span>{{ 'IVA %g%%' | format(desglose.iva_pct) if desglose.iva_pct else 'Sin IVA' }}</span><b>{{ desglose.iva | dinero(co.moneda) }}</b></div>
-    {% if desglose.ajuste %}<div class="cb-kv"><span>Descuentos posteriores</span><b>{{ desglose.ajuste | dinero(co.moneda) }}</b></div>{% endif %}
-    <div class="cb-kv total"><span>Total</span><b>{{ co.total_v | dinero(co.moneda) }}</b></div>
+    {% if desglose.ret_iva %}<div class="cb-kv"><span>Retención de IVA ({{ '%g' | format(desglose.ret_iva_pct) }}%)</span><b>−{{ desglose.ret_iva | dinero(co.moneda) }}</b></div>{% endif %}
+    {% if desglose.ret_isr %}<div class="cb-kv"><span>Retención de ISR ({{ '%g' | format(desglose.ret_isr_pct) }}%)</span><b>−{{ desglose.ret_isr | dinero(co.moneda) }}</b></div>{% endif %}
+    {% if desglose.ajuste %}<div class="cb-kv"><span>Descuentos posteriores</span><b>−{{ (-desglose.ajuste) | dinero(co.moneda) }}</b></div>{% endif %}
+    <div class="cb-kv total"><span>{{ 'Total que paga el cliente' if desglose.ret_iva or desglose.ret_isr else 'Total' }}</span><b>{{ co.total_v | dinero(co.moneda) }}</b></div>
+    {% if desglose.ret_iva or desglose.ret_isr %}<p class="cb-hint">El cliente entera las retenciones al SAT y debe darte su constancia de retenciones.</p>{% endif %}
   </section>
 
   <section>
@@ -70,11 +90,12 @@
     <div class="cb-kv"><span>Fecha límite de pago</span><b>{{ vencimiento if co.fecha_vencimiento else 'Sin fecha' }}</b></div>
     <div class="cb-kv"><span>Responsable</span><b>{{ abogado.nombre if abogado else '—' }}</b></div>
     {% if co.moneda == 'USD' %}<div class="cb-kv"><span>Moneda</span><b>Dólares (USD)</b></div>{% endif %}
+    {% if co.asunto_id %}<div class="cb-kv"><span>Expediente</span><b><a href="{{ url_for('asuntos.detalle', id=co.asunto_id) }}">{{ co.numero_expediente or co.asunto_titulo }}</a></b></div>{% endif %}
     <div class="cb-kv"><span>Factura</span><b>
       {% if co.archivo_factura_url %}<a href="{{ co.archivo_factura_url }}" target="_blank" rel="noopener">PDF</a>{% endif %}
       {% if co.archivo_factura_url and co.archivo_xml_url %} · {% endif %}
       {% if co.archivo_xml_url %}<a href="{{ co.archivo_xml_url }}" target="_blank" rel="noopener">XML</a>{% endif %}
-      {% if not co.archivo_factura_url and not co.archivo_xml_url %}<span class="as-muted" style="font-weight:500">Sin adjuntar</span>{% endif %}
+      {% if not co.archivo_factura_url and not co.archivo_xml_url %}{% if puede and co.estado != 'cancelado' %}<button type="button" class="cb-link" data-acc="factura">Adjuntar factura</button>{% else %}<span class="as-muted" style="font-weight:500">Sin adjuntar</span>{% endif %}{% endif %}
     </b></div>
     {% if cli and (cli.celular or cli.telefono or cli.email) %}
     <div class="cb-kv"><span>Contacto</span><b style="font-weight:500">{{ cli.celular or cli.telefono or '' }}{% if (cli.celular or cli.telefono) and cli.email %}<br>{% endif %}{{ cli.email or '' }}</b></div>

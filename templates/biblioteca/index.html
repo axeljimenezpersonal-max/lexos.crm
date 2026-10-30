@@ -27,13 +27,32 @@
 {% endif %}
 {% endmacro %}
 {% macro tipo_pill(d, tabla, fila_id) %}
-<span class="tp" data-tabla="{{ tabla or '' }}" data-id="{{ fila_id }}" data-tipo="{{ d.tipo or '' }}">
+<span class="tp" data-tabla="{{ tabla or '' }}" data-id="{{ fila_id }}" data-tipo="{{ d.tipo or '' }}" data-destino="{{ {'documentos': 'expedientes', 'asunto_sentencias': 'expedientes', 'cliente_documentos': 'personas', 'biblioteca_archivos': 'estudio'}.get(tabla, '') }}">
   {%- if d.tipo %}<span class="tp-et{{ ' sug' if d.tipo_sugerido }}"{% if d.tipo_sugerido %} title="Lo sugirió el sistema por el nombre o el texto: confírmalo o cámbialo"{% endif %}>{{ d.tipo_label }}{% if d.tipo_sugerido %} <i>sugerido</i>{% endif %}</span>{% endif %}
   {%- if tabla %}
     {%- if d.tipo_sugerido %}<button type="button" class="tp-ok" data-tipo="{{ d.tipo }}">Confirmar</button>{% endif %}
     <button type="button" class="tp-cambiar{{ ' tp-falta' if not d.tipo }}">{{ '¿Qué es?' if not d.tipo else 'Cambiar' }}</button>
   {%- endif %}
 </span>
+{%- endmacro %}
+{% macro doc_acciones(d, tabla) %}
+{%- set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+<span class="dc-acc">
+  {%- if enlace %}<a href="{{ d.archivo_url }}" target="_blank" rel="noopener">Abrir</a><a href="{{ d.archivo_url }}?descargar=1">Descargar</a>{% endif %}
+  {%- if tabla in ('documentos', 'cliente_documentos') %}<button type="button" class="dc-mover" data-tabla="{{ tabla }}" data-id="{{ d.id }}" data-nombre="{{ d.nombre }}">Mover</button>{% endif %}
+</span>
+{%- endmacro %}
+{% macro fila_doc(d) %}
+{%- set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
+<li class="pf-doc">
+  <span class="doc-ext {{ d.ext }}" aria-hidden="true">{{ d.ext or 'doc' }}</span>
+  <div class="pf-doc-tx">
+    {% if enlace %}<a class="pf-doc-n" href="{{ d.archivo_url }}" target="_blank" rel="noopener">{{ d.nombre }}</a>{% else %}<span class="pf-doc-n">{{ d.nombre }}</span>{% endif %}
+    <small>{{ d.dia }}{% if d.estado %} · {{ d.estado }}{% endif %}{% if d.paginas %} · {{ d.paginas }} pág.{% endif %}</small>
+    {{ tipo_pill(d, d.tabla, d.id) }}
+  </div>
+  {{ doc_acciones(d, d.tabla) }}
+</li>
 {%- endmacro %}
 {# Mientras se busca dentro de los documentos, la página muestra solo los resultados #}
 {% set vista = '' if texto else seccion %}
@@ -154,10 +173,10 @@
 {% if vista in secciones %}<p class="bv-ayuda">{{ secciones[vista].ayuda }}</p>{% endif %}
 
 {% if vista == 'expedientes' %}
-{% set docs_total = conteo_estados.values() | sum %}
+<div data-destino="expedientes"{% if busqueda.asunto %} data-asunto="{{ busqueda.asunto }}"{% endif %}>
 <div class="dc-busca">
   {{ buscador(en='documentos', accion=url_for('biblioteca.index'), valor=request.args.get('q', ''), chips=busqueda.chips, enviar=True,
-       placeholder='Filtra por nombre del documento, expediente o cliente: «sentencias de amparo»',
+       placeholder='Filtra por documento, expediente o cliente: «sentencias de amparo», «Moreno»',
        ocultos={'seccion': 'expedientes', 'estado': estado_f, 'asunto': busqueda.asunto, 'grupo': filtro.grupo if filtro else None, 'tipo': filtro.tipo if filtro else None},
        sugerencias=[('sentencias', 'Sentencias y resoluciones'), ('amparo', 'Amparo'), ('familiar', 'Familiar'), ('mercantil', 'Mercantil')]
                    + ([('mis', 'De mis expedientes')] if session.get('role') == 'abogado' else [])) }}
@@ -172,13 +191,13 @@
   </div>
   <div class="dc-carp-grid">
     {% for c in busqueda.carpetas[:12] %}
-    <a class="dc-carp{{ ' on' if busqueda.asunto == c.id }}{{ ' cerrada' if not c.abierto }}"
+    <a class="dc-carp{{ ' on' if busqueda.asunto == c.id }}{{ ' cerrada' if not c.abierto }}" data-destino="expedientes" data-asunto="{{ c.id }}"
        href="{{ url_for('biblioteca.index', seccion='expedientes', asunto=None if busqueda.asunto == c.id else c.id, q=request.args.get('q') or None, estado=estado_f or None) }}">
       <svg class="dc-carp-ico" width="34" height="34" viewBox="0 0 48 48" fill="none" aria-hidden="true">
         <path d="M4 13a3 3 0 0 1 3-3h11l4 4h19a3 3 0 0 1 3 3v21a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".18"/>
         <path d="M4 19h40v19a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".55"/>
       </svg>
-      <span class="dc-carp-tx"><b>{{ c.numero }}</b><small>{{ c.titulo }}</small></span>
+      <span class="dc-carp-tx"><b>{{ c.numero }}</b><small>{{ c.titulo }}</small>{% if c.cliente %}<small class="dc-carp-cli">{{ c.cliente }}</small>{% endif %}</span>
       <span class="dc-carp-n">{{ c.n }}</span>
     </a>
     {% endfor %}
@@ -187,6 +206,19 @@
 {% endif %}
 
 {% set base_exp = {'seccion': 'expedientes', 'q': request.args.get('q') or None, 'estado': estado_f or None, 'asunto': busqueda.asunto} %}
+{% if busqueda.asunto %}
+{% set sel = (busqueda.carpetas | selectattr('id', 'equalto', busqueda.asunto) | list | first) %}
+{% if sel %}
+<div class="bv-contexto">
+  <div class="bv-contexto-tx"><b>{{ sel.numero }}</b> {{ sel.titulo }}{% if sel.cliente %}<small>Cliente: {{ sel.cliente }}</small>{% endif %}</div>
+  <div class="bv-contexto-acc">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('asuntos.detalle', id=sel.id) }}#documentos">Abrir expediente</a>
+    {% if sel.cliente_id %}<a class="btn btn-ghost btn-sm" href="{{ url_for('biblioteca.index', seccion='personas', cliente=sel.cliente_id) }}">Documentos de {{ sel.cliente }}</a>{% endif %}
+    <button type="button" class="btn btn-primary btn-sm" data-subir="expedientes">Subir a este expediente</button>
+  </div>
+</div>
+{% endif %}
+{% endif %}
 <div class="dc-sec-h dc-docs-h">
   <h2>{% if busqueda.asunto %}Documentos de esta carpeta{% else %}Todos los documentos{% endif %} <span>{{ docs_exp | length }}</span></h2>
   <div class="ex-atencion" style="padding:0;margin:0">
@@ -201,7 +233,7 @@
 <div class="dc-grid">
   {% for d in docs_exp %}
   {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
-  <article class="dc-doc">
+  <article class="dc-doc" data-destino="expedientes" data-asunto="{{ d.asunto_id }}">
     <a class="dc-hoja t-{{ 'res' if d.origen == 'resolucion' else (d.ext or 'doc') }}" href="{{ d.archivo_url if enlace else url_for('asuntos.detalle', id=d.asunto_id) ~ '#documentos' }}"{% if enlace %} target="_blank" rel="noopener"{% endif %}>
       <span class="dc-esquina" aria-hidden="true"></span>
       <span class="dc-tipo">{{ d.tipo_txt }}</span>
@@ -209,7 +241,8 @@
     </a>
     <div class="dc-info">
       <b title="{{ d.nombre }}">{{ d.nombre }}</b>
-      <a class="dc-exp" href="{{ url_for('asuntos.detalle', id=d.asunto_id) }}#documentos"><em>{{ d.numero_expediente or '' }}</em> {{ d.asunto }}</a>
+      <a class="dc-exp" href="{{ url_for('biblioteca.index', seccion='expedientes', asunto=d.asunto_id) }}"><em>{{ d.numero_expediente or '' }}</em> {{ d.asunto }}</a>
+      {% if d.cliente %}<a class="dc-cli" href="{{ url_for('biblioteca.index', seccion='personas', cliente=d.cliente_id) }}">{{ d.cliente }}</a>{% endif %}
       {{ tipo_pill(d, d.tabla, d.id) }}
       <span class="dc-pie">
         <span class="doc-estado {{ d.grupo }}"{% if d.lectura_error %} title="{{ d.lectura_error }}"{% endif %}>
@@ -221,13 +254,17 @@
           {{ d.estado }}</span>
         <small>{{ d.dia }}{% if d.paginas %} · {{ d.paginas }} pág.{% endif %}</small>
       </span>
+      {{ doc_acciones(d, d.tabla) }}
     </div>
   </article>
   {% endfor %}
 </div>
 {% else %}
 <div class="bv-vacio">
-  {% if request.args.get('q') or estado_f or busqueda.asunto or filtro.activo %}
+  {% if busqueda.asunto and not (request.args.get('q') or estado_f or filtro.activo) %}
+    <h3>Esta carpeta todavía no tiene documentos</h3><p>Arrastra aquí los archivos o usa «Subir a este expediente».</p>
+    <button type="button" class="btn btn-primary" data-subir="expedientes">Subir a este expediente</button>
+  {% elif request.args.get('q') or estado_f or busqueda.asunto or filtro.activo %}
     <h3>Nada coincide con esa búsqueda</h3><p>Prueba con otras palabras o quita el filtro.</p>
     <a class="btn btn-ghost" href="{{ url_for('biblioteca.index', seccion='expedientes') }}">Limpiar filtros</a>
   {% else %}
@@ -238,6 +275,7 @@
 </div>
 {% endif %}
 {% if n_acuerdos %}<p class="doc-nota">Antes se anotaban acuerdos y audiencias en una lista aparte: ahora son tipos de documento (filtro «Del juzgado o autoridad»). <a href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">Ver los {{ n_acuerdos }} registros anteriores</a>.</p>{% endif %}
+</div>
 <p class="doc-nota">«Listo para buscar» quiere decir que {{ config.ASISTENTE_NOMBRE }} ya leyó el documento. «Guardado» significa que está cifrado en la bóveda pero aún no se ha leído. «Requiere revisión» indica un escaneo sin texto o un formato que todavía no se puede leer. Un tipo marcado «sugerido» lo propuso el sistema por el nombre o el texto: confírmalo o cámbialo con un clic.</p>
 {% endif %}
 
@@ -245,55 +283,102 @@
      PERSONAS — documentos de clientes que no son de un expediente
      ══════════════════════════════════════════════════════════════════════════ -->
 {% if vista == 'personas' %}
-{% set base_per = {'seccion': 'personas', 'q': request.args.get('q') or None} %}
-<div class="es">
+{% set base_per = {'seccion': 'personas', 'q': request.args.get('q') or None, 'cliente': cliente_f, 'estado': estado_f or None} %}
+{% set sel_p = (carpetas_personas | selectattr('id', 'equalto', cliente_f) | list | first) if cliente_f else None %}
+<div class="es" data-destino="personas"{% if cliente_f %} data-cliente="{{ cliente_f }}"{% endif %}>
   <div class="es-barra">
     <form method="GET" class="es-buscar" role="search" action="{{ url_for('biblioteca.index') }}">
       <input type="hidden" name="seccion" value="personas">
+      {% if cliente_f %}<input type="hidden" name="cliente" value="{{ cliente_f }}">{% endif %}
       {% if filtro.grupo %}<input type="hidden" name="grupo" value="{{ filtro.grupo }}">{% endif %}
       {% if filtro.tipo %}<input type="hidden" name="tipo" value="{{ filtro.tipo }}">{% endif %}
       <div class="bz-caja">
         <svg class="bz-lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input class="bz-input" type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Filtra por nombre del documento o de la persona…" aria-label="Filtrar documentos de personas">
+        <input class="bz-input" type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Filtra por persona, documento o expediente…" aria-label="Filtrar documentos de personas">
       </div>
     </form>
     <button type="button" class="btn btn-primary" data-subir="personas">Subir documento</button>
   </div>
-  <div class="dc-sec-h dc-docs-h"><h2>Documentos de personas <span>{{ docs_personas | length }}</span></h2></div>
-  {{ chips_tipo(filtro, base_per) }}
-  {% if docs_personas %}
-  <div class="dc-grid">
-    {% for d in docs_personas %}
-    {% set enlace = d.archivo_url and d.archivo_url.startswith('/archivos/') %}
-    <article class="dc-doc">
-      <a class="dc-hoja t-{{ d.ext or 'doc' }}" href="{{ d.archivo_url if enlace else url_for('clientes.detalle', id=d.cliente_id) }}"{% if enlace %} target="_blank" rel="noopener"{% endif %}>
-        <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ (d.ext or 'doc') | upper }}</span>
-        <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+
+  {% if carpetas_personas and not cliente_f %}
+  <section class="dc-carpetas" aria-labelledby="pfCarpT">
+    <div class="dc-sec-h"><h2 id="pfCarpT">Carpetas de personas</h2></div>
+    <div class="dc-carp-grid">
+      {% for c in carpetas_personas[:12] %}
+      <a class="dc-carp" data-destino="personas" data-cliente="{{ c.id }}" href="{{ url_for('biblioteca.index', seccion='personas', cliente=c.id, q=request.args.get('q') or None) }}">
+        <svg class="dc-carp-ico" width="34" height="34" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M4 13a3 3 0 0 1 3-3h11l4 4h19a3 3 0 0 1 3 3v21a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".18"/><path d="M4 19h40v19a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="currentColor" opacity=".55"/></svg>
+        <span class="dc-carp-tx"><b>{{ c.nombre }}</b><small>{{ c.propios }} suyo{{ 's' if c.propios != 1 }} · {{ c.de_exp }} en {{ c.n_exp }} expediente{{ 's' if c.n_exp != 1 }}</small></span>
+        <span class="dc-carp-n">{{ c.propios + c.de_exp }}</span>
       </a>
-      <div class="dc-info">
-        <b title="{{ d.nombre }}">{{ d.nombre }}</b>
-        <a class="dc-exp" href="{{ url_for('clientes.detalle', id=d.cliente_id) }}">{{ d.cliente }}</a>
-        {{ tipo_pill(d, 'cliente_documentos', d.id) }}
-        <span class="dc-pie">
-          <span class="doc-estado {{ d.grupo }}"{% if d.lectura_error %} title="{{ d.lectura_error }}"{% endif %}>{{ d.estado }}</span>
-          <small>{{ d.dia }}{% if d.paginas %} · {{ d.paginas }} pág.{% endif %}</small>
-        </span>
-      </div>
-    </article>
-    {% endfor %}
+      {% endfor %}
+    </div>
+    {% if carpetas_personas | length > 12 %}<p class="bv-ayuda">Hay {{ carpetas_personas | length }} personas con documentos: escribe un nombre arriba para encontrar a la que buscas.</p>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if sel_p %}
+  <div class="bv-contexto">
+    <div class="bv-contexto-tx"><b>{{ sel_p.nombre }}</b><small>{{ sel_p.propios }} documento{{ 's' if sel_p.propios != 1 }} suyo{{ 's' if sel_p.propios != 1 }} · {{ sel_p.de_exp }} en {{ sel_p.n_exp }} expediente{{ 's' if sel_p.n_exp != 1 }}</small></div>
+    <div class="bv-contexto-acc">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('clientes.detalle', id=sel_p.id) }}">Ficha de la persona</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('biblioteca.index', seccion='personas') }}">Todas las personas</a>
+      <button type="button" class="btn btn-primary btn-sm" data-subir="personas">Subir a esta persona</button>
+    </div>
   </div>
+  {% endif %}
+
+  <div class="dc-sec-h dc-docs-h">
+    <h2>{% if sel_p %}Sus documentos y los de sus expedientes{% else %}Documentos por persona{% endif %} <span>{{ docs_personas | length }}</span></h2>
+    <div class="ex-atencion" style="padding:0;margin:0">
+      {% for k, l in [('listo','Listos para buscar'),('procesando','Procesando'),('revision','Requieren revisión'),('error','Con error'),('guardado','Solo guardados')] %}
+      {% if conteo_estados[k] or estado_f == k %}<a class="{{ 'on' if estado_f == k }}" href="{{ url_for('biblioteca.index', **dict(base_per, estado=None if estado_f == k else k, grupo=filtro.grupo or None, tipo=filtro.tipo)) }}">{{ conteo_estados[k] }} {{ l | lower }}</a>{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {{ chips_tipo(filtro, base_per) }}
+
+  {% for p in personas %}
+  <section class="pf" data-destino="personas" data-cliente="{{ p.id }}" aria-label="Documentos de {{ p.nombre }}">
+    {% if not cliente_f %}
+    <header class="pf-h">
+      <a href="{{ url_for('biblioteca.index', **dict(base_per, cliente=p.id)) }}"><b>{{ p.nombre }}</b></a>
+      <small>{{ p.n }} documento{{ 's' if p.n != 1 }}</small>
+      <a class="pf-ficha" href="{{ url_for('clientes.detalle', id=p.id) }}">Ficha</a>
+    </header>
+    {% endif %}
+    {% if p.propios or cliente_f %}
+    <div class="pf-grupo">
+      <h4>Documentos de la persona <span>{{ p.n_propios }}</span></h4>
+      {% if p.propios %}<ul class="pf-lista">{% for d in p.propios %}{{ fila_doc(d) }}{% endfor %}</ul>
+      {% else %}<p class="pf-vacio">Ninguno{% if filtro.activo or estado_f or request.args.get('q') %} con este filtro{% endif %}. Arrastra aquí su INE, comprobantes o actas.</p>{% endif %}
+      {% if not cliente_f and p.n_propios > p.propios | length %}<a class="pf-mas" href="{{ url_for('biblioteca.index', **dict(base_per, cliente=p.id)) }}">Ver los {{ p.n_propios }}</a>{% endif %}
+    </div>
+    {% endif %}
+    {% for e in p.expedientes %}
+    <div class="pf-grupo pf-exp" data-destino="expedientes" data-asunto="{{ e.id }}">
+      <h4><a href="{{ url_for('biblioteca.index', seccion='expedientes', asunto=e.id) }}"><em>{{ e.numero }}</em> {{ e.titulo }}</a> <span>{{ e.n }}</span>
+        <a class="pf-ficha" href="{{ url_for('asuntos.detalle', id=e.id) }}#documentos">Abrir expediente</a></h4>
+      <ul class="pf-lista">{% for d in e.docs %}{{ fila_doc(d) }}{% endfor %}</ul>
+      {% if e.n > e.docs | length %}<a class="pf-mas" href="{{ url_for('biblioteca.index', seccion='expedientes', asunto=e.id) }}">Ver los {{ e.n }} de este expediente</a>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
   {% else %}
   <div class="bv-vacio">
-    {% if request.args.get('q') or filtro.activo %}
-      <h3>Nada coincide con ese filtro</h3><p>Prueba con otras palabras o quita el filtro.</p>
-      <a class="btn btn-ghost" href="{{ url_for('biblioteca.index', seccion='personas') }}">Limpiar filtros</a>
+    {% if request.args.get('q') or filtro.activo or estado_f %}
+      <h3>Nada coincide con ese filtro</h3><p>Prueba con otro nombre o quita el filtro.</p>
+      <a class="btn btn-ghost" href="{{ url_for('biblioteca.index', seccion='personas', cliente=cliente_f) }}">Limpiar filtros</a>
+    {% elif cliente_f %}
+      <h3>Todavía no hay documentos de esta persona</h3>
+      <p>Aquí van su INE, comprobante de domicilio, actas y contratos, y también aparecen los de sus expedientes.</p>
+      <button type="button" class="btn btn-primary" data-subir="personas">Subir a esta persona</button>
     {% else %}
       <h3>Todavía no hay documentos de personas</h3>
-      <p>Aquí van la INE, el comprobante de domicilio, las actas y los contratos de cada cliente.</p>
+      <p>Aquí van la INE, el comprobante de domicilio, las actas y los contratos de cada cliente, junto con los documentos de sus expedientes.</p>
       <button type="button" class="btn btn-primary" data-subir="personas">Subir documento</button>
     {% endif %}
   </div>
-  {% endif %}
+  {% endfor %}
 </div>
 {% endif %}
 
@@ -303,7 +388,7 @@
 {% if vista == 'estudio' %}
 {% set pct = [(espacio_usado / espacio_limite * 100) | round(1), 100] | min if espacio_limite else 0 %}
 {% set base_est = {'seccion': 'estudio', 'q': q or None, 'carpeta': carpeta_id, 'ext': tipo_f or None} %}
-<div class="es">
+<div class="es" data-destino="estudio">
   <div class="es-barra">
     <form method="GET" class="es-buscar" role="search" action="{{ url_for('biblioteca.index') }}">
       <input type="hidden" name="seccion" value="estudio">
@@ -348,10 +433,7 @@
   <div class="dc-sec-h dc-docs-h"><h2>{% if carpeta_id %}Archivos de esta carpeta{% else %}Archivos{% endif %} <span>{{ archivos | length }}</span></h2></div>
   {{ chips_tipo(filtro, base_est) }}
   <div class="xd-grid">
-    <div class="xd-subir" id="mainDropzone" role="button" tabindex="0" data-subir="estudio"
-         ondragover="event.preventDefault(); this.classList.add('sobre')"
-         ondragleave="this.classList.remove('sobre')"
-         ondrop="handleMainDrop(event)">
+    <div class="xd-subir" id="mainDropzone" role="button" tabindex="0" data-subir="estudio">
       <span class="xd-mas">+</span><b>Subir documento</b><small>Arrastra aquí o haz clic. PDF, Word, Excel o imágenes, hasta 16 MB.</small>
     </div>
     {% for a in archivos %}
@@ -369,7 +451,7 @@
           <a href="{{ a.archivo_url }}" download title="Descargar" aria-label="Descargar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
           <button type="button" onclick="compartirArchivo({{ a.id }})" title="Compartir" aria-label="Compartir">{{ icon_link(14, 14) }}</button>
           <button type="button" onclick="vincularArchivo({{ a.id }})" title="Vincular a un expediente o cliente" aria-label="Vincular">{{ icon_paperclip(14, 14) }}</button>
-          <button type="button" class="peligro" onclick="eliminarArchivo({{ a.id }})" title="Eliminar" aria-label="Eliminar">{{ icon_trash(14, 14) }}</button>
+          {% if es_admin or a.creado_por == user_id %}<button type="button" class="peligro" onclick="eliminarArchivo({{ a.id }})" title="Eliminar" aria-label="Eliminar">{{ icon_trash(14, 14) }}</button>{% endif %}
         </span>
       </div>
     </article>
@@ -383,13 +465,13 @@
      SECTION 2 — FORMATOS (Plantillas)
      ══════════════════════════════════════════════════════════════════════════ -->
 {% if vista == 'formatos' %}
-<div class="es">
+<div class="es" data-destino="formatos">
   <div class="es-barra">
     <form method="GET" class="es-buscar" role="search" action="{{ url_for('biblioteca.index') }}">
       <input type="hidden" name="seccion" value="formatos">
       <div class="bz-caja">
         <svg class="bz-lupa" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input class="bz-input" type="search" name="q_pl" value="{{ q_pl }}" placeholder="Buscar formatos…" aria-label="Buscar formatos">
+        <input class="bz-input" type="search" name="q_pl" value="{{ q_pl }}" placeholder="Busca un machote por nombre…" aria-label="Buscar machotes">
         <select name="categoria" class="es-tipo" onchange="this.form.submit()" aria-label="Categoría">
           <option value="">Todas las categorías</option>
           {% for cat in categorias %}<option value="{{ cat }}" {{ 'selected' if cat_f == cat }}>{{ cat }}</option>{% endfor %}
@@ -409,8 +491,9 @@
     </div>{% endif %}
     {% for p in plantillas %}
     {% set llenable = p.archivo_url and p.archivo_url.endswith('.docx') %}
+    {% set abrir = url_for('biblioteca.editor', plantilla=p.id) if llenable else p.archivo_url %}
     <article class="dc-doc">
-      <a class="dc-hoja t-{{ p.extension or 'doc' }}" href="{{ url_for('insights.machote', pid=p.id) if llenable else url_for('biblioteca.editor', plantilla=p.id) }}">
+      <a class="dc-hoja t-{{ p.extension or 'doc' }}" href="{{ abrir }}"{% if not llenable %} target="_blank" rel="noopener"{% endif %} title="{{ 'Usar este machote en el editor' if llenable else 'Abrir el archivo' }}">
         <span class="dc-esquina" aria-hidden="true"></span><span class="dc-tipo">{{ (p.extension or 'doc') | upper }}</span>
         <span class="dc-lineas" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       </a>
@@ -418,17 +501,25 @@
         <b title="{{ p.nombre }}">{{ p.nombre }}</b>
         <span class="es-chips"><span>{{ p.categoria or 'Otro' }}</span>{% if p.tipo_derecho %}<span>{{ p.tipo_derecho | capitalize }}</span>{% endif %}{% if p.es_custom %}<span class="dorado">Del despacho</span>{% endif %}</span>
         {% if p.descripcion %}<span class="dc-exp" title="{{ p.descripcion }}">{{ p.descripcion }}</span>{% endif %}
-        {% if llenable %}<a class="btn btn-primary btn-sm es-llenar" href="{{ url_for('insights.machote', pid=p.id) }}">Llenar con un expediente</a>{% endif %}
+        {% if llenable %}
+        <a class="btn btn-primary btn-sm es-llenar" href="{{ abrir }}">Usar este machote</a>
+        <a class="es-llenar-alt" href="{{ url_for('insights.machote', pid=p.id) }}">Llenar el Word con un expediente</a>
+        {% elif p.archivo_url %}<a class="btn btn-ghost btn-sm es-llenar" href="{{ p.archivo_url }}" target="_blank" rel="noopener">Abrir</a>{% endif %}
         <span class="es-acc">
-          <a href="{{ url_for('biblioteca.editor', plantilla=p.id) }}" title="Usar en el editor" aria-label="Usar en el editor">{{ icon_edit(14, 14) }}</a>
           <a href="{{ url_for('biblioteca.plantilla_descargar', id=p.id) }}" title="Descargar" aria-label="Descargar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
-          <button type="button" class="peligro" onclick="eliminarPlantilla({{ p.id }})" title="Eliminar" aria-label="Eliminar">{{ icon_trash(14, 14) }}</button>
+          {% if es_admin %}<button type="button" class="peligro" onclick="eliminarPlantilla({{ p.id }})" title="Eliminar" aria-label="Eliminar">{{ icon_trash(14, 14) }}</button>{% endif %}
         </span>
       </div>
     </article>
     {% endfor %}
   </div>
-  {% if not plantillas and (cat_f or derecho_f or q_pl) %}<p class="as-empty" style="margin-top:14px">No hay formatos con esos filtros.</p>{% endif %}
+  {% if not plantillas %}
+  <div class="bv-vacio" style="margin-top:14px">
+    {% if cat_f or derecho_f or q_pl %}<h3>No hay machotes con esos filtros</h3><p>Prueba con otro nombre o quita el filtro.</p>
+      <a class="btn btn-ghost" href="{{ url_for('biblioteca.index', seccion='formatos') }}">Limpiar filtros</a>
+    {% else %}<h3>Todavía no hay machotes</h3><p>Sube un Word de demanda, contrato o escrito: al usarlo, los datos del expediente se llenan solos.</p>{% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -600,17 +691,17 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     SUBIR DOCUMENTO — ¿dónde va? ¿qué es?
+     SUBIR DOCUMENTOS — uno o varios, ¿dónde va? y ¿qué es? cada uno
      ══════════════════════════════════════════════════════════════════════════ -->
 <div class="bv-modal" id="subirModal" role="dialog" aria-modal="true" aria-labelledby="subirT" hidden
-     data-asunto="{{ busqueda.asunto or '' }}" data-carpeta="{{ carpeta_id or '' }}">
+     data-asunto="{{ busqueda.asunto or '' }}" data-carpeta="{{ carpeta_id or '' }}" data-cliente="{{ cliente_f or '' }}">
   <form class="bv-modal-c" id="subirForm" novalidate>
-    <div class="bv-modal-h"><h3 id="subirT">Subir documento</h3><button type="button" class="bv-x" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="bv-modal-h"><h3 id="subirT">Subir documentos</h3><button type="button" class="bv-x" data-cerrar aria-label="Cerrar">×</button></div>
     <div class="bv-modal-b">
       <label class="bv-archivo" id="subZona">
-        <input type="file" id="subArchivo" name="archivo">
+        <input type="file" id="subArchivo" multiple>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
-        <span><b id="subArchNombre">Elige el archivo</b><small>o arrástralo aquí · PDF, Word, Excel o imagen, hasta 16 MB</small></span>
+        <span><b id="subArchNombre">Elige uno o varios archivos</b><small>o arrástralos aquí · PDF, Word, Excel o imagen, hasta 16 MB cada uno</small></span>
       </label>
 
       <fieldset class="bv-campo">
@@ -625,15 +716,15 @@
 
       <div class="bv-campo" data-para="expedientes">
         <label for="subExpQ">¿De qué expediente?</label>
-        <div class="bv-combo" data-lista="expedientes">
-          <input type="search" id="subExpQ" placeholder="Escribe el número o el nombre del expediente" autocomplete="off" spellcheck="false"
+        <div class="bv-combo" id="subExpCombo">
+          <input type="search" id="subExpQ" placeholder="Escribe el número, el nombre o el cliente" autocomplete="off" spellcheck="false"
                  role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="subExpL">
           <ul id="subExpL" role="listbox" hidden></ul>
         </div>
       </div>
       <div class="bv-campo" data-para="personas" hidden>
         <label for="subPerQ">¿De qué persona?</label>
-        <div class="bv-combo" data-lista="personas">
+        <div class="bv-combo" id="subPerCombo">
           <input type="search" id="subPerQ" placeholder="Escribe el nombre de la persona o empresa" autocomplete="off" spellcheck="false"
                  role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="subPerL">
           <ul id="subPerL" role="listbox" hidden></ul>
@@ -641,32 +732,52 @@
       </div>
       <div class="bv-campo" data-para="estudio" hidden>
         <label for="subCarpeta">Carpeta <small>(opcional)</small></label>
-        <select id="subCarpeta" name="carpeta_id"><option value="">Sin carpeta</option>{% for c in destinos.carpetas %}<option value="{{ c.id }}">{{ c.t }}</option>{% endfor %}</select>
+        <select id="subCarpeta"><option value="">Sin carpeta</option>{% for c in destinos.carpetas %}<option value="{{ c.id }}">{{ c.t }}</option>{% endfor %}</select>
       </div>
 
-      <div class="bv-campo" data-para="expedientes personas estudio">
-        <label for="subTipo">¿Qué es? <span class="bv-sug" id="subSug" hidden>sugerido</span></label>
-        <select id="subTipo" name="tipo_documento">
-          <option value="">Elige qué es el documento</option>
-          {% for gr in tipos_grupos %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}
-        </select>
-        <small class="bv-nota" id="subSugNota" hidden>Lo sugerimos por el nombre del archivo. Confírmalo o cámbialo.</small>
-      </div>
-      <div class="bv-campo" data-para="formatos" hidden>
-        <label for="subCat">¿Qué es?</label>
-        <select id="subCat" name="categoria">{% for c in categorias %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
-      </div>
-      <div class="bv-fila">
-        <div class="bv-campo"><label for="subNombre">Nombre <small>(opcional)</small></label><input id="subNombre" name="nombre" maxlength="200" placeholder="Si lo dejas vacío, se usa el del archivo"></div>
-        <div class="bv-campo" data-para="expedientes personas estudio"><label for="subFecha">Fecha del documento <small>(opcional)</small></label><input type="date" id="subFecha" name="fecha_documento"></div>
+      <div class="bv-campo" id="subDocs" hidden>
+        <div class="bv-docs-h">
+          <span class="bv-docs-t">¿Qué es cada uno?</span>
+          <label class="bv-todos" data-para="expedientes personas estudio"><input type="checkbox" id="subTodos"> Ver todos los tipos</label>
+        </div>
+        <ol class="bv-docs" id="subLista"></ol>
+        <small class="bv-nota" id="subSugNota" hidden>Lo marcado «sugerido» lo propusimos por el nombre del archivo: confírmalo o cámbialo.</small>
       </div>
       <p class="bv-error" id="subError" role="alert" hidden></p>
     </div>
-    <div class="bv-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button type="submit" class="btn btn-primary" id="subOk">Subir documento</button></div>
+    <div class="bv-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button type="submit" class="btn btn-primary" id="subOk">Subir</button></div>
   </form>
 </div>
-<template id="tpOpciones"><option value="">¿Qué es?</option>{% for gr in tipos_grupos %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}</template>
-<script type="application/json" id="bvDestinos">{{ {'expedientes': destinos.expedientes, 'personas': destinos.personas} | tojson }}</script>
+
+<!-- Mover un documento a otro expediente o a otra persona -->
+<div class="bv-modal" id="moverModal" role="dialog" aria-modal="true" aria-labelledby="moverT" hidden>
+  <form class="bv-modal-c bv-modal-chico" id="moverForm" novalidate>
+    <div class="bv-modal-h"><h3 id="moverT">Mover documento</h3><button type="button" class="bv-x" data-cerrar aria-label="Cerrar">×</button></div>
+    <div class="bv-modal-b">
+      <p class="bv-ayuda" id="moverNombre" style="margin:0"></p>
+      <div class="bv-campo">
+        <label for="moverQ" id="moverLabel">¿A qué expediente?</label>
+        <div class="bv-combo" id="moverCombo">
+          <input type="search" id="moverQ" autocomplete="off" spellcheck="false" placeholder="Escribe para buscar"
+                 role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="moverL">
+          <ul id="moverL" role="listbox" hidden></ul>
+        </div>
+      </div>
+      <p class="bv-error" id="moverError" role="alert" hidden></p>
+    </div>
+    <div class="bv-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button type="submit" class="btn btn-primary" id="moverOk">Mover</button></div>
+  </form>
+</div>
+
+<!-- Arrastrar archivos a cualquier parte de la Bóveda -->
+<div class="bv-soltar" id="bvSoltar" hidden aria-hidden="true">
+  <div class="bv-soltar-c">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+    <b>Suelta aquí para subir</b>
+    <small id="bvSoltarDonde"></small>
+  </div>
+</div>
+<script type="application/json" id="bvDatos">{{ {'expedientes': destinos.expedientes, 'personas': destinos.personas, 'tipos': tipos_form, 'categorias': categorias, 'seccion': seccion if seccion in secciones else 'expedientes'} | tojson }}</script>
 
 <!-- ══════════════════════════════════════════════
      JAVASCRIPT
@@ -709,13 +820,6 @@ async function eliminarCarpeta(id) {
     method: "POST", headers: {"X-Requested-With": "XMLHttpRequest"},
   });
   location.reload();
-}
-
-/* ── Archivo del despacho: soltar un archivo abre «Subir documento» ── */
-function handleMainDrop(e) {
-  e.preventDefault();
-  document.getElementById("mainDropzone").classList.remove("sobre");
-  if (e.dataTransfer.files.length) window.abrirSubir("estudio", e.dataTransfer.files[0]);
 }
 
 /* ── Estudio: file actions ──────────────────── */
@@ -799,37 +903,41 @@ async function eliminarAcuerdo(id) {
   document.getElementById("ac-row-" + id)?.remove();
 }
 
-/* ── Bóveda: «Subir documento» (¿dónde va? ¿qué es?) ── */
+/* ══ Bóveda: subir (uno o varios, arrastrando desde cualquier parte), mover y «¿Qué es?» ══ */
 (function () {
-  const modal = document.getElementById("subirModal"), form = document.getElementById("subirForm");
-  document.body.appendChild(modal);   // fuera del contenedor de la página, para quedar sobre la barra inferior del teléfono
-  const archivo = document.getElementById("subArchivo"), zona = document.getElementById("subZona");
-  const tipo = document.getElementById("subTipo"), sug = document.getElementById("subSug"), sugNota = document.getElementById("subSugNota");
-  const error = document.getElementById("subError"), ok = document.getElementById("subOk");
-  const DEST = JSON.parse(document.getElementById("bvDestinos").textContent);
-  const URLS = {
-    expedientes: id => "{{ url_for('asuntos.subir_documento', id=0) }}".replace("/0/", `/${id}/`),
-    personas: id => "{{ url_for('clientes.subir_documento', id=0) }}".replace("/0/", `/${id}/`),
-    estudio: () => "{{ url_for('biblioteca.upload') }}",
-    formatos: () => "{{ url_for('biblioteca.plantilla_subir') }}",
-  };
+  const DATOS = JSON.parse(document.getElementById("bvDatos").textContent);
+  const TIPOS = DATOS.tipos;
+  const $id = id => document.getElementById(id);
   const plano = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  let sugerido = "";
+  const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const JSONH = { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" };
 
+  /* «¿Qué es?» según a dónde va: grupos del destino + «Otro» + «Ver todos los tipos…» */
+  function opcionesTipo(destino, todos, primera) {
+    if (destino === "formatos") return DATOS.categorias.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+    const del = TIPOS.destinos[destino];
+    const grupos = (todos || !del) ? TIPOS.grupos : TIPOS.grupos.filter(g => del.includes(g.clave));
+    return `<option value="">${esc(primera || "Elige qué es")}</option>`
+      + grupos.map(g => `<optgroup label="${esc(g.etiqueta)}">${g.tipos.map(t => `<option value="${t.clave}">${esc(t.etiqueta)}</option>`).join("")}</optgroup>`).join("")
+      + ((todos || !del) ? "" : `<option value="__todos">Ver todos los tipos…</option>`);
+  }
+  const enLista = (sel, v) => !!v && [...sel.options].some(o => o.value === v);
+
+  /* Selector con búsqueda (expedientes, personas) */
   function combo(caja, lista) {
     const input = caja.querySelector("input"), ul = caja.querySelector("ul");
     let elegido = null;
     const cerrar = () => { ul.hidden = true; input.setAttribute("aria-expanded", "false"); };
     function pintar() {
       const q = plano(input.value).trim();
-      const hits = lista.filter(x => !q || q.split(/\s+/).every(p => plano(x.t).includes(p))).slice(0, 8);
+      const hits = lista().filter(x => !q || q.split(/\s+/).every(p => plano(x.t).includes(p))).slice(0, 8);
       ul.replaceChildren(...hits.map(x => {
         const li = document.createElement("li");
         li.setAttribute("role", "option"); li.dataset.id = x.id; li.textContent = x.t;
         if (elegido === String(x.id)) li.setAttribute("aria-selected", "true");
         return li;
       }));
-      if (!hits.length) { const li = document.createElement("li"); li.className = "vacio"; li.textContent = lista.length ? "Sin coincidencias" : "No hay opciones todavía"; ul.append(li); }
+      if (!hits.length) { const li = document.createElement("li"); li.className = "vacio"; li.textContent = lista().length ? "Sin coincidencias" : "No hay opciones todavía"; ul.append(li); }
       ul.hidden = false; input.setAttribute("aria-expanded", "true");
     }
     function elegir(id, texto) { elegido = String(id); input.value = texto; caja.classList.add("elegido"); cerrar(); }
@@ -838,122 +946,247 @@ async function eliminarAcuerdo(id) {
     input.addEventListener("blur", () => setTimeout(cerrar, 150));
     input.addEventListener("keydown", e => {
       if (e.key === "Enter") { e.preventDefault(); const li = ul.querySelector("li[data-id]"); if (li) elegir(li.dataset.id, li.textContent); }
-      if (e.key === "Escape") cerrar();
+      if (e.key === "Escape") { e.stopPropagation(); cerrar(); }
     });
     ul.addEventListener("mousedown", e => { const li = e.target.closest("li[data-id]"); if (li) { e.preventDefault(); elegir(li.dataset.id, li.textContent); } });
     return {
       valor: () => elegido,
-      poner(id) { const x = lista.find(o => String(o.id) === String(id)); if (x) elegir(x.id, x.t); },
+      poner(id) { const x = lista().find(o => String(o.id) === String(id)); if (x) elegir(x.id, x.t); },
       limpiar() { elegido = null; input.value = ""; caja.classList.remove("elegido"); },
     };
   }
-  const combos = {
-    expedientes: combo(modal.querySelector('[data-lista="expedientes"]'), DEST.expedientes),
-    personas: combo(modal.querySelector('[data-lista="personas"]'), DEST.personas),
-  };
+  function modalAlBody(m) { document.body.appendChild(m); return m; }   // sobre la barra inferior del teléfono
+  function abrirModal(m) { m.hidden = false; document.body.classList.add("bv-modal-abierto"); }
+  function cerrarModal_(m) { m.hidden = true; if (document.querySelectorAll(".bv-modal:not([hidden])").length === 0) document.body.classList.remove("bv-modal-abierto"); }
 
-  function destino() { return form.querySelector('input[name="destino"]:checked').value; }
-  function mostrar() {
+  /* ── Subir documentos ───────────────────────────────────────────── */
+  const modal = modalAlBody($id("subirModal")), form = $id("subirForm");
+  const archivo = $id("subArchivo"), zona = $id("subZona"), lista = $id("subLista"), docs = $id("subDocs");
+  const todosChk = $id("subTodos"), sugNota = $id("subSugNota"), error = $id("subError"), ok = $id("subOk");
+  const URLS = {
+    expedientes: id => "{{ url_for('asuntos.subir_documento', id=0) }}".replace("/0/", `/${id}/`),
+    personas: id => "{{ url_for('clientes.subir_documento', id=0) }}".replace("/0/", `/${id}/`),
+    estudio: () => "{{ url_for('biblioteca.upload') }}",
+    formatos: () => "{{ url_for('biblioteca.plantilla_subir') }}",
+  };
+  const combos = {
+    expedientes: combo($id("subExpCombo"), () => DATOS.expedientes),
+    personas: combo($id("subPerCombo"), () => DATOS.personas),
+  };
+  let filas = [];   // [{f, li, sel, sugerido, todos}]
+
+  const destino = () => form.querySelector('input[name="destino"]:checked').value;
+  function mostrarCampos() {
     const d = destino();
     modal.querySelectorAll("[data-para]").forEach(el => { el.hidden = !el.dataset.para.split(" ").includes(d); });
   }
-  form.querySelectorAll('input[name="destino"]').forEach(r => r.addEventListener("change", mostrar));
-
-  function marcarSugerido(on) { sug.hidden = !on; sugNota.hidden = !on; tipo.classList.toggle("sug", on); }
-  tipo.addEventListener("change", () => marcarSugerido(!!sugerido && tipo.value === sugerido));
-
-  async function alElegirArchivo() {
-    const f = archivo.files[0];
-    document.getElementById("subArchNombre").textContent = f ? f.name : "Elige el archivo";
-    zona.classList.toggle("lleno", !!f);
-    if (!f) return;
+  function pintarSelect(fila) {
+    const d = destino(), antes = fila.sel.value;
+    fila.sel.innerHTML = opcionesTipo(d, fila.todos || todosChk.checked);
+    if (enLista(fila.sel, antes) && antes !== "__todos") fila.sel.value = antes;
+    else if (fila.sugerido && enLista(fila.sel, fila.sugerido)) fila.sel.value = fila.sugerido;
+    marcarSugerido(fila);
+  }
+  function marcarSugerido(fila) {
+    const on = !!fila.sugerido && fila.sel.value === fila.sugerido && destino() !== "formatos";
+    fila.li.querySelector(".bv-sug").hidden = !on; fila.sel.classList.toggle("sug", on);
+    sugNota.hidden = !filas.some(x => !x.li.querySelector(".bv-sug").hidden);
+  }
+  async function sugerir(fila) {
+    if (destino() === "formatos") return;
     try {
       const u = new URL("{{ url_for('biblioteca.tipo_sugerir') }}", location.origin);
-      u.searchParams.set("nombre", f.name);
+      u.searchParams.set("nombre", fila.f.name); u.searchParams.set("destino", destino());
       const j = await (await fetch(u)).json();
-      sugerido = j.tipo || "";
-      if (sugerido && (!tipo.value || tipo.classList.contains("sug"))) { tipo.value = sugerido; marcarSugerido(true); }
+      const previo = fila.sugerido;
+      fila.sugerido = j.tipo || "";
+      if (!fila.sugerido) return;
+      if (fila.sel.value && fila.sel.value !== previo) return;   // la persona ya eligió otra cosa
+      if (!enLista(fila.sel, fila.sugerido)) { fila.todos = true; pintarSelect(fila); }
+      fila.sel.value = fila.sugerido; marcarSugerido(fila);
     } catch (_) { /* sin sugerencia: la persona elige */ }
   }
-  archivo.addEventListener("change", alElegirArchivo);
-  ["dragover", "dragenter"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.add("sobre"); }));
-  ["dragleave", "drop"].forEach(ev => zona.addEventListener(ev, () => zona.classList.remove("sobre")));
-  zona.addEventListener("drop", e => {
-    e.preventDefault();
-    if (!e.dataTransfer.files.length) return;
-    const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]); archivo.files = dt.files; alElegirArchivo();
-  });
-
-  function abrir(dest, file) {
-    form.reset(); sugerido = ""; marcarSugerido(false); error.hidden = true;
-    combos.expedientes.limpiar(); combos.personas.limpiar();
-    document.getElementById("subArchNombre").textContent = "Elige el archivo"; zona.classList.remove("lleno");
-    const radio = form.querySelector(`input[name="destino"][value="${dest || "expedientes"}"]`) || form.querySelector('input[name="destino"]');
-    radio.checked = true; mostrar();
-    if (modal.dataset.asunto) combos.expedientes.poner(modal.dataset.asunto);
-    if (modal.dataset.carpeta) document.getElementById("subCarpeta").value = modal.dataset.carpeta;
-    if (file) { const dt = new DataTransfer(); dt.items.add(file); archivo.files = dt.files; alElegirArchivo(); }
-    modal.hidden = false; document.body.classList.add("bv-modal-abierto");
-    setTimeout(() => (file ? tipo : archivo).focus(), 50);
+  function actualizarResumen() {
+    docs.hidden = !filas.length;
+    const n = filas.length;
+    $id("subArchNombre").textContent = n ? (n === 1 ? "Agregar otro archivo" : `${n} archivos · agregar otro`) : "Elige uno o varios archivos";
+    zona.classList.toggle("lleno", !!n);
+    ok.textContent = n > 1 ? `Subir ${n} documentos` : "Subir";
+    $id("subirT").textContent = n > 1 ? `Subir ${n} documentos` : "Subir documento";
   }
-  function cerrar() { modal.hidden = true; document.body.classList.remove("bv-modal-abierto"); }
+  function agregar(files) {
+    const d = destino();
+    for (const f of files) {
+      if (filas.length >= 25) { error.textContent = "Sube hasta 25 archivos a la vez."; error.hidden = false; break; }
+      if (filas.some(x => x.f.name === f.name && x.f.size === f.size)) continue;
+      const li = document.createElement("li"); li.className = "bv-doc-f";
+      const ext = (f.name.split(".").pop() || "").toLowerCase().slice(0, 4);
+      const base = f.name.replace(/\.[^.]+$/, "");
+      const i = filas.length + Math.random().toString(36).slice(2, 6);
+      li.innerHTML = `
+        <div class="bv-doc-f-h"><span class="doc-ext ${esc(ext)}" aria-hidden="true">${esc(ext || "doc")}</span>
+          <b>${esc(f.name)}</b><small>${Math.max(1, Math.round(f.size / 1024))} KB</small>
+          <button type="button" class="bv-quitar" aria-label="Quitar ${esc(f.name)}">×</button></div>
+        <div class="bv-doc-f-c">
+          <div class="bv-campo"><label for="ft${i}">¿Qué es? <span class="bv-sug" hidden>sugerido</span></label><select id="ft${i}" class="f-tipo"></select></div>
+          <div class="bv-campo"><label for="fn${i}">Nombre <small>(opcional)</small></label><input id="fn${i}" class="f-nombre" maxlength="200" placeholder="${esc(base)}"></div>
+          <div class="bv-campo f-fecha-c" data-para="expedientes personas estudio"><label for="ff${i}">Fecha del documento <small>(opcional)</small></label><input type="date" id="ff${i}" class="f-fecha"></div>
+        </div>`;
+      const fila = { f, li, sel: li.querySelector("select"), sugerido: "", todos: false };
+      fila.sel.addEventListener("change", () => {
+        if (fila.sel.value === "__todos") { fila.todos = true; pintarSelect(fila); fila.sel.value = ""; fila.sel.focus(); return; }
+        marcarSugerido(fila);
+      });
+      li.querySelector(".bv-quitar").addEventListener("click", () => { filas = filas.filter(x => x !== fila); li.remove(); actualizarResumen(); });
+      lista.append(li); filas.push(fila); pintarSelect(fila); sugerir(fila);
+      li.querySelector(".f-fecha-c").hidden = d === "formatos";
+    }
+    actualizarResumen();
+  }
+  form.querySelectorAll('input[name="destino"]').forEach(r => r.addEventListener("change", () => {
+    mostrarCampos();
+    filas.forEach(fila => { fila.li.querySelector(".f-fecha-c").hidden = destino() === "formatos"; pintarSelect(fila); sugerir(fila); });
+  }));
+  todosChk.addEventListener("change", () => filas.forEach(pintarSelect));
+  archivo.addEventListener("change", () => { agregar([...archivo.files]); archivo.value = ""; });
+
+  function abrir(dest, files, ctx) {
+    ctx = ctx || {};
+    form.reset(); filas = []; lista.replaceChildren(); error.hidden = true; sugNota.hidden = true;
+    combos.expedientes.limpiar(); combos.personas.limpiar();
+    const radio = form.querySelector(`input[name="destino"][value="${dest || DATOS.seccion}"]`) || form.querySelector('input[name="destino"]');
+    radio.checked = true; mostrarCampos();
+    const asunto = ctx.asunto || modal.dataset.asunto, cliente = ctx.cliente || modal.dataset.cliente;
+    if (asunto) combos.expedientes.poner(asunto);
+    if (cliente) combos.personas.poner(cliente);
+    if (modal.dataset.carpeta) $id("subCarpeta").value = modal.dataset.carpeta;
+    ok.disabled = false; actualizarResumen();
+    if (files && files.length) agregar(files);
+    abrirModal(modal);
+    setTimeout(() => (files && files.length ? (radio.value === "expedientes" && !combos.expedientes.valor() ? $id("subExpQ")
+      : radio.value === "personas" && !combos.personas.valor() ? $id("subPerQ") : filas[0]?.sel) : archivo)?.focus(), 60);
+  }
+  const cerrar = () => cerrarModal_(modal);
   window.abrirSubir = abrir;
-  document.addEventListener("click", e => { const b = e.target.closest("[data-subir]"); if (b) abrir(b.dataset.subir || "{{ seccion if seccion in secciones else 'expedientes' }}"); });
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-subir]");
+    if (!b) return;
+    const zonaCtx = b.closest("[data-destino]");
+    abrir(b.dataset.subir || DATOS.seccion, null, { asunto: zonaCtx?.dataset.asunto, cliente: zonaCtx?.dataset.cliente });
+  });
   document.addEventListener("keydown", e => {
     const b = e.target.closest && e.target.closest(".xd-subir[data-subir]");
-    if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrir(b.dataset.subir); }
-    if (e.key === "Escape" && !modal.hidden) cerrar();
+    if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); b.click(); }
+    if (e.key === "Escape") document.querySelectorAll(".bv-modal:not([hidden])").forEach(cerrarModal_);
   });
   modal.addEventListener("click", e => { if (e.target === modal || e.target.closest("[data-cerrar]")) cerrar(); });
 
   form.addEventListener("submit", async e => {
     e.preventDefault();
-    const d = destino(), f = archivo.files[0];
+    const d = destino();
     const falta = msg => { error.textContent = msg; error.hidden = false; };
-    if (!f) return falta("Elige el archivo que quieres subir.");
+    error.hidden = true;
+    if (!filas.length) return falta("Elige o arrastra al menos un archivo.");
     let id = null;
-    if (d === "expedientes" && !(id = combos.expedientes.valor())) return falta("Elige de qué expediente es.");
-    if (d === "personas" && !(id = combos.personas.valor())) return falta("Elige de qué persona es.");
-    if (d !== "formatos" && !tipo.value) return falta("Dinos qué es el documento: así se encuentra después con los filtros.");
-    const nombre = document.getElementById("subNombre").value.trim();
-    const fd = new FormData();
-    if (d === "estudio") {
-      fd.append("archivos", f); fd.append("carpeta_id", document.getElementById("subCarpeta").value);
-    } else {
-      fd.append("archivo", f);
+    if (d === "expedientes" && !(id = combos.expedientes.valor())) return falta("Elige de qué expediente son.");
+    if (d === "personas" && !(id = combos.personas.valor())) return falta("Elige de qué persona son.");
+    const sinTipo = filas.find(x => !x.sel.value);
+    if (sinTipo && d !== "formatos") { sinTipo.sel.focus(); return falta(`Dinos qué es «${sinTipo.f.name}»: así se encuentra después con los filtros.`); }
+    ok.disabled = true;
+    const fallos = [];
+    for (const [n, fila] of [...filas].entries()) {
+      ok.textContent = filas.length > 1 ? `Subiendo ${n + 1} de ${filas.length}…` : "Subiendo…";
+      const nombre = fila.li.querySelector(".f-nombre").value.trim(), fecha = fila.li.querySelector(".f-fecha").value;
+      const fd = new FormData();
+      if (d === "estudio") { fd.append("archivos", fila.f); fd.append("carpeta_id", $id("subCarpeta").value); }
+      else fd.append("archivo", fila.f);
+      if (d === "formatos") { fd.append("nombre", nombre || fila.f.name.replace(/\.[^.]+$/, "")); fd.append("categoria", fila.sel.value); }
+      else { fd.append("nombre", nombre); fd.append("tipo_documento", fila.sel.value); fd.append("fecha_documento", fecha); }
+      try {
+        const r = await fetch(URLS[d](id), { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" }, body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok || (d === "estudio" && !j.count)) throw new Error(j.error || "No se pudo subir");
+        fila.li.remove(); filas = filas.filter(x => x !== fila);
+      } catch (err) {
+        fallos.push(`${fila.f.name}: ${err.message}`); fila.li.classList.add("con-error");
+      }
     }
-    if (d === "formatos") {
-      fd.append("nombre", nombre || f.name.replace(/\.[^.]+$/, "")); fd.append("categoria", document.getElementById("subCat").value);
-    } else {
-      fd.append("nombre", nombre); fd.append("tipo_documento", tipo.value);
-      fd.append("fecha_documento", document.getElementById("subFecha").value);
-    }
-    ok.disabled = true; ok.textContent = "Subiendo…"; error.hidden = true;
-    try {
-      const r = await fetch(URLS[d](id), { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" }, body: fd });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok || (d === "estudio" && !j.count)) throw new Error(j.error || "No se pudo subir. Revisa el tipo de archivo e inténtalo de nuevo.");
-      showToast("Documento guardado y cifrado. En unos segundos se podrá buscar dentro de él.");
-      const destinoSec = d === "formatos" ? "formatos" : d;
-      const u = new URL(location.href);
-      ["texto", "grupo", "tipo", "estado", "q"].forEach(k => u.searchParams.delete(k));
-      u.searchParams.set("seccion", destinoSec);
-      if (d === "expedientes") u.searchParams.set("asunto", id); else u.searchParams.delete("asunto");
-      location.href = u.toString();
-    } catch (err) {
-      falta(err.message); ok.disabled = false; ok.textContent = "Subir documento";
-    }
+    ok.disabled = false; actualizarResumen();
+    if (fallos.length) { falta(`No se pudieron subir: ${fallos.join(" · ")}. Revisa el formato e inténtalo de nuevo.`); return; }
+    showToast("Guardado y cifrado. En unos segundos se podrá buscar dentro.");
+    const u = new URL(location.href);
+    ["texto", "grupo", "tipo", "estado", "q", "asunto", "cliente", "carpeta"].forEach(k => u.searchParams.delete(k));
+    u.searchParams.set("seccion", d);
+    if (d === "expedientes") u.searchParams.set("asunto", id);
+    if (d === "personas") u.searchParams.set("cliente", id);
+    location.href = u.toString();
   });
-})();
 
-/* ── «¿Qué es?» en cada tarjeta: confirmar la sugerencia o elegir el tipo ── */
-(function () {
-  const OPC = document.getElementById("tpOpciones");
-  const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  async function guardar(caja, tipo) {
+  /* ── Arrastrar archivos a cualquier parte de la página ─────────────── */
+  const capa = $id("bvSoltar"), capaDonde = $id("bvSoltarDonde");
+  const ETQ = { expedientes: "Expedientes", personas: "Personas", estudio: "Archivo del despacho", formatos: "Machotes y formatos" };
+  let profundidad = 0, marcado = null;
+  const conArchivos = e => [...(e.dataTransfer?.types || [])].includes("Files");
+  function donde(el) {
+    const z = el && el.closest ? el.closest("[data-destino]") : null;
+    if (!z) return { dest: DATOS.seccion, el: null, texto: ETQ[DATOS.seccion] };
+    const nombre = z.dataset.asunto ? (DATOS.expedientes.find(x => String(x.id) === z.dataset.asunto) || {}).t
+      : z.dataset.cliente ? (DATOS.personas.find(x => String(x.id) === z.dataset.cliente) || {}).t : null;
+    return { dest: z.dataset.destino, el: z, texto: nombre || ETQ[z.dataset.destino] || "" };
+  }
+  function marcar(el) {
+    const w = donde(el);
+    if (marcado !== w.el) { marcado?.classList.remove("bv-aqui"); w.el?.classList.add("bv-aqui"); marcado = w.el; }
+    capaDonde.textContent = modal.hidden ? (w.texto ? `Irá a: ${w.texto}. Lo confirmas antes de subir.` : "") : "Se agregan a la lista";
+  }
+  function ocultar() { profundidad = 0; capa.hidden = true; marcado?.classList.remove("bv-aqui"); marcado = null; }
+  document.addEventListener("dragenter", e => { if (!conArchivos(e)) return; e.preventDefault(); profundidad++; capa.hidden = false; marcar(e.target); });
+  document.addEventListener("dragover", e => { if (!conArchivos(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy"; marcar(e.target); });
+  document.addEventListener("dragleave", e => { if (!conArchivos(e)) return; profundidad = Math.max(0, profundidad - 1); if (!profundidad) ocultar(); });
+  document.addEventListener("drop", e => {
+    if (!conArchivos(e)) return;
+    e.preventDefault();
+    const w = donde(e.target); ocultar();
+    const files = [...e.dataTransfer.files];
+    if (!files.length) return;
+    if (!modal.hidden) { agregar(files); return; }
+    abrir(w.dest, files, { asunto: w.el?.dataset.asunto, cliente: w.el?.dataset.cliente });
+  });
+  window.addEventListener("blur", ocultar);
+
+  /* ── Mover un documento a otro expediente o persona ─────────────────── */
+  const mModal = modalAlBody($id("moverModal")), mForm = $id("moverForm"), mErr = $id("moverError");
+  let mDoc = null;
+  const mCombo = combo($id("moverCombo"), () => (mDoc && mDoc.tabla === "cliente_documentos" ? DATOS.personas : DATOS.expedientes));
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".dc-mover");
+    if (!b) return;
+    mDoc = { tabla: b.dataset.tabla, id: b.dataset.id };
+    const aPersona = mDoc.tabla === "cliente_documentos";
+    $id("moverNombre").textContent = `«${b.dataset.nombre}»`;
+    $id("moverLabel").textContent = aPersona ? "¿A qué persona?" : "¿A qué expediente?";
+    $id("moverQ").placeholder = aPersona ? "Escribe el nombre de la persona" : "Escribe el número, el nombre o el cliente";
+    mCombo.limpiar(); mErr.hidden = true; $id("moverOk").disabled = false;
+    abrirModal(mModal); setTimeout(() => $id("moverQ").focus(), 60);
+  });
+  mModal.addEventListener("click", e => { if (e.target === mModal || e.target.closest("[data-cerrar]")) cerrarModal_(mModal); });
+  mForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const destinoId = mCombo.valor();
+    if (!destinoId) { mErr.textContent = "Elige a dónde lo mueves."; mErr.hidden = false; return; }
+    $id("moverOk").disabled = true;
+    const cuerpo = { tabla: mDoc.tabla, id: mDoc.id };
+    cuerpo[mDoc.tabla === "cliente_documentos" ? "cliente_id" : "asunto_id"] = destinoId;
+    const r = await fetch("{{ url_for('biblioteca.mover') }}", { method: "POST", headers: JSONH, body: JSON.stringify(cuerpo) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { mErr.textContent = j.error || "No se pudo mover."; mErr.hidden = false; $id("moverOk").disabled = false; return; }
+    showToast("Documento movido"); location.reload();
+  });
+
+  /* ── «¿Qué es?» en cada tarjeta: confirmar la sugerencia o elegir (según su destino) ── */
+  async function guardarTipo(caja, tipo) {
     const r = await fetch("{{ url_for('biblioteca.tipo_guardar') }}", {
-      method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-      body: JSON.stringify({ tabla: caja.dataset.tabla, id: caja.dataset.id, tipo }),
+      method: "POST", headers: JSONH, body: JSON.stringify({ tabla: caja.dataset.tabla, id: caja.dataset.id, tipo }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok) { showToast(j.error || "No se pudo guardar el tipo", "error"); return; }
@@ -963,16 +1196,22 @@ async function eliminarAcuerdo(id) {
   }
   document.addEventListener("click", e => {
     const okb = e.target.closest(".tp-ok");
-    if (okb) { guardar(okb.closest(".tp"), okb.dataset.tipo); return; }
+    if (okb) { guardarTipo(okb.closest(".tp"), okb.dataset.tipo); return; }
     const b = e.target.closest(".tp-cambiar");
-    if (!b || !OPC) return;
-    const caja = b.closest(".tp");
+    if (!b) return;
+    const caja = b.closest(".tp"), dest = caja.dataset.destino;
     const sel = document.createElement("select");
     sel.className = "tp-sel"; sel.setAttribute("aria-label", "¿Qué es este documento?");
-    sel.innerHTML = OPC.innerHTML; sel.value = caja.dataset.tipo || "";
+    const actual = caja.dataset.tipo || "";
+    sel.innerHTML = opcionesTipo(dest, false, "¿Qué es?");
+    if (actual && !enLista(sel, actual)) sel.innerHTML = opcionesTipo(dest, true, "¿Qué es?");
+    sel.value = actual;
     caja.querySelector(".tp-ok")?.remove();
     b.replaceWith(sel); sel.focus();
-    sel.addEventListener("change", () => { if (sel.value) guardar(caja, sel.value); });
+    sel.addEventListener("change", () => {
+      if (sel.value === "__todos") { sel.innerHTML = opcionesTipo(dest, true, "¿Qué es?"); sel.focus(); return; }
+      if (sel.value) guardarTipo(caja, sel.value);
+    });
   });
 })();
 

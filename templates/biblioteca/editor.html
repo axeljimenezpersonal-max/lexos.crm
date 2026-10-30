@@ -13,7 +13,10 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>Bóveda</a>
     <input class="ed2-titulo" id="edTitulo" value="{{ documento.titulo if documento and documento.titulo != 'Sin título' else '' }}"
            placeholder="Título del documento" maxlength="200" aria-label="Título del documento">
-    <span class="ed2-estado" id="edEstado" aria-live="polite">{% if documento %}Guardado{% else %}Sin guardar{% endif %}</span>
+    <div class="ed2-quien">
+      <span class="ed2-avatares" id="edOtros" aria-live="polite"></span>
+      <span class="ed2-estado" id="edEstado" aria-live="polite">{% if historial %}Última edición: {{ 'tú' if historial[0].autor.id == yo else historial[0].autor.corto }} · {{ historial[0].cuando }}{% elif documento %}Guardado{% else %}Sin guardar · lo verá todo el equipo{% endif %}</span>
+    </div>
     <div class="ed2-acc">
       {% if documento %}<button type="button" class="btn btn-ghost" onclick="compartirDoc()">Compartir</button>{% endif %}
       <div class="ed2-menu">
@@ -27,6 +30,12 @@
       <button type="button" class="btn btn-primary" id="btnGuardar" onclick="guardarDoc()">Guardar</button>
     </div>
   </header>
+
+  <div class="ed2-aviso" id="edAviso" role="alert" hidden>
+    <p id="edAvisoTexto"></p>
+    <div><button type="button" class="btn btn-ghost btn-sm" id="edTraer">Traer sus cambios</button>
+      <button type="button" class="btn btn-primary btn-sm" id="edForzar">Guardar los míos encima</button></div>
+  </div>
 
   <div class="ed2-cuerpo">
     <!-- Hoja -->
@@ -71,14 +80,14 @@
           <select id="edAsunto">
             <option value="">Ninguno</option>
             {% for a in asuntos %}
-            <option value="{{ a.id }}" data-cliente="{{ a.cliente_id or '' }}"{{ ' selected' if documento and documento.asunto_id == a.id }}>{{ (a.numero_expediente ~ ' · ') if a.numero_expediente }}{{ a.titulo }}</option>
+            <option value="{{ a.id }}" data-cliente="{{ a.cliente_id or '' }}"{{ ' selected' if (documento and documento.asunto_id == a.id) or asunto_inicial == a.id }}>{{ (a.numero_expediente ~ ' · ') if a.numero_expediente }}{{ a.titulo }}</option>
             {% endfor %}
           </select></label>
         <label class="ed2-campo"><span>Persona</span>
           <select id="edCliente">
             <option value="">Ninguna</option>
             {% for c in clientes %}
-            <option value="{{ c.id }}"{{ ' selected' if documento and documento.cliente_id == c.id }}>{{ c.razon_social or ((c.nombre or '') ~ ' ' ~ (c.apellidos or '')) }}</option>
+            <option value="{{ c.id }}"{{ ' selected' if (documento and documento.cliente_id == c.id) or (asunto_inicial and (asuntos | selectattr('id', 'equalto', asunto_inicial) | map(attribute='cliente_id') | first) == c.id) }}>{{ c.razon_social or ((c.nombre or '') ~ ' ' ~ (c.apellidos or '')) }}</option>
             {% endfor %}
           </select></label>
       </details>
@@ -109,23 +118,24 @@
       </details>
       {% endif %}
 
-      {% if versiones %}
-      <details class="ed2-caja">
-        <summary><b>Versiones anteriores</b><small>Cada vez que guardas queda una</small></summary>
-        <div class="ed2-lista">
-          {% for v in versiones %}
-          <button type="button" onclick="cargarVersion({{ documento.id }}, {{ v.id }})"><b>Versión {{ v.version }}</b><small>{{ v.fecha[:16] if v.fecha else '' }}</small></button>
+      {% if documento %}
+      <details class="ed2-caja" id="edHistCaja"{{ ' open' if historial | length > 1 }}>
+        <summary><b>Quién cambió qué</b><small>Cada persona que edita deja su versión, con la hora</small></summary>
+        <div class="ed2-hist" id="edHist">
+          {% for h in historial %}
+          <button type="button" data-ver="{{ h.id }}"><i style="background:{{ h.autor.color }}">{{ h.autor.iniciales }}</i>
+            <span><b>{{ 'Tú' if h.autor.id == yo else h.autor.corto }}</b><small>{{ h.cuando }} · versión {{ h.version }}</small></span></button>
           {% endfor %}
         </div>
       </details>
       {% endif %}
 
       <details class="ed2-caja">
-        <summary><b>Mis documentos</b><small>Los últimos que se escribieron</small></summary>
+        <summary><b>Documentos del equipo</b><small>Todos los ven y los pueden editar</small></summary>
         <div class="ed2-lista">
           <a href="{{ url_for('biblioteca.editor') }}" class="ed2-nuevo">+ Documento nuevo</a>
           {% for r in recientes %}
-          <a href="{{ url_for('biblioteca.editor', doc_id=r.id) }}"{{ ' class=on' if documento and documento.id == r.id }}><b>{{ r.titulo }}</b><small>{{ (r.fecha_mod or '')[:10] }}</small></a>
+          <a href="{{ url_for('biblioteca.editor', doc_id=r.id) }}"{{ ' class=on' if documento and documento.id == r.id }}><b>{{ r.titulo }}</b><small>{{ r.editor ~ ' · ' if r.editor }}{{ r.cuando }}</small></a>
           {% endfor %}
         </div>
       </details>
@@ -156,17 +166,24 @@
   </div>
 </div>
 
-<!-- Ver una versión -->
+<!-- Ver una versión: qué cambió y cómo quedó -->
 <div class="modal-overlay" id="diffModal" onclick="if(event.target===this)cerrarModal('diffModal')">
-  <div class="modal-box" style="max-width:800px;height:76vh;display:flex;flex-direction:column">
+  <div class="modal-box ed2-vmodal">
     <div class="modal-header">
       <span class="modal-title" id="diffTitle">Versión</span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-primary btn-sm" onclick="restaurarVersion()">Volver a esta versión</button>
-        <button class="modal-close" onclick="cerrarModal('diffModal')" aria-label="Cerrar">×</button>
-      </div>
+      <button class="modal-close" onclick="cerrarModal('diffModal')" aria-label="Cerrar">×</button>
     </div>
-    <div class="modal-body" style="overflow:auto"><div id="diffContent" class="ed2-version ql-editor"></div></div>
+    <div class="ed2-vtabs" role="tablist">
+      <button type="button" class="on" data-vista="cambios" role="tab">Qué cambió</button>
+      <button type="button" data-vista="completo" role="tab">Cómo quedó</button>
+    </div>
+    <div class="modal-body ed2-vcuerpo">
+      <p class="ed2-nota" id="diffNota"></p>
+      <div id="diffCambios" class="ed2-cambios"></div>
+      <div id="diffContent" class="ed2-version ql-editor" hidden></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="cerrarModal('diffModal')">Cerrar</button>
+      <button class="btn btn-primary" onclick="restaurarVersion()">Volver a esta versión</button></div>
   </div>
 </div>
 {% endblock %}
@@ -186,10 +203,14 @@
     doc: {{ url_for('biblioteca.editor', doc_id=0) | tojson }},
     version: {{ url_for('biblioteca.editor_version', doc_id=0, ver_id=0) | tojson }},
     compartir: {{ url_for('biblioteca.editor_compartir', doc_id=0) | tojson }},
+    presencia: {{ url_for('biblioteca.editor_presencia', doc_id=0) | tojson }},
+    contenido: {{ url_for('biblioteca.editor_contenido', doc_id=0) | tojson }},
   };
   const conId = (url, ...ids) => { let i = 0; return url.replace(/\/0(?=\/|\?|$)/g, () => '/' + ids[i++]); };
   const $ = s => document.querySelector(s);
   let DOC_ID = {{ documento.id if documento else 'null' }};
+  let BASE = {{ huella | tojson }};   // lo guardado cuando abrí el documento (o la última vez que guardé)
+  const YO = {{ yo | tojson }};
   let valores = {};
 
   /* ── Bloquecito de dato: se ve como «Nombre del cliente» o, con un caso elegido, con su valor ── */
@@ -286,8 +307,8 @@
   quill.on('text-change', (d, v, fuente) => { if (fuente === 'user') marcarCambio(); });
   $('#edTitulo').addEventListener('input', marcarCambio);
 
-  window.guardarDoc = async function (solo) {
-    if (guardando) return;
+  window.guardarDoc = async function (solo, forzar) {
+    if (guardando || (solo && !$('#edAviso').hidden)) return;
     const actual = huella();
     if (solo && actual === guardado) return;
     guardando = true; clearTimeout(temporizador); estado('Guardando…');
@@ -298,14 +319,16 @@
         body: JSON.stringify({
           id: DOC_ID, titulo: $('#edTitulo').value.trim() || 'Sin título', contenido_html: quill.root.innerHTML,
           asunto_id: $('#edAsunto').value || null, cliente_id: $('#edCliente').value || null,
-          plantilla_id: {{ plantilla_id or 'null' }},
+          plantilla_id: {{ plantilla_id or 'null' }}, base: BASE, forzar: !!forzar,
         }),
       });
       const j = await r.json();
+      if (r.status === 409 && j.conflicto) { mostrarConflicto(`${j.quien} guardó cambios ${j.cuando} mientras tú escribías. Tus cambios todavía no se guardan.`); estado('Sin guardar'); return; }
       if (!r.ok || !j.ok) throw new Error(j.error || 'No se pudo guardar');
-      if (j.nuevo) { DOC_ID = j.id; history.replaceState(null, '', conId(URL_.doc, j.id)); }
-      guardado = actual;
-      estado('Guardado · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }));
+      if (j.nuevo) { DOC_ID = j.id; history.replaceState(null, '', conId(URL_.doc, j.id)); presencia(); }
+      BASE = j.huella; guardado = actual; $('#edAviso').hidden = true;
+      estado('Guardado por ti · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }));
+      if (j.nueva_version || j.nuevo) refrescarHistorial();
     } catch (e) {
       estado('No se guardó'); avisar(e.message || 'No se pudo guardar', 'error');
     } finally { guardando = false; btn.disabled = false; }
@@ -360,23 +383,76 @@
   };
   window.copiarShareLink = () => { navigator.clipboard.writeText($('#shareDocLink').value); avisar('Enlace copiado'); };
 
-  /* ── Versiones ── */
+  /* ── Quién cambió qué ── */
   let versionHtml = '';
+  const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function pintarHistorial(lista) {
+    $('#edHist') && ($('#edHist').innerHTML = lista.map(h => `<button type="button" data-ver="${h.id}"><i style="background:${esc(h.autor.color)}">${esc(h.autor.iniciales)}</i>
+      <span><b>${h.autor.id === YO ? 'Tú' : esc(h.autor.corto)}</b><small>${esc(h.cuando)} · versión ${h.version}</small></span></button>`).join(''));
+  }
+  async function refrescarHistorial() {
+    if (!DOC_ID || !$('#edHist')) return;
+    const j = await (await fetch(conId(URL_.contenido, DOC_ID))).json().catch(() => ({}));
+    if (j.ok) pintarHistorial(j.historial);
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-ver]'); if (b) cargarVersion(DOC_ID, b.dataset.ver); });
   window.cargarVersion = async (docId, verId) => {
     const j = await (await fetch(conId(URL_.version, docId, verId))).json();
     if (!j.ok) return;
     versionHtml = j.contenido_html;
-    $('#diffTitle').textContent = `Versión ${j.version} · ${(j.fecha || '').slice(0, 16)}`;
+    $('#diffTitle').textContent = `Versión ${j.version} · ${j.autor}`;
+    $('#diffNota').textContent = j.primera ? `${j.autor} escribió la primera versión ${j.cuando}.` : `Lo que ${j.autor} cambió ${j.cuando}: en verde lo que agregó, tachado lo que quitó.`;
+    $('#diffCambios').innerHTML = j.cambios || '<p class="ed2-nota">No cambió el texto (quizá solo el formato).</p>';
     $('#diffContent').innerHTML = j.contenido_html;
     $('#diffContent').querySelectorAll('[data-campo]').forEach(n => { n.textContent = valores[n.dataset.campo] || ETIQUETAS[n.dataset.campo] || n.dataset.campo; });
+    vista('cambios');
     $('#diffModal').classList.add('open');
   };
+  function vista(v) {
+    document.querySelectorAll('.ed2-vtabs button').forEach(b => b.classList.toggle('on', b.dataset.vista === v));
+    $('#diffCambios').hidden = v !== 'cambios'; $('#diffNota').hidden = v !== 'cambios'; $('#diffContent').hidden = v !== 'completo';
+  }
+  document.querySelectorAll('.ed2-vtabs button').forEach(b => b.addEventListener('click', () => vista(b.dataset.vista)));
   window.restaurarVersion = () => {
-    if (!versionHtml || !confirm('¿Volver a esta versión? Lo que hay ahora en la hoja se reemplaza.')) return;
+    if (!versionHtml || !confirm('¿Volver a esta versión? Lo que hay ahora en la hoja se reemplaza (queda guardado en el historial).')) return;
     quill.setContents(quill.clipboard.convert(versionHtml), 'user');
     quill.root.querySelectorAll('.ed-campo').forEach(pintar);
-    cerrarModal('diffModal');
+    cerrarModal('diffModal'); marcarCambio();
   };
+
+  /* ── Trabajo en equipo: quién está aquí y cambios de otros ── */
+  function mostrarConflicto(texto) { $('#edAvisoTexto').textContent = texto; $('#edAviso').hidden = false; }
+  async function traerCambios() {
+    const j = await (await fetch(conId(URL_.contenido, DOC_ID))).json().catch(() => ({}));
+    if (!j.ok) return;
+    const sel = quill.getSelection();
+    quill.setContents(quill.clipboard.convert(j.contenido_html), 'silent');
+    quill.root.querySelectorAll('.ed-campo').forEach(pintar);
+    $('#edTitulo').value = j.titulo === 'Sin título' ? '' : j.titulo;
+    if (sel) quill.setSelection(Math.min(sel.index, quill.getLength() - 1), 0, 'silent');
+    BASE = j.huella; guardado = huella(); $('#edAviso').hidden = true;
+    pintarHistorial(j.historial);
+  }
+  $('#edTraer').addEventListener('click', () => { if (huella() === guardado || confirm('Se reemplaza lo que escribiste desde la última vez que guardaste. ¿Seguir?')) traerCambios(); });
+  $('#edForzar').addEventListener('click', () => guardarDoc(false, true));
+  async function presencia() {
+    if (!DOC_ID || document.hidden) return;
+    try {
+      const j = await (await fetch(conId(URL_.presencia, DOC_ID), { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })).json();
+      if (!j.ok) return;
+      $('#edOtros').innerHTML = j.otros.map(o => `<i style="background:${esc(o.color)}" title="${esc(o.nombre)} tiene abierto este documento">${esc(o.iniciales)}</i>`).join('')
+        + (j.otros.length ? `<span>${j.otros.length === 1 ? esc(j.otros[0].corto) + ' también está aquí' : j.otros.length + ' personas más están aquí'}</span>` : '');
+      if (j.huella !== BASE && !guardando && j.ultimo && !j.ultimo.yo) {
+        if (huella() === guardado) { await traerCambios(); estado(`${j.ultimo.quien} guardó cambios ${j.ultimo.cuando}; ya los ves`); }
+        else mostrarConflicto(`${j.ultimo.quien} guardó cambios ${j.ultimo.cuando}. Tú también tienes cambios sin guardar.`);
+      }
+    } catch (_) {}
+  }
+  presencia(); setInterval(presencia, 10000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) presencia(); });
+
+  /* Las ventanas van directo en <body> para quedar encima de la barra del teléfono */
+  ['shareDocModal', 'diffModal'].forEach(id => document.body.appendChild($('#' + id)));
 
   /* En el teléfono los paneles empiezan cerrados para dejar ver la hoja */
   if (matchMedia('(max-width: 900px)').matches) document.querySelectorAll('.ed2-panel details').forEach(d => d.open = false);

@@ -6,12 +6,14 @@ en PDF y exportación a Excel.
 """
 from __future__ import annotations
 
+import calendar
 import html
 import io
 import json
 import math
 import re
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from urllib.parse import quote
 
 from flask import (
@@ -54,6 +56,11 @@ MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "
 MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
                 "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
 ROLES_COBRANZA = ("super_admin", "admin", "abogado", "asistente")
+# Retenciones que hace una persona moral al pagar honorarios a una persona física:
+# dos terceras partes del IVA (10.6667 % de la base) y 10 % de ISR.
+RET_IVA_PCT = Decimal("10.6667")
+RET_ISR_PCT = Decimal("10")
+TOPE_MONTO = Decimal("999999999")
 PER_PAGE = 25
 
 # Montos en SQL. Los cobros viejos guardaban solo `monto`; desde este módulo siempre hay `total`.
@@ -121,10 +128,73 @@ def _auto_folio(tdb) -> str:
     return f"C-{anio}-{n:04d}"
 
 
-def _calcular(monto: float, iva_pct: float, descuento: float) -> dict:
-    base = max(round(monto - descuento, 2), 0)
-    iva = round(base * iva_pct / 100, 2)
-    return {"iva_monto": iva, "total": round(base + iva, 2)}
+CENTAVO = Decimal("0.01")
+
+
+def _dec(v, default=None):
+    """Texto o número a Decimal (acepta «$12,500.50»). Regresa `default` si no se puede leer."""
+    if v in (None, "", "None"):
+        return default
+    try:
+        d = Decimal(str(v).replace(",", "").replace("$", "").replace(" ", "").strip())
+    except (InvalidOperation, ValueError):
+        return default
+    return d if d.is_finite() else default
+
+
+def _centavos(d) -> Decimal:
+    """Redondeo a centavos «de banco»: medio centavo hacia arriba."""
+    return Decimal(str(d or 0)).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+def _calcular(monto, iva_pct, descuento, ret_iva_pct=0, ret_isr_pct=0) -> dict:
+    """Honorarios − descuento = subtotal; + IVA; − retenciones = total que paga el cliente.
+    Todo en Decimal y redondeado a centavos, igual que un CFDI."""
+    base = max(_centavos(_centavos(monto) - _centavos(descuento)), Decimal("0"))
+    iva = _centavos(base * Decimal(str(iva_pct or 0)) / 100)
+    ret_iva = _centavos(base * Decimal(str(ret_iva_pct or 0)) / 100) if iva else Decimal("0")
+    ret_isr = _centavos(base * Decimal(str(ret_isr_pct or 0)) / 100)
+    total = base + iva - ret_iva - ret_isr
+    return {"subtotal": float(base), "iva_monto": float(iva), "ret_iva_monto": float(ret_iva),
+            "ret_isr_monto": float(ret_isr), "total": float(total)}
+
+
+def _desglose(co) -> dict:
+    """Desglose guardado de un cobro. `ajuste` son los descuentos aplicados después (notas de crédito)."""
+    co = dict(co)
+    hon = _centavos(co.get("monto"))
+    desc = _centavos(co.get("descuento_valor"))
+    if co.get("descuento_tipo") == "pct":
+        desc = _centavos(hon * desc / 100)
+    sub = hon - desc
+    iva, riva, risr = (_centavos(co.get(k)) for k in ("iva_monto", "ret_iva_monto", "ret_isr_monto"))
+    calculado = sub + iva - riva - risr
+    total = _centavos(co.get("total")) or hon
+    ajuste = min(total - calculado, Decimal("0"))
+    if ajuste >= Decimal("-0.01"):        # diferencias de redondeo de cobros viejos, no un descuento
+        ajuste = Decimal("0")
+    return {"honorarios": float(hon), "descuento": float(desc), "subtotal": float(sub),
+            "iva_pct": float(co.get("iva_pct") or 0), "iva": float(iva),
+            "ret_iva_pct": float(co.get("ret_iva_pct") or 0), "ret_iva": float(riva),
+            "ret_isr_pct": float(co.get("ret_isr_pct") or 0), "ret_isr": float(risr),
+            "ajuste": float(ajuste), "total": float(total)}
+
+
+def _sumar_mes(f: date, dia: int) -> date:
+    """El mismo día del mes siguiente (o el último día, si ese mes es más corto)."""
+    y, m = divmod(f.year * 12 + f.month, 12)
+    return date(y, m + 1, min(dia, calendar.monthrange(y, m + 1)[1]))
+
+
+_MES_EN_TEXTO = re.compile(r"\b(" + "|".join(MESES_LARGOS) + r")(\s+(?:de\s+|del\s+)?)(\d{4})\b", re.I)
+
+
+def _concepto_del_mes(concepto: str, f: date) -> str:
+    """«Iguala mensual — octubre 2026» → «Iguala mensual — noviembre 2026»."""
+    def cambio(m):
+        mes = MESES_LARGOS[f.month - 1]
+        return (mes.capitalize() if m.group(1)[0].isupper() else mes) + m.group(2) + str(f.year)
+    return _MES_EN_TEXTO.sub(cambio, concepto or "", count=1)
 
 
 def _alcance() -> tuple[str, list]:
@@ -169,6 +239,61 @@ def al_dia(tdb) -> None:
         tdb.commit()
     except Exception:
         tdb.rollback()
+    try:
+        _repetir_igualas(tdb)
+        tdb.commit()
+    except Exception:
+        tdb.rollback()
+
+
+def _repetir_igualas(tdb) -> int:
+    """Igualas que se repiten: cuando llega el día del mes siguiente se crea el cobro de ese mes,
+    con los mismos honorarios, IVA, retenciones y plazo de pago. Solo repite el último de la cadena."""
+    hoy, creados = _hoy(), 0
+    for _ in range(24):                     # si nadie abrió la cobranza en meses, se ponen al día (con tope)
+        nuevos = 0
+        for co in tdb.execute("""SELECT * FROM cobros co WHERE co.repetir='mensual' AND co.estado != 'cancelado'
+                                 AND NOT EXISTS (SELECT 1 FROM cobros h WHERE h.repetido_de=co.id)""").fetchall():
+            emision = _fecha(co["fecha_emision"])
+            if not emision:
+                continue
+            dia = co["repetir_dia"] or emision.day
+            sig = _sumar_mes(emision, dia)
+            if sig > hoy:
+                continue
+            vence = _fecha(co["fecha_vencimiento"])
+            plazo = (vence - emision).days if vence else None
+            d = _desglose(co)
+            calc = _calcular(d["honorarios"], co["iva_pct"], d["descuento"], co["ret_iva_pct"], co["ret_isr_pct"])
+            cur = tdb.execute(
+                """INSERT INTO cobros (cliente_id, asunto_id, concepto, numero_factura, monto, moneda, iva_pct, iva_monto,
+                                       ret_iva_pct, ret_iva_monto, ret_isr_pct, ret_isr_monto, total,
+                                       descuento_tipo, descuento_valor, estado, monto_abonado, fecha_emision, fecha_vencimiento,
+                                       abogado_id, repetir, repetir_dia, repetido_de, creado_por)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'fijo',?,'pendiente',0,?,?,?,'mensual',?,?,?)""",
+                (co["cliente_id"], co["asunto_id"], _concepto_del_mes(co["concepto"], sig), _auto_folio(tdb),
+                 d["honorarios"], co["moneda"] or "MXN", co["iva_pct"] or 0, calc["iva_monto"],
+                 co["ret_iva_pct"] or 0, calc["ret_iva_monto"], co["ret_isr_pct"] or 0, calc["ret_isr_monto"], calc["total"],
+                 d["descuento"], sig.isoformat(), (sig + timedelta(days=plazo)).isoformat() if plazo is not None else None,
+                 co["abogado_id"], dia, co["id"], co["creado_por"]))
+            _recalcular(tdb, cur.lastrowid)
+            nuevos += 1
+        creados += nuevos
+        if not nuevos:
+            break
+    return creados
+
+
+def _cadena(tdb, cid: int) -> list[int]:
+    """Este cobro y los que se crearon después a partir de él (iguala que se repite)."""
+    ids, actual = [cid], cid
+    for _ in range(600):
+        h = tdb.execute("SELECT id FROM cobros WHERE repetido_de=?", (actual,)).fetchone()
+        if not h:
+            break
+        ids.append(h[0])
+        actual = h[0]
+    return ids
 
 
 def _recalcular(tdb, cid: int) -> str | None:
@@ -177,9 +302,10 @@ def _recalcular(tdb, cid: int) -> str | None:
     if not co or co["estado"] == "cancelado":
         return co["estado"] if co else None
     suma, ultima = tdb.execute("SELECT COALESCE(SUM(monto),0), MAX(fecha) FROM cobro_pagos WHERE cobro_id=?", (cid,)).fetchone()
-    total = float(co["total"] or co["monto"] or 0)
+    suma = float(_centavos(suma))
+    total = float(_centavos(co["total"] or co["monto"] or 0))
     vence = _fecha(co["fecha_vencimiento"])
-    if total > 0 and suma >= total - 0.01:
+    if total > 0 and suma >= total:
         estado = "pagado"
     elif suma > 0:
         estado = "abono"
@@ -231,13 +357,25 @@ def _decorar(r) -> dict:
     d["vence"] = _vence_info(d["estado"], d.get("fecha_vencimiento"), d["saldo_v"])
     d["folio"] = d.get("numero_factura") or f"#{d['id']}"
     d["pagado_el"] = _fecha_txt(d.get("fecha_pago"))
+    d["repite"] = d.get("repetir") == "mensual" and d["estado"] != "cancelado"
+    d["retiene"] = bool((d.get("ret_iva_monto") or 0) or (d.get("ret_isr_monto") or 0))
     return d
 
 
 def _clientes():
     return [dict(r) for r in g.tenant_db.execute(
-        f"SELECT c.id, {CLIENTE} AS nombre FROM clientes c WHERE c.activo=1 ORDER BY nombre COLLATE NOCASE LIMIT 1000"
+        f"SELECT c.id, {CLIENTE} AS nombre, c.tipo, c.rfc FROM clientes c WHERE c.activo=1 "
+        f"ORDER BY nombre COLLATE NOCASE LIMIT 5000"
     ).fetchall()]
+
+
+def _despacho_persona_fisica() -> bool:
+    """Un RFC de 13 caracteres es de persona física: sus clientes personas morales le retienen IVA e ISR."""
+    try:
+        rfc = (g.tenant["rfc"] or "").strip()
+    except (KeyError, IndexError, TypeError):
+        rfc = ""
+    return len(rfc) == 13
 
 
 def _abogados():
@@ -468,7 +606,8 @@ def index():
         horas_pend={"horas": float(horas_pend[0]), "asuntos": horas_pend[1]},
         clientes=_clientes(), abogados=_abogados(), conceptos=CONCEPTOS, metodos=METODOS_PAGO,
         puede_crear=session.get("role") in ROLES_COBRANZA, es_admin=_es_admin(),
-        hoy=hoy.isoformat(), folio_sugerido=_auto_folio(tdb),
+        hoy=hoy.isoformat(), folio_sugerido=_auto_folio(tdb), despacho_pf=_despacho_persona_fisica(),
+        ret_iva_pct=float(RET_IVA_PCT), ret_isr_pct=float(RET_ISR_PCT),
     )
 
 
@@ -502,12 +641,17 @@ def panel(id: int):
         p["autor"] = (usuarios.get(p["creado_por"]) or {}).get("corto")
         pagos.append(p)
 
-    descuento = float(co.get("descuento_valor") or 0)
-    if co.get("descuento_tipo") == "pct":
-        descuento = round(float(co.get("monto") or 0) * descuento / 100, 2)
-    desglose = {"honorarios": float(co.get("monto") or 0), "descuento": descuento,
-                "iva_pct": float(co.get("iva_pct") or 0), "iva": float(co.get("iva_monto") or 0),
-                "ajuste": round(co["total_v"] - (float(co.get("monto") or 0) - descuento + float(co.get("iva_monto") or 0)), 2)}
+    desglose = _desglose(co)
+    # Iguala que se repite: el cobro del mes siguiente, o cuándo se va a crear
+    siguiente = tdb.execute("SELECT id, numero_factura, fecha_emision FROM cobros WHERE repetido_de=?", (id,)).fetchone()
+    repeticion = None
+    if co["repite"] or siguiente:
+        em = _fecha(co.get("fecha_emision"))
+        repeticion = {
+            "activa": co["repite"] and not siguiente,
+            "siguiente": dict(siguiente) if siguiente else None,
+            "cuando": _fecha_txt(_sumar_mes(em, co.get("repetir_dia") or em.day)) if em else "—",
+        }
 
     whatsapp = None
     tel = re.sub(r"\D", "", (cli["celular"] or cli["telefono"] or "") if cli else "")
@@ -524,15 +668,17 @@ def panel(id: int):
     actividad = []
     for a in tdb.execute("SELECT accion, detalles, user_id, fecha FROM actividad_log WHERE entidad='cobro' AND entidad_id=? "
                          "ORDER BY id DESC LIMIT 6", (id,)).fetchall():
-        if a["accion"] in ("enviar_recordatorio", "nota_credito_parcial", "editar_cobro"):
-            actividad.append({"accion": {"enviar_recordatorio": "Recordatorio enviado por correo",
-                                         "nota_credito_parcial": "Descuento aplicado",
-                                         "editar_cobro": "Cobro editado"}[a["accion"]],
+        etiquetas = {"enviar_recordatorio": "Recordatorio enviado por correo", "nota_credito_parcial": "Descuento aplicado",
+                     "editar_cobro": "Cobro editado", "crear_cobro": "Cobro registrado", "cancelar_cobro": "Cobro cancelado",
+                     "borrar_pago": "Pago borrado", "dejar_de_repetir": "Dejó de repetirse cada mes",
+                     "repetir_cada_mes": "Se repite cada mes"}
+        if a["accion"] in etiquetas:
+            actividad.append({"accion": etiquetas[a["accion"]],
                               "quien": (usuarios.get(a["user_id"]) or {}).get("corto"),
                               "fecha": _fecha_txt(a["fecha"])})
 
     return render_template(
-        "cobranzas/_panel.html", co=co, cli=dict(cli) if cli else None, pagos=pagos, desglose=desglose,
+        "cobranzas/_panel.html", co=co, cli=dict(cli) if cli else None, pagos=pagos, desglose=desglose, repeticion=repeticion,
         abogado=usuarios.get(co.get("abogado_id")), whatsapp=whatsapp, actividad=actividad,
         es_admin=_es_admin(), puede=session.get("role") in ROLES_COBRANZA,
         emision=_fecha_txt(co.get("fecha_emision")), vencimiento=_fecha_txt(co.get("fecha_vencimiento")),
@@ -549,9 +695,16 @@ def datos(id: int):
         abort(404)
     d = {k: co[k] for k in ("id", "cliente_id", "asunto_id", "concepto", "numero_factura", "monto", "moneda", "iva_pct",
                              "fecha_emision", "fecha_vencimiento", "abogado_id", "notas", "estado")}
-    d["descuento"] = float(co["descuento_valor"] or 0) if co["descuento_tipo"] != "pct" else \
-        round(float(co["monto"] or 0) * float(co["descuento_valor"] or 0) / 100, 2)
+    des = _desglose(co)
+    d["descuento"] = des["descuento"]
+    d["ajuste"] = des["ajuste"]
+    d["retenciones"] = bool(des["ret_iva"] or des["ret_isr"] or co["ret_isr_pct"])
+    d["repetir"] = co["repetir"] == "mensual"
     d["pagado"] = float(co["monto_abonado"] or 0)
+    d["archivo_factura"] = bool(co["archivo_factura_url"])
+    d["archivo_xml"] = bool(co["archivo_xml_url"])
+    nombre = g.tenant_db.execute(f"SELECT {CLIENTE} FROM clientes c WHERE c.id=?", (co["cliente_id"],)).fetchone()
+    d["cliente_nombre"] = nombre[0] if nombre else ""
     return jsonify(d)
 
 
@@ -561,42 +714,65 @@ def datos(id: int):
 
 
 def _leer_cobro(tdb):
-    """Valida el formulario de alta/edición. Regresa (valores, error)."""
+    """Valida el formulario de alta/edición. Regresa (valores, (campo, error))."""
     d = request.form
-    concepto = (d.get("concepto") or "").strip()[:300]
+    concepto = " ".join((d.get("concepto") or "").split())[:300]
     cliente_id = _int(d.get("cliente_id"))
     asunto_id = _int(d.get("asunto_id"))
-    monto = round(_num(d.get("monto")), 2)
+    monto = _dec(d.get("monto"))
     if not cliente_id or not tdb.execute("SELECT 1 FROM clientes WHERE id=?", (cliente_id,)).fetchone():
-        return None, "Elige a qué cliente le vas a cobrar"
-    if not concepto:
-        return None, "Escribe el concepto del cobro"
-    if monto <= 0:
-        return None, "Escribe el monto de los honorarios"
+        return None, ("cliente_id", "Elige a qué cliente le vas a cobrar")
     if asunto_id:
         a = tdb.execute("SELECT cliente_id FROM asuntos WHERE id=?", (asunto_id,)).fetchone()
         if not a or not puede_ver(tdb, asunto_id):
-            return None, "Ese asunto no existe"
+            return None, ("asunto_id", "No encontramos ese asunto. Elige otro o déjalo sin asunto.")
         if a["cliente_id"] and a["cliente_id"] != cliente_id:
-            return None, "Ese asunto es de otro cliente"
+            return None, ("asunto_id", "Ese asunto es de otro cliente")
+    if not concepto:
+        return None, ("concepto", "Escribe qué le estás cobrando (por ejemplo, «Anticipo de honorarios»)")
+    if monto is None and (d.get("monto") or "").strip():
+        return None, ("monto", "Escribe los honorarios solo con números, por ejemplo 12500.50")
+    if monto is None or monto <= 0:
+        return None, ("monto", "Escribe cuánto son los honorarios")
+    if monto > TOPE_MONTO:
+        return None, ("monto", "Revisa los honorarios: la cantidad es demasiado grande")
+    monto = _centavos(monto)
+    descuento = _dec(d.get("descuento"), Decimal("0"))
+    if descuento < 0:
+        return None, ("descuento", "El descuento no puede ser negativo")
+    descuento = _centavos(descuento)
+    if descuento >= monto:
+        return None, ("descuento", "El descuento tiene que ser menor que los honorarios")
     iva_pct = 16.0 if d.get("iva") != "0" else 0.0
-    descuento = min(max(round(_num(d.get("descuento")), 2), 0), monto)
+    retiene = d.get("retenciones") == "1"
+    ret_iva_pct = float(RET_IVA_PCT) if retiene and iva_pct else 0.0
+    ret_isr_pct = float(RET_ISR_PCT) if retiene else 0.0
     emision = _fecha(d.get("fecha_emision")) or _hoy()
+    if (d.get("fecha_vencimiento") or "").strip() and not _fecha(d.get("fecha_vencimiento")):
+        return None, ("fecha_vencimiento", "Revisa la fecha límite de pago")
     vence = _fecha(d.get("fecha_vencimiento"))
     if vence and vence < emision:
-        return None, "La fecha de pago no puede ser anterior a la emisión"
+        return None, ("fecha_vencimiento", "La fecha límite de pago no puede ser antes de la fecha del cobro")
     moneda = d.get("moneda") if d.get("moneda") in MONEDAS else "MXN"
     abogado_id = _int(d.get("abogado_id"))
     if abogado_id and abogado_id not in {a["id"] for a in _abogados()}:
         abogado_id = None
+    repetir = d.get("repetir") == "1"
     return {
         "cliente_id": cliente_id, "asunto_id": asunto_id, "concepto": concepto,
         "numero_factura": (d.get("numero_factura") or "").strip()[:40] or None,
-        "monto": monto, "moneda": moneda, "iva_pct": iva_pct, "descuento_tipo": "fijo", "descuento_valor": descuento,
-        **_calcular(monto, iva_pct, descuento),
+        "monto": float(monto), "moneda": moneda, "iva_pct": iva_pct, "descuento_tipo": "fijo", "descuento_valor": float(descuento),
+        "ret_iva_pct": ret_iva_pct, "ret_isr_pct": ret_isr_pct,
+        **{k: v for k, v in _calcular(monto, iva_pct, descuento, ret_iva_pct, ret_isr_pct).items() if k != "subtotal"},
         "fecha_emision": emision.isoformat(), "fecha_vencimiento": vence.isoformat() if vence else None,
         "abogado_id": abogado_id, "notas": (d.get("notas") or "").strip()[:3000] or None,
+        "repetir": "mensual" if repetir else None, "repetir_dia": emision.day if repetir else None,
     }, None
+
+
+def _error(err, status=400):
+    campo, msg = err if isinstance(err, tuple) else (None, err)
+    return jsonify(ok=False, error=msg, campo=campo), status
 
 
 @cobranzas_bp.route("/crear", methods=["POST"])
@@ -607,7 +783,7 @@ def crear():
     tdb = g.tenant_db
     v, err = _leer_cobro(tdb)
     if err:
-        return jsonify(ok=False, error=err), 400
+        return _error(err)
     if not v["abogado_id"]:
         resp = tdb.execute("SELECT abogado_responsable FROM asuntos WHERE id=?", (v["asunto_id"],)).fetchone() if v["asunto_id"] else None
         v["abogado_id"] = (resp["abogado_responsable"] if resp else None) or \
@@ -616,10 +792,13 @@ def crear():
     pdf, err = _guardar_archivo("archivo_factura", "facturas", {"pdf", "png", "jpg", "jpeg"})
     xml, err2 = _guardar_archivo("archivo_xml", "xml", {"xml"})
     if err or err2:
-        return jsonify(ok=False, error="La factura debe ser PDF o imagen, y el CFDI un archivo .xml"), 400
+        return _error(("archivo_factura" if err else "archivo_xml",
+                       "La factura debe ser PDF o imagen, y el CFDI un archivo .xml"))
 
-    cols = ["cliente_id", "asunto_id", "concepto", "numero_factura", "monto", "moneda", "iva_pct", "iva_monto", "total",
-            "descuento_tipo", "descuento_valor", "fecha_emision", "fecha_vencimiento", "abogado_id", "notas"]
+    cols = ["cliente_id", "asunto_id", "concepto", "numero_factura", "monto", "moneda", "iva_pct", "iva_monto",
+            "ret_iva_pct", "ret_iva_monto", "ret_isr_pct", "ret_isr_monto", "total",
+            "descuento_tipo", "descuento_valor", "fecha_emision", "fecha_vencimiento", "abogado_id", "notas",
+            "repetir", "repetir_dia"]
     cur = tdb.execute(
         f"INSERT INTO cobros ({', '.join(cols)}, estado, monto_abonado, archivo_factura_url, archivo_xml_url, creado_por) "
         f"VALUES ({', '.join('?' * len(cols))}, 'pendiente', 0, ?, ?, ?)",
@@ -627,14 +806,17 @@ def crear():
     cid = cur.lastrowid
 
     if request.form.get("ya_pagado"):
+        # Pagado con la fecha del cobro (o hoy, si el cobro tiene fecha futura)
         tdb.execute("INSERT INTO cobro_pagos (cobro_id, monto, fecha, metodo, notas, creado_por) VALUES (?,?,?,?,?,?)",
-                    (cid, v["total"], v["fecha_emision"],
+                    (cid, v["total"], min(v["fecha_emision"], _hoy().isoformat()),
                      request.form.get("metodo") if request.form.get("metodo") in METODOS_PAGO else "Transferencia",
                      "Pagado al registrar el cobro", session.get("user_id")))
     estado = _recalcular(tdb, cid)
     tdb.commit()
     _log("crear_cobro", cid, {"concepto": v["concepto"], "total": v["total"]})
-    return jsonify(ok=True, id=cid, folio=v["numero_factura"], estado=estado)
+    if v["repetir"]:
+        al_dia(tdb)                                  # si la fecha del cobro ya pasó, se crean los meses que siguen
+    return jsonify(ok=True, id=cid, folio=v["numero_factura"], estado=estado, total=v["total"])
 
 
 @cobranzas_bp.route("/<int:id>/editar", methods=["POST"])
@@ -645,24 +827,65 @@ def editar(id: int):
     tdb = g.tenant_db
     co = tdb.execute("SELECT * FROM cobros WHERE id=?", (id,)).fetchone()
     if co["estado"] == "cancelado":
-        return jsonify(ok=False, error="El cobro está cancelado"), 400
+        return jsonify(ok=False, error="Este cobro está cancelado y ya no se puede editar"), 400
     v, err = _leer_cobro(tdb)
     if err:
-        return jsonify(ok=False, error=err), 400
-    if v["total"] < float(co["monto_abonado"] or 0) - 0.01:
-        return jsonify(ok=False, error=f"Ya se pagaron {dinero(co['monto_abonado'], co['moneda'])}; el total no puede ser menor"), 400
+        return _error(err)
+    # Los descuentos aplicados después (notas de crédito) se conservan al editar
+    ajuste = Decimal(str(_desglose(co)["ajuste"]))
+    if ajuste:
+        v["total"] = float(Decimal(str(v["total"])) + ajuste)
+        if v["total"] < 0:
+            return _error(("monto", f"Este cobro ya tiene descuentos por {dinero(-ajuste, co['moneda'])}; "
+                                    "los honorarios no pueden quedar por debajo de eso"))
+    pagado = _centavos(co["monto_abonado"])
+    if _centavos(v["total"]) < pagado:
+        return _error(("monto", f"Ya se pagaron {dinero(pagado, co['moneda'])}; el total no puede quedar por debajo de eso"))
     v["numero_factura"] = v["numero_factura"] or co["numero_factura"] or _auto_folio(tdb)
     pdf, err = _guardar_archivo("archivo_factura", "facturas", {"pdf", "png", "jpg", "jpeg"})
     xml, err2 = _guardar_archivo("archivo_xml", "xml", {"xml"})
     if err or err2:
-        return jsonify(ok=False, error="La factura debe ser PDF o imagen, y el CFDI un archivo .xml"), 400
+        return _error(("archivo_factura" if err else "archivo_xml",
+                       "La factura debe ser PDF o imagen, y el CFDI un archivo .xml"))
     v["archivo_factura_url"] = pdf or co["archivo_factura_url"]
     v["archivo_xml_url"] = xml or co["archivo_xml_url"]
+    if not v["repetir"] and co["repetir"]:
+        tdb.execute(f"UPDATE cobros SET repetir=NULL WHERE id IN ({','.join('?' * len(_cadena(tdb, id)))})", _cadena(tdb, id))
+    elif v["repetir"] and co["repetir"] and co["repetir_dia"]:
+        v["repetir_dia"] = co["repetir_dia"] if _fecha(co["fecha_emision"]) == _fecha(v["fecha_emision"]) else v["repetir_dia"]
     tdb.execute(f"UPDATE cobros SET {', '.join(k + '=?' for k in v)} WHERE id=?", (*v.values(), id))
     estado = _recalcular(tdb, id)
     tdb.commit()
     _log("editar_cobro", id, {"total": v["total"]})
-    return jsonify(ok=True, estado=estado)
+    if v["repetir"] and not co["repetir"]:
+        _log("repetir_cada_mes", id)
+        al_dia(tdb)
+    return jsonify(ok=True, estado=estado, total=v["total"])
+
+
+@cobranzas_bp.route("/<int:id>/repetir", methods=["POST"])
+@login_required
+@tenant_required
+@role_required(*ROLES_COBRANZA)
+def repetir(id: int):
+    """Detiene (o reanuda) una iguala que se repite cada mes."""
+    tdb = g.tenant_db
+    activo = bool((request.get_json(silent=True) or {}).get("activo"))
+    co = tdb.execute("SELECT * FROM cobros WHERE id=?", (id,)).fetchone()
+    if activo:
+        if co["estado"] == "cancelado":
+            return jsonify(ok=False, error="Este cobro está cancelado"), 400
+        em = _fecha(co["fecha_emision"]) or _hoy()
+        tdb.execute("UPDATE cobros SET repetir='mensual', repetir_dia=COALESCE(repetir_dia, ?) WHERE id=?", (em.day, id))
+        tdb.commit()
+        _log("repetir_cada_mes", id)
+        al_dia(tdb)
+    else:
+        ids = _cadena(tdb, id)
+        tdb.execute(f"UPDATE cobros SET repetir=NULL WHERE id IN ({','.join('?' * len(ids))})", ids)
+        tdb.commit()
+        _log("dejar_de_repetir", id)
+    return jsonify(ok=True)
 
 
 @cobranzas_bp.route("/asuntos-de/<int:cid>")
@@ -677,10 +900,13 @@ def asuntos_de(cid: int):
         filtro, p = f"AND {_FILTRO_PROPIOS}", [uid, uid, uid]
     filas = tdb.execute(f"""
         SELECT a.id, a.titulo, a.numero_expediente, a.estado, a.honorarios_pactados, a.forma_cobro, a.abogado_responsable,
-               (SELECT COALESCE(SUM({TOTAL}),0) FROM cobros co WHERE co.asunto_id=a.id AND co.estado!='cancelado') AS facturado
+               (SELECT COALESCE(SUM({TOTAL}),0) FROM cobros co WHERE co.asunto_id=a.id AND co.estado!='cancelado') AS facturado,
+               (SELECT COALESCE(SUM(co.monto - COALESCE(co.descuento_valor,0)),0) FROM cobros co
+                 WHERE co.asunto_id=a.id AND co.estado!='cancelado') AS facturado_sub,
+               (SELECT COUNT(*) FROM asunto_horas h WHERE h.asunto_id=a.id AND h.cobro_id IS NULL) AS horas_pendientes
         FROM asuntos a WHERE a.cliente_id=? AND a.estado != 'archivado' {filtro}
         ORDER BY a.estado IN ('cerrado','completado'), a.fecha_alta DESC""", (cid, *p)).fetchall()
-    return jsonify([dict(r) for r in filas])
+    return jsonify([{**dict(r), "facturado_sub": round(r["facturado_sub"] or 0, 2)} for r in filas])
 
 
 @cobranzas_bp.route("/cliente-de-asunto/<int:aid>")
@@ -708,14 +934,16 @@ def registrar_pago(id: int):
     co = tdb.execute(f"SELECT co.*, {SALDO} AS saldo FROM cobros co WHERE co.id=?", (id,)).fetchone()
     if co["estado"] in ("cancelado", "pagado"):
         return jsonify(ok=False, error="Este cobro ya no tiene saldo"), 400
-    monto = round(_num(request.form.get("monto")), 2)
-    if monto <= 0:
-        return jsonify(ok=False, error="Escribe cuánto pagó"), 400
-    if monto > float(co["saldo"]) + 0.01:
-        return jsonify(ok=False, error=f"El pago es mayor al saldo ({dinero(co['saldo'], co['moneda'])})"), 400
+    monto = _dec(request.form.get("monto"))
+    if monto is None or monto <= 0:
+        return jsonify(ok=False, error="Escribe cuánto pagó, solo con números", campo="monto"), 400
+    monto, saldo = _centavos(monto), _centavos(co["saldo"])
+    if monto > saldo:
+        return jsonify(ok=False, error=f"El pago es mayor a lo que debe ({dinero(saldo, co['moneda'])})", campo="monto"), 400
+    monto = float(monto)
     fecha = _fecha(request.form.get("fecha")) or _hoy()
     if fecha > _hoy():
-        return jsonify(ok=False, error="La fecha del pago no puede ser futura"), 400
+        return jsonify(ok=False, error="La fecha del pago no puede ser posterior a hoy", campo="fecha"), 400
     metodo = request.form.get("metodo") if request.form.get("metodo") in METODOS_PAGO else "Transferencia"
     comprobante, err = _guardar_archivo("comprobante", "comprobantes", {"pdf", "png", "jpg", "jpeg", "webp", "heic"})
     if err:
@@ -767,16 +995,17 @@ def nota_credito(id: int):
         if float(co["monto_abonado"] or 0) > 0:
             return jsonify(ok=False, error="Tiene pagos registrados. Bórralos antes de cancelarlo o aplica un descuento."), 400
         nota = f"Cancelado: {motivo}" if motivo else "Cancelado"
-        tdb.execute("UPDATE cobros SET estado='cancelado', notas=TRIM(COALESCE(notas,'') || char(10) || ?) WHERE id=?", (nota, id))
+        tdb.execute("UPDATE cobros SET estado='cancelado', repetir=NULL, notas=TRIM(COALESCE(notas,'') || char(10) || ?) WHERE id=?",
+                    (nota, id))
         tdb.commit()
         _log("cancelar_cobro", id, {"motivo": motivo})
         return jsonify(ok=True, estado="cancelado")
-    monto = round(_num(data.get("monto")), 2)
-    if monto <= 0 or monto > float(co["saldo"]) + 0.01:
-        return jsonify(ok=False, error=f"El descuento debe ser mayor a cero y no pasar del saldo ({dinero(co['saldo'], co['moneda'])})"), 400
+    monto = _centavos(_dec(data.get("monto"), Decimal("0")))
+    if monto <= 0 or monto > _centavos(co["saldo"]):
+        return jsonify(ok=False, error=f"El descuento debe ser mayor a cero y no pasar de lo que debe ({dinero(co['saldo'], co['moneda'])})"), 400
     nota = f"Descuento de {dinero(monto, co['moneda'])}" + (f": {motivo}" if motivo else "")
     tdb.execute("UPDATE cobros SET total=?, notas=TRIM(COALESCE(notas,'') || char(10) || ?) WHERE id=?",
-                (round(float(co["total_v"]) - monto, 2), nota, id))
+                (float(_centavos(co["total_v"]) - monto), nota, id))
     estado = _recalcular(tdb, id)
     tdb.commit()
     _log("nota_credito_parcial", id, {"monto": monto, "motivo": motivo})
@@ -891,7 +1120,7 @@ def facturar_horas():
     if horas <= 0:
         return jsonify(ok=False, error="Ese asunto no tiene horas pendientes de cobrar"), 400
 
-    monto = round(horas * tarifa, 2)
+    monto = float(_centavos(Decimal(str(horas)) * Decimal(str(tarifa))))
     iva_pct = 0.0 if str(data.get("iva")) == "0" else 16.0
     calc = _calcular(monto, iva_pct, 0)
     folio = _auto_folio(tdb)
@@ -932,26 +1161,36 @@ def exportar_excel():
     ws = wb.active
     ws.title = "Cobranza"
     encabezados = ["Folio", "Cliente", "Asunto", "Expediente", "Concepto", "Emisión", "Fecha de pago", "Moneda",
-                   "Honorarios", "IVA", "Total", "Pagado", "Saldo", "Estado"]
+                   "Honorarios", "Descuento", "Subtotal", "IVA", "Retención IVA", "Retención ISR", "Descuentos posteriores",
+                   "Total", "Pagado", "Saldo", "Estado", "Se repite cada mes"]
     ws.append(encabezados)
     for c in ws[1]:
         c.fill = PatternFill("solid", fgColor="1D3FD6")
         c.font = Font(color="FFFFFF", bold=True)
         c.alignment = Alignment(horizontal="center", vertical="center")
     for r in rows:
+        d = _desglose(r)
         ws.append([r["folio"], r["cliente"], r["asunto_titulo"], r["numero_expediente"], r["concepto"],
                    _fecha(r["fecha_emision"]), _fecha(r["fecha_vencimiento"]), r["moneda"] or "MXN",
-                   float(r["monto"] or 0), float(r["iva_monto"] or 0), r["total_v"], r["pagado_v"], r["saldo_v"],
-                   r["estado_info"]["label"]])
+                   d["honorarios"], d["descuento"], d["subtotal"], d["iva"], d["ret_iva"], d["ret_isr"], d["ajuste"],
+                   r["total_v"], r["pagado_v"], r["saldo_v"], r["estado_info"]["label"], "Sí" if r["repite"] else ""])
     for fila in ws.iter_rows(min_row=2):
         for c in fila[5:7]:
             c.number_format = "DD/MM/YYYY"
-        for c in fila[8:13]:
+        for c in fila[8:18]:
             c.number_format = '"$"#,##0.00'
-    for i, ancho in enumerate([13, 30, 32, 14, 34, 12, 13, 8, 14, 12, 14, 14, 14, 13], 1):
+    if rows:
+        n = len(rows) + 1
+        ws.append(["Total", None, None, None, None, None, None, None,
+                   *[f"=SUM({get_column_letter(i)}2:{get_column_letter(i)}{n})" for i in range(9, 19)], None, None])
+        for c in ws[n + 1]:
+            c.font = Font(bold=True)
+        for c in ws[n + 1][8:18]:
+            c.number_format = '"$"#,##0.00'
+    for i, ancho in enumerate([13, 30, 32, 14, 34, 12, 13, 8, 14, 12, 14, 12, 13, 13, 14, 14, 14, 14, 13, 12], 1):
         ws.column_dimensions[get_column_letter(i)].width = ancho
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(encabezados))}{len(rows) + 1}"
 
     buf = io.BytesIO()
     wb.save(buf)

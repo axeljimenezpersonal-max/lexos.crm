@@ -107,7 +107,7 @@
             <td class="c-tit">
               <div class="as-tit" style="display:block">
                 <a href="#cobro-{{ c.id }}">{{ c.concepto }}</a>
-                <small>{% if c.estado in ('abono', 'cancelado') %}<span class="as-chip cb-chip" style="--c-c:{{ c.estado_info.color }};--c-f:{{ c.estado_info.fondo }}">{{ c.estado_info.label }}</span> {% endif %}{{ c.folio }}{% if c.asunto_titulo %} · {{ c.asunto_titulo }}{% endif %}<span class="cb-solo-movil"> · {{ c.cliente or 'Sin cliente' }}</span></small>
+                <small>{% if c.estado in ('abono', 'cancelado') %}<span class="as-chip cb-chip" style="--c-c:{{ c.estado_info.color }};--c-f:{{ c.estado_info.fondo }}">{{ c.estado_info.label }}</span> {% endif %}{% if c.repite %}<span class="cb-repite" title="Iguala que se repite cada mes">↻ Cada mes</span> {% endif %}{{ c.folio }}{% if c.asunto_titulo %} · {{ c.asunto_titulo }}{% endif %}<span class="cb-solo-movil"> · {{ c.cliente or 'Sin cliente' }}</span></small>
               </div>
             </td>
             <td class="c-cli">{{ c.cliente or '—' }}</td>
@@ -216,74 +216,91 @@
 <aside class="cb-drawer" id="cbDrawer" role="dialog" aria-modal="true" aria-label="Detalle del cobro"></aside>
 
 {# ── Nuevo / editar cobro ────────────────────────────────────────────────── #}
+<script type="application/json" id="cbClientesData">{{ clientes | tojson }}</script>
 <div class="as-modal" id="cbNuevo" role="dialog" aria-modal="true" aria-labelledby="cbNuevoT">
   <form class="as-modal-c ancho" id="cbForm" novalidate>
     <div class="as-modal-h"><h3 id="cbNuevoT">Nuevo cobro</h3><button type="button" data-cerrar aria-label="Cerrar">×</button></div>
     <div class="as-modal-b">
       <div class="cb-form">
-        <div>
-          <label class="as-label" for="cbCliente">Cliente</label>
-          <select class="as-select" id="cbCliente" name="cliente_id" required>
-            <option value="">Elige un cliente</option>
-            {% for c in clientes %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}
-          </select>
+        <div class="cb-campo" data-campo="cliente_id">
+          <label class="as-label" for="cbClienteQ">Cliente</label>
+          <div class="cb-combo" id="cbCombo">
+            <input class="as-input" id="cbClienteQ" type="text" role="combobox" autocomplete="off" spellcheck="false"
+                   aria-autocomplete="list" aria-expanded="false" aria-controls="cbClienteLista" placeholder="Escribe nombre o RFC">
+            <button type="button" class="cb-combo-x" id="cbClienteX" aria-label="Quitar cliente" hidden>×</button>
+            <ul class="cb-combo-lista" id="cbClienteLista" role="listbox" aria-label="Clientes" hidden></ul>
+          </div>
+          <input type="hidden" name="cliente_id" id="cbCliente" value="">
         </div>
-        <div>
+        <div class="cb-campo" data-campo="asunto_id">
           <label class="as-label" for="cbAsunto">Asunto <small>(opcional)</small></label>
           <select class="as-select" id="cbAsunto" name="asunto_id" disabled><option value="">Primero elige el cliente</option></select>
         </div>
-        <p class="cb-hint full" id="cbPactado" hidden></p>
-        <div class="full">
+        <div class="cb-hint full" id="cbPactado" hidden></div>
+        <div class="full cb-campo" data-campo="concepto">
           <label class="as-label" for="cbConcepto">Concepto</label>
-          <input class="as-input" id="cbConcepto" name="concepto" maxlength="300" required placeholder="¿Qué le estás cobrando?">
-          <div class="cb-chips" id="cbConceptos">{% for c in conceptos %}<button type="button">{{ c }}</button>{% endfor %}</div>
+          <input class="as-input" id="cbConcepto" name="concepto" maxlength="300" required placeholder="¿Qué le estás cobrando?" autocomplete="off">
+          <div class="cb-chips" id="cbConceptos" aria-label="Conceptos frecuentes">{% for c in conceptos %}<button type="button" data-concepto="{{ c }}">{{ c }}</button>{% endfor %}</div>
         </div>
-        <div>
+        <div class="cb-campo" data-campo="monto">
           <label class="as-label" for="cbMonto">Honorarios <small>(antes de IVA)</small></label>
-          <div class="cb-dinero"><span>$</span><input class="as-input" id="cbMonto" name="monto" type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></div>
+          <div class="cb-dinero"><span>$</span><input class="as-input" id="cbMonto" name="monto" type="text" inputmode="decimal" autocomplete="off" required placeholder="0.00"></div>
         </div>
         <div>
-          <span class="as-label">IVA</span>
-          <div class="cb-seg">
+          <span class="as-label" id="cbIvaL">IVA</span>
+          <div class="cb-seg" role="radiogroup" aria-labelledby="cbIvaL">
             <label><input type="radio" name="iva" value="16" checked><span>Más IVA 16%</span></label>
             <label><input type="radio" name="iva" value="0"><span>Sin IVA</span></label>
           </div>
         </div>
-        <div>
+        <div class="cb-hint full cb-ret-hint" id="cbRetHint" hidden></div>
+        <div class="cb-campo" data-campo="fecha_emision">
           <label class="as-label" for="cbEmision">Fecha del cobro</label>
           <input class="as-input" type="date" id="cbEmision" name="fecha_emision" value="{{ hoy }}">
         </div>
-        <div>
+        <div class="cb-campo" data-campo="fecha_vencimiento">
           <label class="as-label" for="cbVence">Fecha límite de pago</label>
           <input class="as-input" type="date" id="cbVence" name="fecha_vencimiento">
           <div class="cb-chips" id="cbPlazos"><button type="button" data-dias="0">De contado</button><button type="button" data-dias="15">15 días</button><button type="button" data-dias="30">30 días</button></div>
         </div>
+        <label class="cb-check full" id="cbRepF" hidden>
+          <input type="checkbox" name="repetir" value="1" id="cbRep">
+          <span><b>Repetir cada mes</b><small id="cbRepTxt">Cada mes se crea un cobro nuevo con los mismos datos. Lo puedes detener cuando quieras.</small></span>
+        </label>
         <div class="full cb-resumen" aria-live="polite">
           <div class="cb-kv"><span>Honorarios</span><b id="rHon">$0.00</b></div>
           <div class="cb-kv" id="rDescF" hidden><span>Descuento</span><b id="rDesc">−$0.00</b></div>
+          <div class="cb-kv" id="rSubF" hidden><span>Subtotal</span><b id="rSub">$0.00</b></div>
           <div class="cb-kv"><span id="rIvaL">IVA 16%</span><b id="rIva">$0.00</b></div>
-          <div class="cb-kv total"><span>Total a cobrar</span><b id="rTotal">$0.00</b></div>
+          <div class="cb-kv" id="rRetIvaF" hidden><span>Retención de IVA ({{ '%g' | format(ret_iva_pct) }}%)</span><b id="rRetIva">−$0.00</b></div>
+          <div class="cb-kv" id="rRetIsrF" hidden><span>Retención de ISR ({{ '%g' | format(ret_isr_pct) }}%)</span><b id="rRetIsr">−$0.00</b></div>
+          <div class="cb-kv" id="rAjusteF" hidden><span>Descuentos ya aplicados</span><b id="rAjuste">−$0.00</b></div>
+          <div class="cb-kv total"><span id="rTotalL">Total a cobrar</span><b id="rTotal">$0.00</b></div>
         </div>
         <label class="cb-check full" id="cbYaF">
           <input type="checkbox" name="ya_pagado" value="1" id="cbYa">
           <span><b>Ya me lo pagaron</b><small>Se registra el pago completo con la fecha del cobro.</small></span>
-          <select class="as-select" name="metodo" id="cbYaMetodo" style="width:auto;margin-left:auto" hidden>
+          <select class="as-select" name="metodo" id="cbYaMetodo" aria-label="Forma de pago" hidden>
             {% for m in metodos %}<option>{{ m }}</option>{% endfor %}
           </select>
         </label>
       </div>
-      <details class="cb-mas">
+      <details class="cb-mas" id="cbMas">
         <summary>Factura, descuento y más datos</summary>
         <div class="cb-form">
-          <div>
+          <div class="cb-campo" data-campo="numero_factura">
             <label class="as-label" for="cbFolio">Folio</label>
             <input class="as-input" id="cbFolio" name="numero_factura" maxlength="40" placeholder="{{ folio_sugerido }}">
             <p class="cb-hint">Usa el folio de tu factura. Si lo dejas vacío se asigna uno.</p>
           </div>
-          <div>
-            <label class="as-label" for="cbDescuento">Descuento</label>
-            <div class="cb-dinero"><span>$</span><input class="as-input" id="cbDescuento" name="descuento" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></div>
+          <div class="cb-campo" data-campo="descuento">
+            <label class="as-label" for="cbDescuento">Descuento <small>(antes de IVA)</small></label>
+            <div class="cb-dinero"><span>$</span><input class="as-input" id="cbDescuento" name="descuento" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
           </div>
+          <label class="cb-check full" id="cbRetF">
+            <input type="checkbox" name="retenciones" value="1" id="cbRet">
+            <span><b>El cliente me retiene IVA e ISR</b><small>Cuando una persona moral le paga honorarios a una persona física, le retiene {{ '%g' | format(ret_iva_pct) }}% de IVA (dos terceras partes) y {{ '%g' | format(ret_isr_pct) }}% de ISR. Entonces el cliente te paga menos y entera la diferencia al SAT.</small></span>
+          </label>
           <div>
             <label class="as-label" for="cbMoneda">Moneda</label>
             <select class="as-select" id="cbMoneda" name="moneda"><option value="MXN">Pesos (MXN)</option><option value="USD">Dólares (USD)</option></select>
@@ -295,8 +312,14 @@
               {% for ab in abogados %}<option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>{% endfor %}
             </select>
           </div>
-          <label class="cb-archivo"><input type="file" name="archivo_factura" accept=".pdf,.png,.jpg,.jpeg">📄 <span>Factura en PDF</span></label>
-          <label class="cb-archivo"><input type="file" name="archivo_xml" accept=".xml">🧾 <span>CFDI (.xml)</span></label>
+          <div class="cb-campo" data-campo="archivo_factura">
+            <label class="cb-archivo"><input type="file" name="archivo_factura" id="cbArchPdf" accept=".pdf,.png,.jpg,.jpeg">📄 <span>Factura en PDF</span></label>
+            <p class="cb-hint" id="cbArchPdfYa" hidden>Ya tiene factura en PDF. Sube otra solo si quieres reemplazarla.</p>
+          </div>
+          <div class="cb-campo" data-campo="archivo_xml">
+            <label class="cb-archivo"><input type="file" name="archivo_xml" accept=".xml">🧾 <span>CFDI (.xml)</span></label>
+            <p class="cb-hint" id="cbArchXmlYa" hidden>Ya tiene su XML. Sube otro solo si quieres reemplazarlo.</p>
+          </div>
           <div class="full">
             <label class="as-label" for="cbNotas">Notas internas</label>
             <textarea class="as-textarea" id="cbNotas" name="notas" rows="2" maxlength="3000" placeholder="Ej. Acordado en la junta del lunes; paga contra entrega del escrito."></textarea>
@@ -320,7 +343,7 @@
       <div class="as-fila2">
         <div>
           <label class="as-label" for="pgMonto">¿Cuánto pagó?</label>
-          <div class="cb-dinero"><span>$</span><input class="as-input" id="pgMonto" name="monto" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
+          <div class="cb-dinero"><span>$</span><input class="as-input" id="pgMonto" name="monto" type="text" inputmode="decimal" autocomplete="off" required></div>
         </div>
         <div>
           <label class="as-label" for="pgFecha">¿Cuándo?</label>
@@ -358,14 +381,14 @@
       </div>
       <div id="ncMontoF">
         <label class="as-label" for="ncMonto">Monto a descontar</label>
-        <div class="cb-dinero"><span>$</span><input class="as-input" id="ncMonto" name="monto" type="number" min="0.01" step="0.01" inputmode="decimal"></div>
+        <div class="cb-dinero"><span>$</span><input class="as-input" id="ncMonto" name="monto" type="text" inputmode="decimal" autocomplete="off"></div>
         <p class="cb-hint" id="ncSaldo"></p>
       </div>
       <div>
         <label class="as-label" for="ncMotivo">Motivo</label>
         <input class="as-input" id="ncMotivo" name="motivo" maxlength="300" placeholder="Ej. Descuento por pronto pago">
       </div>
-      <p id="ncAviso" hidden style="font-size:12.5px">Si ya emitiste el CFDI, recuerda cancelarlo también ante el SAT o emitir la nota de crédito desde tu sistema de facturación.</p>
+      <p id="ncAviso" hidden style="font-size:12.5px">Si ya emitiste el CFDI, recuerda cancelarlo también ante el SAT o emitir la nota de crédito desde tu sistema de facturación. Si era una iguala que se repite, deja de repetirse.</p>
     </div>
     <div class="as-modal-f">
       <button type="button" class="btn btn-ghost" data-cerrar>Volver</button>
@@ -480,6 +503,12 @@
     const acc = b.dataset.acc, info = drawer.querySelector('[data-info]')?.dataset || {};
     if (acc === 'pago') abrirPago(info);
     else if (acc === 'editar') abrirEditar(panelId);
+    else if (acc === 'factura') abrirEditar(panelId, { factura: true });
+    else if (acc === 'no-repetir') {
+      if (!confirm('¿Dejar de repetir esta iguala? Ya no se crearán cobros nuevos cada mes.')) return;
+      const d = await enviar(`/cobranzas/${panelId}/repetir`, { headers: JSONH, body: JSON.stringify({ activo: false }) });
+      if (d) recargar('Ya no se repetirá cada mes', 'cobro-' + panelId);
+    }
     else if (acc === 'nc') abrirNC(info);
     else if (acc === 'correo') {
       b.disabled = true;
@@ -498,35 +527,171 @@
   drawer.addEventListener('input', e => { if (e.target.id === 'drNotas') drawer.querySelector('[data-acc=notas]').hidden = false; });
 
   // ── Nuevo / editar cobro ───────────────────────────────────
-  const mNuevo = $('#cbNuevo'), form = $('#cbForm'), selCli = $('#cbCliente'), selAs = $('#cbAsunto');
-  let editando = null, asuntos = [];
+  const mNuevo = $('#cbNuevo'), form = $('#cbForm'), selAs = $('#cbAsunto');
+  const cliQ = $('#cbClienteQ'), cliId = $('#cbCliente'), cliLista = $('#cbClienteLista'), cliX = $('#cbClienteX');
+  const CLIENTES = JSON.parse($('#cbClientesData').textContent || '[]');
+  const DESPACHO_PF = {{ 'true' if despacho_pf else 'false' }};
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const norm = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  CLIENTES.forEach(c => { c._q = norm(`${c.nombre} ${c.rfc || ''}`); });
+  let editando = null, asuntos = [], cliente = null, retTocada = false, montoAuto = false, ajuste = 0;
+
+  // Errores junto al campo, en palabras sencillas
+  function limpiarErrores() {
+    form.querySelectorAll('.cb-err').forEach(e => e.remove());
+    form.querySelectorAll('[aria-invalid]').forEach(e => e.removeAttribute('aria-invalid'));
+  }
+  function marcarError(campo, msg) {
+    const caja = form.querySelector(`[data-campo="${campo}"]`);
+    if (!caja) { showToast(msg, 'error'); return; }
+    if (caja.closest('details')) caja.closest('details').open = true;
+    caja.querySelector('.cb-err')?.remove();
+    const p = document.createElement('p'); p.className = 'cb-err'; p.id = 'err-' + campo; p.textContent = msg;
+    caja.append(p);
+    const el = campo === 'cliente_id' ? cliQ : (caja.querySelector('input:not([type=hidden]):not([type=file]),select') || caja.querySelector('input'));
+    const vis = el && el._flatpickr && el._flatpickr.altInput ? el._flatpickr.altInput : el;
+    if (vis) { vis.setAttribute('aria-invalid', 'true'); vis.setAttribute('aria-describedby', p.id); vis.focus?.(); }
+  }
+  form.addEventListener('input', e => {
+    const caja = e.target.closest('[data-campo]');
+    if (caja) { caja.querySelector('.cb-err')?.remove(); caja.querySelectorAll('[aria-invalid]').forEach(x => x.removeAttribute('aria-invalid')); }
+  });
+
+  // ── Cliente: buscador en lugar de una lista larga ──
+  let activo = -1, visibles = [];
+  function pintarLista() {
+    const q = norm(cliQ.value).split(/\s+/).filter(Boolean);
+    visibles = (q.length ? CLIENTES.filter(c => q.every(t => c._q.includes(t))) : CLIENTES).slice(0, 40);
+    cliLista.innerHTML = ''; activo = visibles.length ? 0 : -1;
+    if (!visibles.length) {
+      const li = document.createElement('li'); li.className = 'vacio';
+      li.innerHTML = 'No encontramos ese cliente. <a href="{{ url_for('clientes.nuevo') }}">Darlo de alta</a>';
+      cliLista.append(li);
+    }
+    visibles.forEach((c, i) => {
+      const li = document.createElement('li');
+      li.id = 'cbCli-' + c.id; li.setAttribute('role', 'option'); li.dataset.i = i;
+      li.innerHTML = '<b></b><small></small>';
+      li.querySelector('b').textContent = c.nombre;
+      li.querySelector('small').textContent = [c.tipo === 'persona_moral' ? 'Persona moral' : 'Persona física', c.rfc].filter(Boolean).join(' · ');
+      cliLista.append(li);
+    });
+    marcarActivo(); cliLista.hidden = false; cliQ.setAttribute('aria-expanded', 'true');
+  }
+  function marcarActivo() {
+    [...cliLista.querySelectorAll('[role=option]')].forEach((li, i) => li.setAttribute('aria-selected', i === activo ? 'true' : 'false'));
+    const li = cliLista.querySelector(`[data-i="${activo}"]`);
+    if (li) { cliQ.setAttribute('aria-activedescendant', li.id); li.scrollIntoView({ block: 'nearest' }); } else cliQ.removeAttribute('aria-activedescendant');
+  }
+  function cerrarLista() { cliLista.hidden = true; cliQ.setAttribute('aria-expanded', 'false'); cliQ.removeAttribute('aria-activedescendant'); }
+  async function elegirCliente(c, asunto = '') {
+    cliente = c || null; cliId.value = c ? c.id : ''; cliQ.value = c ? c.nombre : ''; cliX.hidden = !c;
+    cerrarLista(); form.querySelector('[data-campo=cliente_id] .cb-err')?.remove(); cliQ.removeAttribute('aria-invalid');
+    sugerirRetencion();
+    await cargarAsuntos(cliId.value, asunto);
+  }
+  cliQ.addEventListener('focus', () => { if (!cliId.value) pintarLista(); });
+  cliQ.addEventListener('click', () => { if (cliLista.hidden) pintarLista(); });
+  cliQ.addEventListener('input', () => {
+    if (cliId.value) { cliId.value = ''; cliente = null; cliX.hidden = true; sugerirRetencion(); cargarAsuntos(''); }
+    pintarLista();
+  });
+  cliQ.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); if (cliLista.hidden) pintarLista();
+      activo = Math.max(0, Math.min(visibles.length - 1, activo + (e.key === 'ArrowDown' ? 1 : -1))); marcarActivo();
+    } else if (e.key === 'Enter') {
+      if (!cliLista.hidden && visibles[activo]) { e.preventDefault(); elegirCliente(visibles[activo]).then(() => $('#cbConcepto').focus()); }
+    } else if (e.key === 'Escape' && !cliLista.hidden) { e.stopPropagation(); cerrarLista(); }
+  });
+  cliLista.addEventListener('mousedown', e => {
+    e.preventDefault();                                   // que el campo no pierda el foco antes del clic
+    const li = e.target.closest('[role=option]'); if (!li) return;
+    elegirCliente(visibles[+li.dataset.i]);
+  });
+  cliQ.addEventListener('blur', () => setTimeout(() => {
+    if (document.activeElement === cliQ) return;
+    cerrarLista();
+    if (!cliId.value && cliQ.value.trim()) {        // si escribió el nombre exacto, se toma
+      const exacto = CLIENTES.filter(c => norm(c.nombre) === norm(cliQ.value.trim()));
+      if (exacto.length === 1) elegirCliente(exacto[0]);
+    }
+  }, 120));
+  cliX.addEventListener('click', () => { elegirCliente(null); cliQ.focus(); });
+
+  function sugerirRetencion() {
+    const h = $('#cbRetHint'), moral = cliente && cliente.tipo === 'persona_moral';
+    if (!editando && !retTocada) { $('#cbRet').checked = !!(moral && DESPACHO_PF); }
+    if (!moral) { h.hidden = true; recalcular(); return; }
+    h.innerHTML = '';
+    const t = document.createElement('span');
+    t.textContent = $('#cbRet').checked
+      ? `${cliente.nombre} es persona moral: se aplican las retenciones de IVA e ISR.`
+      : `${cliente.nombre} es persona moral. Si el despacho factura como persona física, te retiene IVA e ISR.`;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cb-link';
+    b.textContent = $('#cbRet').checked ? 'Quitar retenciones' : 'Aplicar retenciones';
+    b.addEventListener('click', () => { retTocada = true; $('#cbRet').checked = !$('#cbRet').checked; sugerirRetencion(); });
+    h.append(t, ' ', b); h.hidden = false; recalcular();
+  }
+  $('#cbRet').addEventListener('change', () => { retTocada = true; sugerirRetencion(); });
+
+  // ── Asunto: lo pactado y lo que falta ──
   async function cargarAsuntos(cid, elegido = '') {
     selAs.innerHTML = '<option value="">Sin asunto</option>'; selAs.disabled = !cid; asuntos = [];
     $('#cbPactado').hidden = true;
     if (!cid) { selAs.innerHTML = '<option value="">Primero elige el cliente</option>'; return; }
-    const r = await fetch(`/cobranzas/asuntos-de/${cid}`, { headers: XHR });
-    asuntos = r.ok ? await r.json() : [];
+    try { const r = await fetch(`/cobranzas/asuntos-de/${cid}`, { headers: XHR }); asuntos = r.ok ? await r.json() : []; } catch (e) { asuntos = []; }
+    if (String(cliId.value) !== String(cid)) return;          // cambió de cliente mientras cargaba
     asuntos.forEach(a => selAs.add(new Option(a.titulo + (a.numero_expediente ? ` · ${a.numero_expediente}` : ''), a.id)));
-    if (!elegido && asuntos.length === 1) elegido = asuntos[0].id;
+    if (!asuntos.length) selAs.options[0].textContent = 'Este cliente no tiene asuntos abiertos';
+    if (!elegido && asuntos.length === 1 && !editando) elegido = asuntos[0].id;
     selAs.value = elegido || ''; pactado();
   }
   function pactado() {
     const a = asuntos.find(x => String(x.id) === selAs.value), p = $('#cbPactado');
-    if (!a || !a.honorarios_pactados) { p.hidden = true; return; }
-    const resta = a.honorarios_pactados - a.facturado;
-    p.innerHTML = `Honorarios pactados en el asunto: <b>${fmt(a.honorarios_pactados)}</b> · ya facturado: <b>${fmt(a.facturado)}</b>` +
-      (resta > 0 ? ` · faltan <b>${fmt(resta)}</b>` : '');
-    p.hidden = false;
+    p.innerHTML = ''; p.hidden = true;
+    if (montoAuto && !editando) { $('#cbMonto').value = ''; montoAuto = false; }
+    if (!a) { recalcular(); return; }
+    const partes = [];
+    if (a.honorarios_pactados) {
+      const resta = Math.round((a.honorarios_pactados - a.facturado_sub) * 100) / 100;
+      partes.push(`Honorarios pactados en el asunto: <b>${fmt(a.honorarios_pactados)}</b> antes de IVA · ya cobrado: <b>${fmt(a.facturado_sub)}</b>` +
+        (resta > 0 ? ` · faltan <b>${fmt(resta)}</b>` : ' · ya se cobró todo lo pactado'));
+      if (resta > 0 && !editando && !$('#cbMonto').value.trim()) {
+        $('#cbMonto').value = resta.toFixed(2); montoAuto = true;
+        partes.push('Pusimos lo que falta; cámbialo si vas a cobrar solo una parte.');
+      }
+    }
+    if (a.forma_cobro === 'por_hora' && a.horas_pendientes) partes.push('Este asunto se cobra por hora y tiene horas sin cobrar: usa el botón «h por cobrar».');
+    if (partes.length) { p.innerHTML = partes.join('<br>'); p.hidden = false; }
+    recalcular();
   }
-  selCli.addEventListener('change', () => cargarAsuntos(selCli.value));
   selAs.addEventListener('change', pactado);
+  $('#cbMonto').addEventListener('input', () => { montoAuto = false; });
+
+  // ── Concepto: los chips llenan el texto ──
+  function textoIguala() { const f = new Date(($('#cbEmision').value || HOY) + 'T12:00:00'); return `Iguala mensual — ${MESES[f.getMonth()]} ${f.getFullYear()}`; }
   $('#cbConceptos').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    $('#cbConcepto').value = b.textContent; $('#cbConcepto').focus();
+    const c = b.dataset.concepto;
+    $('#cbConcepto').value = /iguala/i.test(c) ? textoIguala() : c;
+    $('#cbConcepto').dispatchEvent(new Event('input', { bubbles: true }));
+    marcarConcepto(); $('#cbConcepto').focus();
   });
+  function marcarConcepto() {
+    const v = norm($('#cbConcepto').value), esIguala = /iguala/.test(v);
+    document.querySelectorAll('#cbConceptos button').forEach(b => b.classList.toggle('on', v.startsWith(norm(b.dataset.concepto))));
+    $('#cbRepF').hidden = !(esIguala || $('#cbRep').checked);
+    const em = new Date(($('#cbEmision').value || HOY) + 'T12:00:00');
+    $('#cbRepTxt').textContent = `Cada mes, el día ${em.getDate()}, se crea un cobro nuevo con los mismos datos. Lo puedes detener cuando quieras.`;
+  }
+  $('#cbConcepto').addEventListener('input', marcarConcepto);
+
+  // ── Fechas ──
   $('#cbPlazos').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     fecha($('#cbVence'), sumarDias($('#cbEmision').value || HOY, +b.dataset.dias));
+    form.querySelector('[data-campo=fecha_vencimiento] .cb-err')?.remove();
     marcarPlazo();
   });
   function marcarPlazo() {
@@ -534,48 +699,98 @@
     document.querySelectorAll('#cbPlazos button').forEach(b => b.classList.toggle('on', $('#cbVence').value === sumarDias(em, +b.dataset.dias)));
   }
   $('#cbVence').addEventListener('change', marcarPlazo);
-  $('#cbEmision').addEventListener('change', marcarPlazo);
+  let emisionAntes = HOY;
+  $('#cbEmision').addEventListener('change', () => {
+    // Si había un plazo elegido, se recorre con la nueva fecha del cobro
+    const em = $('#cbEmision').value || HOY, vence = $('#cbVence').value;
+    if (vence) {
+      const dias = Math.round((new Date(vence + 'T12:00:00') - new Date(emisionAntes + 'T12:00:00')) / 864e5);
+      if ([0, 15, 30].includes(dias)) fecha($('#cbVence'), sumarDias(em, dias));
+    }
+    const c = $('#cbConcepto');
+    if (/^iguala mensual/i.test(c.value)) c.value = c.value.replace(new RegExp(`(${MESES.join('|')})\\s+\\d{4}`, 'i'), textoIguala().split('— ')[1]);
+    emisionAntes = em; marcarPlazo(); marcarConcepto();
+  });
+
+  // ── Totales en vivo (en centavos, igual que el servidor) ──
+  const num = v => { const n = parseFloat(String(v ?? '').replace(/[$,\s]/g, '')); return isFinite(n) ? n : 0; };
+  const cent = v => Math.round(num(v) * 100);
+  const pct = (c, milesimas) => Math.floor((c * milesimas + 500000) / 1000000);   // redondeo medio centavo hacia arriba
   function recalcular() {
-    const m = $('#cbMoneda').value, hon = +$('#cbMonto').value || 0, desc = Math.min(+$('#cbDescuento').value || 0, hon);
-    const iva = form.iva.value === '16' ? Math.round((hon - desc) * 16) / 100 : 0;
-    $('#rHon').textContent = fmt(hon, m); $('#rDesc').textContent = '−' + fmt(desc, m); $('#rDescF').hidden = !desc;
-    $('#rIvaL').textContent = form.iva.value === '16' ? 'IVA 16%' : 'Sin IVA'; $('#rIva').textContent = fmt(iva, m);
-    $('#rTotal').textContent = fmt(hon - desc + iva, m);
+    const m = $('#cbMoneda').value, hon = cent($('#cbMonto').value), desc = Math.min(cent($('#cbDescuento').value), hon);
+    const base = Math.max(hon - desc, 0), conIva = form.iva.value === '16', ret = $('#cbRet').checked;
+    const iva = conIva ? pct(base, 160000) : 0;
+    const rIva = ret && conIva ? pct(base, {{ (ret_iva_pct * 10000) | round | int }}) : 0;
+    const rIsr = ret ? pct(base, {{ (ret_isr_pct * 10000) | round | int }}) : 0;
+    const total = base + iva - rIva - rIsr + Math.round(ajuste * 100);
+    const $m = c => fmt(c / 100, m);
+    $('#rHon').textContent = $m(hon); $('#rDesc').textContent = '−' + $m(desc); $('#rDescF').hidden = !desc;
+    $('#rSub').textContent = $m(base); $('#rSubF').hidden = !desc;
+    $('#rIvaL').textContent = conIva ? 'IVA 16%' : 'Sin IVA'; $('#rIva').textContent = $m(iva);
+    $('#rRetIva').textContent = '−' + $m(rIva); $('#rRetIvaF').hidden = !rIva;
+    $('#rRetIsr').textContent = '−' + $m(rIsr); $('#rRetIsrF').hidden = !rIsr;
+    $('#rAjuste').textContent = '−' + fmt(-ajuste, m); $('#rAjusteF').hidden = !ajuste;
+    $('#rTotalL').textContent = rIva || rIsr ? 'Total que te paga el cliente' : 'Total a cobrar';
+    $('#rTotal').textContent = $m(total);
   }
-  form.addEventListener('input', recalcular);
+  form.addEventListener('input', recalcular); form.addEventListener('change', recalcular);
   $('#cbYa').addEventListener('change', e => $('#cbYaMetodo').hidden = !e.target.checked);
 
-  async function abrirNuevo({ cliente = '', asunto = '' } = {}) {
-    editando = null; form.reset(); fecha($('#cbEmision'), HOY); fecha($('#cbVence'), '');
-    $('#cbNuevoT').textContent = 'Nuevo cobro'; $('#cbGuardar').textContent = 'Guardar cobro';
-    $('#cbYaF').hidden = false; $('#cbYaMetodo').hidden = true; form.querySelector('.cb-mas').open = false;
+  function limpiarForm() {
+    form.reset(); limpiarErrores(); retTocada = false; montoAuto = false; ajuste = 0;
+    cliente = null; cliId.value = ''; cliQ.value = ''; cliX.hidden = true; cerrarLista();
+    $('#cbRetHint').hidden = true; $('#cbPactado').hidden = true; $('#cbRep').checked = false;
+    $('#cbArchPdfYa').hidden = true; $('#cbArchXmlYa').hidden = true;
     form.querySelectorAll('.cb-archivo input').forEach(i => i.dispatchEvent(new Event('change')));
-    selCli.value = cliente; await cargarAsuntos(cliente, asunto);
-    recalcular(); marcarPlazo(); abrir(mNuevo);
   }
-  async function abrirEditar(id) {
-    const r = await fetch(`/cobranzas/${id}/datos`, { headers: XHR }); if (!r.ok) return;
+  async function abrirNuevo({ cliente: cid = '', asunto = '' } = {}) {
+    editando = null; limpiarForm(); fecha($('#cbEmision'), HOY); fecha($('#cbVence'), ''); emisionAntes = HOY;
+    $('#cbNuevoT').textContent = 'Nuevo cobro'; $('#cbGuardar').textContent = 'Guardar cobro';
+    $('#cbYaF').hidden = false; $('#cbYaMetodo').hidden = true; $('#cbMas').open = false;
+    abrir(mNuevo);
+    const c = CLIENTES.find(x => String(x.id) === String(cid));
+    await elegirCliente(c || null, asunto);
+    marcarConcepto(); recalcular(); marcarPlazo();
+    if (c) setTimeout(() => $('#cbConcepto').focus(), 40);
+  }
+  async function abrirEditar(id, { factura = false } = {}) {
+    const r = await fetch(`/cobranzas/${id}/datos`, { headers: XHR }); if (!r.ok) { showToast('No se pudo abrir el cobro', 'error'); return; }
     const d = await r.json();
-    form.reset(); editando = id;
+    limpiarForm(); editando = id; ajuste = d.ajuste || 0;
     $('#cbNuevoT').textContent = 'Editar cobro'; $('#cbGuardar').textContent = 'Guardar cambios'; $('#cbYaF').hidden = true;
-    selCli.value = d.cliente_id || ''; await cargarAsuntos(d.cliente_id, d.asunto_id || '');
+    $('#cbRet').checked = !!d.retenciones; $('#cbRep').checked = !!d.repetir;
+    const c = CLIENTES.find(x => String(x.id) === String(d.cliente_id)) ||
+      (d.cliente_id ? { id: d.cliente_id, nombre: d.cliente_nombre || 'Cliente', tipo: '', rfc: '' } : null);
+    await elegirCliente(c, d.asunto_id || '');
     $('#cbConcepto').value = d.concepto || ''; $('#cbMonto').value = d.monto || '';
     form.iva.value = d.iva_pct > 0 ? '16' : '0';
     fecha($('#cbEmision'), (d.fecha_emision || HOY).slice(0, 10)); fecha($('#cbVence'), (d.fecha_vencimiento || '').slice(0, 10));
+    emisionAntes = (d.fecha_emision || HOY).slice(0, 10);
     $('#cbFolio').value = d.numero_factura || ''; $('#cbDescuento').value = d.descuento || '';
     $('#cbMoneda').value = d.moneda || 'MXN'; $('#cbAbogado').value = d.abogado_id || ''; $('#cbNotas').value = d.notas || '';
-    form.querySelector('.cb-mas').open = !!(d.descuento || d.notas);
-    recalcular(); marcarPlazo(); abrir(mNuevo);
+    $('#cbArchPdfYa').hidden = !d.archivo_factura; $('#cbArchXmlYa').hidden = !d.archivo_xml;
+    $('#cbMas').open = !!(d.descuento || d.notas || d.retenciones || factura);
+    pactado(); marcarConcepto(); recalcular(); marcarPlazo(); abrir(mNuevo);
+    if (factura) setTimeout(() => form.querySelector('[data-campo=archivo_factura]').scrollIntoView({ block: 'center' }), 60);
   }
   form.addEventListener('submit', async e => {
-    e.preventDefault();
-    if (!selCli.value) { showToast('Elige a qué cliente le vas a cobrar', 'error'); selCli.focus(); return; }
-    if (!$('#cbConcepto').value.trim()) { showToast('Escribe el concepto del cobro', 'error'); $('#cbConcepto').focus(); return; }
-    if (!(+$('#cbMonto').value > 0)) { showToast('Escribe el monto de los honorarios', 'error'); $('#cbMonto').focus(); return; }
-    const btn = $('#cbGuardar'); btn.disabled = true;
-    const d = await enviar(editando ? `/cobranzas/${editando}/editar` : '/cobranzas/crear', { headers: XHR, body: new FormData(form) });
-    btn.disabled = false;
-    if (d) recargar(editando ? 'Cobro actualizado' : `Cobro ${d.folio} registrado`, 'cobro-' + (editando || d.id));
+    e.preventDefault(); limpiarErrores();
+    if (!cliId.value) return marcarError('cliente_id', cliQ.value.trim() ? 'Elige al cliente de la lista' : 'Elige a qué cliente le vas a cobrar');
+    if (!$('#cbConcepto').value.trim()) return marcarError('concepto', 'Escribe qué le estás cobrando (por ejemplo, «Anticipo de honorarios»)');
+    const montoTxt = $('#cbMonto').value.trim();
+    if (montoTxt && !/^\$?\s*[\d,]*\.?\d*$/.test(montoTxt)) return marcarError('monto', 'Escribe los honorarios solo con números, por ejemplo 12500.50');
+    if (!(num(montoTxt) > 0)) return marcarError('monto', 'Escribe cuánto son los honorarios');
+    if (cent($('#cbDescuento').value) >= cent(montoTxt)) return marcarError('descuento', 'El descuento tiene que ser menor que los honorarios');
+    if ($('#cbVence').value && $('#cbVence').value < ($('#cbEmision').value || HOY)) return marcarError('fecha_vencimiento', 'La fecha límite de pago no puede ser antes de la fecha del cobro');
+    const btn = $('#cbGuardar'); btn.disabled = true; btn.dataset.txt ??= btn.textContent; btn.textContent = 'Guardando…';
+    let d = null;
+    try {
+      const r = await fetch(editando ? `/cobranzas/${editando}/editar` : '/cobranzas/crear', { method: 'POST', headers: XHR, body: new FormData(form) });
+      d = await r.json().catch(() => ({ ok: false, error: r.status === 413 ? 'El archivo es demasiado grande' : 'No se pudo guardar el cobro' }));
+      if (!r.ok || d.ok === false) { if (d.campo) marcarError(d.campo, d.error); else showToast(d.error || 'No se pudo guardar el cobro', 'error'); d = null; }
+    } catch (err) { showToast('Sin conexión con el servidor. Revisa tu internet e inténtalo de nuevo.', 'error'); }
+    btn.disabled = false; btn.textContent = editando ? 'Guardar cambios' : 'Guardar cobro';
+    if (d) recargar(editando ? 'Cobro actualizado' : `Cobro ${d.folio} registrado por ${fmt(d.total, $('#cbMoneda').value)}`, 'cobro-' + (editando || d.id));
   });
   document.querySelectorAll('[data-nuevo]').forEach(b => b.addEventListener('click', () => abrirNuevo()));
 
@@ -588,12 +803,12 @@
     $('#cbPagoQuien').innerHTML = '<b></b><br><span></span>';
     $('#cbPagoQuien b').textContent = info.concepto;
     $('#cbPagoQuien span').textContent = `${info.cliente} · saldo ${fmt(info.saldo, info.moneda)}`;
-    $('#pgMonto').value = (+info.saldo).toFixed(2); $('#pgMonto').max = info.saldo;
+    $('#pgMonto').value = (+info.saldo).toFixed(2);
     elegirMetodo(document.querySelector('#pgMetodos button')); despues(); abrir(mPago);
     setTimeout(() => $('#pgMonto').select(), 40);
   }
   function despues() {
-    const resta = Math.round(((+pagoInfo.saldo) - (+$('#pgMonto').value || 0)) * 100) / 100, p = $('#pgDespues');
+    const resta = (cent(pagoInfo.saldo) - cent($('#pgMonto').value)) / 100, p = $('#pgDespues');
     p.className = 'cb-despues' + (resta <= 0 ? ' ok' : '');
     p.innerHTML = resta < 0 ? '<b style="color:#A23B33">Es más que el saldo pendiente</b>' :
       resta === 0 ? '<b>Con este pago queda liquidado ✓</b>' : `Después de este pago quedará un saldo de <b>${fmt(resta, pagoInfo.moneda)}</b>`;
@@ -603,7 +818,8 @@
   $('#pgMetodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) elegirMetodo(b); });
   fPago.addEventListener('submit', async e => {
     e.preventDefault();
-    if (!(+$('#pgMonto').value > 0)) { showToast('Escribe cuánto pagó', 'error'); return; }
+    if (!(num($('#pgMonto').value) > 0)) { showToast('Escribe cuánto pagó', 'error'); $('#pgMonto').focus(); return; }
+    if (cent($('#pgMonto').value) > cent(pagoInfo.saldo)) { showToast(`El pago es mayor a lo que debe (${fmt(pagoInfo.saldo, pagoInfo.moneda)})`, 'error'); $('#pgMonto').focus(); return; }
     const btn = $('#pgGuardar'); btn.disabled = true;
     const d = await enviar(`/cobranzas/${pagoInfo.id}/pago`, { headers: XHR, body: new FormData(fPago) });
     btn.disabled = false;

@@ -142,6 +142,75 @@ def _vinculo_visible(asunto_id, cliente_id):
     return asunto_id, cliente_id
 
 
+# ── Documentos del equipo: quién editó qué y cuándo ──────────────────────────
+VERSIONES_GUARDADAS = 200
+SESION_DE_EDICION = timedelta(minutes=10)   # guardados seguidos de la misma persona son una sola versión
+PRESENCIA_VIVA = 40                          # segundos: «está editando ahora»
+
+
+def _huella_doc(titulo, contenido) -> str:
+    """Identifica el contenido guardado: si cambió desde que alguien lo abrió, otra persona lo editó."""
+    import hashlib
+    return hashlib.sha1(f"{titulo or ''}\x00{contenido or ''}".encode()).hexdigest()[:16]
+
+
+def _cuando(v) -> str:
+    from modules.asuntos import _local
+    dt = _local(v)
+    if not dt:
+        return ""
+    hoy = date.today()
+    if dt.date() == hoy:
+        return f"hoy {dt:%H:%M}"
+    if (hoy - dt.date()).days == 1:
+        return f"ayer {dt:%H:%M}"
+    return f"{dt.day} {MESES_CORTOS[dt.month - 1]} {dt:%H:%M}"
+
+
+MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def _historial(tdb, doc_id, usuarios) -> list[dict]:
+    filas = tdb.execute(
+        "SELECT id, version, creado_por, fecha FROM biblioteca_doc_versiones WHERE documento_id=? "
+        "ORDER BY version DESC LIMIT ?", (doc_id, VERSIONES_GUARDADAS)).fetchall()
+    sin_nombre = {"nombre": "Alguien del equipo", "corto": "Alguien", "iniciales": "?", "color": "#60718D"}
+    return [{"id": f["id"], "version": f["version"], "autor": usuarios.get(f["creado_por"], sin_nombre),
+             "cuando": _cuando(f["fecha"])} for f in filas]
+
+
+def _asegurar_presencia(tdb) -> None:
+    tdb.execute("""CREATE TABLE IF NOT EXISTS biblioteca_doc_presencia (
+        documento_id INTEGER NOT NULL, user_id INTEGER NOT NULL, visto DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (documento_id, user_id))""")
+
+
+def _texto_plano(html: str) -> str:
+    from modules import documento_salida
+    lineas = []
+    for b in documento_salida.bloques(html):
+        lineas.append("".join(t[0] for t in b["trozos"]))
+    return "\n".join(lineas)
+
+
+def _cambios_html(antes: str, despues: str) -> str:
+    """Lo que cambió entre dos versiones, palabra por palabra: agregado en verde, quitado tachado."""
+    import difflib
+    import html as html_mod
+    trozos = lambda t: re.findall(r"\n|[^\S\n]+|\w+|[^\w\s]", t)
+    a, b = trozos(_texto_plano(antes)), trozos(_texto_plano(despues))
+    salida = []
+    pinta = lambda ts: html_mod.escape("".join(ts)).replace("\n", "<br>")
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op == "equal":
+            salida.append(pinta(a[i1:i2]))
+        if op in ("delete", "replace"):
+            salida.append(f"<del>{pinta(a[i1:i2])}</del>")
+        if op in ("insert", "replace"):
+            salida.append(f"<ins>{pinta(b[j1:j2])}</ins>")
+    return "".join(salida)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  INDEX — página principal con 3 secciones (tabs)
 # ═════════════════════════════════════════════════════════════════════════════
@@ -161,9 +230,14 @@ ESTADOS_LECTURA = {
 }
 
 
-def _documentos_de_expedientes(tdb):
-    """Documentos y resoluciones de los expedientes que la persona puede ver, con su estado de lectura.
-    La búsqueda usa el buscador inteligente (sin acentos, frases como «de Luis» o «amparo»)."""
+_NOMBRE_CLIENTE = "COALESCE(NULLIF(c.razon_social, ''), TRIM(COALESCE(c.nombre,'') || ' ' || COALESCE(c.apellidos,'')))"
+
+
+def _documentos_de_expedientes(tdb, filtrar: bool = True):
+    """Documentos y resoluciones de los expedientes que la persona puede ver, con su estado de lectura
+    y la persona (cliente) de cada expediente. La búsqueda usa el buscador inteligente (sin acentos,
+    frases como «de Luis» o «amparo») y también encuentra por el nombre del cliente.
+    Con filtrar=False no aplica el filtro por nombre ni por carpeta (lo usa la sección Personas)."""
     from modules import buscador
     from modules.asuntos import TIPOS_DERECHO, _FILTRO_PROPIOS, _solo_lo_suyo, _usuarios
     where, params = ["1"], []
@@ -179,9 +253,11 @@ def _documentos_de_expedientes(tdb):
                    d.tipo_documento AS clase, d.tipo_documento, d.tipo_estado, d.fecha_documento,
                    a.id AS asunto_id, a.titulo AS asunto, a.numero_expediente,
                    a.tipo_asunto, a.abogado_responsable, a.estado AS asunto_estado,
+                   c.id AS cliente_id, {_NOMBRE_CLIENTE} AS cliente,
                    l.estado AS lectura, l.error AS lectura_error, l.paginas
             FROM documentos d
             JOIN asuntos a ON a.id = d.asunto_id
+            LEFT JOIN clientes c ON c.id = a.cliente_id AND c.activo = 1
             LEFT JOIN lector_documentos l ON l.archivo_url = d.archivo_url
             WHERE {w}""", params).fetchall()]
     filas += [dict(r, origen="resolucion", tabla="asunto_sentencias", archivo_nombre=None, tamanio=None,
@@ -190,11 +266,13 @@ def _documentos_de_expedientes(tdb):
         f"""SELECT s.id, s.titulo AS nombre, s.archivo_url, COALESCE(s.fecha_emision, s.fecha_alta) AS fecha_subida,
                    s.creado_por AS subido_por, s.tipo AS clase, s.contenido, s.tipo_documento, s.tipo_estado,
                    NULL AS fecha_documento, a.id AS asunto_id, a.titulo AS asunto,
-                   a.numero_expediente, a.tipo_asunto, a.abogado_responsable, a.estado AS asunto_estado
+                   a.numero_expediente, a.tipo_asunto, a.abogado_responsable, a.estado AS asunto_estado,
+                   c.id AS cliente_id, {_NOMBRE_CLIENTE} AS cliente
             FROM asunto_sentencias s JOIN asuntos a ON a.id = s.asunto_id
+            LEFT JOIN clientes c ON c.id = a.cliente_id AND c.activo = 1
             WHERE {w}""", params).fetchall()]
 
-    q = (request.args.get("q") or "").strip()
+    q = (request.args.get("q") or "").strip() if filtrar else ""
     chips, sugerencia = [], None
     usuarios = _usuarios()
     if q:
@@ -209,6 +287,7 @@ def _documentos_de_expedientes(tdb):
         for d in filas:
             d["_pajar"] = buscador.normalizar(" ".join(str(v or "") for v in (
                 d["nombre"], d["archivo_nombre"], tipos.etiqueta(d["tipo_documento"]), d["asunto"], d["numero_expediente"],
+                d["cliente"],
                 TIPOS_DERECHO.get(d["tipo_asunto"] or "otro", {}).get("label"), (d.get("contenido") or "")[:400])))
         filas, corregido = buscador._filtrar(filas, inter["tokens"])
         sugerencia = " ".join(corregido) if corregido else None
@@ -232,15 +311,14 @@ def _documentos_de_expedientes(tdb):
         conteo[d["grupo"]] += 1
         c = carpetas.setdefault(d["asunto_id"], {"id": d["asunto_id"], "titulo": d["asunto"], "n": 0,
                                                  "numero": d["numero_expediente"] or f"#{d['asunto_id']}",
+                                                 "cliente_id": d["cliente_id"], "cliente": d["cliente"],
                                                  "abierto": d["asunto_estado"] not in ("cerrado", "completado", "archivado")})
         c["n"] += 1
         docs.append(d)
-    asunto_f = request.args.get("asunto", type=int)
+    asunto_f = request.args.get("asunto", type=int) if filtrar else None
     if asunto_f:
         docs = [d for d in docs if d["asunto_id"] == asunto_f]
-    estado_f = request.args.get("estado", "")
-    if estado_f in conteo:
-        docs = [d for d in docs if d["grupo"] == estado_f]
+    # El estado de lectura se filtra en index(), junto con el tipo, para que los conteos cuadren
     carpetas_l = sorted(carpetas.values(), key=lambda c: (not c["abierto"], -c["n"]))
     return docs, conteo, {"chips": chips, "sugerencia": sugerencia, "carpetas": carpetas_l, "asunto": asunto_f}
 
@@ -249,17 +327,17 @@ def _documentos_de_expedientes(tdb):
 
 SECCIONES = {
     "expedientes": {"label": "Expedientes",
-                    "ayuda": "Escritos, acuerdos, sentencias y pruebas de cada expediente. Para agregar uno: "
-                             "«Subir documento» y elige el expediente (o súbelo desde el propio expediente)."},
+                    "ayuda": "Escritos, acuerdos, sentencias y pruebas de cada expediente, con su cliente. Para agregar: "
+                             "«Subir documento» o arrastra los archivos sobre la carpeta del expediente."},
     "personas":    {"label": "Personas",
-                    "ayuda": "Identificaciones, comprobantes, actas y contratos de tus clientes que no son de un "
-                             "expediente. Para agregar uno: «Subir documento» y elige la persona."},
+                    "ayuda": "Cada cliente con lo suyo (identificaciones, comprobantes, actas, contratos) y los documentos "
+                             "de sus expedientes. Para agregar: «Subir documento» o arrastra los archivos sobre la persona."},
     "estudio":     {"label": "Archivo del despacho",
-                    "ayuda": "Doctrina, jurisprudencia, leyes y papeles internos que no son de ningún expediente. "
-                             "Para agregar: «Subir documento» → «Archivo del despacho»."},
+                    "ayuda": "Doctrina, leyes, formatos internos y papeles del despacho que no son de ningún expediente "
+                             "ni de una persona. Para agregar: «Subir documento» o arrastra los archivos aquí."},
     "formatos":    {"label": "Machotes y formatos",
-                    "ayuda": "Modelos de escritos y contratos que se llenan solos con los datos de un expediente. "
-                             "Para agregar: «Subir documento» → «Machotes y formatos»."},
+                    "ayuda": "Modelos de escritos y contratos: «Usar este machote» lo abre en el editor con los datos "
+                             "del expediente que elijas. Para agregar: «Subir documento» → «Machotes y formatos»."},
 }
 # «Acuerdos y audiencias» ya no es pestaña: los acuerdos y las actas de audiencia son tipos de documento
 # (filtro «Del juzgado o autoridad»). Los registros viejos siguen en ?seccion=acuerdos.
@@ -313,8 +391,8 @@ def _filtro_tipos(filas: list[dict]) -> tuple[list[dict], dict]:
                    "activo": bool(grupo_f or tipo_f)}
 
 
-def _documentos_de_personas(tdb) -> list[dict]:
-    """Documentos de las personas (clientes activos), con su estado de lectura y su tipo."""
+def _documentos_de_personas(tdb, filtrar: bool = True) -> list[dict]:
+    """Documentos propios de las personas (clientes activos), con su estado de lectura y su tipo."""
     from modules.asuntos import _usuarios
     lector.indice.asegurar_esquema(tdb)
     filas = [dict(r, origen="cliente", tabla="cliente_documentos") for r in tdb.execute(
@@ -325,7 +403,7 @@ def _documentos_de_personas(tdb) -> list[dict]:
            FROM cliente_documentos cd JOIN clientes c ON c.id = cd.cliente_id AND c.activo = 1
            LEFT JOIN lector_documentos l ON l.archivo_url = cd.archivo_url
            ORDER BY COALESCE(cd.fecha_documento, cd.fecha_subida) DESC""").fetchall()]
-    q = _plano(request.args.get("q") or "")
+    q = _plano(request.args.get("q") or "") if filtrar else ""
     if q:
         filas = [d for d in filas if all(t in _plano(" ".join(str(v or "") for v in (
             d["nombre"], d["archivo_nombre"], d["cliente"], tipos.etiqueta(d["tipo_documento"])))) for t in q.split())]
@@ -340,6 +418,124 @@ def _documentos_de_personas(tdb) -> list[dict]:
         d["dia"] = _dia(d["fecha_documento"] or d["fecha_subida"])
         _con_tipo(d)
     return filas
+
+
+GRUPOS_LECTURA = ("listo", "procesando", "revision", "error", "guardado")
+
+
+def _filtrar_estado_y_tipo(docs: list[dict]) -> tuple[list[dict], dict, dict, str]:
+    """Aplica el estado de lectura y el tipo juntos, para que cada conteo respete al otro filtro:
+    los chips de tipo cuentan dentro del estado elegido y los de estado dentro del tipo elegido."""
+    estado_f = request.args.get("estado", "")
+    if estado_f not in GRUPOS_LECTURA:
+        estado_f = ""
+    final, filtro = _filtro_tipos([d for d in docs if not estado_f or d.get("grupo") == estado_f])
+    solo_tipo, _ = _filtro_tipos(docs)
+    conteo = {k: 0 for k in GRUPOS_LECTURA}
+    for d in solo_tipo:
+        conteo[d.get("grupo") or "guardado"] += 1
+    return final, filtro, conteo, estado_f
+
+
+def _personas(tdb) -> tuple[list[dict], list[dict], int | None]:
+    """Sección Personas: los documentos propios de cada persona más los de sus expedientes (solo los
+    expedientes que quien consulta puede ver). Devuelve (documentos, carpetas de personas, persona elegida).
+    El filtro por nombre encuentra por el nombre de la persona, del documento, del expediente o del tipo."""
+    propios = _documentos_de_personas(tdb, filtrar=False)
+    for d in propios:
+        d.update(asunto_id=None, asunto=None, numero_expediente=None)
+    de_exp, _, _ = _documentos_de_expedientes(tdb, filtrar=False)
+    docs = propios + [d for d in de_exp if d.get("cliente_id")]
+    q = _plano(request.args.get("q") or "")
+    if q:
+        docs = [d for d in docs if all(t in _plano(" ".join(str(v or "") for v in (
+            d["nombre"], d.get("archivo_nombre"), d["cliente"], d.get("asunto"), d.get("numero_expediente"),
+            tipos.etiqueta(d.get("tipo_documento"))))) for t in q.split())]
+    carpetas: dict[int, dict] = {}
+    for d in docs:
+        c = carpetas.setdefault(d["cliente_id"], {"id": d["cliente_id"], "nombre": d["cliente"], "propios": 0,
+                                                  "de_exp": 0, "expedientes": set(), "ultima": ""})
+        if d.get("asunto_id"):
+            c["de_exp"] += 1
+            c["expedientes"].add(d["asunto_id"])
+        else:
+            c["propios"] += 1
+        c["ultima"] = max(c["ultima"], str(d.get("fecha_subida") or ""))
+    carpetas_l = sorted(carpetas.values(), key=lambda c: c["ultima"], reverse=True)
+    for c in carpetas_l:
+        c["n_exp"] = len(c.pop("expedientes"))
+    cliente_f = request.args.get("cliente", type=int)
+    if cliente_f:
+        docs = [d for d in docs if d["cliente_id"] == cliente_f]
+    docs.sort(key=lambda d: str(d.get("fecha_documento") or d.get("fecha_subida") or ""), reverse=True)
+    return docs, carpetas_l, cliente_f
+
+
+def _agrupar_por_persona(docs: list[dict], limite: int | None) -> list[dict]:
+    """Cada persona con sus documentos propios y, aparte, los de cada uno de sus expedientes."""
+    personas: dict[int, dict] = {}
+    for d in docs:
+        p = personas.setdefault(d["cliente_id"], {"id": d["cliente_id"], "nombre": d["cliente"], "n": 0,
+                                                  "propios": [], "expedientes": {}})
+        p["n"] += 1
+        if d.get("asunto_id"):
+            e = p["expedientes"].setdefault(d["asunto_id"], {"id": d["asunto_id"], "titulo": d["asunto"],
+                                                             "numero": d["numero_expediente"] or f"#{d['asunto_id']}",
+                                                             "docs": [], "n": 0})
+            e["n"] += 1
+            if limite is None or len(e["docs"]) < limite:
+                e["docs"].append(d)
+        else:
+            if limite is None or len(p["propios"]) < limite:
+                p["propios"].append(d)
+    salida = list(personas.values())
+    for p in salida:
+        p["n_propios"] = sum(1 for d in docs if d["cliente_id"] == p["id"] and not d.get("asunto_id"))
+        p["expedientes"] = sorted(p["expedientes"].values(), key=lambda e: -e["n"])
+    return salida
+
+
+@biblioteca_bp.route("/mover", methods=["POST"])
+@login_required
+@tenant_required
+def mover():
+    """Pasar un documento a otro expediente (o a otra persona). Solo entre expedientes que quien lo mueve
+    puede ver, o entre personas activas. El índice del lector se actualiza para que Dictum lo encuentre
+    en su nuevo lugar."""
+    from modules.asuntos import puede_ver
+    tdb = g.tenant_db
+    data = request.get_json(silent=True) or request.form
+    tabla, fila_id = data.get("tabla", ""), _safe_int(data.get("id"))
+    if tabla == "documentos":
+        destino = _safe_int(data.get("asunto_id"))
+        fila = tdb.execute("SELECT asunto_id, archivo_url, nombre FROM documentos WHERE id=?", (fila_id,)).fetchone()
+        if not fila or not puede_ver(tdb, fila["asunto_id"]):
+            return jsonify(ok=False, error="No encontré ese documento"), 404
+        if not destino or not tdb.execute("SELECT 1 FROM asuntos WHERE id=?", (destino,)).fetchone() \
+                or not puede_ver(tdb, destino):
+            return jsonify(ok=False, error="Elige un expediente al que tengas acceso"), 400
+        tdb.execute("UPDATE documentos SET asunto_id=? WHERE id=?", (destino, fila_id))
+        campo, valor = "asunto_id", destino
+    elif tabla == "cliente_documentos":
+        destino = _safe_int(data.get("cliente_id"))
+        fila = tdb.execute("SELECT cd.cliente_id, cd.archivo_url, cd.nombre FROM cliente_documentos cd "
+                           "JOIN clientes c ON c.id = cd.cliente_id AND c.activo = 1 WHERE cd.id=?", (fila_id,)).fetchone()
+        if not fila:
+            return jsonify(ok=False, error="No encontré ese documento"), 404
+        if not destino or not tdb.execute("SELECT 1 FROM clientes WHERE id=? AND activo=1", (destino,)).fetchone():
+            return jsonify(ok=False, error="Elige una persona"), 400
+        tdb.execute("UPDATE cliente_documentos SET cliente_id=? WHERE id=?", (destino, fila_id))
+        campo, valor = "cliente_id", destino
+    else:
+        return jsonify(ok=False, error="Ese documento no se puede mover desde aquí"), 400
+    if fila["archivo_url"]:
+        try:
+            tdb.execute(f"UPDATE lector_documentos SET {campo}=? WHERE archivo_url=?", (valor, fila["archivo_url"]))
+        except Exception:
+            pass   # el despacho aún no tiene índice
+    tdb.commit()
+    _log("mover_documento", fila_id, {"tabla": tabla, campo: valor})
+    return jsonify(ok=True)
 
 
 def _puede_clasificar(tdb, tabla: str, fila_id: int) -> bool:
@@ -383,7 +579,7 @@ def tipo_guardar():
 @tenant_required
 def tipo_sugerir():
     """Sugerencia por el nombre del archivo (la misma que usa el servidor al guardar)."""
-    clave = tipos.sugerir((request.args.get("nombre") or "")[:200])
+    clave = tipos.sugerir((request.args.get("nombre") or "")[:200], destino=request.args.get("destino"))
     return jsonify(ok=True, tipo=clave, etiqueta=tipos.etiqueta(clave))
 
 
@@ -494,11 +690,15 @@ def index():
         en_contenido, filtro = _filtro_tipos(en_contenido)
     docs_exp, conteo_estados, busqueda = (_documentos_de_expedientes(tdb) if seccion == "expedientes" and not texto
                                           else ([], {}, {"chips": [], "sugerencia": None, "carpetas": [], "asunto": None}))
+    estado_f = ""
     if seccion == "expedientes" and not texto:
-        docs_exp, filtro = _filtro_tipos(docs_exp)
-    docs_personas = []
+        docs_exp, filtro, conteo_estados, estado_f = _filtrar_estado_y_tipo(docs_exp)
+    personas, carpetas_personas, cliente_f, docs_personas = [], [], None, []
     if seccion == "personas" and not texto:
-        docs_personas, filtro = _filtro_tipos(_documentos_de_personas(tdb))
+        docs_personas, carpetas_personas, cliente_f = _personas(tdb)
+        docs_personas, filtro, conteo_estados, estado_f = _filtrar_estado_y_tipo(docs_personas)
+        # Sin persona elegida se ven todas, con sus primeros documentos; al elegir una, todo lo suyo
+        personas = _agrupar_por_persona(docs_personas, None if cliente_f else 4)
 
     # ── Estudio data ──
     carpetas = tdb.execute(
@@ -580,14 +780,16 @@ def index():
         uid = session.get("user_id")
         alc, alc_p = _FILTRO_PROPIOS, [uid, uid, uid]
     asuntos = tdb.execute(
-        f"SELECT a.id, a.titulo, a.numero_expediente, a.estado FROM asuntos a WHERE a.estado != 'archivado' AND {alc} "
+        f"SELECT a.id, a.titulo, a.numero_expediente, a.estado, {_NOMBRE_CLIENTE} AS cliente FROM asuntos a "
+        f"LEFT JOIN clientes c ON c.id = a.cliente_id WHERE a.estado != 'archivado' AND {alc} "
         "ORDER BY CASE WHEN a.estado IN ('cerrado','completado') THEN 1 ELSE 0 END, a.titulo", alc_p
     ).fetchall()
     clientes = tdb.execute(
         "SELECT id, nombre, apellidos, razon_social FROM clientes WHERE activo=1 ORDER BY nombre LIMIT 1000"
     ).fetchall()
     destinos = {
-        "expedientes": [{"id": a["id"], "t": f"{a['numero_expediente'] or '#' + str(a['id'])} · {a['titulo']}"} for a in asuntos],
+        "expedientes": [{"id": a["id"], "t": f"{a['numero_expediente'] or '#' + str(a['id'])} · {a['titulo']}"
+                                            + (f" · {a['cliente']}" if (a["cliente"] or "").strip() else "")} for a in asuntos],
         "personas": [{"id": c["id"], "t": (c["razon_social"] or f"{c['nombre'] or ''} {c['apellidos'] or ''}").strip()}
                      for c in clientes],
         "carpetas": [{"id": c["id"], "t": c["nombre"]} for c in carpetas],
@@ -597,10 +799,12 @@ def index():
         "biblioteca/index.html",
         texto=texto, en_contenido=en_contenido, lectura=lectura,
         max_pasajes=MAX_PASAJES,
-        seccion=seccion, secciones=SECCIONES, filtro=filtro, docs_personas=docs_personas,
-        tipos_grupos=tipos.por_grupo(), destinos=destinos, n_acuerdos=n_acuerdos,
+        seccion=seccion, secciones=SECCIONES, filtro=filtro,
+        tipos_grupos=tipos.por_grupo(), tipos_form=tipos.para_formulario(), destinos=destinos, n_acuerdos=n_acuerdos,
+        es_admin=session.get("role") in ("super_admin", "admin"), user_id=session.get("user_id"),
         puede_formatos=session.get("role") in ("super_admin", "admin", "abogado"),
-        docs_exp=docs_exp, conteo_estados=conteo_estados, estado_f=request.args.get("estado", ""), busqueda=busqueda,
+        docs_exp=docs_exp, conteo_estados=conteo_estados, estado_f=estado_f, busqueda=busqueda,
+        personas=personas, carpetas_personas=carpetas_personas, cliente_f=cliente_f, docs_personas=docs_personas,
         estados_lectura=ESTADOS_LECTURA,
         # Estudio
         carpetas=carpetas, archivos=archivos,
@@ -738,7 +942,11 @@ def upload():
 @login_required
 @tenant_required
 def archivo_eliminar(id):
-    fila = g.tenant_db.execute("SELECT archivo_url FROM biblioteca_archivos WHERE id=?", (id,)).fetchone()
+    fila = g.tenant_db.execute("SELECT archivo_url, creado_por FROM biblioteca_archivos WHERE id=?", (id,)).fetchone()
+    if not fila:
+        return jsonify(ok=False, error="No encontré ese archivo"), 404
+    if session.get("role") not in ("super_admin", "admin") and fila["creado_por"] != session.get("user_id"):
+        return jsonify(ok=False, error="Solo quien lo subió o un administrador puede eliminarlo"), 403
     g.tenant_db.execute("DELETE FROM biblioteca_archivos WHERE id=?", (id,))
     g.tenant_db.commit()
     if fila:
@@ -771,9 +979,12 @@ def archivo_compartir(id):
 @login_required
 @tenant_required
 def archivo_vincular(id):
+    from modules.asuntos import puede_ver
     data = request.json or request.form
     asunto_id = _safe_int(data.get("asunto_id"))
     cliente_id = _safe_int(data.get("cliente_id"))
+    if asunto_id and not puede_ver(g.tenant_db, asunto_id):
+        return jsonify(ok=False, error="Elige un expediente al que tengas acceso"), 400
     sets, vals = [], []
     if asunto_id is not None:
         sets.append("asunto_id=?"); vals.append(asunto_id)
@@ -933,12 +1144,6 @@ def editor(doc_id=None):
             abort(404)   # documento de un expediente que esta persona no puede ver
         if documento:
             documento = dict(documento)
-            versiones = tdb.execute(
-                "SELECT id, version, creado_por, fecha FROM biblioteca_doc_versiones "
-                "WHERE documento_id=? ORDER BY version DESC LIMIT 10",
-                (doc_id,),
-            ).fetchall()
-            versiones = [dict(v) for v in versiones]
 
     plantilla_id = _safe_int(request.args.get("plantilla"))
     plantilla_html = ""
@@ -964,13 +1169,21 @@ def editor(doc_id=None):
         "SELECT id, nombre, categoria FROM biblioteca_plantillas ORDER BY nombre"
     ).fetchall()
 
-    # Recent documents for sidebar
-    recientes = tdb.execute(
-        "SELECT id, titulo, estado, fecha_mod FROM biblioteca_documentos ORDER BY fecha_mod DESC LIMIT 10"
-    ).fetchall()
-
+    from modules.asuntos import _usuarios
+    usuarios = _usuarios()
+    historial = _historial(tdb, documento["id"], usuarios) if documento else []
+    recientes = [dict(r) for r in tdb.execute(
+        "SELECT d.id, d.titulo, d.fecha_mod, (SELECT v.creado_por FROM biblioteca_doc_versiones v "
+        "WHERE v.documento_id=d.id ORDER BY v.version DESC LIMIT 1) AS editor FROM biblioteca_documentos d "
+        "ORDER BY d.fecha_mod DESC LIMIT 15").fetchall()]
+    for r in recientes:
+        r["editor"] = usuarios.get(r["editor"], {}).get("corto", "")
+        r["cuando"] = _cuando(r["fecha_mod"])
     return render_template(
         "biblioteca/editor.html",
+        huella=_huella_doc(documento["titulo"], documento["contenido_html"]) if documento else "",
+        asunto_inicial=_vinculo_visible(_safe_int(request.args.get("asunto")), None)[0] if not documento else None,
+        historial=historial, yo=session.get("user_id"),
         documento=documento,
         versiones=versiones,
         plantilla_html=plantilla_html,
@@ -981,7 +1194,7 @@ def editor(doc_id=None):
         asuntos=[dict(a) for a in asuntos],
         clientes=[dict(c) for c in clientes],
         plantillas=[dict(p) for p in plantillas],
-        recientes=[dict(r) for r in recientes],
+        recientes=recientes,
     )
 
 
@@ -989,76 +1202,125 @@ def editor(doc_id=None):
 @login_required
 @tenant_required
 def editor_guardar():
-    tdb = g.tenant_db
+    """Guarda el documento. Si otra persona lo guardó desde que lo abriste, avisa en vez de pisar su trabajo."""
+    tdb, uid = g.tenant_db, session.get("user_id")
     data = request.json or {}
     doc_id = _safe_int(data.get("id"))
-    titulo = (data.get("titulo") or "Sin título").strip()
+    titulo = (data.get("titulo") or "Sin título").strip()[:200]
     contenido = data.get("contenido_html", "")
-    asunto_id = _safe_int(data.get("asunto_id"))
-    cliente_id = _safe_int(data.get("cliente_id"))
+    asunto_id, cliente_id = _vinculo_visible(_safe_int(data.get("asunto_id")), _safe_int(data.get("cliente_id")))
     plantilla_id = _safe_int(data.get("plantilla_id"))
 
-    if doc_id:
-        # Update existing
-        tdb.execute(
-            """UPDATE biblioteca_documentos
-               SET titulo=?, contenido_html=?, asunto_id=?, cliente_id=?,
-                   fecha_mod=CURRENT_TIMESTAMP
-               WHERE id=?""",
-            (titulo, contenido, asunto_id, cliente_id, doc_id),
-        )
-        # Save version
-        last_ver = tdb.execute(
-            "SELECT MAX(version) FROM biblioteca_doc_versiones WHERE documento_id=?",
-            (doc_id,),
-        ).fetchone()[0] or 0
-        tdb.execute(
-            """INSERT INTO biblioteca_doc_versiones
-               (documento_id, contenido_html, version, creado_por)
-               VALUES (?,?,?,?)""",
-            (doc_id, contenido, last_ver + 1, session.get("user_id")),
-        )
-        # Keep only last 10 versions
-        tdb.execute(
-            """DELETE FROM biblioteca_doc_versiones
-               WHERE documento_id=? AND id NOT IN (
-                 SELECT id FROM biblioteca_doc_versiones
-                 WHERE documento_id=? ORDER BY version DESC LIMIT 10
-               )""",
-            (doc_id, doc_id),
-        )
-        tdb.commit()
-        return jsonify(ok=True, id=doc_id, version=last_ver + 1)
-    else:
-        # Create new
+    if not doc_id:
         cur = tdb.execute(
-            """INSERT INTO biblioteca_documentos
-               (titulo, contenido_html, plantilla_id, asunto_id, cliente_id, creado_por)
-               VALUES (?,?,?,?,?,?)""",
-            (titulo, contenido, plantilla_id, asunto_id, cliente_id, session.get("user_id")),
-        )
+            "INSERT INTO biblioteca_documentos (titulo, contenido_html, plantilla_id, asunto_id, cliente_id, creado_por) "
+            "VALUES (?,?,?,?,?,?)", (titulo, contenido, plantilla_id, asunto_id, cliente_id, uid))
         doc_id = cur.lastrowid
-        # Version 1
-        tdb.execute(
-            "INSERT INTO biblioteca_doc_versiones (documento_id, contenido_html, version, creado_por) VALUES (?,?,1,?)",
-            (doc_id, contenido, session.get("user_id")),
-        )
+        tdb.execute("INSERT INTO biblioteca_doc_versiones (documento_id, contenido_html, version, creado_por) VALUES (?,?,1,?)",
+                    (doc_id, contenido, uid))
         tdb.commit()
         _log("crear_documento", doc_id, {"titulo": titulo})
-        return jsonify(ok=True, id=doc_id, version=1, nuevo=True)
+        return jsonify(ok=True, id=doc_id, version=1, nuevo=True, huella=_huella_doc(titulo, contenido))
+
+    actual = tdb.execute("SELECT * FROM biblioteca_documentos WHERE id=?", (doc_id,)).fetchone()
+    if not actual or (actual["asunto_id"] and _vinculo_visible(actual["asunto_id"], None)[0] is None):
+        return jsonify(ok=False, error="Este documento ya no existe"), 404
+    ultima = tdb.execute("SELECT id, version, creado_por, fecha FROM biblioteca_doc_versiones WHERE documento_id=? "
+                         "ORDER BY version DESC LIMIT 1", (doc_id,)).fetchone()
+    base = data.get("base") or ""
+    if base and base != _huella_doc(actual["titulo"], actual["contenido_html"]) and not data.get("forzar") \
+            and ultima and ultima["creado_por"] != uid:
+        from modules.asuntos import _usuarios
+        quien = _usuarios().get(ultima["creado_por"], {}).get("nombre", "Alguien del equipo")
+        return jsonify(ok=False, conflicto=True, quien=quien, cuando=_cuando(ultima["fecha"]),
+                       error=f"{quien} guardó cambios {_cuando(ultima['fecha'])}."), 409
+
+    tdb.execute("UPDATE biblioteca_documentos SET titulo=?, contenido_html=?, asunto_id=?, cliente_id=?, "
+                "fecha_mod=CURRENT_TIMESTAMP WHERE id=?", (titulo, contenido, asunto_id, cliente_id, doc_id))
+    misma_sesion = False
+    if ultima and ultima["creado_por"] == uid:
+        try:
+            misma_sesion = datetime.utcnow() - datetime.fromisoformat(str(ultima["fecha"])[:19]) < SESION_DE_EDICION
+        except ValueError:
+            misma_sesion = False
+    if misma_sesion:   # sigues editando: se actualiza tu versión en lugar de crear una por cada pausa
+        tdb.execute("UPDATE biblioteca_doc_versiones SET contenido_html=?, fecha=CURRENT_TIMESTAMP WHERE id=?",
+                    (contenido, ultima["id"]))
+        version = ultima["version"]
+    else:
+        version = (ultima["version"] if ultima else 0) + 1
+        tdb.execute("INSERT INTO biblioteca_doc_versiones (documento_id, contenido_html, version, creado_por) VALUES (?,?,?,?)",
+                    (doc_id, contenido, version, uid))
+        tdb.execute("DELETE FROM biblioteca_doc_versiones WHERE documento_id=? AND id NOT IN (SELECT id FROM "
+                    "biblioteca_doc_versiones WHERE documento_id=? ORDER BY version DESC LIMIT ?)",
+                    (doc_id, doc_id, VERSIONES_GUARDADAS))
+        if version > 1:
+            _log("editar_documento", doc_id, {"titulo": titulo, "version": version})
+    tdb.commit()
+    return jsonify(ok=True, id=doc_id, version=version, nueva_version=not misma_sesion,
+                   huella=_huella_doc(titulo, contenido))
+
+
+@biblioteca_bp.route("/editor/<int:doc_id>/presencia", methods=["POST"])
+@login_required
+@tenant_required
+def editor_presencia(doc_id):
+    """Cada pocos segundos: quién más tiene abierto el documento y si alguien guardó cambios."""
+    tdb, uid = g.tenant_db, session.get("user_id")
+    doc = tdb.execute("SELECT titulo, contenido_html, asunto_id FROM biblioteca_documentos WHERE id=?", (doc_id,)).fetchone()
+    if not doc or (doc["asunto_id"] and _vinculo_visible(doc["asunto_id"], None)[0] is None):
+        return jsonify(ok=False), 404
+    _asegurar_presencia(tdb)
+    tdb.execute("INSERT INTO biblioteca_doc_presencia (documento_id, user_id, visto) VALUES (?,?,CURRENT_TIMESTAMP) "
+                "ON CONFLICT(documento_id, user_id) DO UPDATE SET visto=CURRENT_TIMESTAMP", (doc_id, uid))
+    tdb.execute("DELETE FROM biblioteca_doc_presencia WHERE visto < datetime('now', '-10 minutes')")
+    otros = [r["user_id"] for r in tdb.execute(
+        "SELECT user_id FROM biblioteca_doc_presencia WHERE documento_id=? AND user_id<>? "
+        "AND visto >= datetime('now', ?)", (doc_id, uid, f"-{PRESENCIA_VIVA} seconds"))]
+    tdb.commit()
+    from modules.asuntos import _usuarios
+    usuarios = _usuarios()
+    ultima = tdb.execute("SELECT creado_por, fecha, version FROM biblioteca_doc_versiones WHERE documento_id=? "
+                         "ORDER BY version DESC LIMIT 1", (doc_id,)).fetchone()
+    return jsonify(
+        ok=True, huella=_huella_doc(doc["titulo"], doc["contenido_html"]),
+        otros=[{k: usuarios[o][k] for k in ("nombre", "corto", "iniciales", "color")} for o in otros if o in usuarios],
+        ultimo={"quien": usuarios.get(ultima["creado_por"], {}).get("corto", "Alguien"), "yo": ultima["creado_por"] == uid,
+                "cuando": _cuando(ultima["fecha"]), "version": ultima["version"]} if ultima else None)
+
+
+@biblioteca_bp.route("/editor/<int:doc_id>/contenido")
+@login_required
+@tenant_required
+def editor_contenido(doc_id):
+    """Lo último guardado (para traer los cambios de otra persona sin recargar la página)."""
+    doc = g.tenant_db.execute("SELECT * FROM biblioteca_documentos WHERE id=?", (doc_id,)).fetchone()
+    if not doc or (doc["asunto_id"] and _vinculo_visible(doc["asunto_id"], None)[0] is None):
+        return jsonify(ok=False), 404
+    from modules.asuntos import _usuarios
+    return jsonify(ok=True, titulo=doc["titulo"], contenido_html=doc["contenido_html"] or "",
+                   huella=_huella_doc(doc["titulo"], doc["contenido_html"]),
+                   historial=_historial(g.tenant_db, doc_id, _usuarios())[:30])
 
 
 @biblioteca_bp.route("/editor/<int:doc_id>/version/<int:ver_id>")
 @login_required
 @tenant_required
 def editor_version(doc_id, ver_id):
-    v = g.tenant_db.execute(
-        "SELECT * FROM biblioteca_doc_versiones WHERE id=? AND documento_id=?",
-        (ver_id, doc_id),
-    ).fetchone()
+    tdb = g.tenant_db
+    doc = tdb.execute("SELECT asunto_id FROM biblioteca_documentos WHERE id=?", (doc_id,)).fetchone()
+    if not doc or (doc["asunto_id"] and _vinculo_visible(doc["asunto_id"], None)[0] is None):
+        return jsonify(ok=False, error="Versión no encontrada"), 404
+    v = tdb.execute("SELECT * FROM biblioteca_doc_versiones WHERE id=? AND documento_id=?", (ver_id, doc_id)).fetchone()
     if not v:
         return jsonify(ok=False, error="Versión no encontrada"), 404
-    return jsonify(ok=True, contenido_html=v["contenido_html"], version=v["version"], fecha=v["fecha"])
+    previa = tdb.execute("SELECT contenido_html FROM biblioteca_doc_versiones WHERE documento_id=? AND version<? "
+                         "ORDER BY version DESC LIMIT 1", (doc_id, v["version"])).fetchone()
+    from modules.asuntos import _usuarios
+    autor = _usuarios().get(v["creado_por"], {}).get("nombre", "Alguien del equipo")
+    return jsonify(ok=True, contenido_html=v["contenido_html"], version=v["version"], fecha=v["fecha"],
+                   autor=autor, cuando=_cuando(v["fecha"]), primera=previa is None,
+                   cambios=_cambios_html(previa["contenido_html"] if previa else "", v["contenido_html"] or ""))
 
 
 @biblioteca_bp.route("/editor/datos")

@@ -213,6 +213,17 @@
           <div class="xr-progreso"><i style="width:{{ dinero.pct }}%"></i></div></div>
         <div class="xp-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
         <div class="xp-kv"><span>Por cobrar</span><b style="color:{{ '#8A6A2F' if dinero.pendiente else 'var(--e)' }}">{{ dinero.pendiente | dinero }}</b></div>
+        {% if cobros %}
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:6px">
+          {% for c in cobros %}
+          {% set tot_ = c.total or c.monto or 0 %}{% set saldo_ = 0 if c.estado == 'pagado' else [tot_ - (c.monto_abonado or 0), 0] | max %}
+          <a class="xp-kv" style="text-decoration:none;color:inherit" href="{{ url_for('cobranzas.index') }}#cobro-{{ c.id }}">
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.concepto }}</span>
+            <b style="white-space:nowrap;{{ 'color:#A23B33' if c.estado == 'vencido' else '' }}">{% if saldo_ %}debe {{ saldo_ | dinero(c.moneda) }}{% else %}pagado{% endif %}</b>
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
         {% if session.get('role') in ('super_admin', 'admin', 'abogado', 'asistente') %}
         <a class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px" href="{{ url_for('cobranzas.index') }}#nuevo-asunto-{{ asunto.id }}">+ Nuevo cobro</a>
         {% endif %}
@@ -412,6 +423,7 @@
             {% if it.tipo == 'horas' and it.fecha_evento %}<div class="quien">Trabajadas el {{ it.fecha_evento }}</div>{% endif %}
             {% if it.texto %}<p>{{ it.texto }}</p>{% endif %}
             {% if it.url %}<a class="archivo" href="{{ it.url }}" target="_blank" rel="noopener">{{ ic('doc', 13) }} Abrir archivo</a>{% endif %}
+            {% if it.enlace %}<a class="archivo" href="{{ it.enlace }}">{{ ic('pen', 13) }} Abrir en el editor</a>{% endif %}
             {% if it.tipo != 'nota' %}<div class="quien">{{ it.autor.nombre }}</div>{% endif %}
           </div>
         </div>
@@ -426,7 +438,19 @@
 <!-- ── Documentos ─────────────────────────────────────────────── -->
 <section class="xp-panel" id="p-documentos" role="tabpanel">
   <div class="xd-h"><h2>Bóveda del expediente <span>{{ documentos | length }}</span></h2>
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 13) }} Generar desde machote</a></div>
+    <div class="xd-h-acc"><a class="btn btn-ghost btn-sm" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 13) }} Generar desde machote</a>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('biblioteca.editor', asunto=asunto.id) }}">{{ ic('pen', 13) }} Escribir un documento</a></div></div>
+  {% if escritos %}
+  <div class="xd-escritos">
+    <h3>Escritos del equipo <span>Todos los pueden abrir y editar; cada cambio queda con nombre y hora</span></h3>
+    <div class="xd-escritos-l">
+      {% for e in escritos %}
+      <a href="{{ url_for('biblioteca.editor', doc_id=e.id) }}"><b>{{ e.titulo }}</b>
+        <small>{% if e.editor %}Última edición: {{ e.editor }} · {% endif %}{{ e.cuando }}{% if e.autores > 1 %} · {{ e.autores }} personas lo han editado{% endif %}</small></a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
   <div class="xd-grid">
     <label class="xd-subir" id="afDrop">
       <input type="file" id="afArchivo" hidden multiple>
@@ -765,7 +789,9 @@
     <div class="as-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button class="btn btn-primary" id="dtOk">Subir</button></div>
   </form>
 </div>
-<template id="dtOpciones"><option value="">Elige qué es</option>{% for gr in tipos_doc %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}</template>
+{# «¿Qué es?» de un expediente: primero los tipos que tienen sentido aquí (catálogo: tipos_documento.DESTINOS) #}
+<template id="dtOpciones"><option value="">Elige qué es</option>{% for gr in tipos_doc if gr.clave in tipos_exp %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}<option value="__todos">Ver todos los tipos…</option></template>
+<template id="dtTodos"><option value="">Elige qué es</option>{% for gr in tipos_doc %}<optgroup label="{{ gr.etiqueta }}">{% for t in gr.tipos %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 
 <div class="as-modal" id="senModal" role="dialog" aria-modal="true" aria-labelledby="senTitulo">
   <form class="as-modal-c" id="fSentencia">
@@ -976,10 +1002,17 @@
         </div>`;
       const sel = fila.querySelector('select'), marca = fila.querySelector('.dt-sug');
       let sugerido = '';
-      sel.addEventListener('change', () => { const on = !!sugerido && sel.value === sugerido; marca.hidden = !on; sel.classList.toggle('sug', on); });
-      const u = new URL("{{ url_for('biblioteca.tipo_sugerir') }}", location.origin); u.searchParams.set('nombre', f.name);
-      fetch(u).then(r => r.json()).then(j => { if (j.tipo && !sel.value) { sugerido = j.tipo; sel.value = j.tipo; marca.hidden = false; sel.classList.add('sug'); } })
-        .catch(() => {});
+      const todos = () => { sel.innerHTML = $('#dtTodos').innerHTML; };
+      sel.addEventListener('change', () => {
+        if (sel.value === '__todos') { todos(); sel.focus(); return; }
+        const on = !!sugerido && sel.value === sugerido; marca.hidden = !on; sel.classList.toggle('sug', on);
+      });
+      const u = new URL("{{ url_for('biblioteca.tipo_sugerir') }}", location.origin); u.searchParams.set('nombre', f.name); u.searchParams.set('destino', 'expedientes');
+      fetch(u).then(r => r.json()).then(j => {
+        if (!j.tipo || sel.value) return;
+        if (![...sel.options].some(o => o.value === j.tipo)) todos();
+        sugerido = j.tipo; sel.value = j.tipo; marca.hidden = false; sel.classList.add('sug');
+      }).catch(() => {});
       return fila;
     }));
     dtModal.classList.add('open');

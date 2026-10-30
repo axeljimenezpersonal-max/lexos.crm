@@ -10,6 +10,7 @@ import html
 import io
 import json
 import math
+import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -645,14 +646,26 @@ def _bitacora(tdb, id: int, asunto: dict, usuarios: dict) -> list[dict]:
                       "fecha_evento": trabajo})
     for h in tdb.execute(
         "SELECT * FROM actividad_log WHERE entidad='asunto' AND entidad_id=? AND accion IN "
-        "('cambiar_estado_asunto','crear_asunto','archivar_asunto','resultado_asunto') ORDER BY fecha DESC LIMIT 40",
+        "('cambiar_estado_asunto','crear_asunto','archivar_asunto','resultado_asunto','actualizar_asunto') "
+        "ORDER BY fecha DESC LIMIT 60",
         (id,),
     ).fetchall():
         try:
             det = json.loads(h["detalles"] or "{}")
         except Exception:
             det = {}
-        if h["accion"] == "crear_asunto":
+        texto_h = ""
+        if h["accion"] == "actualizar_asunto":
+            cambios = det.get("cambios") or {}
+            campos = [c for c in (det.get("campos") or list(cambios)) if c in _NOMBRE_CAMPO]
+            if not campos:
+                continue
+            nombres = [_NOMBRE_CAMPO[c] for c in campos]
+            titulo = "Cambió " + (nombres[0] if len(nombres) == 1 else ", ".join(nombres[:-1]) + " y " + nombres[-1])
+            texto_h = " · ".join(f"{_NOMBRE_CAMPO[c].split(' ', 1)[1][:1].upper()}{_NOMBRE_CAMPO[c].split(' ', 1)[1][1:]}: "
+                                 f"{cambios[c][0] or '—'} → {cambios[c][1] or '—'}"
+                                 for c in campos if c in cambios and c in _CAMPO_CORTO)
+        elif h["accion"] == "crear_asunto":
             titulo = "Abrió el asunto"
         elif h["accion"] == "archivar_asunto":
             titulo = "Archivó el asunto"
@@ -663,8 +676,20 @@ def _bitacora(tdb, id: int, asunto: dict, usuarios: dict) -> list[dict]:
             de = ESTADOS.get(det.get("de"), {}).get("label", det.get("de", "?"))
             a_ = ESTADOS.get(det.get("a") or det.get("estado"), {}).get("label", "?")
             titulo = f"Cambió el estado de {de} a {a_}"
-        items.append({"id": h["id"], "tipo": "sistema", "etiqueta": "", "titulo": titulo, "texto": "",
+        items.append({"id": h["id"], "tipo": "sistema", "etiqueta": "", "titulo": titulo, "texto": texto_h,
                       "autor": autor(h["user_id"]), "momento": _local(h["fecha"])})
+    try:   # escritos que el equipo redacta en el editor: cada versión dice quién y cuándo
+        escritos = tdb.execute(
+            "SELECT v.id, v.version, v.creado_por, v.fecha, d.id AS doc_id, d.titulo FROM biblioteca_doc_versiones v "
+            "JOIN biblioteca_documentos d ON d.id = v.documento_id WHERE d.asunto_id=? ORDER BY v.fecha DESC LIMIT 60",
+            (id,)).fetchall()
+    except sqlite3.OperationalError:
+        escritos = []
+    for e in escritos:
+        items.append({"id": e["id"], "tipo": "documento", "etiqueta": "Escrito del equipo",
+                      "titulo": ("Empezó" if e["version"] == 1 else "Editó") + f" «{e['titulo']}»", "texto": "",
+                      "autor": autor(e["creado_por"]), "momento": _local(e["fecha"]),
+                      "enlace": url_for("biblioteca.editor", doc_id=e["doc_id"])})
 
     items.sort(key=lambda x: x["momento"] or datetime.min, reverse=True)
     hoy, grupos, indice = _hoy(), [], {}
@@ -851,6 +876,17 @@ def detalle(id: int):
         t["semaforo"] = _semaforo(t["dias"])
 
     tipos_documento.asegurar(tdb)
+    try:
+        escritos = [dict(e) for e in tdb.execute(
+            "SELECT d.id, d.titulo, d.fecha_mod, (SELECT v.creado_por FROM biblioteca_doc_versiones v "
+            "WHERE v.documento_id=d.id ORDER BY v.version DESC LIMIT 1) AS editor, "
+            "(SELECT COUNT(DISTINCT v.creado_por) FROM biblioteca_doc_versiones v WHERE v.documento_id=d.id) AS autores "
+            "FROM biblioteca_documentos d WHERE d.asunto_id=? ORDER BY d.fecha_mod DESC", (id,)).fetchall()]
+    except sqlite3.OperationalError:
+        escritos = []
+    for e in escritos:
+        e["editor"] = (usuarios.get(e["editor"]) or {}).get("corto", "")
+        e["cuando"] = _hace_txt(_local(e["fecha_mod"]))
     documentos = [dict(d) for d in tdb.execute(
         "SELECT id, nombre, archivo_url, archivo_nombre, mime_type, tamanio, fecha_subida, subido_por, "
         "tipo_documento, tipo_estado "
@@ -960,12 +996,13 @@ def detalle(id: int):
         ultima_actividad=_fecha_corta(ultimo.isoformat()) if ultimo else "",
         asunto=asunto, responsable=responsable, colaboradores=colaboradores, abogados=abogados,
         bitacora=bitacora, proximo=proximo, eventos=eventos, pendientes=pendientes,
-        documentos=documentos, sentencias=sentencias, horas=horas, horas_total=horas_total,
+        documentos=documentos, sentencias=sentencias, horas=horas, horas_total=horas_total, escritos=escritos,
         cobros=cobros[:4], dinero=dinero, etiquetas=etiquetas, todas_etiquetas=todas_etiquetas, ficha=ficha,
         dias_llevamos=dias_llevamos, abierto=abierto, clientes=clientes,
         estados=ESTADOS, estados_menu=ESTADOS_MENU, tipos_derecho=TIPOS_DERECHO,
         tipos_actividad=TIPOS_ACTIVIDAD, actividad_label=ACTIVIDAD_LABEL,
         tipos_sentencia=TIPOS_SENTENCIA, sentencia_label=SENTENCIA_LABEL, tipos_doc=tipos_documento.por_grupo(),
+        tipos_exp=tipos_documento.DESTINOS["expedientes"],
         resultados=precedentes.RESULTADOS, sentidos=precedentes.SENTIDOS,
         es_admin=es_admin, notas=notas, resumen=resumen, conv_id=conv_id, hallazgos=hallazgos,
         puede_editar=es_admin or uid == asunto.get("abogado_responsable") or uid in col_ids
@@ -1172,6 +1209,21 @@ def quitar_etiqueta(id, eid):
 #  EDICIÓN INLINE
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Cómo se nombra cada dato en la Actividad del expediente
+_NOMBRE_CAMPO = {
+    "titulo": "el título", "descripcion": "los hechos", "tipo_asunto": "la materia", "sub_tipo": "el tipo de asunto",
+    "estado": "el estado", "prioridad": "la prioridad", "numero_expediente": "el número de expediente",
+    "juzgado": "el juzgado", "numero_juicio": "el número de juicio", "fecha_inicio": "la fecha de inicio",
+    "fecha_limite": "la fecha límite", "fecha_cierre": "la fecha de cierre", "monto_estimado": "el monto",
+    "honorarios_pactados": "los honorarios", "forma_cobro": "la forma de cobro", "contrario_nombre": "la contraparte",
+    "contrario_abogado": "el abogado de la contraparte", "contrario_despacho": "el despacho de la contraparte",
+    "cliente_id": "el cliente", "abogado_responsable": "el responsable", "notas": "las notas",
+}
+# Datos cuyo valor anterior y nuevo se muestran tal cual (los demás solo se nombran)
+_CAMPO_CORTO = {"numero_expediente", "juzgado", "numero_juicio", "fecha_inicio", "fecha_limite", "fecha_cierre",
+                "monto_estimado", "honorarios_pactados", "contrario_nombre", "contrario_abogado", "contrario_despacho",
+                "titulo", "prioridad"}
+
 _EDITABLE = {
     "titulo", "descripcion", "tipo_asunto", "sub_tipo", "estado", "prioridad",
     "numero_expediente", "juzgado", "numero_juicio", "fecha_inicio", "fecha_limite",
@@ -1204,11 +1256,14 @@ def editar_campo(id: int):
                 elif k in ("cliente_id", "abogado_responsable"):
                     v = _safe_int(v)
                 updates.append((k, v))
+        antes = dict(tdb.execute("SELECT * FROM asuntos WHERE id=?", (id,)).fetchone())
+        cambios = {k: [antes.get(k), v] for k, v in updates if str(antes.get(k) or "") != str(v or "")}
         for k, v in updates:
             tdb.execute(f"UPDATE asuntos SET {k}=? WHERE id=?", (v, id))
         if updates:
             tdb.commit()
-            _log("actualizar_asunto", id, {"campos": [k for k, _ in updates]})
+        if cambios:
+            _log("actualizar_asunto", id, {"campos": list(cambios), "cambios": cambios})
         return jsonify(ok=True)
 
     # Special case: add collaborator
@@ -1234,7 +1289,8 @@ def editar_campo(id: int):
     old_val = tdb.execute(f"SELECT {campo} FROM asuntos WHERE id=?", (id,)).fetchone()
     tdb.execute(f"UPDATE asuntos SET {campo}=? WHERE id=?", (valor, id))
     tdb.commit()
-    _log("actualizar_asunto", id, {"campo": campo, "valor": valor})
+    if str((old_val[0] if old_val else "") or "") != str(valor or ""):
+        _log("actualizar_asunto", id, {"campos": [campo], "cambios": {campo: [old_val[0] if old_val else None, valor]}})
     return jsonify(ok=True)
 
 
