@@ -12,7 +12,6 @@ Uso:
 import os
 import sys
 import sqlite3
-import hashlib
 import json
 from datetime import date, datetime, timedelta
 from config import Config
@@ -723,7 +722,8 @@ CREATE INDEX IF NOT EXISTS idx_rpt_guardados_carpeta ON reportes_guardados(carpe
 # ─────────────────────────────────────────────────────────────────────────────
 
 def hash_password(pwd: str) -> str:
-    return hashlib.sha256(pwd.encode()).hexdigest()
+    from werkzeug.security import generate_password_hash
+    return generate_password_hash(pwd)
 
 
 def get_global_conn():

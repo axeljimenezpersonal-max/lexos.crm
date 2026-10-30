@@ -13,6 +13,7 @@ import io
 import mimetypes
 import os
 import re
+import sqlite3
 import uuid
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -173,6 +174,24 @@ def respuesta(url: str, nombre: str | None = None, descargar: bool = False):
 
 # ── Control de acceso ──────────────────────────────────────────────────────────
 
+def _equipo_puede(url: str) -> bool:
+    """Un archivo de un expediente solo lo abre quien puede ver ese expediente (misma regla que la página
+    del expediente). Lo que no pertenece a un expediente (personas, formatos, facturas) lo ve todo el equipo."""
+    from modules.asuntos import puede_ver
+    tdb = getattr(g, "tenant_db", None)
+    if tdb is None:
+        return False
+    for tabla in ("documentos", "asunto_sentencias", "biblioteca_archivos"):
+        try:
+            filas = tdb.execute(f"SELECT asunto_id FROM {tabla} WHERE archivo_url=? AND asunto_id IS NOT NULL",
+                                (url,)).fetchall()
+        except sqlite3.OperationalError:
+            continue   # despacho sin esa tabla todavía
+        if any(not puede_ver(tdb, f[0]) for f in filas):
+            return False
+    return True
+
+
 def _cliente_portal_puede(url: str) -> bool:
     if session.get("portal_tenant") != getattr(g, "tenant_slug", None):
         return False
@@ -213,6 +232,6 @@ def servir(rel: str):
     if getattr(g, "tenant", None) is None:
         abort(404)
     url = PREFIJO + rel
-    if not (sesion_del_despacho() or _cliente_portal_puede(url)):
+    if not ((sesion_del_despacho() and _equipo_puede(url)) or _cliente_portal_puede(url)):
         abort(404)
     return respuesta(url, _nombre_original(url), descargar=request.args.get("descargar") == "1")

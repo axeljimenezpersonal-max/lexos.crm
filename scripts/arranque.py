@@ -7,7 +7,6 @@ Variables:
   DEMO_PASSWORD  contraseña para todos los usuarios de demostración (@*.lexos.mx).
                  Se aplica en cada arranque, así que basta con cambiar la variable.
 """
-import hashlib
 import os
 from datetime import date, datetime, timedelta, timezone
 import sqlite3
@@ -38,8 +37,16 @@ def main() -> None:
     clave = os.environ.get("DEMO_PASSWORD", "")
     if clave:
         con = sqlite3.connect(Config.GLOBAL_DB)
-        n = con.execute("UPDATE tenant_users SET password_hash=? WHERE email LIKE '%.lexos.mx'",
-                        (hashlib.sha256(clave.encode()).hexdigest(),)).rowcount
+        from werkzeug.security import check_password_hash, generate_password_hash
+        n = 0
+        for uid, actual in con.execute("SELECT id, password_hash FROM tenant_users WHERE email LIKE '%.lexos.mx'").fetchall():
+            try:
+                igual = check_password_hash(actual or "", clave)
+            except ValueError:
+                igual = False
+            if not igual:   # cada cuenta con su propia sal; solo se rehace si la clave cambió
+                con.execute("UPDATE tenant_users SET password_hash=? WHERE id=?", (generate_password_hash(clave), uid))
+            n += 1
         con.commit()
         con.close()
         print(f"[arranque] Contraseña de demostración aplicada a {n} usuarios", flush=True)
@@ -69,7 +76,8 @@ def cuenta_compartida() -> None:
         print("[arranque] No existe el despacho de demostración; no se creó la cuenta compartida", flush=True)
         con.close()
         return
-    tenant_id, hash_ = fila[0], hashlib.sha256(clave.encode()).hexdigest()
+    from werkzeug.security import generate_password_hash
+    tenant_id, hash_ = fila[0], generate_password_hash(clave)
     existe = con.execute("SELECT id FROM tenant_users WHERE tenant_id=? AND LOWER(email)=?", (tenant_id, usuario)).fetchone()
     if existe:
         user_id = existe[0]

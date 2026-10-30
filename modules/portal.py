@@ -6,7 +6,6 @@ Secciones: Inicio, Mis Asuntos, Mis Documentos, Mis Facturas, Mensajes.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import secrets
 from datetime import datetime, timedelta
@@ -17,6 +16,7 @@ from flask import (
     send_from_directory, session, url_for,
 )
 
+from modules import claves
 from modules.auth import login_required, role_required, tenant_required
 
 portal_bp = Blueprint("portal", __name__)
@@ -26,7 +26,7 @@ portal_bp = Blueprint("portal", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _hash(pw: str) -> str:
-    return hashlib.sha256(pw.encode()).hexdigest()
+    return claves.cifrar(pw)
 
 
 def _safe_int(v, default=None):
@@ -299,7 +299,7 @@ def cliente_auth():
         return render_template("portal/login.html",
                                error="Tu cuenta usa link mágico. Solicita uno a tu abogado.")
 
-    if _hash(password) != pc["password_hash"]:
+    if not claves.coincide(password, pc["password_hash"]):
         intentos = (pc["intentos_login"] or 0) + 1
         if intentos >= 5:
             block = (datetime.now() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
@@ -317,6 +317,9 @@ def cliente_auth():
                                error="Cuenta bloqueada por 15 minutos.")
 
     # Success
+    if claves.es_vieja(pc["password_hash"]):   # formato viejo: se protege al entrar
+        tdb.execute("UPDATE portal_clientes SET password_hash=? WHERE id=?", (_hash(password), pc["id"]))
+        tdb.commit()
     _do_portal_login(tdb, pc)
     return redirect(url_for("portal.cliente_inicio"))
 

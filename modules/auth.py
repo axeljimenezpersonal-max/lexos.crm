@@ -16,7 +16,6 @@ import os
 import re
 import json
 import secrets
-import hashlib
 import unicodedata
 from datetime import datetime, timedelta
 from functools import wraps
@@ -26,6 +25,8 @@ from flask import (
     url_for, session, flash, g, current_app, jsonify
 )
 
+from modules import claves
+
 auth_bp = Blueprint("auth", __name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -33,11 +34,11 @@ auth_bp = Blueprint("auth", __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _hash(pwd: str) -> str:
-    return hashlib.sha256(pwd.encode()).hexdigest()
+    return claves.cifrar(pwd)
 
 
 def _verify(pwd: str, hashed: str) -> bool:
-    return _hash(pwd) == hashed
+    return claves.coincide(pwd, hashed)
 
 
 def _slugify(text: str) -> str:
@@ -341,6 +342,10 @@ def login():
             return render_template(
                 "auth/login.html", prefill_email=email, next_url=next_url, error=True
             )
+
+        if claves.es_vieja(user["password_hash"]):   # cuenta con el formato viejo: se protege al entrar
+            gdb.execute("UPDATE tenant_users SET password_hash=? WHERE id=?", (_hash(password), user["id"]))
+            gdb.commit()
 
         # ── Sesión válida ─────────────────────────────────────────────────────
         session.clear()
