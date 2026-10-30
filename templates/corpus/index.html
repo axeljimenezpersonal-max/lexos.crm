@@ -38,6 +38,9 @@
 .bl-item:hover b{color:var(--e)}
 .bl-fuente{font-size:12px;color:var(--ash);padding:0 18px 16px}
 @media(max-width:1000px){.bl-grid{grid-template-columns:1fr}.bl-kpis{grid-template-columns:repeat(2,1fr)}}
+.bl-aviso{display:flex;align-items:center;gap:10px;margin:-6px 0 18px;padding:12px 16px;border-radius:12px;background:#F4ECDD;color:#6E5226;font:500 14px/1.45 'Inter',sans-serif}
+.bl-aviso i{width:14px;height:14px;flex:none;border-radius:50%;border:2px solid #C9A86A;border-top-color:transparent;animation:blGira 1s linear infinite}
+@keyframes blGira{to{transform:rotate(360deg)}}
 @media(max-width:600px){.bl-search{flex-direction:column}}
 </style>
 {% endblock %}
@@ -47,6 +50,11 @@
 {% set leyes = resumen.leyes %}{% set dof = resumen.dof %}
 <h1 class="page-title">Base legal de México</h1>
 <p class="bl-sub">Leyes federales vigentes y Diario Oficial de la Federación, descargados de las fuentes oficiales y actualizados todos los días. Es la base que consulta el asistente.</p>
+{% if avance %}
+<p class="bl-aviso" role="status"><i aria-hidden="true"></i>Descargando {{ 'las leyes federales' if avance.fuente == 'ley_federal' else 'el Diario Oficial' }} de las fuentes oficiales{% if avance.total %}: {{ avance.hecho }} de {{ avance.total }}{% endif %}. Puedes seguir trabajando; lo que ya bajó se puede buscar.</p>
+{% elif not leyes.documentos and not dof.documentos %}
+<p class="bl-aviso" role="status">La base se descarga sola en el servidor. La primera vez tarda un rato porque son 317 leyes; vuelve en unos minutos.</p>
+{% endif %}
 
 <section class="bl-kpis" aria-label="Contenido de la base">
   <div class="bl-kpi"><small>Leyes federales</small><b>{{ leyes.documentos or 0 }}</b><span>de 317 publicadas por la Cámara de Diputados</span></div>

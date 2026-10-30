@@ -33,6 +33,20 @@
 .tb-avatar { background: #AD9060; color: #fff; }
 .tb-menu-btn { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22); color: #fff; }
 
+/* Dictum es la inteligencia artificial: va en su propio color (ciruela con destello dorado) en todos los menús */
+.tb-link.tb-ia { align-self: center; height: 38px; padding: 0 16px 0 13px; border-radius: 999px; color: #fff; font-weight: 600;
+  background: linear-gradient(135deg, #6B4E71, #8C6292); box-shadow: inset 0 0 0 1px rgba(233,220,192,.28), 0 4px 14px rgba(0,0,0,.22); }
+.tb-link.tb-ia .nav-icon, .tb-link.tb-ia:hover .nav-icon, .tb-link.tb-ia.active .nav-icon { color: #F1DFB4; }
+.tb-link.tb-ia:hover { background: linear-gradient(135deg, #7A5A81, #9A6EA0); }
+.tb-link.tb-ia.active { box-shadow: inset 0 0 0 1px rgba(233,220,192,.5), 0 0 0 2px #D9BE8C; }
+.tb-link.tb-ia.active::after { display: none; }
+.mm-panel a.mm-ia { color: #6B4E71; font-weight: 600; }
+.mm-panel a.mm-ia .nav-icon { color: #AD9060; }
+.mm-panel a.mm-ia.active { background: #F1EAF2; color: #6B4E71; }
+.tabbar a.tab-ia { color: #6B4E71; font-weight: 600; }
+.tabbar a.tab-ia .nav-icon { color: #AD9060; }
+@media (max-width: 1200px) { .tb-link.tb-ia { height: 34px; padding: 0 12px 0 10px; } }
+
 /* ── Pestañas de cada página: banda azul, al centro ─────────── */
 .ex-tabs, .xp-barra.xp2-tabs, .as-seg.as-tabs {
   background: linear-gradient(135deg, #142E59, #1B3B6F); border: 0; border-radius: 16px;

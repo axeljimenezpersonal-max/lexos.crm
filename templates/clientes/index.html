@@ -15,10 +15,6 @@
     <p class="as-sub">Clientes y contrapartes del despacho · {{ conteos.activo }} cliente{{ 's' if conteos.activo != 1 }}{% if conteos.prospecto %} · {{ conteos.prospecto }} prospecto{{ 's' if conteos.prospecto != 1 }}{% endif %}</p>
   </div>
   <div class="cl-acciones">
-    <div class="as-seg" aria-label="Sección">
-      <a href="{{ url_for('clientes.index') }}" class="on">Clientes</a>
-      <a href="{{ url_for('contrapartes.index') }}">Contrapartes</a>
-    </div>
     <button type="button" class="btn btn-secondary" id="clImportarBtn">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 20h14"/></svg>
       Importar
@@ -33,6 +29,8 @@
     </button>
   </div>
 </div>
+
+{% with seccion_personas='clientes' %}{% include "clientes/_secciones.html" %}{% endwith %}
 
 <section class="as-kpis" aria-label="Resumen">
   <a class="as-kpi{% if grupo == 'activo' and orden != 'saldo' %} on{% endif %}" href="{{ url_for('clientes.index') }}">

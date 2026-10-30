@@ -726,3 +726,62 @@
   .bib-file-card .bib-file-actions { display: flex; }
   .ql-editor { padding: 20px 16px; }
 }
+
+/* ── Bóveda: buscar dentro de los documentos ───────────────────────────────── */
+.bv-busca { margin-top: 2px; }
+.bv-form { margin: 0; }
+.bv-caja { height: 62px; border-radius: 16px; padding-left: 20px; box-shadow: 0 14px 30px -26px rgba(20,46,89,.55); }
+.bv-caja .bz-input { font-size: 16px; }
+.bv-ir { flex-shrink: 0; height: 46px; padding: 0 22px; border: 0; border-radius: 12px; background: var(--e); color: #fff; font: 600 14.5px 'Inter', sans-serif; cursor: pointer; }
+.bv-ir:hover { background: var(--ed); }
+.bv-ir:focus-visible { outline: 2px solid var(--dorado); outline-offset: 2px; }
+.bv-lectura { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 10px 2px 0; font: 400 13px/1.5 'Inter', sans-serif; color: var(--ash); }
+.bv-lectura > span:not(:last-child)::after { content: '·'; margin: 0 8px; color: #B9BFCA; }
+.bv-releer { border: 0; background: none; padding: 0; font: 600 13px 'Inter', sans-serif; color: var(--e); cursor: pointer; text-decoration: underline; text-decoration-color: var(--dorado); text-underline-offset: 3px; }
+.bv-releer:disabled { color: var(--ash); cursor: default; }
+
+.bv-res { margin-top: 8px; }
+.bv-doc { background: var(--c); border: 1px solid var(--border); border-left: 3px solid var(--dorado); border-radius: 14px; padding: 16px 18px 14px; margin-bottom: 14px; min-width: 0; }
+.bv-doc-h { display: flex; align-items: flex-start; gap: 12px; }
+.bv-doc-h .doc-ext { margin-top: 2px; }
+.bv-doc-tx { flex: 1; min-width: 0; }
+.bv-doc-tx h3 { margin: 0; font: 600 15.5px/1.35 'Sora', sans-serif; color: var(--e); overflow-wrap: anywhere; }
+.bv-doc-tx h3 a { color: inherit; text-decoration: none; }
+.bv-doc-tx h3 a:hover { text-decoration: underline; text-decoration-color: var(--dorado); text-underline-offset: 3px; }
+.bv-doc-meta { display: flex; flex-wrap: wrap; gap: 2px 0; margin: 4px 0 0; font-size: 13px; color: var(--ash); }
+.bv-doc-meta > *:not(:last-child)::after { content: '·'; display: inline-block; margin: 0 7px; color: #B9BFCA; font-weight: 400; }
+.bv-doc-meta a { color: var(--e); text-decoration: none; font-weight: 500; overflow-wrap: anywhere; }
+.bv-doc-meta a:hover { text-decoration: underline; text-decoration-color: var(--dorado); text-underline-offset: 3px; }
+.bv-doc-meta em { font-style: normal; font-weight: 600; }
+.bv-doc-acc { display: flex; gap: 8px; flex-shrink: 0; }
+.bv-pasajes { list-style: none; margin: 12px 0 0; padding: 0; }
+.bv-pasajes li { display: flex; gap: 12px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--border); }
+.bv-pasajes p { margin: 0; flex: 1; min-width: 0; font: 400 14px/1.6 'Inter', sans-serif; color: #3B4A61; overflow-wrap: anywhere; }
+.bv-pasajes mark { background: var(--dorado-p); color: var(--e); font-weight: 600; padding: 0 2px; border-radius: 3px; }
+.bv-pag { flex-shrink: 0; min-width: 44px; padding: 2px 8px; border-radius: 99px; background: #F1EEE8; font: 600 12px 'Inter', sans-serif; color: var(--e); text-align: center; text-decoration: none; white-space: nowrap; }
+a.bv-pag:hover { background: var(--edim); color: #6E5A3A; }
+.bv-mas { margin-top: 2px; }
+.bv-mas summary { cursor: pointer; padding: 8px 0 2px; font: 600 13px 'Inter', sans-serif; color: var(--e); list-style: none; }
+.bv-mas summary::-webkit-details-marker { display: none; }
+.bv-mas summary::before { content: '+'; display: inline-block; width: 16px; color: var(--dorado); font-weight: 700; }
+.bv-mas[open] summary::before { content: '–'; }
+.bv-mas .bv-pasajes { margin-top: 6px; }
+.bv-vacio { padding: 36px 20px; text-align: center; background: var(--c); border: 1px dashed var(--border-m); border-radius: 14px; }
+.bv-vacio h3 { margin: 0; font: 600 16px 'Sora', sans-serif; color: var(--e); overflow-wrap: anywhere; }
+.bv-vacio p { margin: 6px auto 0; max-width: 520px; font-size: 13.5px; color: var(--ash); }
+.bv-tabs { margin-top: 22px; }
+
+@media (max-width: 860px) {
+  .bv-caja { height: 56px; padding-left: 14px; gap: 8px; }
+  .bv-ir { height: 42px; padding: 0 14px; }
+  .bv-doc-h { flex-wrap: wrap; }
+  .bv-doc-acc { width: 100%; padding-left: 42px; flex-wrap: wrap; }
+}
+@media (max-width: 480px) {
+  .bv-caja .bz-input { font-size: 15px; }
+  .bv-caja .bz-lupa { display: none; }
+  .bv-doc { padding: 14px 14px 12px; }
+  .bv-doc-acc { padding-left: 0; }
+  .bv-doc-acc .btn { flex: 1; justify-content: center; }
+  .bv-pasajes li { flex-direction: column; gap: 6px; }
+}

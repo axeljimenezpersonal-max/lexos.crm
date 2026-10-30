@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Estadísticas{% endblock %}
 {% block page_title %}Estadísticas{% endblock %}{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/estadisticas.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 {% endblock %}
 
 {% block content %}
-<div class="tb-breadcrumb"><span>Estadísticas</span></div>
+{% from "estadisticas/_pestanas.html" import pestanas with context %}
+{{ pestanas('resumen') }}
 
 <!-- ══════════════════════════════════════════════
      FILTROS GLOBALES
@@ -52,7 +54,7 @@
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46"/></svg>
     Aplicar
   </button>
-  <div class="est-filt-range">{{ start }} → {{ end }}</div>
+  <div class="est-filt-range">Del {{ start }} al {{ end }}</div>
 </form>
 
 <!-- ══════════════════════════════════════════════
@@ -60,7 +62,7 @@
      ══════════════════════════════════════════════ -->
 <div class="est-kpi-grid">
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(0,223,162,.12);color:var(--e);">
+    <div class="est-kpi-icon" style="background:#E9EDF3;color:var(--e);">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -71,7 +73,7 @@
   </div>
 
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#4F6D8A;">
+    <div class="est-kpi-icon" style="background:#E8EEF3;color:#4F6D8A;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -82,7 +84,7 @@
   </div>
 
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(245,158,11,.12);color:#B08A4A;">
+    <div class="est-kpi-icon" style="background:#F4EEDF;color:#8A6A2F;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -102,7 +104,7 @@
   </div>
 
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(16,185,129,.12);color:#4F6D8A;">
+    <div class="est-kpi-icon" style="background:#E8EEF3;color:#4F6D8A;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -113,7 +115,7 @@
   </div>
 
   <div class="est-kpi">
-    <div class="est-kpi-icon" style="background:rgba(0,223,162,.12);color:var(--e);">
+    <div class="est-kpi-icon" style="background:#E9EDF3;color:var(--e);">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -124,7 +126,7 @@
   </div>
 
   <div class="est-kpi {{ 'est-kpi-alert' if kpi.vencidos > 0 }}">
-    <div class="est-kpi-icon" style="background:rgba(239,68,68,.12);color:#B5483F;">
+    <div class="est-kpi-icon" style="background:#F8ECEA;color:#A23B33;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     </div>
     <div class="est-kpi-body">
@@ -362,13 +364,13 @@
 document.addEventListener('DOMContentLoaded', function() {
 
   // ── Chart defaults ──
-  Chart.defaults.color = '#8E99AB';
-  Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+  Chart.defaults.color = '#60718D';
+  Chart.defaults.font.family = "'Inter', system-ui, -apple-system, sans-serif";
   Chart.defaults.font.size = 12;
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
   Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
 
-  const COLORS = ['#AD9060','#4F6D8A','#B08A4A','#B5483F','#8C7A5B','#8E6F4A','#4B6585','#B08A4A','#06B6D4','#84CC16'];
+  const COLORS = ['#142E59','#AD9060','#4F6D8A','#B5483F','#8C7A5B','#3D6B6B','#6B4E71','#D9BE8C','#60718D','#8A6A2F'];
 
   // ── 1. Asuntos por estado (dona) ──
   const estadoData = {{ ch_asuntos_estado | tojson }};
@@ -406,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' } },
+      scales: { x: { beginAtZero: true, grid: { color: 'rgba(20,46,89,.07)' } },
                 y: { grid: { display: false } } }
     }
   });
@@ -422,14 +424,14 @@ document.addEventListener('DOMContentLoaded', function() {
           label: 'Facturado',
           data: factData.map(d => d.facturado),
           borderColor: '#AD9060',
-          backgroundColor: 'rgba(0,223,162,.1)',
+          backgroundColor: 'rgba(173,144,96,.12)',
           fill: true, tension: .3, pointRadius: 3,
         },
         {
           label: 'Cobrado',
           data: factData.map(d => d.cobrado),
           borderColor: '#4F6D8A',
-          backgroundColor: 'rgba(16,185,129,.1)',
+          backgroundColor: 'rgba(79,109,138,.10)',
           fill: true, tension: .3, pointRadius: 3,
         }
       ]
@@ -438,8 +440,8 @@ document.addEventListener('DOMContentLoaded', function() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'top' } },
       scales: {
-        x: { grid: { color: 'rgba(255,255,255,.05)' } },
-        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' },
+        x: { grid: { color: 'rgba(20,46,89,.07)' } },
+        y: { beginAtZero: true, grid: { color: 'rgba(20,46,89,.07)' },
              ticks: { callback: v => '$' + v.toLocaleString() } }
       }
     }
@@ -462,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { x: { grid: { display: false } },
-                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' } } }
+                y: { beginAtZero: true, grid: { color: 'rgba(20,46,89,.07)' } } }
     }
   });
 
@@ -481,7 +483,7 @@ document.addEventListener('DOMContentLoaded', function() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'top' } },
       scales: { x: { grid: { display: false } },
-                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' } } }
+                y: { beginAtZero: true, grid: { color: 'rgba(20,46,89,.07)' } } }
     }
   });
 
@@ -506,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' },
+      scales: { x: { beginAtZero: true, grid: { color: 'rgba(20,46,89,.07)' },
                       ticks: { callback: v => '$' + v.toLocaleString() } },
                 y: { grid: { display: false } } }
     }
@@ -531,8 +533,8 @@ function buildHeatmap(data) {
       const cell = data.find(d => d.day === di && d.hour === h);
       const count = cell ? cell.count : 0;
       const intensity = count / maxCount;
-      const bg = intensity === 0 ? 'rgba(255,255,255,.03)' :
-                 `rgba(99,102,241,${0.15 + intensity * 0.85})`;
+      const bg = intensity === 0 ? 'rgba(20,46,89,.05)' :
+                 `rgba(20,46,89,${0.15 + intensity * 0.85})`;
       html += `<div class="hm-cell" style="background:${bg}" title="${day} ${h}:00 — ${count} acciones"></div>`;
     });
   });

@@ -9,13 +9,16 @@ import io
 import json
 import math
 import os
+import re
 import secrets
+import unicodedata
 from datetime import date, datetime, timedelta
 
 from flask import (
-    Blueprint, Response, abort, g, jsonify, redirect, render_template,
+    Blueprint, Response, abort, current_app, g, jsonify, make_response, redirect, render_template,
     request, send_file, session, url_for,
 )
+from markupsafe import Markup, escape
 
 from modules import boveda
 from modules import lector
@@ -220,6 +223,85 @@ def _documentos_de_expedientes(tdb):
     return docs, conteo, {"chips": chips, "sugerencia": sugerencia, "carpetas": carpetas_l, "asunto": asunto_f}
 
 
+# ── Bóveda: búsqueda dentro del contenido de los documentos ──────────────────
+
+ORIGEN_TXT = {"documento": "Documento del expediente", "sentencia": "Resolución", "cliente": "Documento de la persona",
+              "biblioteca": "Estudio", "plantilla": "Formato"}
+_VACIAS = {"de", "la", "el", "los", "las", "del", "que", "por", "con", "una", "uno", "para", "en", "se", "su", "sus",
+           "al", "lo", "un", "y", "o", "a", "es", "no", "como", "sobre", "entre", "este", "esta"}
+MAX_PASAJES = 4
+
+
+def _plano(t: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", t.lower()) if not unicodedata.combining(c))
+
+
+def _terminos(consulta: str) -> list[str]:
+    return [t for t in dict.fromkeys(_plano(w) for w in re.findall(r"\w+", consulta))
+            if t not in _VACIAS and (len(t) > 2 or t.isdigit())]
+
+
+def _coincide(palabra: str, terminos: list[str]) -> bool:
+    w = _plano(palabra)
+    return any(w == t or (len(t) >= 4 and w.startswith(t[:5])) for t in terminos)
+
+
+def _resaltar(texto: str, terminos: list[str]) -> Markup:
+    """Texto escapado con las palabras buscadas dentro de <mark> (sin acentos ni mayúsculas, por raíz)."""
+    partes, pos = [], 0
+    for m in re.finditer(r"\w+", texto):
+        if _coincide(m.group(), terminos):
+            partes.append(escape(texto[pos:m.start()]))
+            partes.append(Markup("<mark>%s</mark>") % m.group())
+            pos = m.end()
+    partes.append(escape(texto[pos:]))
+    return Markup("").join(partes)
+
+
+def _dia(v) -> str:
+    try:
+        f = date.fromisoformat(str(v or "")[:10])
+    except ValueError:
+        return ""
+    return f"{f.day} {_MESES_CORTOS[f.month - 1]} {f.year}"
+
+
+def _buscar_en_contenido(tdb, consulta: str, visibles: dict[int, dict]) -> list[dict]:
+    """Resultados agrupados por documento: cada uno con sus pasajes, página y palabras resaltadas.
+    Solo entran los documentos que la persona puede ver (lector.documentos_visibles)."""
+    permitidos = {i for i, d in visibles.items() if d["estado"] == "listo"}
+    if not consulta or not permitidos:
+        return []
+    hallazgos = lector.indice.buscar(current_app._get_current_object(), g.tenant_slug, tdb, consulta,
+                                     limite=40, documentos=permitidos)
+    terminos = _terminos(consulta)
+    grupos: dict[int, dict] = {}
+    for h in hallazgos:
+        d = visibles.get(h["doc_id"])
+        if not d:
+            continue
+        grupo = grupos.get(h["doc_id"])
+        if grupo is None:
+            url = d["archivo_url"] or ""
+            ext = url.rsplit(".", 1)[-1].lower()[:4] if "." in url else ""
+            grupo = grupos[h["doc_id"]] = {
+                "id": h["doc_id"], "nombre": d["nombre"] or h["documento"] or "Documento sin nombre",
+                "url": url if boveda.es_de_boveda(url) else None, "ext": ext, "pdf": ext == "pdf",
+                "origen": ORIGEN_TXT.get(d["origen"], "Documento"), "dia": _dia(d["fecha"]),
+                "asunto_id": d["asunto_id"], "asunto": d["asunto"], "numero": d["numero_expediente"],
+                "cliente_id": d["cliente_id"], "cliente": (d["cliente"] or "").strip() or None,
+                "paginas": d["paginas"], "pasajes": [], "seccion": "formatos" if d["origen"] == "plantilla" else
+                ("estudio" if d["origen"] == "biblioteca" else None),
+            }
+        grupo["pasajes"].append({"pagina": h["pagina"] or 1, "orden": h["fragmento_id"],
+                                 "html": _resaltar(h["resumen"], terminos)})
+    salida = list(grupos.values())
+    for grupo in salida:
+        grupo["pasajes"].sort(key=lambda x: (x["pagina"], x["orden"]))
+        grupo["n"] = len(grupo["pasajes"])
+    return salida
+
+
 @biblioteca_bp.route("/")
 @login_required
 @tenant_required
@@ -228,6 +310,13 @@ def index():
     seccion = request.args.get("seccion", "expedientes")
     if seccion not in ("expedientes", "estudio", "formatos", "acuerdos"):
         seccion = "expedientes"
+
+    # ── Búsqueda dentro de los documentos y estado de lectura (solo lo que la persona puede ver) ──
+    texto = (request.args.get("texto") or "").strip()[:300]
+    visibles = lector.documentos_visibles(tdb)
+    lectura = lector.conteo_lectura(visibles)
+    lectura["reintentar"] = lector.puede_reintentar() and lectura["reintentables"] > 0
+    en_contenido = _buscar_en_contenido(tdb, texto, visibles) if texto else []
     docs_exp, conteo_estados, busqueda = (_documentos_de_expedientes(tdb) if seccion == "expedientes"
                                           else ([], {}, {"chips": [], "sugerencia": None, "carpetas": [], "asunto": None}))
 
@@ -303,8 +392,10 @@ def index():
         "SELECT id, nombre, apellidos, razon_social FROM clientes WHERE activo=1 ORDER BY nombre LIMIT 300"
     ).fetchall()
 
-    return render_template(
+    resp = make_response(render_template(
         "biblioteca/index.html",
+        texto=texto, en_contenido=en_contenido, lectura=lectura,
+        max_pasajes=MAX_PASAJES,
         seccion=seccion,
         docs_exp=docs_exp, conteo_estados=conteo_estados, estado_f=request.args.get("estado", ""), busqueda=busqueda,
         estados_lectura=ESTADOS_LECTURA,
@@ -322,7 +413,11 @@ def index():
         # Shared
         asuntos=asuntos, clientes=clientes,
         abogados=_get_abogados(),
-    )
+    ))
+    if texto:
+        # Los pasajes son texto de los documentos: que el navegador no los guarde
+        resp.headers["Cache-Control"] = "private, no-store"
+    return resp
 
 
 # ═════════════════════════════════════════════════════════════════════════════

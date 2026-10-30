@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from flask import (
     Blueprint,
     abort,
+    current_app,
     flash,
     g,
     jsonify,
@@ -975,6 +976,73 @@ def mapa_revisar(id):
         return jsonify(ok=False, error="Falta el punto"), 400
     mapa_mod.marcar(g.tenant_db, id, clave, session.get("user_id"), bool(d.get("revisado", True)))
     log_activity("mapa_revisado" if d.get("revisado", True) else "mapa_reabierto", "asunto", id, {"clave": clave})
+    return jsonify(ok=True)
+
+
+@asuntos_bp.route("/<int:id>/mapa/leer", methods=["POST"])
+@login_required
+@tenant_required
+def mapa_leer(id):
+    """Pone a Dictum a leer los documentos del expediente (en segundo plano)."""
+    from modules import mapa as mapa_mod
+    asunto = g.tenant_db.execute("SELECT * FROM asuntos WHERE id=?", (id,)).fetchone()
+    if not asunto:
+        abort(404)
+    ok, mensaje = mapa_mod.iniciar(current_app._get_current_object(), g.tenant_slug, g.tenant_db, dict(asunto),
+                                   session.get("user_id"))
+    if ok:
+        log_activity("mapa_lectura_dictum", "asunto", id)
+    return jsonify(ok=ok, mensaje=mensaje), (200 if ok else 400)
+
+
+@asuntos_bp.route("/<int:id>/mapa/lectura")
+@login_required
+@tenant_required
+def mapa_lectura(id):
+    from modules import mapa as mapa_mod
+    r = mapa_mod.lectura(g.tenant_db, id) or {}
+    return jsonify(estado=r.get("estado"), nuevas=r.get("nuevas"), mensaje=r.get("mensaje"))
+
+
+@asuntos_bp.route("/<int:id>/mapa/sugerencias/<int:sid>", methods=["POST"])
+@login_required
+@tenant_required
+def mapa_sugerencia(id, sid):
+    """Confirmar, descartar o volver a abrir un hecho sugerido por Dictum."""
+    from modules import mapa as mapa_mod
+    accion = (request.get_json(silent=True) or {}).get("accion")
+    if not mapa_mod.resolver(g.tenant_db, g.tenant_slug, id, sid, accion, session.get("user_id")):
+        return jsonify(ok=False, error="No se pudo guardar"), 400
+    log_activity(f"mapa_sugerencia_{accion}", "asunto", id, {"sugerencia": sid})
+    return jsonify(ok=True)
+
+
+@asuntos_bp.route("/<int:id>/mapa/actos", methods=["POST"])
+@login_required
+@tenant_required
+def mapa_agregar_acto(id):
+    """Acto que el equipo registra a mano; entra a la misma cronología."""
+    from modules import mapa as mapa_mod
+    tdb = g.tenant_db
+    docs = [{"url": d["archivo_url"], "nombre": d["nombre"]}
+            for d in tdb.execute("SELECT nombre, archivo_url FROM documentos WHERE asunto_id=? AND archivo_url IS NOT NULL "
+                                 "UNION ALL SELECT titulo, archivo_url FROM asunto_sentencias "
+                                 "WHERE asunto_id=? AND archivo_url IS NOT NULL", (id, id))]
+    error = mapa_mod.agregar_acto(tdb, id, request.get_json(silent=True) or {}, session.get("user_id"), docs)
+    if error:
+        return jsonify(ok=False, error=error), 400
+    log_activity("mapa_acto", "asunto", id)
+    return jsonify(ok=True)
+
+
+@asuntos_bp.route("/<int:id>/mapa/actos/<int:acto_id>/quitar", methods=["POST"])
+@login_required
+@tenant_required
+def mapa_quitar_acto(id, acto_id):
+    from modules import mapa as mapa_mod
+    if not mapa_mod.quitar_acto(g.tenant_db, id, acto_id):
+        return jsonify(ok=False, error="No se encontró el acto"), 404
+    log_activity("mapa_acto_quitado", "asunto", id, {"acto": acto_id})
     return jsonify(ok=True)
 
 

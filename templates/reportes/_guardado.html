@@ -1,0 +1,8 @@
+{#- Un reporte guardado (se incluye con «r» en contexto) -#}
+<div class="rp-guardado">
+  <button type="button" class="rp-abrir" data-id="{{ r.id }}" data-tipo="{{ r.tipo }}" data-nombre="{{ r.nombre }}"
+          data-carpeta="{{ r.carpeta_id or '' }}" data-filtros='{{ r.filtros | tojson }}'>
+    <b>{{ r.nombre }}</b><small>{{ r.tipo_label }}</small>
+  </button>
+  <button type="button" class="rp-quitar" data-guardado="{{ r.id }}" aria-label="Quitar el reporte guardado {{ r.nombre }}" title="Quitar">&times;</button>
+</div>

@@ -279,6 +279,10 @@ def create_app(env="default"):
     app.register_blueprint(legal_bp, url_prefix="/legal")
     app.register_blueprint(respaldos_bp)
 
+    # ─── Base legal: se actualiza sola en el servidor (DOF cada 6 h, leyes a diario) ───
+    from modules.corpus import programador
+    programador.iniciar(app)
+
     # ─── Modo revisión: el sitio de pruebas no debe aparecer en buscadores ───
     @app.after_request
     def no_indexar(resp):

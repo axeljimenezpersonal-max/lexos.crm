@@ -1,35 +1,120 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon_folder, icon_clipboard, icon_edit, icon_book, icon_file_text, icon_trash, icon_link, icon_file, icon_scale, icon_eye, icon_paperclip, icon_image %}
-{% block title %}Documentos{% endblock %}
-{% block page_title %}Documentos{% endblock %}{% block head %}
+{% block title %}Bóveda{% endblock %}
+{% block page_title %}Bóveda{% endblock %}{% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/biblioteca.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/expedientes.css') }}">
 {% endblock %}
 
 {% block content %}
 {% from "components/buscador.html" import buscador %}
+{# Mientras se busca dentro de los documentos, la página muestra solo los resultados #}
+{% set vista = '' if texto else seccion %}
 <div class="ex-head">
   <div>
-    <h1 class="ex-h1">Documentos</h1>
-    <p class="ex-sub">Todo lo que el despacho tiene guardado y cifrado: documentos de expedientes, archivos del estudio, formatos y acuerdos.</p>
+    <h1 class="ex-h1">Bóveda</h1>
+    <p class="ex-sub">Todo lo que el despacho tiene guardado y cifrado: documentos de expedientes, archivos del estudio, formatos y acuerdos. Busca dentro de ellos y revísalos uno por uno.</p>
   </div>
   <a class="btn btn-ghost ex-crear" href="{{ url_for('biblioteca.editor') }}">{{ icon_edit(16, 16) }} Editor de documentos</a>
 </div>
 
-<div class="ex-tabs" style="margin-top:0">
+<section class="bv-busca" aria-label="Buscar dentro de los documentos">
+  <form class="bv-form" method="get" action="{{ url_for('biblioteca.index') }}" role="search">
+    {% if seccion != 'expedientes' %}<input type="hidden" name="seccion" value="{{ seccion }}">{% endif %}
+    <div class="bz-caja bv-caja">
+      <svg class="bz-lupa" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input class="bz-input" id="bvTexto" type="search" name="texto" value="{{ texto }}" maxlength="300"
+             placeholder="Busca dentro de tus documentos: una frase, un nombre, un artículo…"
+             aria-label="Buscar dentro de tus documentos" autocomplete="off" spellcheck="false"{% if not texto and not request.args.get('q') %} autofocus{% endif %}>
+      {% if texto %}<a class="bz-limpiar" href="{{ url_for('biblioteca.index', seccion=None if seccion == 'expedientes' else seccion) }}" aria-label="Borrar búsqueda">×</a>{% endif %}
+      <button type="submit" class="bv-ir">Buscar</button>
+    </div>
+  </form>
+  <p class="bv-lectura" id="bvLectura">
+    {% if lectura.leidos or lectura.en_fila or lectura.ocr or lectura.problema %}
+      <span>{{ lectura.leidos }} documento{{ 's' if lectura.leidos != 1 }} leído{{ 's' if lectura.leidos != 1 }}</span>
+      {% if lectura.en_fila %}<span>{{ lectura.en_fila }} en fila para leer</span>{% endif %}
+      {% if lectura.ocr %}<span>{{ lectura.ocr }} esperan lector de escaneos</span>{% endif %}
+      {% if lectura.problema %}<span>{{ lectura.problema }} con problema</span>{% endif %}
+      {% if lectura.reintentar %}<button type="button" class="bv-releer" id="bvReleer">Volver a leer</button>{% endif %}
+    {% else %}
+      <span>Todavía no hay documentos leídos. Cada archivo que subes se lee solo y en unos segundos ya puedes buscar dentro de él.</span>
+    {% endif %}
+  </p>
+</section>
+
+{% if texto %}
+{% set n_docs = en_contenido | length %}
+<section class="bv-res" aria-labelledby="bvResT">
+  <div class="dc-sec-h">
+    <h2 id="bvResT">{% if n_docs %}Encontrado en {{ n_docs }} documento{{ 's' if n_docs != 1 }}{% else %}Sin resultados{% endif %}</h2>
+    <a href="{{ url_for('biblioteca.index', seccion=None if seccion == 'expedientes' else seccion) }}">Cerrar búsqueda</a>
+  </div>
+  {% for d in en_contenido %}
+  <article class="bv-doc">
+    <header class="bv-doc-h">
+      <span class="doc-ext {{ d.ext }}" aria-hidden="true">{{ d.ext or 'doc' }}</span>
+      <div class="bv-doc-tx">
+        <h3>{% if d.url %}<a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.nombre }}</a>{% else %}{{ d.nombre }}{% endif %}</h3>
+        <p class="bv-doc-meta">
+          <span>{{ d.origen }}</span>
+          {% if d.asunto_id %}<a href="{{ url_for('asuntos.detalle', id=d.asunto_id) }}#documentos"><em>{{ d.numero or ('#' ~ d.asunto_id) }}</em> {{ d.asunto }}</a>{% endif %}
+          {% if d.cliente %}{% if d.cliente_id and not d.asunto_id %}<a href="{{ url_for('clientes.detalle', id=d.cliente_id) }}">{{ d.cliente }}</a>{% else %}<span>{{ d.cliente }}</span>{% endif %}{% endif %}
+          {% if d.dia %}<span>{{ d.dia }}</span>{% endif %}
+        </p>
+      </div>
+      <div class="bv-doc-acc">
+        {% if d.url %}<a class="btn btn-ghost btn-sm" href="{{ d.url }}" target="_blank" rel="noopener">Abrir documento</a>{% endif %}
+        {% if d.asunto_id %}<a class="btn btn-ghost btn-sm" href="{{ url_for('asuntos.detalle', id=d.asunto_id) }}#documentos">Ver expediente</a>
+        {% elif d.seccion %}<a class="btn btn-ghost btn-sm" href="{{ url_for('biblioteca.index', seccion=d.seccion) }}">Ver en {{ 'Formatos' if d.seccion == 'formatos' else 'Estudio' }}</a>
+        {% elif d.cliente_id %}<a class="btn btn-ghost btn-sm" href="{{ url_for('clientes.detalle', id=d.cliente_id) }}">Ver persona</a>{% endif %}
+      </div>
+    </header>
+    <ol class="bv-pasajes">
+      {% for p in d.pasajes[:max_pasajes] %}
+      <li>{% if d.url %}<a class="bv-pag" href="{{ d.url }}{% if d.pdf %}#page={{ p.pagina }}{% endif %}" target="_blank" rel="noopener" title="Abrir el documento{% if d.pdf %} en la página {{ p.pagina }}{% endif %}">p. {{ p.pagina }}</a>{% else %}<span class="bv-pag">p. {{ p.pagina }}</span>{% endif %}<p>{{ p.html }}</p></li>
+      {% endfor %}
+    </ol>
+    {% if d.n > max_pasajes %}
+    <details class="bv-mas">
+      <summary>Ver {{ d.n - max_pasajes }} pasaje{{ 's' if d.n - max_pasajes != 1 }} más de este documento</summary>
+      <ol class="bv-pasajes">
+        {% for p in d.pasajes[max_pasajes:] %}
+        <li>{% if d.url %}<a class="bv-pag" href="{{ d.url }}{% if d.pdf %}#page={{ p.pagina }}{% endif %}" target="_blank" rel="noopener">p. {{ p.pagina }}</a>{% else %}<span class="bv-pag">p. {{ p.pagina }}</span>{% endif %}<p>{{ p.html }}</p></li>
+        {% endfor %}
+      </ol>
+    </details>
+    {% endif %}
+  </article>
+  {% else %}
+  <div class="bv-vacio">
+    {% if lectura.leidos %}
+      <h3>No encontré «{{ texto }}» dentro de tus documentos</h3>
+      <p>Prueba con otras palabras o con una frase más corta. Solo se busca en los documentos que ya se leyeron ({{ lectura.leidos }}).</p>
+    {% else %}
+      <h3>Todavía no hay documentos leídos</h3>
+      <p>Sube documentos a un expediente, a una persona o al estudio: se leen solos y aquí podrás buscar dentro de ellos.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if n_docs %}<p class="doc-nota">Cada pasaje dice en qué página está. Toca «p.» para abrir el documento ahí mismo (en PDF). Solo ves documentos de los expedientes a los que tienes acceso.</p>{% endif %}
+</section>
+{% endif %}
+
+<div class="ex-tabs bv-tabs">
   <nav aria-label="Secciones">
-    <a class="{{ 'on' if seccion == 'expedientes' }}" href="{{ url_for('biblioteca.index', seccion='expedientes') }}">De expedientes</a>
-    <a class="{{ 'on' if seccion == 'estudio' }}" href="{{ url_for('biblioteca.index', seccion='estudio') }}">Estudio</a>
-    <a class="{{ 'on' if seccion == 'formatos' }}" href="{{ url_for('biblioteca.index', seccion='formatos') }}">Formatos</a>
-    <a class="{{ 'on' if seccion == 'acuerdos' }}" href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">Acuerdos y audiencias</a>
+    <a class="{{ 'on' if vista == 'expedientes' }}" href="{{ url_for('biblioteca.index', seccion='expedientes') }}">De expedientes</a>
+    <a class="{{ 'on' if vista == 'estudio' }}" href="{{ url_for('biblioteca.index', seccion='estudio') }}">Estudio</a>
+    <a class="{{ 'on' if vista == 'formatos' }}" href="{{ url_for('biblioteca.index', seccion='formatos') }}">Formatos</a>
+    <a class="{{ 'on' if vista == 'acuerdos' }}" href="{{ url_for('biblioteca.index', seccion='acuerdos') }}">Acuerdos y audiencias</a>
   </nav>
 </div>
 
-{% if seccion == 'expedientes' %}
+{% if vista == 'expedientes' %}
 {% set docs_total = conteo_estados.values() | sum %}
 <div class="dc-busca">
   {{ buscador(en='documentos', accion=url_for('biblioteca.index'), valor=request.args.get('q', ''), chips=busqueda.chips, enviar=True,
-       placeholder='Busca por nombre del documento, expediente, cliente o con una frase: «sentencias de amparo»',
+       placeholder='Filtra por nombre del documento, expediente o cliente: «sentencias de amparo»',
        ocultos={'seccion': 'expedientes', 'estado': estado_f, 'asunto': busqueda.asunto},
        sugerencias=[('sentencias', 'Sentencias y resoluciones'), ('amparo', 'Amparo'), ('familiar', 'Familiar'), ('mercantil', 'Mercantil')]
                    + ([('mis', 'De mis expedientes')] if session.get('role') == 'abogado' else [])) }}
@@ -112,7 +197,7 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      SECTION 1 — ESTUDIO
      ══════════════════════════════════════════════════════════════════════════ -->
-{% if seccion == 'estudio' %}
+{% if vista == 'estudio' %}
 {% set pct = [(espacio_usado / espacio_limite * 100) | round(1), 100] | min if espacio_limite else 0 %}
 <div class="es">
   <p class="es-intro">Archivos del despacho que no son de un expediente: doctrina, jurisprudencia impresa, contratos tipo, papeles administrativos.</p>
@@ -190,7 +275,7 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      SECTION 2 — FORMATOS (Plantillas)
      ══════════════════════════════════════════════════════════════════════════ -->
-{% if seccion == 'formatos' %}
+{% if vista == 'formatos' %}
 <div class="es">
   <p class="es-intro">Tus machotes y formatos. Los de Word se llenan solos con los datos de un expediente: nombres, fechas, montos con letra.</p>
   <div class="es-barra">
@@ -244,7 +329,7 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      SECTION 3 — ACUERDOS Y AUDIENCIAS
      ══════════════════════════════════════════════════════════════════════════ -->
-{% if seccion == 'acuerdos' %}
+{% if vista == 'acuerdos' %}
 <div class="bib-acuerdos">
   <!-- Info banner -->
   <div class="bib-info-banner">
@@ -786,5 +871,25 @@ async function eliminarAcuerdo(id) {
   await fetch(`/biblioteca/acuerdo/${id}/eliminar`, {method: "POST"});
   document.getElementById("ac-row-" + id)?.remove();
 }
+
+/* ── Bóveda: volver a leer lo pendiente (solo administradores) ── */
+(function () {
+  const boton = document.getElementById("bvReleer");
+  if (!boton) return;
+  boton.addEventListener("click", async () => {
+    boton.disabled = true;
+    try {
+      const r = await fetch("{{ url_for('lector.reintentar') }}", {method: "POST"});
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || "");
+      showToast(j.encolados ? `${j.encolados} documento${j.encolados === 1 ? "" : "s"} en fila para leer` : "No hay documentos pendientes");
+      if (j.encolados) setTimeout(() => location.reload(), 2500);
+      else boton.disabled = false;
+    } catch (e) {
+      showToast(e.message || "No se pudo. Intenta de nuevo.", "error");
+      boton.disabled = false;
+    }
+  });
+})();
 </script>
 {% endblock %}

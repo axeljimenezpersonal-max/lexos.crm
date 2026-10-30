@@ -289,19 +289,23 @@ def _resumen(texto: str, terminos: list[str], qv=None, carpeta: str | None = Non
     return ("…" if mejor else "") + trozo + ("…" if len(trozo) >= largo or mejor + 2 < len(oraciones) else "")
 
 
-def buscar(app, slug: str, conn, consulta: str, limite: int = 8, asunto_id: int | None = None) -> list[dict]:
+def buscar(app, slug: str, conn, consulta: str, limite: int = 8, asunto_id: int | None = None,
+           documentos: set[int] | None = None) -> list[dict]:
+    """Búsqueda híbrida (palabras + significado). `documentos`, si se da, son los únicos ids de
+    lector_documentos que la persona puede ver: los demás se descartan antes de descifrar nada."""
     asegurar_esquema(conn)
     consulta = (consulta or "").strip()
     if not consulta:
         return []
     terminos = [t for t in re.findall(r"\w+", consulta.lower()) if len(t) > 1]
     rangos: dict[int, float] = {}
+    candidatos = max(50, limite * 4)
 
     if terminos:
         from modules.corpus.indice import expresion_fts
         expresion = expresion_fts(terminos)
         filas = conn.execute(
-            "SELECT rowid FROM lector_fts WHERE lector_fts MATCH ? ORDER BY bm25(lector_fts) LIMIT 50", (expresion,)
+            "SELECT rowid FROM lector_fts WHERE lector_fts MATCH ? ORDER BY bm25(lector_fts) LIMIT ?", (expresion, candidatos)
         ).fetchall()
         for pos, (fid,) in enumerate(filas):
             rangos[fid] = rangos.get(fid, 0) + 1 / (60 + pos)
@@ -311,7 +315,7 @@ def buscar(app, slug: str, conn, consulta: str, limite: int = 8, asunto_id: int 
     if len(ids):
         qv = vectores.vectorizar([consulta], _carpeta_modelos(app))[0]
         similitud = matriz @ qv
-        for pos, i in enumerate(np.argsort(-similitud)[:50]):
+        for pos, i in enumerate(np.argsort(-similitud)[:candidatos]):
             if similitud[i] < 0.2:
                 break
             fid = int(ids[i])
@@ -330,6 +334,8 @@ def buscar(app, slug: str, conn, consulta: str, limite: int = 8, asunto_id: int 
         ).fetchone()
         if not f or (asunto_id and f["asunto_id"] != asunto_id):
             continue
+        if documentos is not None and f["doc_id"] not in documentos:
+            continue
         texto = boveda.descifrar_texto(slug, f["texto_cifrado"])
         resumen = _resumen(texto, terminos, qv, _carpeta_modelos(app))
         clave = (f["doc_id"], resumen.strip("…")[:120])
@@ -337,7 +343,7 @@ def buscar(app, slug: str, conn, consulta: str, limite: int = 8, asunto_id: int 
             continue
         vistos.add(clave)
         resultados.append({
-            "fragmento_id": f["id"], "documento": f["nombre"], "url": f["archivo_url"], "origen": f["origen"],
+            "fragmento_id": f["id"], "doc_id": f["doc_id"], "documento": f["nombre"], "url": f["archivo_url"], "origen": f["origen"],
             "pagina": f["pagina"], "asunto_id": f["asunto_id"], "cliente_id": f["cliente_id"],
             "texto": texto, "resumen": resumen, "puntaje": round(rangos[fid], 4),
         })

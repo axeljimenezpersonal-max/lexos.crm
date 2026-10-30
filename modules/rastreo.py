@@ -49,7 +49,7 @@ SECCIONES = {
     "legal.terminos": "Términos", "legal.privacidad": "Aviso de privacidad", "legal.aceptar": "Aceptar términos",
     "dashboard.index": "Inicio", "asuntos.index": "Expedientes", "asuntos.detalle": "Expediente",
     "asuntos.nuevo": "Nuevo expediente", "clientes.index": "Personas", "clientes.detalle": "Persona",
-    "contrapartes.index": "Contrapartes", "calendario.index": "Calendario", "biblioteca.index": "Documentos",
+    "contrapartes.index": "Contrapartes", "calendario.index": "Calendario", "biblioteca.index": "Bóveda",
     "cobranzas.index": "Cobranza", "asistente.index": "Dictum · Preguntar", "investigacion.index": "Dictum · Investigación",
     "corpus.index": "Dictum · Base legal", "insights.index": "Dictum · Precedentes", "buscador.resultados": "Búsqueda",
     "auth.perfil": "Mi perfil", "revision.index": "Comentarios de revisión", "rastreo.panel": "Uso de la plataforma",

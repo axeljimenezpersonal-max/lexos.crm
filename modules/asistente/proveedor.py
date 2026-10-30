@@ -1,6 +1,6 @@
 """
 Proveedor del modelo de lenguaje. Hoy: API de Anthropic. El resto del asistente solo usa
-`reformular()` y `responder()`, así que cambiar a un modelo propio no toca nada más.
+`reformular()`, `responder()` y `extraer()`, así que cambiar a un modelo propio no toca nada más.
 """
 from __future__ import annotations
 
@@ -45,6 +45,18 @@ class ProveedorAnthropic:
             "terminos": [str(t)[:80] for t in (datos.get("terminos") or [])][:6],
             "materia": str(datos.get("materia") or "")[:40],
         }
+
+    def extraer(self, sistema: str, contenido: str, herramienta: dict, max_tokens: int = 8000) -> dict:
+        """Lectura estructurada: obliga al modelo a contestar llenando `herramienta` y devuelve sus datos."""
+        r = self._cliente.messages.create(
+            model=self.modelo, max_tokens=max_tokens, system=sistema, tools=[herramienta],
+            tool_choice={"type": "tool", "name": herramienta["name"]},
+            messages=[{"role": "user", "content": contenido}],
+        )
+        for b in r.content:
+            if getattr(b, "type", "") == "tool_use":
+                return b.input or {}
+        return {}
 
     def responder(self, sistema: str, mensajes: list[dict], max_tokens: int = 1800) -> Iterator[str]:
         with self._cliente.messages.stream(

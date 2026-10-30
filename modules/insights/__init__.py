@@ -52,13 +52,46 @@ def _asuntos_para_elegir(tdb):
 @tenant_required
 def index():
     tdb = g.tenant_db
+    seccion = "machotes" if request.args.get("seccion") == "machotes" else "precedentes"
+    lista = casos.concluidos(tdb)
+    q = (request.args.get("q") or "").strip()[:200]
+    materia = (request.args.get("materia") or "").strip().lower()
+    resultado = request.args.get("resultado") or ""
+    if resultado not in casos.RESULTADOS:
+        resultado = ""
+
+    from modules.asuntos import TIPOS_DERECHO, puede_ver
+    materias = []
+    for m in sorted({(f["tipo_asunto"] or "").strip().lower() for f in lista} - {""}):
+        info = TIPOS_DERECHO.get(m)
+        materias.append({"clave": m, "label": info["label"] if info else m.capitalize()})
+    if materia not in {m["clave"] for m in materias}:
+        materia = ""
+
+    encontrados = lista
+    if seccion == "precedentes":
+        if q:
+            encontrados = casos.buscar(current_app._get_current_object(), tdb, q, lista)
+        encontrados = [f for f in encontrados
+                       if (not materia or (f["tipo_asunto"] or "").strip().lower() == materia)
+                       and (not resultado or f["resultado"] == resultado)]
+        for f in encontrados:
+            f["url"] = url_for("asuntos.detalle", id=f["id"]) if puede_ver(tdb, f["id"]) else None
+            info = TIPOS_DERECHO.get((f["tipo_asunto"] or "").strip().lower())
+            f["materia_label"] = info["label"] if info else (f["tipo_asunto"] or "").capitalize()
+
     return render_template(
         "insights/index.html",
-        stats=casos.estadisticas(tdb),
+        total=len(lista),
+        resumen=casos.resumen(lista),
+        casos=encontrados,
+        materias=materias,
+        filtro={"q": q, "materia": materia, "resultado": resultado},
         resultados=casos.RESULTADOS,
         machotes=_machotes(tdb),
         campos_disponibles=machotes.CAMPOS,
-        seccion=request.args.get("seccion", "precedentes"),
+        seccion=seccion,
+        asunto_machote=request.args.get("asunto", type=int),
     )
 
 

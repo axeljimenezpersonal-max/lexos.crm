@@ -86,7 +86,10 @@ def _buscar(app, config, slug, tdb, consulta: str, extra: str, asunto_id, para_m
                                 else f"DOF {r['fecha_publicacion']}"),
                     "texto": r["texto"][:MAX_TEXTO_FUENTE],
                 })
-    for r in memoria.buscar(app, slug, tdb, consulta, limite=5, asunto_id=asunto_id):
+    # Solo documentos que esta persona puede ver (un abogado no ve los expedientes de otros equipos)
+    from modules.lector import documentos_visibles
+    visibles = set(documentos_visibles(tdb))
+    for r in memoria.buscar(app, slug, tdb, consulta, limite=5, asunto_id=asunto_id, documentos=visibles):
         clave = ("doc", r["fragmento_id"])
         if clave not in vistos:
             vistos.add(clave)

@@ -15,6 +15,7 @@
 {%- elif n == 'note' %}<path d="M4 4h16v12l-4 4H4z"/><path d="M16 20v-4h4M8 9h8M8 13h5"/>
 {%- elif n == 'cal' %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
 {%- elif n == 'clock' %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- elif n == 'vault' %}<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="11.5" r="3"/><path d="M12 8.5v-1M15 11.5h1M6 19v2M18 19v2"/>
 {%- elif n == 'doc' %}<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>
 {%- elif n == 'scale' %}<path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z"/>
 {%- elif n == 'link' %}<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>
@@ -115,7 +116,7 @@
 <nav class="xp-barra xp2-tabs" aria-label="Secciones del expediente">
   <div class="xp-tabs" role="tablist">
     <button class="xp-tab on" data-tab="resumen" role="tab">{{ ic('doc', 15) }}Resumen</button>
-    <button class="xp-tab" data-tab="documentos" role="tab">{{ ic('doc', 15) }}Documentos<span>{{ documentos | length + sentencias | length }}</span></button>
+    <button class="xp-tab" data-tab="documentos" role="tab">{{ ic('vault', 15) }}Bóveda<span>{{ documentos | length + sentencias | length }}</span></button>
     <button class="xp-tab" data-tab="preguntar" role="tab">{{ ic('spark', 15) }}Preguntar a {{ config.ASISTENTE_NOMBRE }}{% if hallazgos %}<span>{{ hallazgos | length }}</span>{% endif %}</button>
     <button class="xp-tab" data-tab="actividad" role="tab">{{ ic('note', 15) }}Actividad<span>{{ n_bit.n }}</span></button>
     <button class="xp-tab" data-tab="estrategia" role="tab">{{ ic('scale', 15) }}Estrategia</button>
@@ -172,7 +173,7 @@
     </article>
 
     <article class="xp-card b-docs">
-      <div class="xp-card-h"><h2>Documentos recientes</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
+      <div class="xp-card-h"><h2>Documentos recientes</h2><button type="button" class="link" data-ir="documentos">Abrir la bóveda →</button></div>
       <div class="xp-card-b">
         {% set recientes = (documentos[:3] | list) %}
         <div class="xr-docs">
@@ -422,7 +423,7 @@
 
 <!-- ── Documentos ─────────────────────────────────────────────── -->
 <section class="xp-panel" id="p-documentos" role="tabpanel">
-  <div class="xd-h"><h2>Documentos del expediente <span>{{ documentos | length }}</span></h2>
+  <div class="xd-h"><h2>Bóveda del expediente <span>{{ documentos | length }}</span></h2>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('insights.index', seccion='machotes', asunto=asunto.id) }}">{{ ic('pen', 13) }} Generar desde machote</a></div>
   <div class="xd-grid">
     <label class="xd-subir" id="afDrop">
@@ -483,7 +484,7 @@
         <h2>Mapa del expediente</h2>
         <p>Entiende el caso por tiempo, personas y documentos, con lo que requiere atención. Cada dato lleva a su fuente.</p>
       </div>
-      <span class="mp-al-dia">{{ ic('check', 14) }} Al día: se arma solo con lo que registra el equipo</span>
+      <span class="mp-al-dia">{{ ic('check', 14) }} Solo entra lo que el equipo registra o confirma</span>
     </header>
 
     <nav class="mp-cifras" aria-label="Secciones del mapa">
@@ -518,8 +519,62 @@
       </div>
     </article>
 
+    {% set dx = mapa.dictum %}{% set lx = dx.lectura or {} %}
+    <article class="xp-card b-resultado mp-dictum" id="mpDictum"{% if lx.estado == 'leyendo' %} data-leyendo{% endif %}>
+      <div class="xp-card-h"><h2>Lectura de {{ config.ASISTENTE_NOMBRE }}</h2><small>Hechos con cita literal del documento</small></div>
+      <div class="xp-card-b">
+        <ol class="mp-embudo" aria-label="Cómo llega un hecho a la cronología">
+          <li><b>{{ dx.leidos }}</b><span>Documentos leídos</span>{% if dx.por_leer %}<small>{{ dx.por_leer }} leyéndose</small>{% endif %}</li>
+          <li><b>{{ dx.por_confirmar | length }}</b><span>Por confirmar</span><small>Cita verificada</small></li>
+          <li class="fin"><b>{{ dx.confirmadas }}</b><span>Confirmados</span><small>Ya en el mapa</small></li>
+        </ol>
+
+        <div class="mp-dictum-accion">
+          {% if dx.privado %}
+          <p>{{ ic('lock', 15) }} Este expediente es privado: sus documentos no salen del servidor, así que {{ config.ASISTENTE_NOMBRE }} no los lee.</p>
+          {% elif not dx.conectada %}
+          <p>{{ ic('spark', 15) }} Falta conectar la IA. Cuando quien administra el sistema la active, aquí aparecerá el botón para que {{ config.ASISTENTE_NOMBRE }} lea los documentos.</p>
+          {% elif lx.estado == 'leyendo' %}
+          <p class="mp-leyendo"><i aria-hidden="true"></i>{{ config.ASISTENTE_NOMBRE }} está leyendo {{ lx.documentos }} documento{{ 's' if lx.documentos != 1 }}. Puede tardar un par de minutos; puedes seguir trabajando.</p>
+          {% elif not dx.leidos %}
+          <p>{{ ic('doc', 15) }} {% if dx.por_leer %}Los documentos se están leyendo; en unos minutos {{ config.ASISTENTE_NOMBRE }} podrá analizarlos.{% else %}Sube documentos al expediente para que {{ config.ASISTENTE_NOMBRE }} los analice.{% endif %}</p>
+          {% else %}
+          <div>
+            {% if lx.estado == 'error' %}<p class="mp-error">{{ lx.mensaje }}</p>
+            {% elif lx.estado == 'listo' %}<p>Última lectura el {{ dx.cuando }}: {{ lx.nuevas }} sugerencia{{ 's' if lx.nuevas != 1 }} nueva{{ 's' if lx.nuevas != 1 }}{% if lx.descartadas %}; {{ lx.descartadas }} se descartaron porque su cita no aparece tal cual en el documento{% endif %}.{% if lx.recortado %} Los documentos son muy largos: se leyó la primera parte de cada uno.{% endif %}</p>
+            {% else %}<p>{{ config.ASISTENTE_NOMBRE }} lee los documentos, identifica qué acto contiene cada uno, su fecha y quién interviene, y lo propone con la cita exacta.</p>{% endif %}
+          </div>
+          <button type="button" class="btn btn-primary" id="mpLeer">{{ ic('spark', 15) }} {{ 'Volver a leer' if lx.estado == 'listo' else 'Que ' ~ config.ASISTENTE_NOMBRE ~ ' lea el expediente' }}</button>
+          {% endif %}
+        </div>
+
+        {% for x in dx.por_confirmar %}
+        <div class="mp-sug t-{{ x.tipo }}">
+          <div class="mp-sug-cab">
+            <span class="mp-sug-chip">{{ x.tipo_label }}{% if x.tipo in ('hecho', 'plazo') and x.clase and x.clase != 'otro' %} · {{ mapa.clases[x.clase] }}{% endif %}</span>
+            {% if x.dia %}<span class="mp-sug-fecha">{{ x.dia.dia }} {{ x.dia.mes }} {{ x.dia.anio }}</span>{% endif %}
+          </div>
+          <b>{{ x.titulo }}</b>
+          {% if x.rol %}<p class="mp-sug-rol">{{ x.rol }}</p>{% endif %}
+          {% if x.detalle %}<p>{{ x.detalle }}</p>{% endif %}
+          {% for c in x.citas %}
+          <blockquote class="mp-cita"><q>{{ c.texto }}</q>
+            {% if c.url_doc %}<a href="{{ c.url_doc }}" target="_blank" rel="noopener">{{ ic('doc', 13) }}«{{ c.documento }}» · p. {{ c.pagina }}</a>
+            {% else %}<span>{{ ic('doc', 13) }}«{{ c.documento }}» · p. {{ c.pagina }}</span>{% endif %}
+          </blockquote>
+          {% endfor %}
+          <div class="mp-sug-acc">
+            <button type="button" class="btn btn-primary btn-sm" data-sug="{{ x.id }}" data-accion="confirmar">{{ ic('check', 14) }} Confirmar</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-sug="{{ x.id }}" data-accion="descartar">Descartar</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+
     <article class="xp-card b-resumen" id="mpCrono">
       <div class="xp-card-h"><h2>Cronología</h2>
+        <button type="button" class="btn btn-primary btn-sm mp-acto-abrir" id="mpActoAbrir" aria-expanded="false" aria-controls="mpActo">+ Agregar acto</button>
         <div class="mp-filtro" role="tablist" aria-label="Qué mostrar">
           <button type="button" class="on" data-carril="">Todo</button>
           <button type="button" data-carril="juicio">Juicio <span>{{ mapa.juicio }}</span></button>
@@ -527,6 +582,16 @@
         </div>
       </div>
       <div class="xp-card-b">
+        <form class="mp-acto" id="mpActo" hidden>
+          <label class="mp-acto-f"><span>Fecha del acto</span><input type="date" name="fecha" required></label>
+          <label class="mp-acto-c"><span>Qué fue</span>
+            <select name="clase">{% for k, v in mapa.clases.items() %}<option value="{{ k }}"{{ ' selected' if k == 'acuerdo' }}>{{ v }}</option>{% endfor %}</select></label>
+          <label class="mp-acto-t"><span>En una línea</span><input name="titulo" maxlength="160" required placeholder="Ej. Se admite la demanda y se ordena emplazar"></label>
+          <label class="mp-acto-d"><span>Documento que lo prueba <em>(opcional)</em></span>
+            <select name="documento"><option value="">Sin documento</option>{% for d in mapa.para_actos %}<option value="{{ d.url }}">{{ d.nombre }}</option>{% endfor %}</select></label>
+          <label class="mp-acto-x"><span>Detalle <em>(opcional)</em></span><input name="detalle" maxlength="400"></label>
+          <div class="mp-acto-acc"><button type="button" class="btn btn-ghost btn-sm" id="mpActoCancelar">Cancelar</button><button class="btn btn-primary btn-sm">Guardar en la cronología</button></div>
+        </form>
         {% if mapa.cronologia %}
         <ol class="mp-linea">
           {% set ns = namespace(hoy=false) %}
@@ -536,9 +601,11 @@
             <span class="mp-fecha"><b>{{ c.dia }} {{ c.mes }}</b><small>{{ c.anio }}</small></span>
             <span class="mp-punto-l" aria-hidden="true"></span>
             <div class="mp-ev-tx">
-              <span class="mp-carril">{{ 'Juicio' if c.carril == 'juicio' else 'Gestión' }} · {{ c.tipo }}</span>
+              <span class="mp-carril">{{ 'Juicio' if c.carril == 'juicio' else 'Gestión' }} · {{ c.tipo }}{% if c.origen == 'dictum' %}<em class="mp-de-dictum">{{ ic('spark', 11) }} Leído por {{ config.ASISTENTE_NOMBRE }} y confirmado</em>{% endif %}</span>
               <b>{{ c.titulo }}</b>
+              {% if c.detalle %}<p class="mp-ev-det">{{ c.detalle }}</p>{% endif %}
               {{ fuente(c) }}
+              {% if c.acto_id %}<button type="button" class="link mp-quitar" data-acto="{{ c.acto_id }}">Quitar</button>{% endif %}
             </div>
           </li>
           {% endfor %}
@@ -561,7 +628,7 @@
         </div>
       </article>
       <article class="xp-card b-docs" id="mpDocs">
-        <div class="xp-card-h"><h2>Documentos</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
+        <div class="xp-card-h"><h2>Documentos</h2><button type="button" class="link" data-ir="documentos">Abrir la bóveda →</button></div>
         <div class="xp-card-b">
           {% for d in mapa.documentos[:8] %}
           <a class="mp-doc"{% if d.url %} href="{{ d.url }}" target="_blank" rel="noopener"{% else %} href="#documentos" data-ir="documentos"{% endif %}>
@@ -571,7 +638,6 @@
       </article>
     </div>
 
-    <p class="mp-ia">{{ ic('spark', 15) }}<span>Cuando se conecte la IA, {{ config.ASISTENTE_NOMBRE }} leerá los documentos y sumará aquí hechos, fechas, montos y contradicciones con su cita y página. Aparecerán como <b>sugeridos</b> hasta que alguien del equipo los confirme.</span></p>
   </div>
 
   <h2 class="mp-sub">Tu estrategia</h2>
@@ -1063,6 +1129,39 @@
     b.disabled = true;
     const r = await post(`/asuntos/${ID}/mapa/revisar`, { clave: b.dataset.clave, revisado: b.classList.contains('mp-revisar') });
     r.ok ? recargar('estrategia') : (b.disabled = false, showToast('No se pudo guardar', 'error'));
+  }));
+  /* Lectura de Dictum y actos de la cronología */
+  $('#mpLeer')?.addEventListener('click', async e => {
+    const b = e.currentTarget; b.disabled = true;
+    const r = await post(`/asuntos/${ID}/mapa/leer`), d = await r.json().catch(() => ({}));
+    r.ok ? recargar('estrategia') : (b.disabled = false, showToast(d.mensaje || 'No se pudo iniciar la lectura', 'error'));
+  });
+  if (document.querySelector('#mpDictum[data-leyendo]')) {
+    const revisar = async () => {
+      const d = await fetch(`/asuntos/${ID}/mapa/lectura`, { headers: JSONH }).then(r => r.json()).catch(() => null);
+      d && d.estado !== 'leyendo' ? recargar('estrategia') : setTimeout(revisar, 5000);
+    };
+    setTimeout(revisar, 5000);
+  }
+  document.querySelectorAll('[data-sug]').forEach(b => b.addEventListener('click', async () => {
+    b.closest('.mp-sug-acc').querySelectorAll('button').forEach(x => x.disabled = true);
+    const r = await post(`/asuntos/${ID}/mapa/sugerencias/${b.dataset.sug}`, { accion: b.dataset.accion });
+    r.ok ? recargar('estrategia') : (b.closest('.mp-sug-acc').querySelectorAll('button').forEach(x => x.disabled = false), showToast('No se pudo guardar', 'error'));
+  }));
+  const acto = $('#mpActo'), actoAbrir = $('#mpActoAbrir');
+  const mostrarActo = si => { acto.hidden = !si; actoAbrir.setAttribute('aria-expanded', si); if (si) acto.fecha.focus(); };
+  actoAbrir?.addEventListener('click', () => mostrarActo(acto.hidden));
+  $('#mpActoCancelar')?.addEventListener('click', () => { acto.reset(); mostrarActo(false); });
+  acto?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = acto.querySelector('button:not([type])'); btn.disabled = true;
+    const r = await post(`/asuntos/${ID}/mapa/actos`, Object.fromEntries(new FormData(acto))), d = await r.json().catch(() => ({}));
+    r.ok ? recargar('estrategia') : (btn.disabled = false, showToast(d.error || 'No se pudo guardar', 'error'));
+  });
+  document.querySelectorAll('.mp-quitar').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('¿Quitar este acto de la cronología?')) return;
+    const r = await post(`/asuntos/${ID}/mapa/actos/${b.dataset.acto}/quitar`);
+    r.ok ? recargar('estrategia') : showToast('No se pudo quitar', 'error');
   }));
   document.querySelectorAll('[data-datos]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); $('#xpEditar')?.click(); }));
   document.querySelectorAll('.mp-cifras a').forEach(a => a.addEventListener('click', e => {

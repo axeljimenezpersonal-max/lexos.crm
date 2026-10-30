@@ -162,3 +162,16 @@
   .pf-av{width:72px;height:72px;font-size:24px}
   .pf-contacto .btn{flex:1 1 auto}
 }
+
+/* ── Pestañas de Personas: Clientes · Contrapartes · Portal de clientes ──
+   La banda azul y la pestaña activa en blanco vienen de bandas.css (.ex-tabs);
+   aquí solo va lo que en otras páginas pone expedientes.css. */
+.pe-tabs{margin-top:22px}
+.pe-tabs nav{display:flex;gap:6px;min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pe-tabs nav::-webkit-scrollbar{display:none}
+.pe-tabs nav a{position:relative;display:flex;align-items:center;gap:8px;white-space:nowrap;font:500 15px 'Inter',sans-serif;text-decoration:none}
+@media (max-width:560px){
+  .pe-tabs{margin-top:16px}
+  .ex-tabs.pe-tabs nav{gap:2px}
+  .ex-tabs.pe-tabs nav a{padding:9px 11px;font-size:13.5px}
+}

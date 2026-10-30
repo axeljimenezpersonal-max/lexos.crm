@@ -13,11 +13,7 @@
     {% endif %}
   </div>
   <div class="d-flex gap-2">
-    <form method="POST" action="{{ url_for('investigacion.eliminar', id=investigacion.id) }}"
-          data-confirm="¿Eliminar esta investigación?">
-      <button class="btn btn-danger btn-sm">Eliminar</button>
-    </form>
-    <a href="{{ url_for('investigacion.index') }}" class="btn btn-ghost">← Volver</a>
+    <a href="{{ url_for('biblioteca.index') }}" class="btn btn-ghost">← Ir a la Bóveda</a>
   </div>
 </div>
 

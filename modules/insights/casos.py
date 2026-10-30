@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import os
 import sqlite3
+import unicodedata
 from datetime import date
 
 import numpy as np
@@ -256,3 +257,62 @@ def estadisticas(tdb) -> dict:
         "lecciones": lecciones[:8],
         "recientes": sorted(fichas, key=lambda f: f["id"], reverse=True)[:12],
     }
+
+
+# ── Lista de casos concluidos (pestaña «Casos concluidos» de Precedentes) ────
+
+_VACIAS = {"de", "del", "la", "las", "el", "los", "un", "una", "unos", "unas", "y", "o", "en", "por", "para",
+           "con", "sin", "que", "se", "al", "lo", "su", "sus", "es", "como", "caso", "casos", "asunto", "asuntos"}
+
+
+def _plano(texto: str) -> str:
+    """Minúsculas y sin acentos, para comparar palabras escritas de cualquier forma."""
+    t = unicodedata.normalize("NFKD", str(texto or "").lower())
+    return "".join(c for c in t if not unicodedata.combining(c))
+
+
+def concluidos(tdb) -> list[dict]:
+    """Todos los asuntos con resultado registrado, del más reciente al más antiguo."""
+    asegurar(tdb)
+    fichas = []
+    for a in _asuntos(tdb):
+        if not a["resultado"]:
+            continue
+        f = _ficha(a, 1.0)
+        f["fecha_cierre"] = (a["fecha_cierre"] or "")[:10]
+        f["_texto"] = _plano(" ".join(str(x or "") for x in (
+            a["titulo"], a["numero_expediente"], a["tipo_asunto"], a["sub_tipo"], a["juzgado"],
+            a["contrario_despacho"], a["resultado_notas"], (f["resultado_info"] or {}).get("label"),
+            " ".join(s["titulo"] for s in a["_sentencias"]))))
+        fichas.append(f)
+    fichas.sort(key=lambda f: (f["fecha_cierre"], f["id"]), reverse=True)
+    return fichas
+
+
+def buscar(app, tdb, consulta: str, fichas: list[dict] | None = None) -> list[dict]:
+    """
+    Casos concluidos que se parecen a lo que el abogado escribió (tema, materia, juzgado…).
+    Junta las palabras que aparecen tal cual con el parecido por significado que usa Dictum
+    (`por_texto`); devuelve las fichas ordenadas de la más a la menos parecida.
+    """
+    fichas = concluidos(tdb) if fichas is None else fichas
+    consulta = (consulta or "").strip()
+    if not consulta or not fichas:
+        return []
+    palabras = [p for p in _plano(consulta).replace(",", " ").replace(".", " ").split()
+                if len(p) > 1 and p not in _VACIAS]
+    semantico: dict[int, int] = {}
+    try:
+        for f in por_texto(app, tdb, consulta, limite=len(fichas)):
+            semantico[f["id"]] = f["similitud"]
+    except Exception:
+        pass  # sin el modelo local, la búsqueda sigue funcionando por palabras
+    puntuados = []
+    for f in fichas:
+        hallado = sum(1 for p in palabras if p in f["_texto"]) / len(palabras) if palabras else 0.0
+        sim = semantico.get(f["id"], 0) / 100
+        # Por palabras: todas, o casi todas si escribió una frase larga. Lo literal pesa más.
+        if hallado == 1 or (len(palabras) >= 3 and hallado >= 0.66) or sim:
+            puntuados.append(((2.0 if hallado == 1 else hallado) + sim, f))
+    puntuados.sort(key=lambda x: x[0], reverse=True)
+    return [f for _, f in puntuados]

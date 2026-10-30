@@ -1,0 +1,13 @@
+{#- Pestañas de Personas: Clientes · Contrapartes · Portal de clientes.
+    Uso: {% with seccion_personas='clientes' %}{% include "clientes/_secciones.html" %}{% endwith %}
+    El portal solo lo ven los administradores. La banda azul viene de bandas.css. -#}
+{%- set _sp = seccion_personas | default('clientes') -%}
+<div class="ex-tabs pe-tabs">
+  <nav aria-label="Secciones de Personas">
+    <a class="{{ 'on' if _sp == 'clientes' }}" href="{{ url_for('clientes.index') }}"{% if _sp == 'clientes' %} aria-current="page"{% endif %}>Clientes</a>
+    <a class="{{ 'on' if _sp == 'contrapartes' }}" href="{{ url_for('contrapartes.index') }}"{% if _sp == 'contrapartes' %} aria-current="page"{% endif %}>Contrapartes</a>
+    {% if current_role in ('super_admin', 'admin') %}
+    <a class="{{ 'on' if _sp == 'portal' }}" href="{{ url_for('portal.index') }}"{% if _sp == 'portal' %} aria-current="page"{% endif %}>Portal de clientes</a>
+    {% endif %}
+  </nav>
+</div>

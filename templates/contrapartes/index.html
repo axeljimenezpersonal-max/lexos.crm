@@ -13,16 +13,14 @@
     <p class="as-sub">Clientes y contrapartes del despacho · {{ total }} contraparte{{ 's' if total != 1 }}{% if en_curso %} · {{ en_curso }} en juicios abiertos{% endif %}</p>
   </div>
   <div class="cl-acciones">
-    <div class="as-seg" aria-label="Sección">
-      <a href="{{ url_for('clientes.index') }}">Clientes</a>
-      <a href="{{ url_for('contrapartes.index') }}" class="on">Contrapartes</a>
-    </div>
     <button type="button" class="btn btn-primary" id="ctNueva">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       Nueva contraparte
     </button>
   </div>
 </div>
+
+{% with seccion_personas='contrapartes' %}{% include "clientes/_secciones.html" %}{% endwith %}
 
 <form class="ct-busca bz" method="get" action="{{ url_for('contrapartes.index') }}" role="search">
   <div class="bz-caja">

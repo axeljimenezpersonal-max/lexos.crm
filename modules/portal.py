@@ -100,12 +100,25 @@ def index():
                   c.email as cliente_email
            FROM portal_clientes pc
            JOIN clientes c ON pc.cliente_id=c.id
-           ORDER BY pc.fecha_alta DESC"""
+           ORDER BY pc.activo DESC, pc.fecha_alta DESC"""
+    ).fetchall()
+    # Clientes a los que todavía se les puede dar acceso (sin acceso o con acceso quitado)
+    disponibles = tdb.execute(
+        """SELECT c.id, c.nombre || ' ' || COALESCE(c.apellidos,'') as nombre,
+                  COALESCE(c.email,'') as email
+           FROM clientes c
+           WHERE c.activo=1
+             AND c.id NOT IN (SELECT cliente_id FROM portal_clientes WHERE activo=1)
+           ORDER BY c.nombre, c.apellidos"""
     ).fetchall()
     return render_template("portal/admin.html",
                            mensajes_no_leidos=mensajes_no_leidos,
                            mensajes_recientes=mensajes_recientes,
-                           accesos=accesos)
+                           accesos=accesos,
+                           activos=sum(1 for a in accesos if a["activo"]),
+                           han_entrado=sum(1 for a in accesos if a["activo"] and a["ultimo_login"]),
+                           disponibles=disponibles,
+                           enlace_portal=url_for("portal.cliente_login", tenant=g.tenant_slug, _external=True))
 
 
 @portal_bp.route("/invitar/<int:cliente_id>", methods=["POST"])
@@ -122,13 +135,22 @@ def invitar(cliente_id):
     email = (request.form.get("email") or cliente["email"] or "").strip()
     password = request.form.get("password", "").strip()
 
-    if not email:
-        return jsonify(ok=False, error="Email requerido"), 400
+    if not email or "@" not in email:
+        return jsonify(ok=False, error="Escribe el correo del cliente"), 400
+
+    # Un mismo correo no puede entrar por dos clientes distintos
+    otro = tdb.execute(
+        "SELECT id FROM portal_clientes WHERE LOWER(email)=LOWER(?) AND cliente_id<>? AND activo=1",
+        (email, cliente_id),
+    ).fetchone()
+    if otro:
+        return jsonify(ok=False, error="Ese correo ya lo usa otro cliente en el portal"), 400
 
     existing = tdb.execute("SELECT id FROM portal_clientes WHERE cliente_id=?", (cliente_id,)).fetchone()
     if existing:
+        # Si no se escribe contraseña nueva, se conserva la que tenía
         tdb.execute(
-            "UPDATE portal_clientes SET email=?, password_hash=?, activo=1 WHERE cliente_id=?",
+            "UPDATE portal_clientes SET email=?, password_hash=COALESCE(?, password_hash), activo=1 WHERE cliente_id=?",
             (email, _hash(password) if password else None, cliente_id),
         )
     else:
@@ -163,13 +185,15 @@ def generar_magic_link(cliente_id):
     tdb = g.tenant_db
     token = secrets.token_urlsafe(48)
     expires = (datetime.now() + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
-    tdb.execute(
-        "UPDATE portal_clientes SET magic_token=?, magic_expires=? WHERE cliente_id=?",
+    cur = tdb.execute(
+        "UPDATE portal_clientes SET magic_token=?, magic_expires=? WHERE cliente_id=? AND activo=1",
         (token, expires, cliente_id),
     )
+    if not cur.rowcount:
+        return jsonify(ok=False, error="Este cliente no tiene acceso al portal"), 404
     tdb.commit()
-    # Build link
-    link = url_for("portal.magic_login", token=token, _external=True)
+    # El enlace lleva el despacho para que funcione en un navegador sin sesión
+    link = url_for("portal.magic_login", token=token, tenant=g.tenant_slug, _external=True)
     return jsonify(ok=True, link=link, token=token)
 
 
@@ -183,7 +207,8 @@ def responder(mensaje_id):
     if not original:
         return jsonify(ok=False, error="Mensaje no encontrado"), 404
 
-    respuesta = (request.form.get("respuesta") or request.json.get("respuesta", "")).strip()
+    respuesta = (request.form.get("respuesta")
+                 or (request.get_json(silent=True) or {}).get("respuesta") or "").strip()
     if not respuesta:
         return jsonify(ok=False, error="Respuesta vacía"), 400
 
@@ -367,7 +392,7 @@ def cliente_inicio():
     ).fetchone()
 
     ultima_factura = tdb.execute(
-        """SELECT id, folio, concepto, monto, total, estado, fecha_vencimiento
+        """SELECT id, numero_factura AS folio, concepto, monto, total, estado, fecha_vencimiento
            FROM cobros WHERE cliente_id=? AND estado IN ('pendiente','vencido')
            ORDER BY fecha_emision DESC LIMIT 1""",
         (cid,),

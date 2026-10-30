@@ -1,0 +1,25 @@
+{#- Encabezado y banda de pestañas de Estadísticas (Resumen · Reportes).
+    Importar con contexto:  {% from "estadisticas/_pestanas.html" import pestanas with context %} -#}
+{% macro pestanas(activa) %}
+{%- set es_admin = current_role in ('super_admin', 'admin') -%}
+<div class="ex-head">
+  <div>
+    <h1 class="ex-h1">Estadísticas</h1>
+    <p class="ex-sub">
+      {%- if activa == 'reportes' -%}
+        Listas del despacho que puedes revisar aquí y descargar en Excel o PDF.
+      {%- else -%}
+        Cómo va el despacho: expedientes, clientes, cobranza y carga del equipo.
+      {%- endif -%}
+    </p>
+  </div>
+</div>
+{% if es_admin %}
+<div class="ex-tabs" style="margin:0 0 24px">
+  <nav aria-label="Secciones de estadísticas">
+    <a class="{{ 'on' if activa == 'resumen' }}" href="{{ url_for('estadisticas.index') }}"{% if activa == 'resumen' %} aria-current="page"{% endif %}>Resumen</a>
+    <a class="{{ 'on' if activa == 'reportes' }}" href="{{ url_for('reportes.index') }}"{% if activa == 'reportes' %} aria-current="page"{% endif %}>Reportes</a>
+  </nav>
+</div>
+{% endif %}
+{% endmacro %}

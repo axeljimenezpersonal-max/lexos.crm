@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 
 from flask import Blueprint, g, jsonify, render_template, request, session
 
+from modules.asuntos import TIPOS_DERECHO
 from modules.auth import login_required, tenant_required
 
 estadisticas_bp = Blueprint("estadisticas", __name__)
@@ -17,10 +18,8 @@ estadisticas_bp = Blueprint("estadisticas", __name__)
 MESES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
             "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
-TIPOS_ASUNTO = [
-    "civil", "penal", "mercantil", "laboral", "familiar",
-    "administrativo", "fiscal", "amparo", "constitucional", "otro",
-]
+# Las mismas materias que se usan al crear un expediente
+TIPOS_ASUNTO = list(TIPOS_DERECHO)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Helpers
@@ -98,8 +97,15 @@ def index():
     hasta_c   = request.args.get("hasta", "")
     abogado_f = _safe_int(request.args.get("abogado"))
     tipo_f    = request.args.get("tipo_derecho", "")
+    # Los filtros van dentro del SQL: solo se aceptan valores conocidos
+    if tipo_f not in TIPOS_ASUNTO:
+        tipo_f = ""
 
-    start, end = _period_range(periodo, desde_c, hasta_c)
+    try:
+        start, end = _period_range(periodo, desde_c, hasta_c)
+    except ValueError:
+        periodo, desde_c, hasta_c = "anio", "", ""
+        start, end = _period_range(periodo)
     prev_start, prev_end = _prev_period(start, end)
 
     abogados = _get_abogados()

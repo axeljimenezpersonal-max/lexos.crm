@@ -1,168 +1,406 @@
 {% extends "base.html" %}
-{% block title %}Portal Clientes{% endblock %}
+{% block title %}Portal de clientes{% endblock %}
+{% block page_title %}Personas{% endblock %}
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/asuntos.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/clientes.css') }}">
 <style>
-  .ptl-admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-  .ptl-admin-stat { background: var(--bg-card,#142E59); border: 1px solid var(--border,#3B4A61); border-radius: 12px; padding: 18px; }
-  .ptl-admin-stat-val { font-size: 1.6rem; font-weight: 700; }
-  .ptl-admin-stat-label { font-size: .78rem; color: var(--text-muted,#8E99AB); }
-  .ptl-resp-form { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border,#3B4A61); }
-  .ptl-resp-form input { flex: 1; }
-  .ptl-acc-actions { display: flex; gap: 6px; }
-  .ptl-acc-btn { background: none; border: 1px solid var(--border,#3B4A61); border-radius: 6px; padding: 4px 10px; font-size: .72rem; cursor: pointer; color: var(--text-muted,#8E99AB); transition: all .15s; }
-  .ptl-acc-btn:hover { border-color: var(--e); color: var(--e); }
-  .ptl-acc-btn-danger:hover { border-color: #B5483F; color: #B5483F; }
-  @media (max-width: 700px) { .ptl-admin-grid { grid-template-columns: 1fr; } }
+  /* Portal de clientes (vista del despacho) — tarjetas claras, texto azul y acentos dorados */
+  .pa-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pa-kpis .as-kpi { cursor: default; }
+  .pa-kpis a.as-kpi { cursor: pointer; }
+
+  .pa-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; margin-top: 22px; align-items: start; }
+  .pa-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .pa-panel { background: var(--c); border: 1px solid var(--border); border-radius: 18px; padding: 20px 22px; min-width: 0; scroll-margin-top: 96px; }
+  .pa-panel > h2 { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 18px/1.3 'Sora', sans-serif; color: var(--e); letter-spacing: -.01em; }
+  .pa-panel > h2 .pa-n { font: 600 12px 'Inter', sans-serif; padding: 3px 9px; border-radius: 99px; background: var(--edim); color: #6E5A3A; }
+  .pa-ayuda { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ash); }
+  .pa-lista { display: flex; flex-direction: column; margin-top: 12px; }
+
+  /* Vacío: qué hacer después */
+  .pa-vacio { margin-top: 14px; padding: 18px; border: 1px dashed #E2D3AE; border-radius: 14px; background: #FBF8F1; }
+  .pa-vacio b { display: block; font: 600 14.5px 'Inter', sans-serif; color: var(--e); }
+  .pa-vacio p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.55; color: #3B4A61; }
+  .pa-vacio a { color: var(--e); font-weight: 600; text-decoration: underline; text-decoration-color: var(--dorado); text-underline-offset: 3px; }
+
+  /* Mensajes */
+  .pa-msg { padding: 14px 0; border-top: 1px solid var(--border); }
+  .pa-msg:first-child { border-top: 0; padding-top: 4px; }
+  .pa-msg-h { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+  .pa-msg-h b { font: 600 14.5px 'Inter', sans-serif; color: var(--e); overflow-wrap: anywhere; }
+  .pa-msg-h small { font-size: 12.5px; color: var(--ash); }
+  .pa-msg-asunto { display: block; font-size: 12.5px; color: #6E5A3A; margin-top: 2px; overflow-wrap: anywhere; }
+  .pa-msg p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: #2A3B55; white-space: pre-line; overflow-wrap: anywhere; }
+  .pa-resp { display: flex; gap: 8px; margin-top: 10px; }
+  .pa-resp input { flex: 1; min-width: 0; }
+  .pa-msg.nuevo { border-left: 3px solid var(--dorado); padding-left: 14px; }
+
+  .pa-quien { display: inline-block; font: 600 11px 'Inter', sans-serif; padding: 2px 8px; border-radius: 99px; margin-right: 6px; vertical-align: 1px; }
+  .pa-quien.cliente { background: var(--edim); color: #6E5A3A; }
+  .pa-quien.despacho { background: #EEF1F5; color: var(--e); }
+
+  /* Accesos */
+  .pa-acc { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; padding: 14px 0; border-top: 1px solid var(--border); }
+  .pa-acc:first-child { border-top: 0; padding-top: 4px; }
+  .pa-acc-n b { display: block; font: 600 14.5px 'Inter', sans-serif; color: var(--e); overflow-wrap: anywhere; }
+  .pa-acc-n small { display: block; font-size: 13px; color: #3B4A61; margin-top: 2px; overflow-wrap: anywhere; }
+  .pa-acc-n em { display: block; font-style: normal; font-size: 12.5px; color: var(--ash); margin-top: 3px; }
+  .pa-acc.off .pa-acc-n b, .pa-acc.off .pa-acc-n small { color: var(--ash); }
+  .pa-estado { display: inline-block; font: 600 11px 'Inter', sans-serif; padding: 2px 8px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; background: #EAF0EC; color: #3D6B4F; }
+  .pa-acc.off .pa-estado { background: var(--c2); color: var(--ash); }
+  .pa-acc-acc { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .pa-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border-m); background: #fff; font: 500 13px 'Inter', sans-serif; color: var(--e); cursor: pointer; white-space: nowrap; }
+  .pa-btn:hover { border-color: var(--e); }
+  .pa-btn.oro { border-color: #E2D3AE; background: var(--edim); color: #6E5A3A; }
+  .pa-btn.oro:hover { border-color: var(--dorado); }
+  .pa-btn.quitar:hover { border-color: #A23B33; color: #A23B33; }
+  .pa-btn:disabled { opacity: .55; cursor: wait; }
+
+  /* Formulario lateral */
+  .pa-form { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+  .pa-form label { display: flex; flex-direction: column; gap: 5px; font: 600 13px 'Inter', sans-serif; color: var(--e); }
+  .pa-form label small { font-weight: 400; font-size: 12.5px; color: var(--ash); line-height: 1.45; }
+  .pa-form .form-control { width: 100%; box-sizing: border-box; min-width: 0; }
+  .pa-form .btn { justify-content: center; }
+  .pa-dir { display: flex; gap: 8px; margin-top: 12px; }
+  .pa-dir input { flex: 1; min-width: 0; font-size: 13px; }
+  .pa-pasos { margin: 12px 0 0; padding-left: 20px; font-size: 13.5px; line-height: 1.6; color: #3B4A61; }
+  .pa-pasos li::marker { color: var(--dorado); font-weight: 600; }
+
+  /* Ventana del enlace para entrar */
+  .pa-dlg { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100vh - 32px); overflow: auto; border: 0; border-radius: 18px; padding: 0; width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(20,46,89,.3); color: var(--e); }
+  .pa-dlg::backdrop { background: rgba(20,46,89,.45); }
+  .pa-dlg-c { padding: 22px; }
+  .pa-dlg h3 { margin: 0; font: 600 19px 'Sora', sans-serif; color: var(--e); }
+  .pa-dlg p { margin: 8px 0 0; font-size: 14px; line-height: 1.55; color: #3B4A61; }
+  .pa-dlg .pa-dir input { font-size: 12.5px; }
+  .pa-dlg-pie { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; }
+
+  @media (max-width: 1100px) {
+    .pa-grid { grid-template-columns: minmax(0, 1fr); }
+    .pa-lado { order: -1; }
+  }
+  @media (max-width: 860px) {
+    .pa-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .pa-kpis .as-kpi { padding: 14px; }
+    .pa-kpis .as-kpi b { font-size: 24px; }
+  }
+  @media (max-width: 560px) {
+    .pa-kpis { grid-template-columns: minmax(0, 1fr); }
+    .pa-kpis .as-kpi { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
+    .pa-kpis .as-kpi b { grid-column: 2; grid-row: 1 / span 2; margin: 0; }
+    .pa-kpis .as-kpi span { grid-column: 1; }
+    .pa-panel { padding: 16px; border-radius: 14px; }
+    .pa-acc { grid-template-columns: minmax(0, 1fr); }
+    .pa-acc-acc { justify-content: flex-start; }
+    .pa-resp { flex-direction: column; }
+    .pa-resp .btn { justify-content: center; }
+    .cl-acciones, .cl-acciones .btn { width: 100%; justify-content: center; }
+  }
 </style>
 {% endblock %}
 
+{% macro fecha(f) -%}
+{%- if f -%}{{ f[8:10] }}/{{ f[5:7] }}/{{ f[:4] }}{% if f|length > 15 %} · {{ f[11:16] }}{% endif %}{%- endif -%}
+{%- endmacro %}
+
 {% block content %}
-<div class="tb-breadcrumb"><span>Portal de Clientes</span></div>
-
-<!-- Stats -->
-<div class="ptl-admin-grid">
-  <div class="ptl-admin-stat">
-    <div class="ptl-admin-stat-val">{{ accesos|length }}</div>
-    <div class="ptl-admin-stat-label">Clientes con acceso al portal</div>
+<div class="as-head">
+  <div>
+    <h1 class="page-title">Personas</h1>
+    <p class="as-sub">Portal de clientes: tus clientes entran con su correo para ver cómo va su asunto, los documentos que les compartes y sus cobros, y para escribirte.</p>
   </div>
-  <div class="ptl-admin-stat">
-    <div class="ptl-admin-stat-val" style="color:#B08A4A;">{{ mensajes_no_leidos|length }}</div>
-    <div class="ptl-admin-stat-label">Mensajes sin leer</div>
+  <div class="cl-acciones">
+    <a class="btn btn-primary" href="#paDar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Dar acceso a un cliente
+    </a>
   </div>
 </div>
 
-<!-- Tabs -->
-<div class="tabs">
-  <button class="tab-btn active" data-tab-group="portal" data-tab-target="tab-mensajes">
-    Mensajes ({{ mensajes_no_leidos|length }} nuevos)
-  </button>
-  <button class="tab-btn" data-tab-group="portal" data-tab-target="tab-accesos">
-    Accesos ({{ accesos|length }})
-  </button>
-  <button class="tab-btn" data-tab-group="portal" data-tab-target="tab-todos">
-    Todos los mensajes
-  </button>
-</div>
+{% with seccion_personas='portal' %}{% include "clientes/_secciones.html" %}{% endwith %}
 
-<!-- Mensajes no leídos -->
-<div id="tab-mensajes" class="tab-content" data-tab-content="portal">
-  {% if mensajes_no_leidos %}
-  <div style="display:grid; gap:12px;">
-    {% for m in mensajes_no_leidos %}
-    <div class="card" style="padding:16px; border-left: 3px solid #B08A4A;">
-      <div class="d-flex justify-between align-center mb-2">
-        <div class="d-flex align-center gap-2">
-          <strong class="text-sm">{{ m.cliente_nombre or '—' }}</strong>
-          {% if m.asunto_titulo %}<span class="text-xs text-muted">· {{ m.asunto_titulo }}</span>{% endif %}
-        </div>
-        <span class="text-xs text-muted">{{ m.fecha[:16] if m.fecha else '' }}</span>
+<section class="as-kpis pa-kpis" aria-label="Resumen del portal">
+  <a class="as-kpi" href="#paAccesos">
+    <small>Clientes con acceso</small><b>{{ activos }}</b>
+    <span>{% if activos %}{{ han_entrado }} ya entr{{ 'aron' if han_entrado != 1 else 'ó' }}{% else %}nadie entra todavía{% endif %}</span>
+  </a>
+  <a class="as-kpi{% if mensajes_no_leidos %} aviso{% endif %}" href="#paPendientes">
+    <small>Mensajes por contestar</small><b>{{ mensajes_no_leidos|length }}</b>
+    <span>{{ 'te escribieron tus clientes' if mensajes_no_leidos else 'estás al día' }}</span>
+  </a>
+  <a class="as-kpi" href="#paDar">
+    <small>Clientes sin acceso</small><b>{{ disponibles|length }}</b>
+    <span>puedes darles acceso cuando quieras</span>
+  </a>
+</section>
+
+<div class="pa-grid">
+  <div class="pa-col">
+
+    <!-- Mensajes por contestar -->
+    <section class="pa-panel" id="paPendientes" aria-labelledby="paPendT">
+      <h2 id="paPendT">Mensajes por contestar{% if mensajes_no_leidos %} <span class="pa-n">{{ mensajes_no_leidos|length }}</span>{% endif %}</h2>
+      {% if mensajes_no_leidos %}
+      <p class="pa-ayuda">Tu respuesta le llega al cliente en su portal, en la sección Mensajes.</p>
+      <div class="pa-lista">
+        {% for m in mensajes_no_leidos %}
+        <article class="pa-msg nuevo">
+          <div class="pa-msg-h">
+            <b>{{ m.cliente_nombre or 'Cliente' }}</b>
+            <small>{{ fecha(m.fecha) }}</small>
+          </div>
+          {% if m.asunto_titulo %}<span class="pa-msg-asunto">Sobre: {{ m.asunto_titulo }}</span>{% endif %}
+          <p>{{ m.mensaje }}</p>
+          <form class="pa-resp" data-url="{{ url_for('portal.responder', mensaje_id=m.id) }}">
+            <input class="form-control" type="text" name="respuesta" placeholder="Escribe tu respuesta…" aria-label="Respuesta para {{ m.cliente_nombre }}" required>
+            <button class="btn btn-primary" type="submit">Responder</button>
+          </form>
+        </article>
+        {% endfor %}
       </div>
-      <p class="text-sm" style="color:var(--text-2); line-height:1.6;">{{ m.mensaje }}</p>
-      <div class="ptl-resp-form">
-        <input class="form-control" type="text" id="resp-{{ m.id }}" placeholder="Escribe una respuesta…">
-        <button class="btn btn-primary btn-sm" onclick="responder({{ m.id }})">Responder</button>
+      {% else %}
+      <div class="pa-vacio">
+        <b>No tienes mensajes por contestar.</b>
+        <p>Cuando un cliente te escriba desde su portal, el mensaje aparecerá aquí y podrás responderle sin salir de esta página.</p>
       </div>
-    </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="empty-state">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-    <h3>Sin mensajes pendientes</h3>
-    <p>Todos los mensajes han sido respondidos.</p>
-  </div>
-  {% endif %}
-</div>
+      {% endif %}
+    </section>
 
-<!-- Accesos -->
-<div id="tab-accesos" class="tab-content" data-tab-content="portal" style="display:none;">
-  {% if accesos %}
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Cliente</th><th>Email</th><th>Último login</th><th>Estado</th><th>Alta</th><th></th></tr></thead>
-      <tbody>
-      {% for a in accesos %}
-      <tr>
-        <td><strong>{{ a.cliente_nombre }}</strong></td>
-        <td class="text-sm">{{ a.email }}</td>
-        <td class="text-sm text-muted">{{ a.ultimo_login[:16] if a.ultimo_login else 'Nunca' }}</td>
-        <td><span class="badge badge-{{ 'activo' if a.activo else 'inactivo' }}">{{ 'Activo' if a.activo else 'Inactivo' }}</span></td>
-        <td class="text-xs text-muted">{{ a.fecha_alta[:10] if a.fecha_alta else '' }}</td>
-        <td>
-          <div class="ptl-acc-actions">
-            <button class="ptl-acc-btn" onclick="magicLink({{ a.cliente_id }})" title="Generar link mágico">Link</button>
+    <!-- Clientes con acceso -->
+    <section class="pa-panel" id="paAccesos" aria-labelledby="paAccT">
+      <h2 id="paAccT">Clientes con acceso{% if activos %} <span class="pa-n">{{ activos }}</span>{% endif %}</h2>
+      {% if accesos %}
+      <p class="pa-ayuda">«Enlace para entrar» te da un enlace que dura 24 horas; mándaselo a tu cliente y entra sin contraseña.</p>
+      <div class="pa-lista">
+        {% for a in accesos %}
+        <div class="pa-acc{{ '' if a.activo else ' off' }}">
+          <div class="pa-acc-n">
+            <b>{{ a.cliente_nombre }}<span class="pa-estado">{{ 'Con acceso' if a.activo else 'Sin acceso' }}</span></b>
+            <small>{{ a.email }}</small>
+            <em>{% if a.ultimo_login %}Entró por última vez el {{ fecha(a.ultimo_login) }}{% else %}Aún no entra{% endif %} · Acceso desde {{ fecha(a.fecha_alta[:10] if a.fecha_alta else '') }}</em>
+          </div>
+          <div class="pa-acc-acc">
             {% if a.activo %}
-            <button class="ptl-acc-btn ptl-acc-btn-danger" onclick="desactivar({{ a.cliente_id }})" title="Desactivar">Desactivar</button>
+            <button type="button" class="pa-btn oro" data-enlace="{{ url_for('portal.generar_magic_link', cliente_id=a.cliente_id) }}" data-nombre="{{ a.cliente_nombre }}" data-email="{{ a.email }}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+              Enlace para entrar
+            </button>
+            <button type="button" class="pa-btn quitar" data-quitar="{{ url_for('portal.desactivar', cliente_id=a.cliente_id) }}" data-nombre="{{ a.cliente_nombre }}">Quitar acceso</button>
+            {% else %}
+            <button type="button" class="pa-btn" data-reactivar="{{ url_for('portal.invitar', cliente_id=a.cliente_id) }}" data-email="{{ a.email }}" data-nombre="{{ a.cliente_nombre }}">Volver a dar acceso</button>
             {% endif %}
           </div>
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="pa-vacio">
+        <b>Todavía ningún cliente tiene acceso.</b>
+        <p>En <a href="#paDar">Dar acceso a un cliente</a> eliges al cliente y confirmas su correo. Después te damos un enlace para que se lo mandes por correo o WhatsApp y entre a ver su asunto.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Conversaciones recientes -->
+    <section class="pa-panel" aria-labelledby="paConvT">
+      <h2 id="paConvT">Mensajes recientes</h2>
+      {% if mensajes_recientes %}
+      <p class="pa-ayuda">Lo último que se han escrito tú y tus clientes en el portal.</p>
+      <div class="pa-lista">
+        {% for m in mensajes_recientes %}
+        <article class="pa-msg">
+          <div class="pa-msg-h">
+            <b><span class="pa-quien {{ m.remitente }}">{{ 'Cliente' if m.remitente == 'cliente' else 'Despacho' }}</span>{{ m.cliente_nombre or 'Cliente' }}</b>
+            <small>{{ fecha(m.fecha) }}</small>
+          </div>
+          <p>{{ m.mensaje[:240] }}{{ '…' if m.mensaje|length > 240 }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="pa-vacio">
+        <b>Aún no hay mensajes.</b>
+        <p>Cuando tus clientes te escriban desde el portal, aquí verás la conversación completa con tus respuestas.</p>
+      </div>
+      {% endif %}
+    </section>
   </div>
-  {% else %}
-  <div class="empty-state" style="padding:40px;">
-    <h3>Sin accesos</h3>
-    <p>Invita clientes desde su ficha con "Invitar al Portal".</p>
-  </div>
-  {% endif %}
+
+  <aside class="pa-col pa-lado">
+    <section class="pa-panel" id="paDar" aria-labelledby="paDarT">
+      <h2 id="paDarT">Dar acceso a un cliente</h2>
+      {% if disponibles %}
+      <form class="pa-form" id="paDarForm">
+        <label>Cliente
+          <select class="form-control" name="cliente" required>
+            <option value="">Elige un cliente…</option>
+            {% for c in disponibles %}<option value="{{ url_for('portal.invitar', cliente_id=c.id) }}" data-email="{{ c.email }}" data-enlace="{{ url_for('portal.generar_magic_link', cliente_id=c.id) }}">{{ c.nombre }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Correo con el que va a entrar
+          <input class="form-control" type="email" name="email" placeholder="cliente@correo.com" autocomplete="off" required>
+        </label>
+        <label>Contraseña <small>Opcional. Si no le pones una, entra con el enlace que le mandas (dura 24 horas) y puedes darle otro cuando lo necesite.</small>
+          <input class="form-control" type="text" name="password" autocomplete="new-password" placeholder="Déjalo vacío para usar solo el enlace">
+        </label>
+        <button class="btn btn-primary" type="submit">Dar acceso</button>
+      </form>
+      {% elif accesos %}
+      <div class="pa-vacio">
+        <b>Todos tus clientes ya tienen acceso.</b>
+        <p>Cuando registres un cliente nuevo en <a href="{{ url_for('clientes.index') }}">Clientes</a>, podrás darle acceso desde aquí.</p>
+      </div>
+      {% else %}
+      <div class="pa-vacio">
+        <b>Primero registra a tu cliente.</b>
+        <p>Ve a <a href="{{ url_for('clientes.index') }}">Clientes</a>, dalo de alta con su correo y regresa aquí para darle acceso.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="pa-panel" aria-labelledby="paDirT">
+      <h2 id="paDirT">Cómo entran tus clientes</h2>
+      <ol class="pa-pasos">
+        <li>Les das acceso aquí con su correo.</li>
+        <li>Les mandas su enlace para entrar, o esta dirección si les pusiste contraseña.</li>
+        <li>Ven su asunto, sus documentos y sus cobros, y te escriben. Sus mensajes llegan a esta página.</li>
+      </ol>
+      <div class="pa-dir">
+        <input class="form-control" type="text" readonly value="{{ enlace_portal }}" aria-label="Dirección del portal de clientes" id="paDirInput">
+        <button type="button" class="pa-btn" data-copiar="paDirInput">Copiar</button>
+      </div>
+    </section>
+  </aside>
 </div>
 
-<!-- Todos los mensajes -->
-<div id="tab-todos" class="tab-content" data-tab-content="portal" style="display:none;">
-  {% if mensajes_recientes %}
-  <div style="display:grid; gap:8px;">
-    {% for m in mensajes_recientes %}
-    <div class="card" style="padding:12px 16px;">
-      <div class="d-flex justify-between align-center">
-        <div class="d-flex align-center gap-2">
-          <span class="badge badge-{{ 'activo' if m.remitente=='despacho' else 'pendiente' }}" style="font-size:.6rem;">{{ m.remitente }}</span>
-          <strong class="text-sm">{{ m.cliente_nombre or '—' }}</strong>
-        </div>
-        <span class="text-xs text-muted">{{ m.fecha[:16] if m.fecha else '' }}</span>
-      </div>
-      <p class="text-sm" style="color:var(--text-2); margin-top:4px;">{{ m.mensaje[:120] }}{{ '…' if m.mensaje|length > 120 }}</p>
+<dialog class="pa-dlg" id="paDlg" aria-labelledby="paDlgT">
+  <div class="pa-dlg-c">
+    <h3 id="paDlgT">Enlace para entrar</h3>
+    <p id="paDlgTx">Mándale este enlace a tu cliente. Sirve una sola vez y dura 24 horas.</p>
+    <div class="pa-dir">
+      <input class="form-control" type="text" readonly id="paDlgLink" aria-label="Enlace para entrar al portal">
+      <button type="button" class="pa-btn oro" data-copiar="paDlgLink">Copiar</button>
     </div>
-    {% endfor %}
+    <div class="pa-dlg-pie">
+      <a class="btn btn-secondary" id="paDlgMail" href="#">Mandar por correo</a>
+      <button type="button" class="btn btn-primary" id="paDlgCerrar">Listo</button>
+    </div>
   </div>
-  {% else %}
-  <div class="empty-state"><p>Sin mensajes.</p></div>
-  {% endif %}
-</div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const PREFIX = '{{ url_for("portal.index") }}'.replace(/\/$/,'');
+(function () {
+  const aviso = (msg, tipo) => window.showToast ? window.showToast(msg, tipo || 'success') : alert(msg);
+  const post = (url, datos) => {
+    const fd = new FormData();
+    Object.entries(datos || {}).forEach(([k, v]) => fd.append(k, v));
+    return fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(r => r.json().catch(() => ({ ok: false, error: 'No se pudo completar. Intenta de nuevo.' })));
+  };
 
-function responder(id) {
-  const input = document.getElementById('resp-' + id);
-  const msg = input.value.trim();
-  if (!msg) return;
-  fetch(PREFIX + '/responder/' + id, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({respuesta: msg})
-  }).then(r => r.json()).then(d => {
-    if (d.ok) location.reload();
-    else alert(d.error || 'Error');
+  // Ventana con el enlace para entrar
+  const dlg = document.getElementById('paDlg');
+  let recargar = false;
+  function mostrarEnlace(link, nombre, email) {
+    document.getElementById('paDlgLink').value = link;
+    document.getElementById('paDlgTx').textContent =
+      'Mándale este enlace a ' + (nombre || 'tu cliente').trim() + '. Sirve una sola vez y dura 24 horas.';
+    const asunto = 'Tu acceso al portal del despacho';
+    const cuerpo = 'Hola ' + (nombre || '').trim() + ',\n\nCon este enlace puedes entrar a ver cómo va tu asunto, tus documentos y escribirnos:\n' + link + '\n\nEl enlace dura 24 horas.';
+    document.getElementById('paDlgMail').href = 'mailto:' + encodeURIComponent(email || '') +
+      '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+  function cerrar() { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); }
+  document.getElementById('paDlgCerrar').addEventListener('click', cerrar);
+  dlg.addEventListener('close', () => { if (recargar) location.reload(); });
+
+  function pedirEnlace(url, nombre, email) {
+    return post(url).then(d => {
+      if (d.ok) mostrarEnlace(d.link, nombre, email);
+      else aviso(d.error || 'No se pudo crear el enlace', 'error');
+      return d;
+    });
+  }
+
+  // Copiar
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-copiar]');
+    if (!b) return;
+    const inp = document.getElementById(b.dataset.copiar);
+    inp.select();
+    const ok = () => { b.textContent = 'Copiado'; setTimeout(() => { b.textContent = 'Copiar'; }, 1600); };
+    if (navigator.clipboard) navigator.clipboard.writeText(inp.value).then(ok, () => { document.execCommand('copy'); ok(); });
+    else { document.execCommand('copy'); ok(); }
   });
-}
 
-function magicLink(clienteId) {
-  fetch(PREFIX + '/magic-link/' + clienteId, {method: 'POST'})
-  .then(r => r.json()).then(d => {
-    if (d.ok) {
-      prompt('Link mágico generado (válido 24h). Cópialo:', d.link);
-    } else alert(d.error || 'Error');
+  // Acciones de cada acceso
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-enlace], [data-quitar], [data-reactivar]');
+    if (!b) return;
+    if (b.dataset.enlace) {
+      b.disabled = true;
+      pedirEnlace(b.dataset.enlace, b.dataset.nombre, b.dataset.email).finally(() => { b.disabled = false; });
+    } else if (b.dataset.quitar) {
+      if (!confirm('¿Quitarle el acceso al portal a ' + b.dataset.nombre.trim() + '? Ya no podrá entrar hasta que se lo vuelvas a dar.')) return;
+      b.disabled = true;
+      post(b.dataset.quitar).then(d => {
+        if (d.ok) location.reload();
+        else { b.disabled = false; aviso(d.error || 'No se pudo quitar el acceso', 'error'); }
+      });
+    } else if (b.dataset.reactivar) {
+      b.disabled = true;
+      post(b.dataset.reactivar, { email: b.dataset.email }).then(d => {
+        if (d.ok) location.reload();
+        else { b.disabled = false; aviso(d.error || 'No se pudo dar el acceso', 'error'); }
+      });
+    }
   });
-}
 
-function desactivar(clienteId) {
-  if (!confirm('¿Desactivar acceso al portal para este cliente?')) return;
-  fetch(PREFIX + '/desactivar/' + clienteId, {method: 'POST'})
-  .then(r => r.json()).then(d => { if (d.ok) location.reload(); });
-}
+  // Responder mensajes
+  document.querySelectorAll('.pa-resp').forEach(f => {
+    f.addEventListener('submit', e => {
+      e.preventDefault();
+      const txt = f.respuesta.value.trim();
+      if (!txt) return;
+      const btn = f.querySelector('button');
+      btn.disabled = true;
+      post(f.dataset.url, { respuesta: txt }).then(d => {
+        if (d.ok) location.reload();
+        else { btn.disabled = false; aviso(d.error || 'No se pudo enviar', 'error'); }
+      });
+    });
+  });
+
+  // Dar acceso
+  const form = document.getElementById('paDarForm');
+  if (form) {
+    const sel = form.cliente, correo = form.email;
+    sel.addEventListener('change', () => {
+      const op = sel.selectedOptions[0];
+      correo.value = (op && op.dataset.email) || '';
+      if (!correo.value) correo.focus();
+    });
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const url = sel.value;
+      if (!url) { sel.focus(); return; }
+      const op = sel.selectedOptions[0], nombre = op.textContent;
+      const btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      post(url, { email: correo.value.trim(), password: form.password.value.trim() }).then(d => {
+        if (!d.ok) { btn.disabled = false; aviso(d.error || 'No se pudo dar el acceso', 'error'); return; }
+        recargar = true;
+        aviso('Listo: ' + nombre.trim() + ' ya tiene acceso al portal');
+        pedirEnlace(op.dataset.enlace, nombre, correo.value.trim())
+          .then(r => { if (!r.ok) location.reload(); });
+      });
+    });
+  }
+})();
 </script>
 {% endblock %}
