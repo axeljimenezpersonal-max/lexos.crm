@@ -219,6 +219,9 @@
 
 /* Horas */
 .af-horas-total{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+#afHorasTotal{margin:14px 0 0;font:500 13.5px 'Inter',sans-serif;color:var(--ash)}
+#afHorasTotal[hidden]{display:none}
+.af-filtros button span{margin-left:3px;color:#3D6B6B}
 .af-horas-total b{font:600 26px 'Sora',sans-serif;color:var(--tinta)}
 .af-hora{display:grid;grid-template-columns:90px 60px 1fr auto;gap:10px;padding:9px 0;border-top:1px solid var(--border);font-size:13.5px;color:#3B4A61;align-items:center}
 .af-hora b{font-family:'Sora',sans-serif;color:var(--tinta)}

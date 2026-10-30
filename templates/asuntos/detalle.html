@@ -120,7 +120,6 @@
     <button class="xp-tab" data-tab="preguntar" role="tab">{{ ic('spark', 15) }}Preguntar a {{ config.ASISTENTE_NOMBRE }}{% if hallazgos %}<span>{{ hallazgos | length }}</span>{% endif %}</button>
     <button class="xp-tab" data-tab="actividad" role="tab">{{ ic('note', 15) }}Actividad<span>{{ n_bit.n }}</span></button>
     <button class="xp-tab" data-tab="estrategia" role="tab">{{ ic('scale', 15) }}Estrategia</button>
-    <button class="xp-tab" data-tab="horas" role="tab">{{ ic('clock', 15) }}Horas<span>{{ horas_total | round(1) }}</span></button>
   </div>
 </nav>
 
@@ -372,7 +371,7 @@
             <div><label class="as-label" for="hrFecha">Fecha</label><input class="as-input" id="hrFecha" name="fecha" type="date" value="{{ today_str }}"></div>
             <div style="grid-column:span 2"><label class="as-label" for="hrDesc">En qué</label><input class="as-input" id="hrDesc" name="descripcion" maxlength="300" placeholder="Ej. Redacción de contestación de demanda"></div>
           </div>
-          <div class="af-comp-f"><small>Se suman a las horas del asunto.</small><button class="btn btn-primary btn-sm">Registrar horas</button></div>
+          <div class="af-comp-f"><small>Se suman a las horas del expediente y aparecen aquí abajo, en Actividad.</small><button class="btn btn-primary btn-sm">Registrar horas</button></div>
         </form>
       </div>
 
@@ -382,10 +381,12 @@
         <button type="button" data-f="actividad">Audiencias y pendientes</button>
         <button type="button" data-f="documento">Documentos</button>
         <button type="button" data-f="sentencia">Resoluciones</button>
+        <button type="button" data-f="horas">Horas <span>{{ horas_total | round(1) }} h</span></button>
       </div>
+      <p class="af-horas-total" id="afHorasTotal" hidden><b>{{ horas_total | round(1) }} h</b> registradas en este expediente{% if asunto.forma_cobro == 'por_hora' %} · se cobra por hora{% endif %}</p>
 
-      {% set colores = {'nota': ('#F4EEDF','#142E59'), 'actividad': ('#F7F0E1','#8A6A2F'), 'documento': ('#EEF1F5','#3D5A80'), 'sentencia': ('#F6F1E6','#6E5A3A'), 'sistema': ('#F1EEE8','#60718D')} %}
-      {% set ico_tipo = {'nota': 'note', 'documento': 'doc', 'sentencia': 'scale'} %}
+      {% set colores = {'nota': ('#F4EEDF','#142E59'), 'actividad': ('#F7F0E1','#8A6A2F'), 'documento': ('#EEF1F5','#3D5A80'), 'sentencia': ('#F6F1E6','#6E5A3A'), 'sistema': ('#F1EEE8','#60718D'), 'horas': ('#E2EEEC','#3D6B6B')} %}
+      {% set ico_tipo = {'nota': 'note', 'documento': 'doc', 'sentencia': 'scale', 'horas': 'clock'} %}
       {% set clave_sentido = {'Favorable': 'favorable', 'Parcial': 'parcial', 'Desfavorable': 'desfavorable'} %}
       <div id="afBitacora">
       {% for grupo in bitacora %}
@@ -408,6 +409,7 @@
               <small>{{ it.hora }}</small>
             </div>
             {% if it.tipo == 'actividad' and it.fecha_evento %}<div class="quien">Para el {{ it.fecha_evento }}</div>{% endif %}
+            {% if it.tipo == 'horas' and it.fecha_evento %}<div class="quien">Trabajadas el {{ it.fecha_evento }}</div>{% endif %}
             {% if it.texto %}<p>{{ it.texto }}</p>{% endif %}
             {% if it.url %}<a class="archivo" href="{{ it.url }}" target="_blank" rel="noopener">{{ ic('doc', 13) }} Abrir archivo</a>{% endif %}
             {% if it.tipo != 'nota' %}<div class="quien">{{ it.autor.nombre }}</div>{% endif %}
@@ -684,15 +686,6 @@
   </form>
 </section>
 
-    <!-- ── Horas ──────────────────────────────────────────────────── -->
-    <section class="xp-panel" id="p-horas" role="tabpanel">
-<div class="xp-card"><div class="xp-card-b" style="padding-top:22px">
-      <div class="af-horas-total"><b>{{ horas_total | round(1) }} h</b><span class="as-muted">registradas{% if asunto.forma_cobro == 'por_hora' %} · el asunto se cobra por hora{% endif %}</span></div>
-      {% for h in horas %}
-      <div class="af-hora"><span>{{ (h.fecha or '')[:10] }}</span><b>{{ h.horas | round(1) }} h</b><span>{{ h.descripcion or '—' }}</span><span class="as-muted">{{ h.autor }}</span></div>
-      {% else %}<p class="as-empty">Sin horas registradas. Regístralas desde la pestaña Actividad.</p>{% endfor %}
-</div></div>
-    </section>
 
 </div>
 
@@ -775,6 +768,7 @@
 
   /* Pestañas */
   function abrirTab(nombre) {
+    if (nombre === 'horas') nombre = 'actividad';   // las horas viven dentro de Actividad
     const panel = document.getElementById('p-' + nombre); if (!panel) return;
     const btn = document.querySelector(`.xp-tab[data-tab="${nombre}"]`);
     document.querySelectorAll('.xp-tab').forEach(t => t.classList.toggle('on', t === btn));
@@ -911,6 +905,7 @@
     const b = e.target.closest('button'); if (!b) return;
     $('#afFiltros').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
     document.querySelectorAll('#afBitacora .af-it').forEach(it => it.hidden = !!b.dataset.f && it.dataset.tipo !== b.dataset.f);
+    $('#afHorasTotal').hidden = b.dataset.f !== 'horas';
     document.querySelectorAll('#afBitacora .af-dia').forEach(d => {
       let n = d.nextElementSibling, visible = false;
       while (n && !n.classList.contains('af-dia')) { if (!n.hidden) visible = true; n = n.nextElementSibling; }

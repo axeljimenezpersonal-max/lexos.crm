@@ -636,6 +636,12 @@ def _bitacora(tdb, id: int, asunto: dict, usuarios: dict) -> list[dict]:
                       "titulo": s["titulo"], "texto": s["contenido"] or "", "autor": autor(s["creado_por"]),
                       "momento": _local(s["fecha_alta"]), "sentido": precedentes.SENTIDOS.get(s["sentido"] or ""),
                       "url": s["archivo_url"] if boveda.es_de_boveda(s["archivo_url"]) else None})
+    for h in tdb.execute("SELECT * FROM asunto_horas WHERE asunto_id=?", (id,)).fetchall():
+        trabajo = _fecha_corta(h["fecha"]) if h["fecha"] else ""
+        items.append({"id": h["id"], "tipo": "horas", "etiqueta": "Horas",
+                      "titulo": f"{_safe_float(h['horas']):g} h trabajadas", "texto": h["descripcion"] or "",
+                      "autor": autor(h["user_id"]), "momento": _local(h["fecha_alta"] or h["fecha"]),
+                      "fecha_evento": trabajo})
     for h in tdb.execute(
         "SELECT * FROM actividad_log WHERE entidad='asunto' AND entidad_id=? AND accion IN "
         "('cambiar_estado_asunto','crear_asunto','archivar_asunto','resultado_asunto') ORDER BY fecha DESC LIMIT 40",
