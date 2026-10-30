@@ -209,10 +209,12 @@
       <div class="xp-card-h"><h2>Cobranza</h2><a href="{{ url_for('cobranzas.index', asunto=asunto.id, grupo='todos') }}">Ver cobros →</a></div>
       <div class="xp-card-b">
         {% set base_ = dinero.pactados or dinero.facturado %}
-        <div class="xr-barra-cobro"><b>{{ dinero.cobrado | dinero(decimales=False) }}</b><span>cobrado de {{ base_ | dinero(decimales=False) if base_ else 'sin honorarios pactados' }}</span>
+        <div class="xr-barra-cobro"><b>{{ dinero.cobrado | dinero(decimales=False) }}</b><span>cobrado de {{ (base_ | dinero(decimales=False)) ~ (' pactados' if dinero.pactados else ' facturados') if base_ else 'sin honorarios pactados' }} · sin IVA</span>
           <div class="xr-progreso"><i style="width:{{ dinero.pct }}%"></i></div></div>
-        <div class="xp-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
-        <div class="xp-kv"><span>Por cobrar</span><b style="color:{{ '#8A6A2F' if dinero.pendiente else 'var(--e)' }}">{{ dinero.pendiente | dinero }}</b></div>
+        <div class="xp-kv"><span>Facturado (con IVA)</span><b>{{ dinero.facturado_total | dinero }}</b></div>
+        <div class="xp-kv"><span>El cliente debe</span><b style="color:{{ '#8A6A2F' if dinero.debe else 'var(--e)' }}">{{ dinero.debe | dinero }}</b></div>
+        {% if dinero.falta_facturar %}<div class="xp-kv"><span>Falta facturar (sin IVA)</span><b>{{ dinero.falta_facturar | dinero }}</b></div>{% endif %}
+        {% if dinero.otras_monedas %}<p class="as-muted" style="font-size:12.5px;margin:6px 0 0">Hay cobros en dólares; se ven en Cobranza y no se suman aquí.</p>{% endif %}
         {% if cobros %}
         <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:6px">
           {% for c in cobros %}

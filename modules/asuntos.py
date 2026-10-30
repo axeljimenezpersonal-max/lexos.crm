@@ -916,12 +916,27 @@ def detalle(id: int):
     cobros = [dict(c) for c in tdb.execute(
         "SELECT * FROM cobros WHERE asunto_id=? AND estado != 'cancelado' ORDER BY fecha_emision DESC", (id,)
     ).fetchall()]
-    facturado = sum(_safe_float(c.get("total")) or _safe_float(c.get("monto")) for c in cobros)
-    cobrado = sum((_safe_float(c.get("total")) or _safe_float(c.get("monto"))) if c["estado"] == "pagado"
-                  else _safe_float(c.get("monto_abonado")) for c in cobros)
+    # Los honorarios pactados son sin IVA y en pesos: el avance se mide igual, con la parte de honorarios
+    # (sin IVA ni retenciones) de lo facturado y de lo pagado. Lo que el cliente debe sí va con IVA.
+    from modules import cobranzas as cobranzas_mod
+    facturado = cobrado = facturado_total = debe = 0.0
+    otras_monedas = False
+    for c in cobros:
+        total_c = _safe_float(c.get("total")) or _safe_float(c.get("monto"))
+        pagado_c = total_c if c["estado"] == "pagado" else min(_safe_float(c.get("monto_abonado")), total_c)
+        if (c.get("moneda") or "MXN") != "MXN":
+            otras_monedas = True
+            continue
+        subtotal_c = cobranzas_mod._desglose(c)["subtotal"]
+        facturado += subtotal_c
+        facturado_total += total_c
+        cobrado += pagado_c * (subtotal_c / total_c) if total_c else 0
+        debe += max(total_c - pagado_c, 0)
     pactados = _safe_float(asunto.get("honorarios_pactados"))
     base_cobro = pactados or facturado
-    dinero = {"pactados": pactados, "facturado": facturado, "cobrado": cobrado,
+    dinero = {"pactados": pactados, "facturado": facturado, "cobrado": round(cobrado, 2),
+              "facturado_total": facturado_total, "debe": round(debe, 2), "otras_monedas": otras_monedas,
+              "falta_facturar": max(pactados - facturado, 0) if pactados else 0,
               "pendiente": max(base_cobro - cobrado, 0),
               "pct": int(min(cobrado / base_cobro * 100, 100)) if base_cobro else 0}
 

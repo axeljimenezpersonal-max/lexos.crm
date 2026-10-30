@@ -49,6 +49,8 @@ GRUPOS = {
 }
 
 MONEDAS = {"MXN": "$", "USD": "US$"}
+# Los totales del despacho van en pesos; lo que se cobra en otra moneda se muestra aparte, nunca sumado
+EN_PESOS = "COALESCE(NULLIF(co.moneda,''),'MXN')='MXN'"
 METODOS_PAGO = ["Transferencia", "Efectivo", "Tarjeta", "Cheque", "Otro"]
 CONCEPTOS = ["Anticipo de honorarios", "Honorarios por etapa", "Iguala mensual",
              "Honorarios de éxito", "Gastos y derechos"]
@@ -319,11 +321,11 @@ def _recalcular(tdb, cid: int) -> str | None:
 
 
 def cobrado_entre(tdb, desde: date, hasta: date, alcance: bool = True) -> float:
-    """Dinero que entró (pagos registrados) entre dos fechas, inclusive."""
+    """Pesos que entraron (pagos registrados) entre dos fechas, inclusive."""
     alc, p = _alcance() if alcance else ("1", [])
     return float(tdb.execute(
         f"""SELECT COALESCE(SUM(pg.monto),0) FROM cobro_pagos pg JOIN cobros co ON co.id=pg.cobro_id
-            WHERE co.estado != 'cancelado' AND date(pg.fecha) BETWEEN ? AND ? AND {alc}""",
+            WHERE co.estado != 'cancelado' AND date(pg.fecha) BETWEEN ? AND ? AND {EN_PESOS} AND {alc}""",
         (desde.isoformat(), hasta.isoformat(), *p)).fetchone()[0])
 
 
@@ -484,8 +486,9 @@ def index():
     cobros = [_decorar(r) for r in tdb.execute(
         f"{BASE_SQL} WHERE {clause} ORDER BY {orden} LIMIT ? OFFSET ?",
         params + [PER_PAGE, (page - 1) * PER_PAGE]).fetchall()]
-    suma_filtro = tdb.execute(f"SELECT COALESCE(SUM(saldo_v),0), COALESCE(SUM(total_v),0) FROM ({BASE_SQL} WHERE {clause})",
-                              params).fetchone()
+    suma_filtro = [dict(x) for x in tdb.execute(
+        f"SELECT COALESCE(NULLIF(moneda,''),'MXN') AS moneda, COALESCE(SUM(saldo_v),0) AS saldo, COALESCE(SUM(total_v),0) AS total "
+        f"FROM ({BASE_SQL} WHERE {clause}) GROUP BY 1 ORDER BY moneda='MXN' DESC", params).fetchall()]
 
     # ── Resumen ──────────────────────────────────────────────
     r = tdb.execute(f"""
@@ -498,8 +501,14 @@ def index():
                COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) BETWEEN :hoy AND :sem THEN {SALDO} END),0) AS semana,
                COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) BETWEEN :hoy AND :sem THEN 1 END),0) AS n_semana
         FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
-        WHERE {ABIERTO_SQL} AND {alc.replace('?', ':u')}
+        WHERE {ABIERTO_SQL} AND {EN_PESOS} AND {alc.replace('?', ':u')}
     """, {"hoy": hoy.isoformat(), "sem": (hoy + timedelta(days=7)).isoformat(), "u": session.get("user_id")}).fetchone()
+    otras_monedas = [dict(x) for x in tdb.execute(f"""
+        SELECT co.moneda AS moneda, COALESCE(SUM({SALDO}),0) AS por_cobrar, COUNT(*) AS abiertos,
+               COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) < ? THEN {SALDO} END),0) AS vencido
+        FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
+        WHERE {ABIERTO_SQL} AND NOT {EN_PESOS} AND {alc} GROUP BY co.moneda HAVING por_cobrar > 0""",
+        (hoy.isoformat(), *ap)).fetchall()]
     inicio_mes = hoy.replace(day=1)
     fin_mes_pasado = inicio_mes - timedelta(days=1)
     viejo = _fecha(r["mas_viejo"])
@@ -516,16 +525,18 @@ def index():
     deudores = []
     for d in tdb.execute(f"""
         SELECT co.cliente_id, {CLIENTE} AS cliente, SUM({SALDO}) AS debe, COUNT(*) AS n,
+               COALESCE(NULLIF(co.moneda,''),'MXN') AS moneda,
                SUM(CASE WHEN date(co.fecha_vencimiento) < ? THEN {SALDO} ELSE 0 END) AS vencido,
                MIN(date(co.fecha_vencimiento)) AS vence
         FROM cobros co LEFT JOIN clientes c ON c.id=co.cliente_id LEFT JOIN asuntos a ON a.id=co.asunto_id
         WHERE {ABIERTO_SQL} AND {alc}
-        GROUP BY co.cliente_id HAVING debe > 0 ORDER BY vencido DESC, debe DESC LIMIT 5
+        GROUP BY co.cliente_id, COALESCE(NULLIF(co.moneda,''),'MXN') HAVING debe > 0
+        ORDER BY moneda='MXN' DESC, vencido DESC, debe DESC LIMIT 6
     """, (hoy.isoformat(), *ap)).fetchall():
         d = dict(d)
         fv = _fecha(d["vence"])
         if d["vencido"] > 0 and fv:
-            d["nota"], d["tono"] = f"{dinero(d['vencido'], decimales=False)} vencido desde hace {(hoy - fv).days} días", "rojo"
+            d["nota"], d["tono"] = f"{dinero(d['vencido'], d['moneda'], decimales=False)} vencido desde hace {(hoy - fv).days} días", "rojo"
         else:
             d["nota"], d["tono"] = f"{d['n']} cobro{'s' if d['n'] != 1 else ''} · {'vence el ' + _fecha_txt(fv, False) if fv else 'sin fecha de pago'}", ""
         deudores.append(d)
@@ -534,7 +545,7 @@ def index():
     tramos = [("Al corriente", "#142E59"), ("1 a 30 días", "#B08A4A"), ("31 a 90 días", "#9A7536"), ("Más de 90 días", "#A23B33")]
     antig = [0.0, 0.0, 0.0, 0.0]
     for s in tdb.execute(f"""SELECT {SALDO} AS saldo, co.fecha_vencimiento FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
-                             WHERE {ABIERTO_SQL} AND {alc}""", ap).fetchall():
+                             WHERE {ABIERTO_SQL} AND {EN_PESOS} AND {alc}""", ap).fetchall():
         fv = _fecha(s["fecha_vencimiento"])
         dias = (hoy - fv).days if fv else 0
         antig[0 if dias <= 0 else 1 if dias <= 30 else 2 if dias <= 90 else 3] += float(s["saldo"] or 0)
@@ -549,7 +560,7 @@ def index():
         ini = date(y, m + 1, 1)
         fin = (date(y + (m + 1) // 12, (m + 1) % 12 + 1, 1) - timedelta(days=1))
         facturado = tdb.execute(f"""SELECT COALESCE(SUM({TOTAL}),0) FROM cobros co LEFT JOIN asuntos a ON a.id=co.asunto_id
-                                    WHERE co.estado != 'cancelado' AND date(co.fecha_emision) BETWEEN ? AND ? AND {alc}""",
+                                    WHERE co.estado != 'cancelado' AND date(co.fecha_emision) BETWEEN ? AND ? AND {EN_PESOS} AND {alc}""",
                                 (ini.isoformat(), fin.isoformat(), *ap)).fetchone()[0]
         meses.append({"label": MESES[ini.month - 1], "facturado": float(facturado),
                       "cobrado": cobrado_entre(tdb, ini, min(fin, hoy)), "actual": i == 0})
@@ -600,7 +611,7 @@ def index():
     return render_template(
         "cobranzas/index.html",
         cobros=cobros, total=total, page=page, total_pages=total_pages,
-        suma_filtro={"saldo": suma_filtro[0], "total": suma_filtro[1]},
+        suma_filtro=suma_filtro, otras_monedas=otras_monedas,
         f=f, nombres=nombres, liga=liga, grupos=GRUPOS, conteos=conteos,
         resumen=resumen, deudores=deudores, antiguedad=antiguedad, suma_ant=suma_ant, meses=meses,
         horas_pend={"horas": float(horas_pend[0]), "asuntos": horas_pend[1]},

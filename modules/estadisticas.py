@@ -14,6 +14,8 @@ from modules.asuntos import TIPOS_DERECHO
 from modules.auth import login_required, tenant_required
 
 estadisticas_bp = Blueprint("estadisticas", __name__)
+# Las cifras de dinero son en pesos: un cobro en dólares no se suma con los de pesos
+PESOS = "COALESCE(NULLIF(moneda,''),'MXN')='MXN'"
 
 MESES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
             "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -163,7 +165,7 @@ def index():
         SELECT COALESCE(SUM(COALESCE(total,monto)),0) as facturado,
                COALESCE(SUM(CASE WHEN estado='pagado' THEN COALESCE(total,monto) ELSE 0 END),0) as cobrado,
                COALESCE(SUM(CASE WHEN estado IN ('pendiente','abono','vencido') THEN COALESCE(total,monto) ELSE 0 END),0) as pendiente
-        FROM cobros WHERE {cw()} AND estado != 'cancelado'
+        FROM cobros WHERE {cw()} AND estado != 'cancelado' AND {PESOS}
     """).fetchone()
     kpi_facturado = float(r_fac["facturado"])
     kpi_cobrado   = float(r_fac["cobrado"])
@@ -174,7 +176,7 @@ def index():
     prev_fac = tdb.execute(f"""
         SELECT COALESCE(SUM(COALESCE(total,monto)),0) FROM cobros
         WHERE fecha_emision >= '{prev_start}' AND fecha_emision <= '{prev_end}'
-          AND estado != 'cancelado'
+          AND estado != 'cancelado' AND {PESOS}
     """).fetchone()[0]
     kpi_fac_delta = round(((kpi_facturado - float(prev_fac)) / float(prev_fac) * 100), 1) if prev_fac else 0
 
@@ -217,7 +219,7 @@ def index():
             SELECT COALESCE(SUM(COALESCE(total,monto)),0) as facturado,
                    COALESCE(SUM(CASE WHEN estado='pagado' THEN COALESCE(total,monto) ELSE 0 END),0) as cobrado
             FROM cobros WHERE strftime('%Y-%m', fecha_emision) = ?
-              AND estado != 'cancelado'
+              AND estado != 'cancelado' AND {PESOS}
               {"AND abogado_id=" + str(abogado_f) if abogado_f else ""}
         """, (ym,)).fetchone()
         ch_facturacion.append({
@@ -272,7 +274,7 @@ def index():
                COALESCE(SUM(COALESCE(co.total,co.monto)),0) as total
         FROM cobros co
         JOIN clientes c ON co.cliente_id=c.id
-        WHERE {cw()} AND co.estado != 'cancelado'
+        WHERE {cw()} AND co.estado != 'cancelado' AND {PESOS}
         GROUP BY co.cliente_id ORDER BY total DESC LIMIT 5
     """).fetchall()]
 
@@ -296,10 +298,10 @@ def index():
         FROM asuntos WHERE {aw(prefix='')} GROUP BY tipo_asunto ORDER BY total DESC
     """).fetchall()]
 
-    tab_clientes = [dict(r) for r in tdb.execute("""
+    tab_clientes = [dict(r) for r in tdb.execute(f"""
         SELECT c.*,
                (SELECT COUNT(*) FROM asuntos WHERE cliente_id=c.id AND estado='activo') as asuntos_activos,
-               (SELECT COALESCE(SUM(COALESCE(total,monto)),0) FROM cobros WHERE cliente_id=c.id AND estado='pagado') as total_cobrado
+               (SELECT COALESCE(SUM(COALESCE(total,monto)),0) FROM cobros WHERE cliente_id=c.id AND estado='pagado' AND {PESOS}) as total_cobrado
         FROM clientes c WHERE c.activo=1 ORDER BY total_cobrado DESC LIMIT 100
     """).fetchall()]
 

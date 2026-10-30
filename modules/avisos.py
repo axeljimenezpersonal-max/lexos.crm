@@ -101,7 +101,7 @@ def avisos(tdb, uid: int, limite: int = 20) -> list[dict]:
     from modules import cobranzas
     alc_c, pc = cobranzas._alcance()
     n, monto = tdb.execute(
-        f"""SELECT COUNT(*), COALESCE(SUM({cobranzas.SALDO}), 0) FROM cobros co
+        f"""SELECT COUNT(*), COALESCE(SUM(CASE WHEN {cobranzas.EN_PESOS} THEN {cobranzas.SALDO} END), 0) FROM cobros co
             WHERE {cobranzas.ABIERTO_SQL} AND date(co.fecha_vencimiento) < ? AND {alc_c}""",
         (hoy.isoformat(), *pc)).fetchone()
     if n:

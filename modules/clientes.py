@@ -239,9 +239,10 @@ def index():
         SELECT c.*, {NOMBRE_SQL} AS nombre_v,
           (SELECT COUNT(*) FROM asuntos x WHERE x.cliente_id=c.id AND x.estado IN ({abiertos}) AND {alc_a}) AS en_curso,
           (SELECT COUNT(*) FROM asuntos x WHERE x.cliente_id=c.id AND {alc_a}) AS asuntos_total,
-          (SELECT COALESCE(SUM({cobranzas.SALDO}),0) FROM cobros co WHERE co.cliente_id=c.id AND {cobranzas.ABIERTO_SQL} AND {alc_c}) AS saldo,
           (SELECT COALESCE(SUM({cobranzas.SALDO}),0) FROM cobros co WHERE co.cliente_id=c.id AND {cobranzas.ABIERTO_SQL}
-                AND date(co.fecha_vencimiento) < ? AND {alc_c}) AS vencido,
+                AND {cobranzas.EN_PESOS} AND {alc_c}) AS saldo,
+          (SELECT COALESCE(SUM({cobranzas.SALDO}),0) FROM cobros co WHERE co.cliente_id=c.id AND {cobranzas.ABIERTO_SQL}
+                AND {cobranzas.EN_PESOS} AND date(co.fecha_vencimiento) < ? AND {alc_c}) AS vencido,
           MAX(COALESCE((SELECT MAX(fecha) FROM cliente_notas n WHERE n.cliente_id=c.id), ''),
               COALESCE((SELECT MAX(fecha) FROM cliente_comunicaciones m WHERE m.cliente_id=c.id), '')) AS ultimo_contacto
         FROM clientes c WHERE {clause}"""
@@ -277,7 +278,7 @@ def index():
         f"WHERE c.activo=1 AND a.estado IN ({abiertos}) AND {alc_a2}", pa2).fetchone()[0]
     deuda = tdb.execute(
         f"SELECT COALESCE(SUM({cobranzas.SALDO}),0), COUNT(DISTINCT co.cliente_id) FROM cobros co "
-        f"WHERE {cobranzas.ABIERTO_SQL} AND {alc_c}", pc).fetchone()
+        f"WHERE {cobranzas.ABIERTO_SQL} AND {cobranzas.EN_PESOS} AND {alc_c}", pc).fetchone()
     nuevos = tdb.execute("SELECT COUNT(*) FROM clientes WHERE activo=1 AND date(fecha_alta) >= ?",
                          (hoy.replace(day=1).isoformat(),)).fetchone()[0]
     resumen = {"con_asuntos": con_asuntos, "saldo": deuda[0], "con_saldo": deuda[1], "nuevos": nuevos}

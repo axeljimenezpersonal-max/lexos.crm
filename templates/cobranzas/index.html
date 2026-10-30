@@ -12,8 +12,9 @@
   <div>
     <h1 class="page-title">Cobranza</h1>
     <p class="as-sub">
-      {% if resumen.abiertos %}{{ resumen.por_cobrar | dinero(decimales=False) }} por cobrar a {{ resumen.clientes }} cliente{{ 's' if resumen.clientes != 1 }}
-      {% else %}Nadie te debe nada en este momento{% endif %}
+      {% if resumen.abiertos %}{{ resumen.por_cobrar | dinero(decimales=False) }} por cobrar a {{ resumen.clientes }} cliente{{ 's' if resumen.clientes != 1 }}{% endif %}
+      {%- for m in otras_monedas %}{{ ' · además ' if resumen.abiertos or not loop.first else '' }}{{ m.por_cobrar | dinero(m.moneda, decimales=False) }} por cobrar en {{ 'dólares' if m.moneda == 'USD' else m.moneda }}{% if m.vencido %} ({{ m.vencido | dinero(m.moneda, decimales=False) }} vencido){% endif %}{% endfor %}
+      {%- if not resumen.abiertos and not otras_monedas %}Nadie te debe nada en este momento{% endif %}
     </p>
   </div>
   <div class="cb-acciones">
@@ -38,7 +39,7 @@
 
 <section class="as-kpis" aria-label="Resumen">
   <a class="as-kpi{% if f.grupo == 'abiertos' and not f.semana %} on{% endif %}" href="{{ liga(grupo='', semana='') }}">
-    <small>Por cobrar</small><b class="cb-monto">{{ resumen.por_cobrar | dinero(decimales=False) }}</b>
+    <small>Por cobrar{{ ' en pesos' if otras_monedas }}</small><b class="cb-monto">{{ resumen.por_cobrar | dinero(decimales=False) }}</b>
     <span>{{ resumen.abiertos }} cobro{{ 's' if resumen.abiertos != 1 }} abierto{{ 's' if resumen.abiertos != 1 }}</span>
   </a>
   <a class="as-kpi{% if resumen.vencido %} alerta{% endif %}{% if f.grupo == 'vencidos' %} on{% endif %}" href="{{ liga(grupo='vencidos', semana='') }}">
@@ -131,7 +132,7 @@
       </table>
       <div class="cb-suma">
         <span>{{ total }} cobro{{ 's' if total != 1 }}{% if total_pages > 1 %} · página {{ page }} de {{ total_pages }}{% endif %}</span>
-        <span>{% if f.grupo in ('pagados', 'cancelados') %}Total <b>{{ suma_filtro.total | dinero }}</b>{% else %}Saldo <b>{{ suma_filtro.saldo | dinero }}</b>{% endif %}</span>
+        <span>{% set campo_suma = 'total' if f.grupo in ('pagados', 'cancelados') else 'saldo' %}{{ 'Total' if campo_suma == 'total' else 'Saldo' }} <b>{% for m in suma_filtro %}{{ ' + ' if not loop.first }}{{ m[campo_suma] | dinero(m.moneda) }}{% else %}{{ 0 | dinero }}{% endfor %}</b></span>
       </div>
       {% if total_pages > 1 %}
       <div class="as-pag">
@@ -170,7 +171,7 @@
       <div class="as-card-b">
         {% for d in deudores %}
         <a class="cb-deudor" href="{{ liga(cliente=d.cliente_id, grupo='', semana='', q='') }}">
-          <b>{{ d.cliente or 'Sin cliente' }}</b><span class="m">{{ d.debe | dinero(decimales=False) }}</span>
+          <b>{{ d.cliente or 'Sin cliente' }}</b><span class="m">{{ d.debe | dinero(d.moneda, decimales=False) }}</span>
           <small class="{{ d.tono }}">{{ d.nota }}</small>
         </a>
         {% else %}<p class="as-empty">Ningún cliente tiene saldo pendiente.</p>{% endfor %}

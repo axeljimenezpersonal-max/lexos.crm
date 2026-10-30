@@ -230,7 +230,7 @@ def index():
         f"""SELECT COALESCE(SUM({cobranzas.SALDO}), 0),
                    COALESCE(SUM(CASE WHEN date(co.fecha_vencimiento) < ? THEN {cobranzas.SALDO} ELSE 0 END), 0),
                    COUNT(DISTINCT CASE WHEN date(co.fecha_vencimiento) < ? THEN co.cliente_id END)
-            FROM cobros co WHERE {cobranzas.ABIERTO_SQL} AND {alc_c}""", (hoy_iso, hoy_iso, *pc)).fetchone()
+            FROM cobros co WHERE {cobranzas.ABIERTO_SQL} AND {cobranzas.EN_PESOS} AND {alc_c}""", (hoy_iso, hoy_iso, *pc)).fetchone()
     usuarios = _usuarios()
     carga = []
     if not _solo_lo_suyo():
