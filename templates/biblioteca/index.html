@@ -42,11 +42,18 @@
     <h1 class="ex-h1">Bóveda</h1>
     <p class="ex-sub">Todo lo que el despacho tiene guardado y cifrado: de expedientes, de personas, el archivo del despacho y los machotes. Cada documento dice qué es, y puedes buscar dentro de ellos uno por uno.</p>
   </div>
-  <div class="bv-acciones">
-    <a class="btn btn-ghost" href="{{ url_for('biblioteca.editor') }}">{{ icon_edit(16, 16) }} Editor de documentos</a>
-    <button type="button" class="btn btn-primary bv-subir-btn" data-subir>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir documento</button>
-  </div>
+</div>
+
+<div class="bv-entrada">
+  <button type="button" class="bv-subir-btn bv-e-subir" data-subir>
+    <i aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></i>
+    <span><b>Subir documento</b><small>PDF, Word, Excel o imágenes. Dices qué es y dónde va: expediente, persona o archivo del despacho.</small></span>
+    <em aria-hidden="true">Elegir archivo →</em>
+  </button>
+  <a class="bv-e-editor" href="{{ url_for('biblioteca.editor') }}">
+    <i aria-hidden="true">{{ icon_edit(20, 20) }}</i>
+    <span><b>Escribir un documento</b><small>Con los datos del caso ya puestos</small></span>
+  </a>
 </div>
 
 <section class="bv-busca" aria-label="Buscar dentro de los documentos">

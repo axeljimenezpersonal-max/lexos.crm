@@ -35,12 +35,12 @@ def _get(url: str, encabezados: dict | None = None, timeout: int = 90) -> tuple[
             _ultima_peticion = time.monotonic()
             if e.code == 304:
                 return 304, b"", dict(e.headers)
-            if e.code < 500 or intento == 2:
+            if (e.code < 500 and e.code != 429) or intento == 2:
                 raise
         except (urllib.error.URLError, TimeoutError):
             if intento == 2:
                 raise
-        time.sleep(5 * (intento + 1))
+        time.sleep(5 * 2 ** intento)   # 5 s, 10 s: espera creciente antes de reintentar
     raise RuntimeError("inalcanzable")
 
 
@@ -52,10 +52,11 @@ class Ley:
     titulo: str
     publicacion: str | None
     ultima_reforma: str | None
+    carpeta: str = "pdf"            # 'pdf' para leyes, 'regley' para reglamentos
 
     @property
     def url_pdf(self) -> str:
-        return f"{DIPUTADOS}pdf/{self.clave}.pdf"
+        return f"{DIPUTADOS}{self.carpeta}/{self.clave}.pdf"
 
 
 def _fecha_dof(texto: str) -> str | None:
@@ -84,6 +85,28 @@ def listar_leyes() -> list[Ley]:
     return leyes
 
 
+def listar_reglamentos() -> list[Ley]:
+    """Reglamentos de leyes federales vigentes (regla.htm). La fecha de la tabla es la publicación original;
+    la última reforma es la fecha más reciente que aparece junto al nombre (Reforma DOF …, Cantidades DOF …)."""
+    _, datos, _ = _get(DIPUTADOS + "regla.htm")
+    pagina = datos.decode("iso-8859-1")
+    reglamentos, vistos = [], set()
+    for fila in re.findall(r"<tr[^>]*>(.*?)</tr>", pagina, flags=re.S | re.I):
+        pdf = re.search(r'href="regley/([A-Za-z0-9_\-]+)\.pdf"', fila)
+        celdas = re.findall(r"<td[^>]*>(.*?)</td>", fila, flags=re.S | re.I)
+        if not pdf or len(celdas) < 3 or pdf.group(1) in vistos:
+            continue
+        nombre = _sin_etiquetas(celdas[1])
+        titulo = re.split(r"\s*(?:\xa0|Original DOF|Cantidades DOF|Reforma DOF|Fe de erratas)", nombre)[0].strip()
+        titulo = re.sub(r"^REGLAMENTO\b", "Reglamento", titulo)
+        fechas = sorted({f"{a}-{m}-{d}" for d, m, a in re.findall(r"(\d{2})/(\d{2})/(\d{4})", nombre)})
+        publicacion = _fecha_dof(celdas[2])
+        vistos.add(pdf.group(1))
+        reglamentos.append(Ley(pdf.group(1), titulo or nombre, publicacion,
+                               fechas[-1] if fechas and fechas[-1] != publicacion else None, carpeta="regley"))
+    return reglamentos
+
+
 def descargar_ley(ley: Ley, etag: str | None = None) -> tuple[bytes | None, str | None, str | None]:
     """Devuelve (pdf, etag, last_modified); pdf es None si no cambió desde el etag dado."""
     estado, datos, enc = _get(ley.url_pdf, {"If-None-Match": etag} if etag else None, timeout=180)
@@ -97,7 +120,16 @@ _ARTICULO = re.compile(
     r"(\d+(?:\s*[oº°])?(?:\s+(?:Bis|Ter|Qu[áa]ter|Quinquies|Sexies|Septies|Octies)(?:\s*\d+)?)?)"
     r"\s*[\.\-–:]"
 )
-_TRANSITORIOS = re.compile(r"(?m)^\s*(?:ART[ÍI]CULOS?\s+)?TRANSITORIOS?\s*$")
+# Los códigos estatales suelen abreviar: "Art. 1º.-", "ARTICULO 5.-"
+_ARTICULO_ABREV = re.compile(
+    r"(?m)^\s*(?:ART[ÍI]CULO|Art[íi]culo|ART\.|Art\.)\s*"
+    r"((?:\d{1,3}(?:,\d{3})+|\d+)(?:\s*[oº°])?"
+    r"(?:\s*(?:Bis|BIS|Ter|TER|Qu[áa]ter|QU[ÁA]TER|Quinquies|QUINQUIES|Sexies|SEXIES|Septies|Octies)(?:\s*\d+)?)?)"
+    r"\s*(?:[\.\-–:]|[ \t]*$)"   # "Art. 5.-", "ARTICULO 1,002.-" o "Artículo 1" solo en su línea
+)
+_NOTA_REFORMA = re.compile(
+    r"^\s*\((?:REFORMAD|ADICIONAD|DEROGAD|F\. DE E|FE DE ERRATAS|ACLARACI|RECORRID|REUBICAD)[^)]{0,200}\)\s*$", re.I)
+_TRANSITORIOS = re.compile(r"(?m)^\s*(?:ART[ÍI]CULOS?\s+)?TRANSITORIOS?\s*[:.]?\s*$")
 
 
 def texto_ley(pdf: bytes) -> str:
@@ -119,18 +151,33 @@ class Seccion:
     texto: str
 
 
-def articulos(texto: str) -> list[Seccion]:
-    """Parte una ley en artículos; lo que va después del primer TRANSITORIOS se agrupa aparte."""
+def articulos(texto: str, abreviado: bool = False) -> list[Seccion]:
+    """Parte una ley en artículos; lo que va después del primer TRANSITORIOS se agrupa aparte.
+    `abreviado` reconoce también "Art. 5.-" (común en la legislación de los estados)."""
     corte = _TRANSITORIOS.search(texto)
     cuerpo, transitorios = (texto[:corte.start()], texto[corte.start():]) if corte else (texto, "")
     secciones: list[Seccion] = []
-    marcas = list(_ARTICULO.finditer(cuerpo))
+    marcas = list((_ARTICULO_ABREV if abreviado else _ARTICULO).finditer(cuerpo))
     if marcas and marcas[0].start() > 0 and cuerpo[:marcas[0].start()].strip():
         secciones.append(Seccion("Encabezado", cuerpo[:marcas[0].start()].strip()))
     for i, m in enumerate(marcas):
         fin = marcas[i + 1].start() if i + 1 < len(marcas) else len(cuerpo)
         numero = re.sub(r"\s+", " ", m.group(1)).strip()
+        if abreviado:
+            numero = re.sub(r"(\d),(\d{3})", r"\1\2", numero)
+            numero = re.sub(r"(\d)\s*(?=[BTQSO][A-Za-zÁá])", r"\1 ", numero)
+            numero = re.sub(r"\b(BIS|TER|QU[ÁA]TER|QUINQUIES|SEXIES)\b", lambda x: x.group(1).capitalize(), numero)
         secciones.append(Seccion(f"Artículo {numero}", cuerpo[m.start():fin].strip()))
+    if abreviado:
+        # Las notas "(REFORMADO, P.O. …)" van antes del artículo al que se refieren: se pasan a ese artículo.
+        for previa, siguiente in zip(secciones, secciones[1:]):
+            lineas = previa.texto.split("\n")
+            notas = []
+            while len(lineas) > 1 and _NOTA_REFORMA.match(lineas[-1]):
+                notas.insert(0, lineas.pop())
+            if notas:
+                previa.texto = "\n".join(lineas)
+                siguiente.texto = "\n".join(notas + [siguiente.texto])
     if not marcas and cuerpo.strip():
         secciones.append(Seccion("Texto", cuerpo.strip()))
     if transitorios.strip():

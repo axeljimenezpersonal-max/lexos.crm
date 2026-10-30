@@ -229,7 +229,7 @@
       .replace(/\[(\d{1,2})\]/g, (m, i) => `<a class="as-cita" href="#f-${n}-${i}" data-f="f-${n}-${i}">${i}</a>`);
   }
 
-  const TIPO_FUENTE = { despacho: 'Documento del despacho', caso: 'Precedente del despacho', dof: 'Diario Oficial de la Federación' };
+  const TIPO_FUENTE = { despacho: 'Documento del despacho', caso: 'Precedente del despacho', dof: 'Diario Oficial de la Federación', reglamento: 'Reglamento federal', ley_estatal: 'Ley estatal', tesis: 'Jurisprudencia y tesis' };
   const wrap = document.querySelector('.as-wrap'), panel = document.getElementById('asPanel');
   let panelFuentes = [], panelI = 0, panelN = 0;
   function abrirFuente(fuentes, i, n) {

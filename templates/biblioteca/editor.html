@@ -1,474 +1,385 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import icon_file_text, icon_book, icon_link %}
-{% block title %}Editor de documentos{% endblock %}
+{% block title %}{{ documento.titulo if documento else 'Nuevo documento' }}{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/biblioteca.css') }}">
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="tb-breadcrumb">
-  <a href="{{ url_for('biblioteca.index') }}">Bóveda</a>
-  <span>›</span>
-  <span>Editor</span>
-</div>
-
-<div class="editor-layout">
-  <!-- ══════════════════════════════════════════
-       SIDEBAR
-       ══════════════════════════════════════════ -->
-  <div class="editor-sidebar">
-    <!-- Document meta -->
-    <div class="ed-sidebar-section">
-      <div class="ed-sidebar-title">Documento</div>
-      <div class="ed-fg">
-        <label>Título</label>
-        <input type="text" id="edTitulo"
-               value="{{ documento.titulo if documento else '' }}"
-               placeholder="Sin título">
+<div class="ed2">
+  <!-- Encabezado: título, estado y acciones -->
+  <header class="ed2-cab">
+    <a class="ed2-volver" href="{{ url_for('biblioteca.index', seccion='estudio') }}" aria-label="Volver a la Bóveda">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>Bóveda</a>
+    <input class="ed2-titulo" id="edTitulo" value="{{ documento.titulo if documento and documento.titulo != 'Sin título' else '' }}"
+           placeholder="Título del documento" maxlength="200" aria-label="Título del documento">
+    <span class="ed2-estado" id="edEstado" aria-live="polite">{% if documento %}Guardado{% else %}Sin guardar{% endif %}</span>
+    <div class="ed2-acc">
+      {% if documento %}<button type="button" class="btn btn-ghost" onclick="compartirDoc()">Compartir</button>{% endif %}
+      <div class="ed2-menu">
+        <button type="button" class="btn btn-ghost" id="edDescargarBtn" aria-haspopup="true" aria-expanded="false">Descargar
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="ed2-menu-l" id="edDescargar" hidden>
+          <button type="button" onclick="exportar('docx')"><b>Word</b><small>Para seguir editando</small></button>
+          <button type="button" onclick="exportar('pdf')"><b>PDF</b><small>Para enviar o imprimir</small></button>
+        </div>
       </div>
-      <div class="ed-fg">
-        <label>Asunto vinculado</label>
-        <select id="edAsunto" onchange="onAsuntoChange()">
-          <option value="">— Ninguno —</option>
-          {% for a in asuntos %}
-          <option value="{{ a.id }}"
-                  data-cliente="{{ a.cliente_id or '' }}"
-                  {{ 'selected' if documento and documento.asunto_id == a.id }}>
-            {{ a.numero_expediente or '' }} {{ a.titulo }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="ed-fg">
-        <label>Cliente</label>
-        <select id="edCliente">
-          <option value="">— Ninguno —</option>
-          {% for c in clientes %}
-          <option value="{{ c.id }}"
-                  {{ 'selected' if documento and documento.cliente_id == c.id }}>
-            {{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
+      <button type="button" class="btn btn-primary" id="btnGuardar" onclick="guardarDoc()">Guardar</button>
     </div>
+  </header>
 
-    <!-- Variables -->
-    <div class="ed-sidebar-section">
-      <div class="ed-sidebar-title">
-        Variables dinámicas
-        <button class="btn btn-ghost btn-sm" onclick="resolverVariables()" title="Reemplazar todas las variables con datos reales">⟳ Resolver</button>
+  <div class="ed2-cuerpo">
+    <!-- Hoja -->
+    <section class="ed2-hoja-wrap">
+      <div class="ed2-barra" id="edBarra" role="toolbar" aria-label="Formato del texto">
+        <select class="ql-header" title="Estilo del párrafo">
+          <option value="1">Título</option>
+          <option value="2">Subtítulo</option>
+          <option value="3">Apartado</option>
+          <option selected>Texto</option>
+        </select>
+        <span class="ed2-sep"></span>
+        <button type="button" class="ql-bold" title="Negritas (⌘B)"></button>
+        <button type="button" class="ql-italic" title="Cursiva (⌘I)"></button>
+        <button type="button" class="ql-underline" title="Subrayado (⌘U)"></button>
+        <button type="button" class="ed2-mayus" id="edMayus" title="Cambiar el texto seleccionado a MAYÚSCULAS o minúsculas">Aa</button>
+        <span class="ed2-sep"></span>
+        <button type="button" class="ql-align" value="" title="Alinear a la izquierda"></button>
+        <button type="button" class="ql-align" value="center" title="Centrar"></button>
+        <button type="button" class="ql-align" value="right" title="Alinear a la derecha"></button>
+        <button type="button" class="ql-align" value="justify" title="Justificar"></button>
+        <span class="ed2-sep"></span>
+        <button type="button" class="ql-list" value="ordered" title="Lista numerada"></button>
+        <button type="button" class="ql-list" value="bullet" title="Lista con viñetas"></button>
+        <button type="button" class="ql-indent" value="-1" title="Quitar sangría"></button>
+        <button type="button" class="ql-indent" value="+1" title="Agregar sangría"></button>
+        <span class="ed2-sep"></span>
+        <button type="button" class="ed2-ico" id="edDeshacer" title="Deshacer (⌘Z)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+        <button type="button" class="ed2-ico" id="edRehacer" title="Rehacer (⌘⇧Z)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+        <button type="button" class="ql-clean" title="Quitar formato"></button>
       </div>
-      <div class="ed-vars-list">
-        {% for var, desc in variables %}
-        <div class="ed-var-item" onclick="insertarVariable('{{ var }}')" title="{{ desc }}">
-          <code>{{ var }}</code>
-          <span>{{ desc }}</span>
+      <div class="ed2-hoja">
+        <div id="quillEditor">{% if documento %}{{ documento.contenido_html | safe }}{% elif plantilla_html %}{{ plantilla_html | safe }}{% endif %}</div>
+      </div>
+    </section>
+
+    <!-- Panel: de qué caso es y qué datos insertar -->
+    <aside class="ed2-panel">
+      <details class="ed2-caja" id="edCaso" open>
+        <summary><b>¿De qué caso es?</b><small>Sus datos llenan los bloquecitos</small></summary>
+        <label class="ed2-campo"><span>Expediente</span>
+          <select id="edAsunto">
+            <option value="">Ninguno</option>
+            {% for a in asuntos %}
+            <option value="{{ a.id }}" data-cliente="{{ a.cliente_id or '' }}"{{ ' selected' if documento and documento.asunto_id == a.id }}>{{ (a.numero_expediente ~ ' · ') if a.numero_expediente }}{{ a.titulo }}</option>
+            {% endfor %}
+          </select></label>
+        <label class="ed2-campo"><span>Persona</span>
+          <select id="edCliente">
+            <option value="">Ninguna</option>
+            {% for c in clientes %}
+            <option value="{{ c.id }}"{{ ' selected' if documento and documento.cliente_id == c.id }}>{{ c.razon_social or ((c.nombre or '') ~ ' ' ~ (c.apellidos or '')) }}</option>
+            {% endfor %}
+          </select></label>
+      </details>
+
+      <details class="ed2-caja" id="edDatos" open>
+        <summary><b>Insertar un dato</b><small>Haz clic y queda en el texto, donde está el cursor</small></summary>
+        {% for grupo, campos in grupos_campos %}
+        <div class="ed2-grupo">
+          <h3>{{ grupo }}</h3>
+          <div class="ed2-chips">
+            {% for clave, etiqueta in campos %}
+            <button type="button" class="ed2-chip" data-campo="{{ clave }}" title="Insertar «{{ etiqueta }}»">
+              <b>{{ etiqueta | replace(' del cliente', '') | replace(' del asunto', '') | replace(' del despacho', '') if grupo != 'Despacho y firma' else etiqueta }}</b><small data-valor-de="{{ clave }}"></small>
+            </button>
+            {% endfor %}
+          </div>
         </div>
         {% endfor %}
-      </div>
-    </div>
+      </details>
 
-    <!-- Plantillas -->
-    <div class="ed-sidebar-section">
-      <div class="ed-sidebar-title">Plantillas</div>
-      <select id="edPlantillaSel" onchange="cargarPlantilla(this.value)">
-        <option value="">— Aplicar plantilla —</option>
-        {% for p in plantillas %}
-        <option value="{{ p.id }}">{{ p.nombre }} ({{ p.categoria }})</option>
-        {% endfor %}
-      </select>
-    </div>
+      {% if plantillas %}
+      <details class="ed2-caja">
+        <summary><b>Empezar desde un machote</b><small>Reemplaza lo que hay en la hoja</small></summary>
+        <select id="edPlantillaSel" class="ed2-select" onchange="cargarPlantilla(this.value)">
+          <option value="">Elige un machote…</option>
+          {% for p in plantillas %}<option value="{{ p.id }}"{{ ' selected' if plantilla_id == p.id }}>{{ p.nombre }}</option>{% endfor %}
+        </select>
+      </details>
+      {% endif %}
 
-    <!-- Actions -->
-    <div class="ed-sidebar-section">
-      <div class="ed-sidebar-title">Acciones</div>
-      <div class="ed-actions-grid">
-        <button class="btn btn-primary btn-sm" onclick="guardarDoc()" id="btnGuardar">Guardar</button>
-        <button class="btn btn-secondary btn-sm" onclick="exportarPdf()">{{ icon_file_text(12, 12) }} Exportar PDF</button>
-        <button class="btn btn-secondary btn-sm" onclick="exportarDocx()">{{ icon_book(12, 12) }} Exportar DOCX</button>
-        {% if documento %}
-        <button class="btn btn-secondary btn-sm" onclick="compartirDoc()">{{ icon_link(12, 12) }} Compartir</button>
-        {% endif %}
-        <span class="ed-firma-placeholder" title="Próximamente — integración con FirmaElectronica.mx">
-          ✍ Firma digital <span class="bib-info-badge" style="font-size:.6rem">Próximamente</span>
-        </span>
-      </div>
-    </div>
-
-    <!-- Versiones -->
-    {% if versiones %}
-    <div class="ed-sidebar-section">
-      <div class="ed-sidebar-title">Historial de versiones</div>
-      <div class="ed-versions-list">
-        {% for v in versiones %}
-        <div class="ed-version-item {{ 'active' if loop.first }}" onclick="cargarVersion({{ documento.id }}, {{ v.id }})">
-          <span class="ed-ver-num">v{{ v.version }}</span>
-          <span class="ed-ver-date">{{ v.fecha[:16] if v.fecha else '' }}</span>
+      {% if versiones %}
+      <details class="ed2-caja">
+        <summary><b>Versiones anteriores</b><small>Cada vez que guardas queda una</small></summary>
+        <div class="ed2-lista">
+          {% for v in versiones %}
+          <button type="button" onclick="cargarVersion({{ documento.id }}, {{ v.id }})"><b>Versión {{ v.version }}</b><small>{{ v.fecha[:16] if v.fecha else '' }}</small></button>
+          {% endfor %}
         </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Recent docs -->
-    <div class="ed-sidebar-section">
-      <div class="ed-sidebar-title">Documentos recientes</div>
-      <div class="ed-recent-list">
-        {% for r in recientes %}
-        <a class="ed-recent-item {{ 'active' if documento and documento.id == r.id }}"
-           href="{{ url_for('biblioteca.editor', doc_id=r.id) }}">
-          <span class="ed-rec-title">{{ r.titulo | truncate(25, true, '…') }}</span>
-          <span class="ed-rec-estado">{{ r.estado }}</span>
-        </a>
-        {% endfor %}
-        <a class="ed-recent-item ed-new-doc" href="{{ url_for('biblioteca.editor') }}">
-          + Nuevo documento
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════
-       MAIN EDITOR
-       ══════════════════════════════════════════ -->
-  <div class="editor-main">
-    <!-- Status bar -->
-    <div class="ed-status-bar">
-      <span id="edStatus" class="ed-status">
-        {% if documento %}Editando · v{{ versiones[0].version if versiones else 1 }}{% else %}Nuevo documento{% endif %}
-      </span>
-      <span id="edAutoSave" class="ed-autosave" style="display:none">Auto-guardado</span>
-      {% if documento and documento.share_token %}
-      <span class="ed-shared-badge">{{ icon_link(12, 12) }} Compartido</span>
+      </details>
       {% endif %}
-    </div>
 
-    <!-- Quill editor -->
-    <div id="quillEditor">
-      {% if documento %}
-        {{ documento.contenido_html | safe }}
-      {% elif plantilla_html %}
-        {{ plantilla_html | safe }}
-      {% else %}
-        <h2>Documento sin título</h2>
-        <p>Escribe aquí o inserta variables dinámicas desde el panel lateral…</p>
-      {% endif %}
-    </div>
+      <details class="ed2-caja">
+        <summary><b>Mis documentos</b><small>Los últimos que se escribieron</small></summary>
+        <div class="ed2-lista">
+          <a href="{{ url_for('biblioteca.editor') }}" class="ed2-nuevo">+ Documento nuevo</a>
+          {% for r in recientes %}
+          <a href="{{ url_for('biblioteca.editor', doc_id=r.id) }}"{{ ' class=on' if documento and documento.id == r.id }}><b>{{ r.titulo }}</b><small>{{ (r.fecha_mod or '')[:10] }}</small></a>
+          {% endfor %}
+        </div>
+      </details>
+    </aside>
   </div>
 </div>
 
-<!-- Compartir doc modal -->
+<!-- Compartir -->
 <div class="modal-overlay" id="shareDocModal" onclick="if(event.target===this)cerrarModal('shareDocModal')">
   <div class="modal-box" style="max-width:440px">
     <div class="modal-header">
-      <span class="modal-title">{{ icon_link(14, 14) }} Compartir documento</span>
-      <button class="modal-close" onclick="cerrarModal('shareDocModal')">×</button>
+      <span class="modal-title">Compartir documento</span>
+      <button class="modal-close" onclick="cerrarModal('shareDocModal')" aria-label="Cerrar">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:.84rem; color:var(--text-2); margin-bottom:12px">
-        Se generará un enlace de solo lectura para que el cliente pueda ver el documento.
-      </p>
-      <div class="bib-fg" style="margin-bottom:12px">
-        <label>Duración</label>
-        <select id="shareDocHoras">
-          <option value="24">24 horas</option>
-          <option value="48">48 horas</option>
-          <option value="72" selected>72 horas</option>
-        </select>
-      </div>
-      <div id="shareDocResult" style="display:none">
-        <div class="bib-share-link">
-          <input type="text" id="shareDocLink" readonly onclick="this.select()">
-          <button class="btn btn-primary btn-sm" onclick="copiarShareLink()">Copiar</button>
-        </div>
+      <p class="ed2-nota">Se crea un enlace de solo lectura para que el cliente vea el documento.</p>
+      <label class="ed2-campo"><span>¿Por cuánto tiempo?</span>
+        <select id="shareDocHoras"><option value="24">1 día</option><option value="72" selected>3 días</option><option value="168">7 días</option></select></label>
+      <div id="shareDocResult" class="ed2-enlace" hidden>
+        <input type="text" id="shareDocLink" readonly onclick="this.select()">
+        <button class="btn btn-primary btn-sm" onclick="copiarShareLink()">Copiar</button>
       </div>
     </div>
     <div class="modal-footer" id="shareDocFooter">
       <button class="btn btn-ghost" onclick="cerrarModal('shareDocModal')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitShareDoc()">Generar enlace</button>
+      <button class="btn btn-primary" onclick="submitShareDoc()">Crear enlace</button>
     </div>
   </div>
 </div>
 
-<!-- Version diff modal -->
+<!-- Ver una versión -->
 <div class="modal-overlay" id="diffModal" onclick="if(event.target===this)cerrarModal('diffModal')">
-  <div class="modal-box" style="max-width:800px; height:70vh">
+  <div class="modal-box" style="max-width:800px;height:76vh;display:flex;flex-direction:column">
     <div class="modal-header">
       <span class="modal-title" id="diffTitle">Versión</span>
-      <div>
-        <button class="btn btn-primary btn-sm" onclick="restaurarVersion()">Restaurar esta versión</button>
-        <button class="modal-close" onclick="cerrarModal('diffModal')">×</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" onclick="restaurarVersion()">Volver a esta versión</button>
+        <button class="modal-close" onclick="cerrarModal('diffModal')" aria-label="Cerrar">×</button>
       </div>
     </div>
-    <div class="modal-body">
-      <div id="diffContent" class="ed-diff-content"></div>
-    </div>
+    <div class="modal-body" style="overflow:auto"><div id="diffContent" class="ed2-version ql-editor"></div></div>
   </div>
 </div>
+{% endblock %}
 
-<!-- ══════════════════════════════════════════════
-     JAVASCRIPT
-     ══════════════════════════════════════════════ -->
+{% block scripts %}
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script>
-/* ── State ──────────────────────────────────── */
-let DOC_ID = {{ documento.id if documento else 'null' }};
-let autoSaveTimer = null;
-let lastSavedContent = '';
-let versionHtml = '';
-
-/* ── Quill init ─────────────────────────────── */
-const quill = new Quill('#quillEditor', {
-  theme: 'snow',
-  placeholder: 'Escribe aquí…',
-  modules: {
-    toolbar: [
-      [{ header: [1, 2, 3, 4, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      [{ align: [] }],
-      ['blockquote', 'code-block'],
-      ['link', 'image'],
-      [{ indent: '-1' }, { indent: '+1' }],
-      [{ color: [] }, { background: [] }],
-      ['clean'],
-    ],
-  },
-});
-
-lastSavedContent = quill.root.innerHTML;
-
-/* ── Auto-save every 30 seconds ─────────────── */
-quill.on('text-change', () => {
-  clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(autoSave, 30000);
-});
-
-async function autoSave() {
-  const html = quill.root.innerHTML;
-  if (html === lastSavedContent) return;
-  const titulo = document.getElementById("edTitulo").value.trim() || "Sin título";
-  const body = {
-    id: DOC_ID,
-    titulo,
-    contenido_html: html,
-    asunto_id: document.getElementById("edAsunto").value || null,
-    cliente_id: document.getElementById("edCliente").value || null,
+(() => {
+  const ETIQUETAS = {{ etiquetas | tojson }};
+  const ALIAS = {{ alias | tojson }};
+  const URL_ = {
+    guardar: {{ url_for('biblioteca.editor_guardar') | tojson }},
+    datos: {{ url_for('biblioteca.editor_datos') | tojson }},
+    pdf: {{ url_for('biblioteca.editor_exportar_pdf') | tojson }},
+    docx: {{ url_for('biblioteca.editor_exportar_docx') | tojson }},
+    editor: {{ url_for('biblioteca.editor') | tojson }},
+    doc: {{ url_for('biblioteca.editor', doc_id=0) | tojson }},
+    version: {{ url_for('biblioteca.editor_version', doc_id=0, ver_id=0) | tojson }},
+    compartir: {{ url_for('biblioteca.editor_compartir', doc_id=0) | tojson }},
   };
-  try {
-    const r = await fetch("/biblioteca/editor/guardar", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body),
-    });
-    const j = await r.json();
-    if (j.ok) {
-      if (j.nuevo) {
-        DOC_ID = j.id;
-        history.replaceState(null, '', `/biblioteca/editor/${j.id}`);
-      }
-      lastSavedContent = html;
-      const el = document.getElementById("edAutoSave");
-      el.style.display = "inline";
-      el.textContent = `Auto-guardado · v${j.version}`;
-      setTimeout(() => el.style.display = "none", 3000);
-      document.getElementById("edStatus").textContent = `Editando · v${j.version}`;
-    }
-  } catch(e) {}
-}
+  const conId = (url, ...ids) => { let i = 0; return url.replace(/\/0(?=\/|\?|$)/g, () => '/' + ids[i++]); };
+  const $ = s => document.querySelector(s);
+  let DOC_ID = {{ documento.id if documento else 'null' }};
+  let valores = {};
 
-/* ── Manual save ────────────────────────────── */
-async function guardarDoc() {
-  const btn = document.getElementById("btnGuardar");
-  btn.disabled = true;
-  btn.textContent = "Guardando…";
-  const html = quill.root.innerHTML;
-  const titulo = document.getElementById("edTitulo").value.trim() || "Sin título";
-  const body = {
-    id: DOC_ID,
-    titulo,
-    contenido_html: html,
-    asunto_id: document.getElementById("edAsunto").value || null,
-    cliente_id: document.getElementById("edCliente").value || null,
-    plantilla_id: {{ plantilla_id or 'null' }},
+  /* ── Bloquecito de dato: se ve como «Nombre del cliente» o, con un caso elegido, con su valor ── */
+  const Embed = Quill.import('blots/embed');
+  class Campo extends Embed {
+    static create(clave) {
+      const node = super.create();
+      node.setAttribute('data-campo', clave);
+      node.setAttribute('contenteditable', 'false');
+      pintar(node);
+      return node;
+    }
+    static value(node) { return node.getAttribute('data-campo'); }
+  }
+  Campo.blotName = 'campo'; Campo.tagName = 'span'; Campo.className = 'ed-campo';
+  Quill.register(Campo);
+
+  function pintar(node) {
+    const clave = node.getAttribute('data-campo'), valor = valores[clave];
+    // Quill envuelve el contenido del bloquecito en un span no editable; antes de eso, es el propio nodo
+    (node.querySelector('span[contenteditable]') || node).textContent = valor || ETIQUETAS[clave] || clave;
+    node.classList.toggle('lleno', !!valor);
+    node.title = ETIQUETAS[clave] || clave;
+  }
+
+  /* Documentos viejos y machotes de Word: {{variable}} pasa a bloquecito */
+  const hoja = $('#quillEditor');
+  hoja.innerHTML = hoja.innerHTML.replace(/\{\{\s*([A-Za-z_]+)\s*\}\}/g, (m, k) => {
+    const c = ALIAS[k.toLowerCase()] || k.toLowerCase();
+    return ETIQUETAS[c] ? `<span class="ed-campo" data-campo="${c}">${ETIQUETAS[c]}</span>` : m;
+  });
+  if (!hoja.textContent.trim()) hoja.innerHTML = '';
+
+  const quill = new Quill('#quillEditor', {
+    theme: 'snow',
+    placeholder: 'Empieza a escribir. Para poner el nombre del cliente, el número de expediente o la fecha, elige el dato a la derecha.',
+    formats: ['header', 'bold', 'italic', 'underline', 'align', 'list', 'indent', 'campo'],
+    modules: { toolbar: '#edBarra', history: { delay: 800, maxStack: 200, userOnly: true } },
+  });
+  const Delta = Quill.import('delta');
+
+  /* ── Datos del caso ── */
+  async function cargarDatos() {
+    const q = new URLSearchParams({ asunto_id: $('#edAsunto').value, cliente_id: $('#edCliente').value });
+    try {
+      const r = await fetch(URL_.datos + (URL_.datos.includes('?') ? '&' : '?') + q, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      valores = (await r.json()).valores || {};
+    } catch (_) { valores = {}; }
+    quill.root.querySelectorAll('.ed-campo').forEach(pintar);
+    document.querySelectorAll('[data-valor-de]').forEach(s => { s.textContent = valores[s.dataset.valorDe] || ''; });
+  }
+  $('#edAsunto').addEventListener('change', e => {
+    const cli = e.target.selectedOptions[0]?.dataset.cliente;
+    if (cli) $('#edCliente').value = cli;
+    cargarDatos(); marcarCambio();
+  });
+  $('#edCliente').addEventListener('change', () => { cargarDatos(); marcarCambio(); });
+  cargarDatos();
+
+  document.querySelectorAll('.ed2-chip').forEach(b => b.addEventListener('mousedown', e => e.preventDefault()));
+  document.querySelectorAll('.ed2-chip').forEach(b => b.addEventListener('click', () => {
+    const r = quill.getSelection(true) || { index: quill.getLength() - 1, length: 0 };
+    if (r.length) quill.deleteText(r.index, r.length, 'user');
+    quill.insertEmbed(r.index, 'campo', b.dataset.campo, 'user');
+    quill.insertText(r.index + 1, ' ', 'user');
+    quill.setSelection(r.index + 2, 0, 'silent');
+  }));
+
+  /* ── MAYÚSCULAS / minúsculas del texto seleccionado ── */
+  $('#edMayus').addEventListener('click', () => {
+    const r = quill.getSelection(true);
+    if (!r || !r.length) { avisar('Selecciona el texto que quieres cambiar'); return; }
+    const texto = quill.getText(r.index, r.length);
+    const aMayus = texto !== texto.toUpperCase();
+    const d = quill.getContents(r.index, r.length);
+    d.ops.forEach(o => { if (typeof o.insert === 'string') o.insert = aMayus ? o.insert.toUpperCase() : o.insert.toLowerCase(); });
+    quill.updateContents(new Delta().retain(r.index).delete(r.length).concat(d), 'user');
+    quill.setSelection(r.index, r.length, 'silent');
+  });
+  $('#edDeshacer').addEventListener('click', () => quill.history.undo());
+  $('#edRehacer').addEventListener('click', () => quill.history.redo());
+
+  /* ── Guardar ── */
+  let guardado = quill.root.innerHTML + '|' + $('#edTitulo').value, temporizador = null, guardando = false;
+  const estado = t => { $('#edEstado').textContent = t; };
+  const avisar = (t, tipo) => (window.showToast ? showToast(t, tipo) : alert(t));
+  function huella() { return quill.root.innerHTML + '|' + $('#edTitulo').value + '|' + $('#edAsunto').value + '|' + $('#edCliente').value; }
+  guardado = huella();
+  function marcarCambio() {
+    if (huella() === guardado) return;
+    estado('Cambios sin guardar');
+    clearTimeout(temporizador); temporizador = setTimeout(() => guardarDoc(true), 4000);
+  }
+  quill.on('text-change', (d, v, fuente) => { if (fuente === 'user') marcarCambio(); });
+  $('#edTitulo').addEventListener('input', marcarCambio);
+
+  window.guardarDoc = async function (solo) {
+    if (guardando) return;
+    const actual = huella();
+    if (solo && actual === guardado) return;
+    guardando = true; clearTimeout(temporizador); estado('Guardando…');
+    const btn = $('#btnGuardar'); btn.disabled = true;
+    try {
+      const r = await fetch(URL_.guardar, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({
+          id: DOC_ID, titulo: $('#edTitulo').value.trim() || 'Sin título', contenido_html: quill.root.innerHTML,
+          asunto_id: $('#edAsunto').value || null, cliente_id: $('#edCliente').value || null,
+          plantilla_id: {{ plantilla_id or 'null' }},
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || 'No se pudo guardar');
+      if (j.nuevo) { DOC_ID = j.id; history.replaceState(null, '', conId(URL_.doc, j.id)); }
+      guardado = actual;
+      estado('Guardado · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }));
+    } catch (e) {
+      estado('No se guardó'); avisar(e.message || 'No se pudo guardar', 'error');
+    } finally { guardando = false; btn.disabled = false; }
   };
-  try {
-    const r = await fetch("/biblioteca/editor/guardar", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body),
-    });
-    const j = await r.json();
-    if (j.ok) {
-      if (j.nuevo) {
-        DOC_ID = j.id;
-        history.replaceState(null, '', `/biblioteca/editor/${j.id}`);
-      }
-      lastSavedContent = html;
-      document.getElementById("edStatus").textContent = `Guardado · v${j.version}`;
-      btn.textContent = "✓ Guardado";
-      setTimeout(() => btn.textContent = "Guardar", 2000);
-    } else {
-      alert(j.error || "Error al guardar");
-      btn.textContent = "Guardar";
-    }
-  } catch(e) {
-    alert("Error de conexión");
-    btn.textContent = "Guardar";
-  }
-  btn.disabled = false;
-}
+  window.addEventListener('beforeunload', e => { if (huella() !== guardado) { e.preventDefault(); e.returnValue = ''; } });
+  document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); guardarDoc(); } });
 
-/* ── Variables ──────────────────────────────── */
-function insertarVariable(varName) {
-  const range = quill.getSelection(true);
-  quill.insertText(range.index, varName, 'user');
-  quill.setSelection(range.index + varName.length);
-}
-
-async function resolverVariables() {
-  if (!confirm("¿Reemplazar todas las variables con datos reales? Esta acción modifica el contenido.")) return;
-  const html = quill.root.innerHTML;
-  const r = await fetch(`/biblioteca/editor/${DOC_ID || 0}/variables`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      contenido_html: html,
-      asunto_id: document.getElementById("edAsunto").value || null,
-      cliente_id: document.getElementById("edCliente").value || null,
-    }),
-  });
-  const j = await r.json();
-  if (j.ok) {
-    quill.root.innerHTML = j.contenido_html;
-  }
-}
-
-/* ── Asunto → auto-select cliente ───────────── */
-function onAsuntoChange() {
-  const sel = document.getElementById("edAsunto");
-  const opt = sel.options[sel.selectedIndex];
-  const clienteId = opt?.dataset?.cliente;
-  if (clienteId) {
-    document.getElementById("edCliente").value = clienteId;
-  }
-}
-
-/* ── Plantilla ──────────────────────────────── */
-function cargarPlantilla(id) {
-  if (!id) return;
-  if (quill.getText().trim().length > 1) {
-    if (!confirm("¿Reemplazar el contenido actual con la plantilla?")) return;
-  }
-  window.location = `/biblioteca/editor?plantilla=${id}`;
-}
-
-/* ── Export PDF ──────────────────────────────── */
-async function exportarPdf() {
-  const html = quill.root.innerHTML;
-  const titulo = document.getElementById("edTitulo").value.trim() || "Documento";
-  try {
-    const r = await fetch("/biblioteca/editor/exportar-pdf", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        contenido_html: html, titulo,
-        asunto_id: document.getElementById("edAsunto").value || null,
-        cliente_id: document.getElementById("edCliente").value || null,
-      }),
-    });
-    if (r.ok) {
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
+  /* ── Descargar ── */
+  const menu = $('#edDescargar');
+  $('#edDescargarBtn').addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; $('#edDescargarBtn').setAttribute('aria-expanded', String(!menu.hidden)); });
+  document.addEventListener('click', () => { menu.hidden = true; });
+  window.exportar = async function (tipo) {
+    menu.hidden = true;
+    const titulo = $('#edTitulo').value.trim() || 'Documento';
+    estado(tipo === 'pdf' ? 'Preparando PDF…' : 'Preparando Word…');
+    try {
+      const r = await fetch(URL_[tipo], {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ contenido_html: quill.root.innerHTML, titulo, asunto_id: $('#edAsunto').value || null, cliente_id: $('#edCliente').value || null }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo descargar');
       const a = document.createElement('a');
-      a.href = url; a.download = `${titulo.replace(/\s/g,'_')}.pdf`;
-      a.click(); URL.revokeObjectURL(url);
-    } else {
-      const j = await r.json();
-      alert(j.error || "Error al exportar PDF");
-    }
-  } catch(e) { alert("Error de conexión"); }
-}
+      a.href = URL.createObjectURL(await r.blob());
+      a.download = `${titulo.replace(/[^\wáéíóúñÁÉÍÓÚÑ\- ]/g, '').trim().replace(/\s+/g, '_') || 'Documento'}.${tipo}`;
+      a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      estado(huella() === guardado ? 'Guardado' : 'Cambios sin guardar');
+    } catch (e) { estado('No se descargó'); avisar(e.message, 'error'); }
+  };
 
-/* ── Export DOCX ────────────────────────────── */
-async function exportarDocx() {
-  const html = quill.root.innerHTML;
-  const titulo = document.getElementById("edTitulo").value.trim() || "Documento";
-  try {
-    const r = await fetch("/biblioteca/editor/exportar-docx", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        contenido_html: html, titulo,
-        asunto_id: document.getElementById("edAsunto").value || null,
-        cliente_id: document.getElementById("edCliente").value || null,
-      }),
+  /* ── Machote ── */
+  window.cargarPlantilla = id => {
+    if (!id) return;
+    if (quill.getText().trim() && !confirm('¿Reemplazar lo que hay en la hoja con el machote?')) { $('#edPlantillaSel').value = ''; return; }
+    location.href = URL_.editor + (URL_.editor.includes('?') ? '&' : '?') + 'plantilla=' + id;
+  };
+
+  /* ── Compartir ── */
+  window.cerrarModal = id => $('#' + id).classList.remove('open');
+  window.compartirDoc = () => {
+    if (!DOC_ID) { avisar('Primero guarda el documento'); return; }
+    $('#shareDocResult').hidden = true; $('#shareDocFooter').style.display = 'flex';
+    $('#shareDocModal').classList.add('open');
+  };
+  window.submitShareDoc = async () => {
+    const r = await fetch(conId(URL_.compartir, DOC_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ horas: parseInt($('#shareDocHoras').value, 10) }),
     });
-    if (r.ok) {
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${titulo.replace(/\s/g,'_')}.docx`;
-      a.click(); URL.revokeObjectURL(url);
-    } else {
-      const j = await r.json();
-      alert(j.error || "Error al exportar DOCX");
-    }
-  } catch(e) { alert("Error de conexión"); }
-}
+    const j = await r.json().catch(() => ({}));
+    if (!j.ok) { avisar('No se pudo crear el enlace', 'error'); return; }
+    $('#shareDocLink').value = j.link; $('#shareDocResult').hidden = false; $('#shareDocFooter').style.display = 'none';
+  };
+  window.copiarShareLink = () => { navigator.clipboard.writeText($('#shareDocLink').value); avisar('Enlace copiado'); };
 
-/* ── Share ───────────────────────────────────── */
-function compartirDoc() {
-  if (!DOC_ID) { alert("Guarda el documento primero"); return; }
-  document.getElementById("shareDocResult").style.display = "none";
-  document.getElementById("shareDocFooter").style.display = "flex";
-  document.getElementById("shareDocModal").classList.add("open");
-}
-function cerrarModal(id) { document.getElementById(id).classList.remove("open"); }
-async function submitShareDoc() {
-  const horas = parseInt(document.getElementById("shareDocHoras").value);
-  const r = await fetch(`/biblioteca/editor/${DOC_ID}/compartir`, {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({horas}),
-  });
-  const j = await r.json();
-  if (j.ok) {
-    document.getElementById("shareDocLink").value = j.link;
-    document.getElementById("shareDocResult").style.display = "block";
-    document.getElementById("shareDocFooter").style.display = "none";
-  }
-}
-function copiarShareLink() {
-  const inp = document.getElementById("shareDocLink");
-  inp.select(); navigator.clipboard.writeText(inp.value);
-}
-
-/* ── Versions ───────────────────────────────── */
-async function cargarVersion(docId, verId) {
-  const r = await fetch(`/biblioteca/editor/${docId}/version/${verId}`);
-  const j = await r.json();
-  if (j.ok) {
+  /* ── Versiones ── */
+  let versionHtml = '';
+  window.cargarVersion = async (docId, verId) => {
+    const j = await (await fetch(conId(URL_.version, docId, verId))).json();
+    if (!j.ok) return;
     versionHtml = j.contenido_html;
-    document.getElementById("diffTitle").textContent = `Versión ${j.version} — ${(j.fecha||'').substring(0,16)}`;
-    document.getElementById("diffContent").innerHTML = j.contenido_html;
-    document.getElementById("diffModal").classList.add("open");
-  }
-}
-function restaurarVersion() {
-  if (!versionHtml) return;
-  if (!confirm("¿Restaurar esta versión? El contenido actual será reemplazado.")) return;
-  quill.root.innerHTML = versionHtml;
-  cerrarModal("diffModal");
-}
+    $('#diffTitle').textContent = `Versión ${j.version} · ${(j.fecha || '').slice(0, 16)}`;
+    $('#diffContent').innerHTML = j.contenido_html;
+    $('#diffContent').querySelectorAll('[data-campo]').forEach(n => { n.textContent = valores[n.dataset.campo] || ETIQUETAS[n.dataset.campo] || n.dataset.campo; });
+    $('#diffModal').classList.add('open');
+  };
+  window.restaurarVersion = () => {
+    if (!versionHtml || !confirm('¿Volver a esta versión? Lo que hay ahora en la hoja se reemplaza.')) return;
+    quill.setContents(quill.clipboard.convert(versionHtml), 'user');
+    quill.root.querySelectorAll('.ed-campo').forEach(pintar);
+    cerrarModal('diffModal');
+  };
 
-/* ── Keyboard shortcut ──────────────────────── */
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    guardarDoc();
-  }
-});
+  /* En el teléfono los paneles empiezan cerrados para dejar ver la hoja */
+  if (matchMedia('(max-width: 900px)').matches) document.querySelectorAll('.ed2-panel details').forEach(d => d.open = false);
+})();
 </script>
 {% endblock %}

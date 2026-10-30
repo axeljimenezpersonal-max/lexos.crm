@@ -875,3 +875,28 @@ body.bv-modal-abierto { overflow: hidden; }
   .tp-chips::-webkit-scrollbar { display: none; }
 }
 .bv-acciones .btn { height: 50px; padding: 0 20px; font-size: 15px; border-radius: 10px; gap: 10px; }
+
+/* ── Bóveda: entrada grande (subir 3/4, escribir 1/4) ───────────── */
+.bv-entrada { display: grid; grid-template-columns: 3fr 1fr; gap: 14px; margin: 4px 0 18px; }
+.bv-e-subir, .bv-e-editor { display: flex; align-items: center; gap: 18px; min-height: 104px; padding: 20px 26px; border-radius: 18px;
+  text-align: left; text-decoration: none; cursor: pointer; font-family: 'Inter', sans-serif; transition: transform .15s, box-shadow .15s; }
+.bv-e-subir { border: 0; background: linear-gradient(135deg, #142E59, #1E4078); color: #fff; box-shadow: 0 10px 26px -12px rgba(20,46,89,.55); }
+.bv-e-subir:hover, .bv-e-editor:hover { transform: translateY(-1px); }
+.bv-e-subir i, .bv-e-editor i { flex: none; display: grid; place-items: center; border-radius: 14px; }
+.bv-e-subir i { width: 58px; height: 58px; background: rgba(233,220,192,.16); color: #E9DCC0; }
+.bv-e-subir span, .bv-e-editor span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bv-e-subir b { font: 600 21px 'Sora', sans-serif; letter-spacing: -.01em; }
+.bv-e-subir small { font-size: 14px; line-height: 1.45; color: rgba(255,255,255,.72); }
+.bv-e-subir em { margin-left: auto; flex: none; padding: 10px 16px; border-radius: 10px; background: #AD9060; color: #fff; font: 600 14px 'Inter', sans-serif; font-style: normal; }
+.bv-e-editor { border: 1px solid var(--border-m); background: var(--c); color: var(--e); }
+.bv-e-editor i { width: 44px; height: 44px; background: #F4ECDD; color: #8A6A2F; }
+.bv-e-editor b { font: 600 15.5px 'Sora', sans-serif; }
+.bv-e-editor small { font-size: 13px; color: var(--ash); }
+@media (max-width: 900px) {
+  .bv-entrada { grid-template-columns: minmax(0, 1fr); }
+  .bv-e-subir { padding: 18px; gap: 14px; }
+  .bv-e-subir em { display: none; }
+  .bv-e-subir i { width: 48px; height: 48px; }
+  .bv-e-subir b { font-size: 18px; }
+  .bv-e-editor { min-height: 0; padding: 14px 18px; }
+}

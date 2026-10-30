@@ -57,6 +57,18 @@ ALLOWED_EXT = {
 }
 
 VARIABLES_DINAMICAS = [("{{%s}}" % clave, etiqueta) for clave, etiqueta in machotes.CAMPOS]
+# Datos que el editor inserta como bloquecitos, agrupados como los piensa un abogado
+GRUPOS_CAMPOS = [
+    ("Cliente", ["nombre_cliente", "representante_legal", "rfc_cliente", "curp_cliente", "domicilio_cliente",
+                 "email_cliente", "telefono_cliente"]),
+    ("Expediente", ["titulo_asunto", "numero_expediente", "numero_juicio", "juzgado", "materia", "contraparte",
+                    "abogado_contraparte", "monto", "monto_letra", "honorarios", "honorarios_letra",
+                    "fecha_inicio_asunto"]),
+    ("Despacho y firma", ["nombre_abogado", "despacho", "domicilio_despacho", "telefono_despacho", "rfc_despacho"]),
+    ("Fechas", ["fecha_hoy", "fecha_hoy_letra"]),
+]
+# Un dato insertado en el editor: <span class="ed-campo" data-campo="nombre_cliente">…</span>
+_BLOQUE_CAMPO = re.compile(r'<span\b[^>]*\bdata-campo="([A-Za-z_]+)"[^>]*>(?:[^<]|<span\b[^>]*>[^<]*</span>)*</span>')
 
 PER_PAGE = 20
 
@@ -116,9 +128,18 @@ def _get_abogados():
 
 
 def _resolve_variables(html: str, asunto_id=None, cliente_id=None) -> str:
-    """Reemplaza {{variables}} con los datos del asunto, del cliente y del despacho."""
-    valores = machotes.datos(g.tenant_db, g.tenant, g.user, asunto_id, cliente_id)
+    """Reemplaza los datos insertados (bloquecitos o {{variables}}) con los del asunto, del cliente y del despacho."""
+    html = _BLOQUE_CAMPO.sub(lambda m: "{{%s}}" % m.group(1), html or "")
+    valores = machotes.datos(g.tenant_db, g.tenant, g.user, *_vinculo_visible(asunto_id, cliente_id))
     return machotes.resolver_html(html, valores)
+
+
+def _vinculo_visible(asunto_id, cliente_id):
+    """Un abogado solo puede llenar un documento con los datos de un expediente que puede ver."""
+    from modules.asuntos import puede_ver
+    if asunto_id and not puede_ver(g.tenant_db, asunto_id):
+        asunto_id = None
+    return asunto_id, cliente_id
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -908,6 +929,8 @@ def editor(doc_id=None):
 
     if doc_id:
         documento = tdb.execute("SELECT * FROM biblioteca_documentos WHERE id=?", (doc_id,)).fetchone()
+        if documento and documento["asunto_id"] and _vinculo_visible(documento["asunto_id"], None)[0] is None:
+            abort(404)   # documento de un expediente que esta persona no puede ver
         if documento:
             documento = dict(documento)
             versiones = tdb.execute(
@@ -927,9 +950,11 @@ def editor(doc_id=None):
             except Exception:
                 plantilla_html = ""
 
+    from modules.asuntos import _FILTRO_PROPIOS, _solo_lo_suyo
+    alc, params = ("1", []) if not _solo_lo_suyo() else (_FILTRO_PROPIOS, [session.get("user_id")] * 3)
     asuntos = tdb.execute(
-        "SELECT id, titulo, numero_expediente, cliente_id FROM asuntos "
-        "WHERE estado NOT IN ('archivado','cerrado') ORDER BY titulo"
+        "SELECT a.id, a.titulo, a.numero_expediente, a.cliente_id FROM asuntos a "
+        f"WHERE a.estado NOT IN ('archivado','cerrado') AND {alc} ORDER BY a.titulo", params
     ).fetchall()
     clientes = tdb.execute(
         "SELECT id, nombre, apellidos, razon_social FROM clientes WHERE activo=1 ORDER BY nombre LIMIT 300"
@@ -951,6 +976,8 @@ def editor(doc_id=None):
         plantilla_html=plantilla_html,
         plantilla_id=plantilla_id,
         variables=VARIABLES_DINAMICAS,
+        grupos_campos=[(nombre, [(k, machotes.ETIQUETAS[k]) for k in claves]) for nombre, claves in GRUPOS_CAMPOS],
+        etiquetas=machotes.ETIQUETAS, alias=machotes.ALIAS,
         asuntos=[dict(a) for a in asuntos],
         clientes=[dict(c) for c in clientes],
         plantillas=[dict(p) for p in plantillas],
@@ -1034,6 +1061,16 @@ def editor_version(doc_id, ver_id):
     return jsonify(ok=True, contenido_html=v["contenido_html"], version=v["version"], fecha=v["fecha"])
 
 
+@biblioteca_bp.route("/editor/datos")
+@login_required
+@tenant_required
+def editor_datos():
+    """Valor de cada dato para el expediente y la persona elegidos (lo que mostrarán los bloquecitos)."""
+    asunto_id, cliente_id = _vinculo_visible(_safe_int(request.args.get("asunto_id")),
+                                             _safe_int(request.args.get("cliente_id")))
+    return jsonify(ok=True, valores=machotes.datos(g.tenant_db, g.tenant, g.user, asunto_id, cliente_id))
+
+
 @biblioteca_bp.route("/editor/<int:doc_id>/variables", methods=["POST"])
 @login_required
 @tenant_required
@@ -1057,53 +1094,11 @@ def editor_exportar_pdf():
     asunto_id = _safe_int(data.get("asunto_id"))
     cliente_id = _safe_int(data.get("cliente_id"))
 
-    # Resolve variables before export
     html = _resolve_variables(html, asunto_id, cliente_id)
-
-    full_html = f"""<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<style>
-  body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12pt;
-         line-height: 1.6; color: #1a1a1a; max-width: 700px; margin: 40px auto; padding: 0 20px; }}
-  h1 {{ font-size: 18pt; color: #333; }} h2 {{ font-size: 15pt; color: #444; }}
-  h3 {{ font-size: 13pt; color: #555; }} h4 {{ font-size: 12pt; color: #666; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
-  th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-  th {{ background: #f5f5f5; font-weight: 600; }}
-  blockquote {{ border-left: 3px solid #AD9060; padding-left: 12px; color: #555; margin: 12px 0; }}
-  img {{ max-width: 100%; }}
-</style>
-</head><body>{html}</body></html>"""
-
-    # Try WeasyPrint first, fallback to pdfkit, then reportlab
-    buf = io.BytesIO()
-    try:
-        from weasyprint import HTML
-        HTML(string=full_html).write_pdf(buf)
-    except ImportError:
-        try:
-            import pdfkit
-            pdf_bytes = pdfkit.from_string(full_html, False)
-            buf.write(pdf_bytes)
-        except ImportError:
-            # Fallback: simple reportlab
-            try:
-                from reportlab.lib.pagesizes import A4
-                from reportlab.platypus import SimpleDocTemplate, Paragraph
-                from reportlab.lib.styles import getSampleStyleSheet
-                doc = SimpleDocTemplate(buf, pagesize=A4)
-                st = getSampleStyleSheet()
-                # Strip HTML for reportlab
-                import re
-                text = re.sub(r'<[^>]+>', ' ', html).strip()
-                story = [Paragraph(titulo, st["Heading1"]), Paragraph(text, st["Normal"])]
-                doc.build(story)
-            except ImportError:
-                return jsonify(ok=False, error="No hay generador PDF instalado (weasyprint/pdfkit/reportlab)"), 500
-
+    from modules import documento_salida
+    buf = io.BytesIO(documento_salida.a_pdf(html, titulo))
     buf.seek(0)
-    safe_name = titulo.replace(" ", "_")[:30]
+    safe_name = re.sub(r"[^\w\- ]", "", titulo).strip().replace(" ", "_")[:60] or "Documento"
     return send_file(buf, mimetype="application/pdf", as_attachment=True,
                      download_name=f"{safe_name}.pdf")
 
@@ -1119,30 +1114,10 @@ def editor_exportar_docx():
     cliente_id = _safe_int(data.get("cliente_id"))
 
     html = _resolve_variables(html, asunto_id, cliente_id)
-
-    try:
-        from docx import Document
-        from docx.shared import Pt, Inches
-        import re
-    except ImportError:
-        return jsonify(ok=False, error="python-docx no instalado"), 500
-
-    doc = Document()
-    doc.add_heading(titulo, level=1)
-
-    # Simple HTML to DOCX conversion
-    import re
-    # Split by block elements
-    blocks = re.split(r'<(?:p|div|h[1-4]|li|blockquote|tr)[^>]*>', html)
-    for block in blocks:
-        text = re.sub(r'<[^>]+>', '', block).strip()
-        if text:
-            doc.add_paragraph(text)
-
-    buf = io.BytesIO()
-    doc.save(buf)
+    from modules import documento_salida
+    buf = io.BytesIO(documento_salida.a_docx(html))
     buf.seek(0)
-    safe_name = titulo.replace(" ", "_")[:30]
+    safe_name = re.sub(r"[^\w\- ]", "", titulo).strip().replace(" ", "_")[:60] or "Documento"
     return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                      as_attachment=True, download_name=f"{safe_name}.docx")
 

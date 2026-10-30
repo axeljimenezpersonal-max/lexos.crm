@@ -5,8 +5,8 @@
 {% block head %}
 <style>
 .bl-sub{color:var(--ash);font-size:14.5px;margin-top:4px;max-width:66ch}
-.bl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
-.bl-kpi{background:var(--c);border:1px solid var(--border);border-radius:14px;padding:16px}
+.bl-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.bl-kpi{background:var(--c);border:1px solid var(--border);border-radius:14px;padding:16px;min-width:0}
 .bl-kpi small{display:block;color:var(--ash);font-size:13px;font-weight:500}
 .bl-kpi b{display:block;font:600 26px/1.1 'Sora',sans-serif;color:var(--tinta);margin-top:8px}
 .bl-kpi span{display:block;color:var(--ash);font-size:12px;margin-top:4px}
@@ -17,12 +17,17 @@
 .bl-search{display:flex;gap:8px;padding:4px 18px 10px}
 .bl-search input{flex:1;padding:11px 14px;border:1px solid var(--border);border-radius:10px;font:400 14.5px 'Inter',sans-serif;color:var(--fog);outline:none}
 .bl-search input:focus{border-color:var(--e);box-shadow:0 0 0 3px var(--edim)}
-.bl-filtros{display:flex;gap:6px;padding:0 18px 12px}
+.bl-filtros{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 12px;align-items:center}
 .bl-chip{padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:var(--c);color:#3B4A61;font:500 12.5px 'Inter',sans-serif;cursor:pointer}
 .bl-chip.on{background:var(--edim);border-color:#E2D3AE;color:var(--e);font-weight:600}
+.bl-edo{padding:5px 10px;border-radius:99px;border:1px solid var(--border);background:var(--c);color:#3B4A61;font:500 12.5px 'Inter',sans-serif;max-width:100%}
+.bl-edo[hidden]{display:none}
+.bl-src{display:inline-block;font:600 11.5px 'Inter',sans-serif;color:#3B4A61;background:#EEF2F7;padding:2px 8px;border-radius:6px;margin-bottom:6px}
+.bl-src.t-tesis{background:#EFEAF8;color:#4B3A78}.bl-src.t-ley_estatal{background:#E8F3EE;color:#24583F}.bl-src.t-dof{background:#F4ECDD;color:#6E5226}
 .bl-results{padding:0 18px 16px}
 .bl-res{padding:14px 0;border-top:1px solid var(--border)}
 .bl-res-h{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.bl-res-h>span{min-width:0;overflow-wrap:anywhere}
 .bl-res-h b{font-weight:600;color:var(--fog)}
 .bl-ref{display:inline-block;font:600 12px 'Inter',sans-serif;color:var(--e);background:var(--edim);padding:2px 8px;border-radius:6px;margin-right:6px}
 .bl-res-h a{font-size:12.5px;color:var(--e);font-weight:600;text-decoration:none;white-space:nowrap}
@@ -38,6 +43,7 @@
 .bl-item:hover b{color:var(--e)}
 .bl-fuente{font-size:12px;color:var(--ash);padding:0 18px 16px}
 @media(max-width:1000px){.bl-grid{grid-template-columns:1fr}.bl-kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:420px){.bl-kpi{padding:13px}.bl-kpi b{font-size:22px}}
 .bl-aviso{display:flex;align-items:center;gap:10px;margin:-6px 0 18px;padding:12px 16px;border-radius:12px;background:#F4ECDD;color:#6E5226;font:500 14px/1.45 'Inter',sans-serif}
 .bl-aviso i{width:14px;height:14px;flex:none;border-radius:50%;border:2px solid #C9A86A;border-top-color:transparent;animation:blGira 1s linear infinite}
 @keyframes blGira{to{transform:rotate(360deg)}}
@@ -47,18 +53,21 @@
 
 {% block content %}
 {% include "components/asistente_tabs.html" %}
-{% set leyes = resumen.leyes %}{% set dof = resumen.dof %}
+{% set leyes = resumen.leyes %}{% set dof = resumen.dof %}{% set regl = resumen.reglamentos %}{% set est = resumen.estatales %}{% set tes = resumen.tesis %}
+{% set nombres_fuente = {'dof': 'el Diario Oficial', 'ley_federal': 'las leyes federales', 'reglamento': 'los reglamentos federales', 'ley_estatal': 'las leyes de los estados', 'tesis': 'las tesis del Semanario Judicial'} %}
 <h1 class="page-title">Base legal de México</h1>
-<p class="bl-sub">Leyes federales vigentes y Diario Oficial de la Federación, descargados de las fuentes oficiales y actualizados todos los días. Es la base que consulta el asistente.</p>
+<p class="bl-sub">Leyes y reglamentos federales, leyes de los estados, jurisprudencia y Diario Oficial, descargados de las fuentes oficiales y actualizados solos. Es la base que consulta el asistente.</p>
 {% if avance %}
-<p class="bl-aviso" role="status"><i aria-hidden="true"></i>Descargando {{ 'las leyes federales' if avance.fuente == 'ley_federal' else 'el Diario Oficial' }} de las fuentes oficiales{% if avance.total %}: {{ avance.hecho }} de {{ avance.total }}{% endif %}. Puedes seguir trabajando; lo que ya bajó se puede buscar.</p>
+<p class="bl-aviso" role="status"><i aria-hidden="true"></i>Descargando {{ nombres_fuente.get(avance.fuente, 'la base legal') }}{% if avance.detalle %} ({{ avance.detalle }}){% endif %} de las fuentes oficiales{% if avance.total %}: {{ avance.hecho }} de {{ avance.total }}{% endif %}. Puedes seguir trabajando; lo que ya bajó se puede buscar.</p>
 {% elif not leyes.documentos and not dof.documentos %}
 <p class="bl-aviso" role="status">La base se descarga sola en el servidor. La primera vez tarda un rato porque son 317 leyes; vuelve en unos minutos.</p>
 {% endif %}
 
 <section class="bl-kpis" aria-label="Contenido de la base">
-  <div class="bl-kpi"><small>Leyes federales</small><b>{{ leyes.documentos or 0 }}</b><span>de 317 publicadas por la Cámara de Diputados</span></div>
-  <div class="bl-kpi"><small>Artículos indexados</small><b>{{ '{:,}'.format(leyes.fragmentos or 0) }}</b><span>separados por artículo</span></div>
+  <div class="bl-kpi"><small>Leyes federales</small><b>{{ leyes.documentos or 0 }}</b><span>{{ '{:,}'.format(leyes.fragmentos or 0) }} artículos · Cámara de Diputados</span></div>
+  <div class="bl-kpi"><small>Reglamentos</small><b>{{ regl.documentos or 0 }}</b><span>federales · {{ '{:,}'.format(regl.fragmentos or 0) }} artículos</span></div>
+  <div class="bl-kpi"><small>Leyes estatales</small><b>{{ '{:,}'.format(est.documentos or 0) }}</b><span>{% if est.documentos %}de {{ est.entidades }} {{ 'entidad' if est.entidades == 1 else 'entidades' }} · Orden Jurídico Nacional{% else %}Constituciones, códigos y leyes de los estados{% endif %}</span></div>
+  <div class="bl-kpi"><small>Jurisprudencia y tesis</small><b>{{ '{:,}'.format(tes.documentos or 0) }}</b><span>{% if tes.documentos %}{{ '{:,}'.format(tes.jurisprudencias or 0) }} jurisprudencias · Semanario Judicial{% elif tes.bloqueada %}El Semanario Judicial no permite descargas automáticas por ahora; se reintenta a diario{% else %}Semanario Judicial de la Federación{% endif %}</span></div>
   <div class="bl-kpi"><small>Notas del DOF</small><b>{{ '{:,}'.format(dof.documentos or 0) }}</b><span>publicaciones oficiales</span></div>
   <div class="bl-kpi"><small>Última actualización</small><b style="font-size:17px">{{ (resumen.sincronizaciones[0].fin or resumen.sincronizaciones[0].inicio)[:16] if resumen.sincronizaciones else '—' }}</b><span>{{ 'En curso' if resumen.sincronizaciones and not resumen.sincronizaciones[0].fin else 'Diaria, automática' }}</span></div>
 </section>
@@ -67,13 +76,21 @@
   <section class="bl-card">
     <div class="bl-card-h"><h2>Buscar en la ley</h2></div>
     <form class="bl-search" id="blForm" role="search">
-      <input id="blQ" placeholder="Ej. obligación de dar alimentos, artículo 14 constitucional, actos de comercio…" autocomplete="off" aria-label="Buscar en leyes federales y DOF">
+      <input id="blQ" placeholder="Ej. obligación de dar alimentos, artículo 14 constitucional, actos de comercio…" autocomplete="off" aria-label="Buscar en la base legal">
       <button class="btn btn-primary" type="submit">Buscar</button>
     </form>
     <div class="bl-filtros" role="group" aria-label="Fuente">
-      <button type="button" class="bl-chip on" data-f="">Todo</button>
-      <button type="button" class="bl-chip" data-f="ley_federal">Leyes federales</button>
-      <button type="button" class="bl-chip" data-f="dof">Diario Oficial</button>
+      <button type="button" class="bl-chip on" data-f="" aria-pressed="true">Todo</button>
+      <button type="button" class="bl-chip" data-f="ley_federal" aria-pressed="false">Leyes federales</button>
+      <button type="button" class="bl-chip" data-f="reglamento" aria-pressed="false">Reglamentos</button>
+      <button type="button" class="bl-chip" data-f="ley_estatal" aria-pressed="false">Leyes estatales</button>
+      <select class="bl-edo" id="blEdo" aria-label="Estado" hidden>
+        <option value="">Todos los estados</option>
+        {% for e in resumen.entidades %}<option value="{{ e.nombre }}"{% if not e.documentos %} disabled{% endif %}>{{ e.nombre }}{% if not e.documentos %} (sin descargar){% endif %}</option>
+        {% endfor %}
+      </select>
+      <button type="button" class="bl-chip" data-f="tesis" aria-pressed="false">Jurisprudencia y tesis</button>
+      <button type="button" class="bl-chip" data-f="dof" aria-pressed="false">Diario Oficial</button>
     </div>
     <div class="bl-results" id="blRes" aria-live="polite"><p class="bl-empty">Escribe una pregunta o un tema. Te muestro el artículo exacto y de qué ley sale.</p></div>
   </section>
@@ -93,12 +110,12 @@
       <div class="bl-card-h"><h2>Reformas más recientes</h2></div>
       <div class="bl-list">
         {% for r in resumen.reformas %}
-        <a class="bl-item" href="{{ r.url_oficial }}" target="_blank" rel="noopener"><b>{{ r.titulo }}</b><small>Última reforma DOF {{ r.ultima_reforma }}</small></a>
+        <a class="bl-item" href="{{ r.url_oficial }}" target="_blank" rel="noopener"><b>{{ r.titulo }}</b><small>{{ 'Reglamento · ' if r.fuente == 'reglamento' }}Última reforma DOF {{ r.ultima_reforma }}</small></a>
         {% else %}
         <p class="bl-empty">Aún no hay leyes descargadas.</p>
         {% endfor %}
       </div>
-      <p class="bl-fuente">Fuentes: Cámara de Diputados (Leyes Federales Vigentes) y Secretaría de Gobernación (SIDOF). El texto con validez oficial es el publicado en el DOF.</p>
+      <p class="bl-fuente">Fuentes: Cámara de Diputados (leyes y reglamentos federales vigentes), Secretaría de Gobernación (SIDOF y Orden Jurídico Nacional, para los estados) y Suprema Corte (Semanario Judicial de la Federación). El texto con validez oficial es el publicado en el DOF o en el periódico oficial de cada estado; las leyes estatales pueden tardar en reflejar las últimas reformas.</p>
     </section>
   </div>
 </div>
@@ -107,15 +124,26 @@
 {% block scripts %}
 <script>
 (function () {
-  const form = document.getElementById('blForm'), out = document.getElementById('blRes');
+  const form = document.getElementById('blForm'), out = document.getElementById('blRes'), edo = document.getElementById('blEdo');
   let fuente = '';
   function el(tag, txt, cls) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function relanzar() { if (document.getElementById('blQ').value.trim()) form.requestSubmit(); }
 
   document.querySelectorAll('.bl-chip').forEach(c => c.addEventListener('click', () => {
     fuente = c.dataset.f;
-    document.querySelectorAll('.bl-chip').forEach(x => x.classList.toggle('on', x === c));
-    if (document.getElementById('blQ').value.trim()) form.requestSubmit();
+    document.querySelectorAll('.bl-chip').forEach(x => { x.classList.toggle('on', x === c); x.setAttribute('aria-pressed', x === c ? 'true' : 'false'); });
+    edo.hidden = fuente !== 'ley_estatal';
+    relanzar();
   }));
+  edo.addEventListener('change', relanzar);
+
+  function meta(r) {
+    if (r.fuente === 'dof') return `DOF ${r.fecha_publicacion} · ${r.detalle || ''}`;
+    if (r.fuente === 'tesis') return [r.tipo_tesis === 'jurisprudencia' ? 'Jurisprudencia' : (r.tipo_tesis ? 'Tesis aislada' : 'Tesis'), r.instancia, r.epoca, r.clave ? `Registro digital ${r.clave}` : ''].filter(Boolean).join(' · ');
+    if (r.fuente === 'ley_estatal') return [r.entidad, r.detalle, r.ultima_reforma ? `Última reforma ${r.ultima_reforma}` : 'Sin reformas registradas', 'según el Orden Jurídico Nacional'].filter(Boolean).join(' · ');
+    return r.ultima_reforma ? `Última reforma DOF ${r.ultima_reforma}` : `Publicado DOF ${r.fecha_publicacion || 's/f'}`;
+  }
+  const ENLACE = { dof: 'Ver en el DOF', tesis: 'Ver en el Semanario', ley_estatal: 'Ver ficha oficial', reglamento: 'Ver reglamento oficial' };
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -125,19 +153,21 @@
     const u = new URL('{{ url_for("corpus.buscar") }}', location.origin);
     u.searchParams.set('q', q);
     if (fuente) u.searchParams.set('fuente', fuente);
+    if (fuente === 'ley_estatal' && edo.value) u.searchParams.set('entidad', edo.value);
     try {
       const j = await (await fetch(u)).json();
       out.replaceChildren();
       if (!j.resultados.length) { out.append(el('p', 'No encontré nada sobre eso.', 'bl-empty')); return; }
       j.resultados.forEach(r => {
         const box = el('div', null, 'bl-res');
+        box.append(el('span', r.fuente === 'ley_estatal' && r.entidad ? `${r.fuente_nombre} · ${r.entidad}` : r.fuente_nombre, 'bl-src t-' + r.fuente));
         const h = el('div', null, 'bl-res-h');
-        const t = el('span'); t.append(el('span', r.referencia, 'bl-ref'), el('b', r.titulo));
-        const a = el('a', r.fuente === 'dof' ? 'Ver en el DOF' : 'Ver ley oficial'); a.href = r.url_oficial; a.target = '_blank'; a.rel = 'noopener';
+        const t = el('span'); t.append(el('span', r.fuente === 'tesis' ? (r.clave_tesis || r.referencia) : r.referencia, 'bl-ref'), el('b', r.titulo));
+        const a = el('a', ENLACE[r.fuente] || 'Ver ley oficial'); a.href = r.url_oficial; a.target = '_blank'; a.rel = 'noopener';
         h.append(t, a);
         const corto = r.texto.length > 600;
         const p = el('p', corto ? r.texto.slice(0, 600) + '…' : r.texto);
-        box.append(h, el('div', r.fuente === 'dof' ? `DOF ${r.fecha_publicacion} · ${r.detalle || ''}` : `Última reforma DOF ${r.ultima_reforma || 's/f'}`, 'meta'), p);
+        box.append(h, el('div', meta(r), 'meta'), p);
         if (corto) {
           const mas = el('button', 'Leer completo', 'bl-mas'); mas.type = 'button';
           mas.addEventListener('click', () => { p.textContent = r.texto; mas.remove(); });

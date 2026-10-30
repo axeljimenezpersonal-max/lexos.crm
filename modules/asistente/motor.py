@@ -71,21 +71,47 @@ def _precedentes(app, tdb, consulta: str, asunto_id, para_modelo: bool) -> list[
     return salida
 
 
+def _entidad_del_asunto(tdb, asunto_id) -> str | None:
+    """El estado del asunto, leído del juzgado ("Juzgado Tercero de lo Familiar de la CDMX" → Ciudad de México)."""
+    if not asunto_id:
+        return None
+    try:
+        from modules.corpus.estatal import entidad_en
+        fila = tdb.execute("SELECT juzgado FROM asuntos WHERE id=?", (asunto_id,)).fetchone()
+        return entidad_en(fila[0]) if fila else None
+    except Exception:
+        return None
+
+
+def _fuente_legal(r: dict) -> dict:
+    """Un resultado de la base legal como fuente citable."""
+    tipo = {"ley_federal": "ley", "dof": "dof"}.get(r["fuente"], r["fuente"])
+    if r["fuente"] == "tesis":
+        detalle = " · ".join(p for p in (r.get("detalle"), f"registro digital {r['clave']}") if p)
+        referencia = r.get("clave_tesis") or r["referencia"]
+    elif r["fuente"] == "ley_estatal":
+        detalle = (f"{r.get('entidad')} · última reforma {r['ultima_reforma'] or 'no indicada'}, "
+                   f"según el Orden Jurídico Nacional")
+        referencia = r["referencia"]
+    elif r["fuente"] == "dof":
+        detalle, referencia = f"DOF {r['fecha_publicacion']}", r["referencia"]
+    else:
+        detalle = f"Última reforma DOF {r['ultima_reforma'] or r['fecha_publicacion'] or 's/f'}"
+        referencia = r["referencia"]
+    return {"tipo": tipo, "titulo": r["titulo"], "referencia": referencia, "url": r["url_oficial"],
+            "detalle": detalle, "texto": r["texto"][:MAX_TEXTO_FUENTE]}
+
+
 def _buscar(app, config, slug, tdb, consulta: str, extra: str, asunto_id, para_modelo: bool = True) -> list[dict]:
     fuentes: list[dict] = []
     vistos = set()
+    entidad = _entidad_del_asunto(tdb, asunto_id)
     for q in [c for c in (consulta, extra) if c]:
-        for r in corpus.buscar(config, q, limite=5):
+        for r in corpus.buscar(config, q, limite=5, preferir_entidad=entidad):
             clave = ("ley", r["id"])
             if clave not in vistos:
                 vistos.add(clave)
-                fuentes.append({
-                    "tipo": "ley" if r["fuente"] == "ley_federal" else "dof",
-                    "titulo": r["titulo"], "referencia": r["referencia"], "url": r["url_oficial"],
-                    "detalle": (f"Última reforma DOF {r['ultima_reforma']}" if r["fuente"] == "ley_federal"
-                                else f"DOF {r['fecha_publicacion']}"),
-                    "texto": r["texto"][:MAX_TEXTO_FUENTE],
-                })
+                fuentes.append(_fuente_legal(r))
     # Solo documentos que esta persona puede ver (un abogado no ve los expedientes de otros equipos)
     from modules.lector import documentos_visibles
     visibles = set(documentos_visibles(tdb))
@@ -104,7 +130,8 @@ def _bloque_fuentes(fuentes: list[dict]) -> str:
     partes = []
     for i, f in enumerate(fuentes, start=1):
         etiqueta = {"despacho": "Documento del despacho", "dof": "Diario Oficial de la Federación",
-                    "caso": "Precedente del despacho"}.get(f["tipo"], "Ley federal")
+                    "caso": "Precedente del despacho", "reglamento": "Reglamento federal",
+                    "ley_estatal": "Ley estatal", "tesis": "Tesis del Semanario Judicial"}.get(f["tipo"], "Ley federal")
         partes.append(f"[{i}] {etiqueta} — {f['titulo']}, {f['referencia']} ({f['detalle']})\n{f['texto']}")
     return "\n\n".join(partes) if partes else "(No se encontraron fuentes relevantes.)"
 
