@@ -642,48 +642,52 @@
 
   </div>
 
-  <h2 class="mp-sub">Tu estrategia</h2>
-  <form class="xe" id="fFicha">
-    <p class="xe-intro">Responde estas cinco preguntas. Así todo el equipo sabe a dónde va el caso, y {{ config.ASISTENTE_NOMBRE }} lo toma en cuenta.</p>
-    <div class="xe-paso">
-      <span class="xe-n">1</span>
-      <div><label class="xe-t" for="eObj">¿Qué quiere lograr el cliente?</label>
-        <textarea class="as-textarea" id="eObj" name="objetivo_cliente" rows="2" maxlength="2000" placeholder="Ej. Que se deje sin efectos la resolución del SAT y no pagar el crédito fiscal.">{{ ficha.objetivo_cliente if ficha else '' }}</textarea></div>
+  {% set f = ficha or {} %}
+  {% set favor = f.argumentos_clave or [] %}{% set riesgos = f.riesgos or [] %}
+  {% set tiene_plan = f.objetivo_cliente or f.via_procesal or favor or riesgos %}
+  {% set probs = {'baja': ('Baja', 'p-baja'), 'media': ('Media', 'p-media'), 'alta': ('Alta', 'p-alta')} %}
+  <article class="xp-card b-resumen pl" id="plCaso">
+    <div class="xp-card-h"><h2>{{ ic('scale', 17) }} Plan del caso</h2>
+      {% if tiene_plan %}<button type="button" class="link" id="plEditar">Editar</button>{% endif %}</div>
+    <div class="xp-card-b">
+      <div class="pl-ver"{% if not tiene_plan %} hidden{% endif %}>
+        <dl class="pl-datos">
+          <div><dt>El cliente quiere</dt><dd>{{ f.objetivo_cliente or '—' }}</dd></div>
+          <div><dt>Vamos por</dt><dd>{{ f.via_procesal or '—' }}{% if f.justificacion_via %}<small>{{ f.justificacion_via }}</small>{% endif %}</dd></div>
+          <div><dt>Probabilidad</dt><dd>{% if f.probabilidad_exito in probs %}<span class="pl-prob {{ probs[f.probabilidad_exito][1] }}">{{ probs[f.probabilidad_exito][0] }}</span>{% else %}—{% endif %}</dd></div>
+        </dl>
+        {% if favor or riesgos %}
+        <div class="pl-listas">
+          <div class="pl-favor"><b>A favor</b>{% for x in favor %}<p>{{ x }}</p>{% else %}<p class="pl-nada">Sin anotar</p>{% endfor %}</div>
+          <div class="pl-riesgo"><b>Riesgos</b>{% for x in riesgos %}<p>{{ x }}</p>{% else %}<p class="pl-nada">Sin anotar</p>{% endfor %}</div>
+        </div>
+        {% endif %}
+        <button type="button" class="link pl-revisar" data-revisar-plan>{{ ic('spark', 14) }} Pídele a {{ config.ASISTENTE_NOMBRE }} que revise el plan</button>
+      </div>
+      {% if not tiene_plan %}
+      <div class="pl-vacio" id="plVacio"><p>Aún no hay plan. En dos líneas: qué quiere el cliente y por qué vía van. Lo ve todo el equipo y {{ config.ASISTENTE_NOMBRE }} lo toma en cuenta.</p>
+        <button type="button" class="btn btn-primary btn-sm" id="plEscribir">Escribir el plan</button></div>
+      {% endif %}
+      <form class="pl-form" id="fFicha" hidden>
+        <label class="pl-campo pl-ancho"><span>¿Qué quiere lograr el cliente?</span>
+          <textarea class="as-textarea" name="objetivo_cliente" rows="2" maxlength="2000" placeholder="Ej. Que se deje sin efectos la resolución del SAT y no pagar el crédito fiscal.">{{ f.objetivo_cliente or '' }}</textarea></label>
+        <label class="pl-campo"><span>¿Por qué vía vamos?</span>
+          <input class="as-input" name="via_procesal" maxlength="200" value="{{ f.via_procesal or '' }}" placeholder="Ej. Amparo indirecto"></label>
+        <label class="pl-campo"><span>¿Por qué esa vía? <em>opcional</em></span>
+          <input class="as-input" name="justificacion_via" maxlength="2000" value="{{ f.justificacion_via or '' }}" placeholder="En una línea"></label>
+        <div class="pl-campo pl-ancho"><span>¿Qué tan probable es ganar?</span>
+          <div class="pl-seg" id="eProb">{% for v, (l, c) in probs.items() %}<button type="button" data-v="{{ v }}" class="{{ c }}{{ ' on' if f.probabilidad_exito == v }}">{{ l }}</button>{% endfor %}</div></div>
+        <label class="pl-campo"><span>A favor <em>uno por renglón</em></span>
+          <textarea class="as-textarea" id="eArg" rows="3" maxlength="4000">{{ favor | join('\n') }}</textarea></label>
+        <label class="pl-campo"><span>Riesgos <em>uno por renglón</em></span>
+          <textarea class="as-textarea" id="eRie" rows="3" maxlength="4000">{{ riesgos | join('\n') }}</textarea></label>
+        <div class="pl-pie pl-ancho">
+          <button type="button" class="btn btn-ghost btn-sm" id="plCancelar">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" id="fFichaGuardar">Guardar plan</button>
+        </div>
+      </form>
     </div>
-    <div class="xe-paso">
-      <span class="xe-n">2</span>
-      <div><label class="xe-t" for="eVia">¿Por qué camino vamos?</label>
-        <input class="as-input" id="eVia" name="via_procesal" maxlength="200" value="{{ ficha.via_procesal if ficha else '' }}" placeholder="Ej. Amparo indirecto">
-        <textarea class="as-textarea" id="eJus" name="justificacion_via" rows="2" maxlength="2000" placeholder="¿Por qué ese camino y no otro?" style="margin-top:8px">{{ ficha.justificacion_via if ficha else '' }}</textarea></div>
-    </div>
-    <div class="xe-paso">
-      <span class="xe-n">3</span>
-      <div><span class="xe-t">¿Qué tan probable es ganar?</span>
-        <div class="xe-prob" id="eProb">
-          {% for v, l, d in [('baja','Baja','Hay obstáculos fuertes'),('media','Media','Puede salir en cualquier sentido'),('alta','Alta','Los argumentos son sólidos')] %}
-          <button type="button" data-v="{{ v }}" class="p-{{ v }}{{ ' on' if pv == v }}"><b>{{ l }}</b><small>{{ d }}</small></button>
-          {% endfor %}
-        </div></div>
-    </div>
-    <div class="xe-paso">
-      <span class="xe-n">4</span>
-      <div><span class="xe-t">Argumentos a favor</span>
-        <ul class="xe-lista favor" data-lista="eArg">{% for x in (ficha.argumentos_clave if ficha else []) %}<li><span>{{ x }}</span><button type="button" aria-label="Quitar">×</button></li>{% endfor %}</ul>
-        <input class="as-input xe-agregar" data-para="eArg" maxlength="400" placeholder="Escribe un argumento y presiona Enter">
-        <textarea id="eArg" name="argumentos_clave" hidden>{{ (ficha.argumentos_clave | join('\n')) if ficha else '' }}</textarea></div>
-    </div>
-    <div class="xe-paso">
-      <span class="xe-n">5</span>
-      <div><span class="xe-t">Riesgos</span>
-        <ul class="xe-lista riesgo" data-lista="eRie">{% for x in (ficha.riesgos if ficha else []) %}<li><span>{{ x }}</span><button type="button" aria-label="Quitar">×</button></li>{% endfor %}</ul>
-        <input class="as-input xe-agregar" data-para="eRie" maxlength="400" placeholder="Escribe un riesgo y presiona Enter">
-        <textarea id="eRie" name="riesgos" hidden>{{ (ficha.riesgos | join('\n')) if ficha else '' }}</textarea></div>
-    </div>
-    <div class="xe-pie">
-      <button type="button" class="link" id="xeRevisar">{{ ic('spark', 14) }} Pídele a {{ config.ASISTENTE_NOMBRE }} que revise la estrategia</button>
-      <button type="button" class="btn btn-primary" id="fFichaGuardar">Guardar estrategia</button>
-    </div>
-  </form>
+  </article>
 </section>
 
 
@@ -989,28 +993,28 @@
     recargar('');
   });
 
-  /* Estrategia: listas de argumentos y riesgos */
-  function syncLista(ul) { $('#' + ul.dataset.lista).value = [...ul.querySelectorAll('li span')].map(x => x.textContent.trim()).filter(Boolean).join('\n'); }
-  function agregarALista(inp) {
-    const v = inp.value.trim(); if (!v) return;
-    const ul = document.querySelector(`.xe-lista[data-lista="${inp.dataset.para}"]`);
-    const li = document.createElement('li'); li.append(Object.assign(document.createElement('span'), { textContent: v }));
-    const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Quitar'); li.append(x);
-    ul.append(li); inp.value = ''; syncLista(ul);
-  }
-  document.querySelectorAll('.xe-lista').forEach(ul => ul.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; b.parentElement.remove(); syncLista(ul); }));
-  document.querySelectorAll('.xe-agregar').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); agregarALista(inp); } }));
-  let prob = {{ ((ficha.probabilidad_exito if ficha else '') or '') | tojson }};
+  /* Plan del caso: se lee en corto y se edita en el mismo lugar */
+  const plForm = $('#fFicha'), plVer = document.querySelector('#plCaso .pl-ver'), plTiene = !!$('#plEditar');
+  const plAbrir = abrir => {
+    plForm.hidden = !abrir;
+    if (plTiene) { plVer.hidden = abrir; $('#plEditar').hidden = abrir; } else { $('#plVacio').hidden = abrir; }
+    if (abrir) plForm.querySelector('textarea').focus();
+  };
+  $('#plEditar')?.addEventListener('click', () => plAbrir(true));
+  $('#plEscribir')?.addEventListener('click', () => plAbrir(true));
+  $('#plCancelar').addEventListener('click', () => plAbrir(false));
+  let prob = {{ ((ficha or {}).probabilidad_exito or '') | tojson }};
   $('#eProb').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; prob = b.dataset.v; $('#eProb').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
-  const lineas = t => (t || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const lineas = t => (t || '').split('\n').map(s => s.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
   $('#fFichaGuardar').addEventListener('click', async () => {
-    document.querySelectorAll('.xe-agregar').forEach(agregarALista);
-    const fd = new FormData($('#fFicha'));
+    const fd = new FormData(plForm), btn = $('#fFichaGuardar'); btn.disabled = true;
     const r = await post(`/asuntos/${ID}/ficha`, {
       objetivo_cliente: fd.get('objetivo_cliente'), via_procesal: fd.get('via_procesal'), justificacion_via: fd.get('justificacion_via'),
       argumentos_clave: lineas($('#eArg').value), riesgos: lineas($('#eRie').value), probabilidad_exito: prob || 'media', insights: [],
     });
-    r.ok ? showToast('Estrategia guardada') : showToast('No se pudo guardar la estrategia', 'error');
+    if (!r.ok) { btn.disabled = false; showToast('No se pudo guardar el plan', 'error'); return; }
+    try { sessionStorage.setItem('xpToast', 'Plan guardado'); } catch (_) {}
+    recargar('estrategia');
   });
 
   /* Preguntar: mini chat con memoria (la conversación se guarda cifrada y sigue al volver) */
@@ -1216,9 +1220,9 @@
     };
   })();
 
-  $('#xeRevisar').addEventListener('click', () => {
+  document.querySelector('[data-revisar-plan]')?.addEventListener('click', () => {
     irA('preguntar');
-    chat.preguntar('Revisa la estrategia de este expediente: ¿los argumentos tienen sustento legal y qué riesgos falta considerar?');
+    chat.preguntar('Revisa el plan de este expediente: ¿los argumentos tienen sustento legal y qué riesgos falta considerar?');
   });
 
   /* Equipo */

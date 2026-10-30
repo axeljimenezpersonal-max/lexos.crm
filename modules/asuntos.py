@@ -789,7 +789,7 @@ def _resumen_inteligente(asunto, responsable, abierto, dias, eventos, pendientes
     if abierto and not nd:
         atencion.append({"tono": "ambar", "texto": "Aún no tiene documentos: súbelos para que el asistente los pueda leer"})
     if abierto and not (ficha and (ficha.get("via_procesal") or ficha.get("argumentos_clave"))):
-        atencion.append({"tono": "gris", "texto": "Falta escribir la estrategia"})
+        atencion.append({"tono": "gris", "texto": "Falta escribir el plan del caso"})
     if not desc:
         atencion.append({"tono": "gris", "texto": "Falta describir los hechos en los datos generales"})
     if not abierto and not asunto.get("resultado"):

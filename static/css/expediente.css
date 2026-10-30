@@ -486,3 +486,38 @@
   .xp-card[class*="b-"] > .xp-card-h .mp-acto-abrir { margin-right: 0; }
   .mp-sug-acc .btn { flex: 1; justify-content: center; }
 }
+
+/* ── Plan del caso: tarjeta corta en Estrategia ──────────────────── */
+.pl { margin-top: 22px; }
+.pl .xp-card-h h2 svg { color: #E9DCC0; }
+.pl-datos { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 14px 28px; margin: 0 0 14px; }
+.pl-datos dt { font: 600 11px 'Inter', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ash); margin-bottom: 4px; }
+.pl-datos dd { margin: 0; font: 500 15px/1.45 'Inter', sans-serif; color: var(--e); }
+.pl-datos dd small { display: block; margin-top: 2px; font-size: 13px; font-weight: 400; color: var(--ash); }
+.pl-prob, .pl-seg button { display: inline-block; padding: 4px 12px; border-radius: 99px; font: 600 13px 'Inter', sans-serif; }
+.pl-prob.p-baja, .pl-seg .p-baja.on { background: #F8E4E0; color: #B4412F; }
+.pl-prob.p-media, .pl-seg .p-media.on { background: #F4ECDD; color: #8A6A2F; }
+.pl-prob.p-alta, .pl-seg .p-alta.on { background: #E2EEEC; color: #3D6B6B; }
+.pl-listas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.pl-listas > div { padding: 12px 14px; border-radius: 12px; }
+.pl-listas b { display: block; margin-bottom: 6px; font: 600 12px 'Inter', sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.pl-listas p { margin: 0 0 4px; font-size: 14px; line-height: 1.45; color: var(--fog); }
+.pl-favor { background: #EEF1F5; border-left: 3px solid #3D5A80; } .pl-favor b { color: #3D5A80; }
+.pl-riesgo { background: #F8EDEA; border-left: 3px solid var(--danger); } .pl-riesgo b { color: #B4412F; }
+.pl-nada { color: var(--ash) !important; font-style: italic; }
+.pl-revisar { display: inline-flex; align-items: center; gap: 6px; }
+.pl-vacio { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.pl-vacio p { margin: 0; font-size: 14.5px; color: var(--ash); max-width: 640px; }
+.pl-vacio[hidden], .pl-ver[hidden], .pl-form[hidden] { display: none; }
+.pl-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.pl-campo > span { display: block; margin-bottom: 6px; font: 600 13.5px 'Inter', sans-serif; color: var(--e); }
+.pl-campo em { font-style: normal; font-weight: 400; color: var(--ash); }
+.pl-ancho { grid-column: 1 / -1; }
+.pl-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.pl-seg button { border: 1px solid var(--border-m); background: var(--c); color: #3B4A61; cursor: pointer; padding: 7px 18px; }
+.pl-pie { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 760px) {
+  .pl-datos, .pl-listas, .pl-form { grid-template-columns: minmax(0, 1fr); }
+  .pl-vacio { flex-direction: column; align-items: stretch; }
+  .pl-pie .btn { flex: 1; }
+}
