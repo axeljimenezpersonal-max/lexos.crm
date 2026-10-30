@@ -326,3 +326,103 @@
 .xm-borrar { font-size: 12.5px; color: var(--ash); }
 .xm-vacio { padding: 16px 0 4px; font-size: 14px; color: var(--ash); }
 .xc-hola > .xc-msg { margin-bottom: 14px; max-width: 92%; }
+
+/* ── Mapa del expediente (pestaña Estrategia) ─────────────────── */
+.mp { display: flex; flex-direction: column; gap: 18px; margin-bottom: 34px; }
+.mp-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.mp-head h2 { font: 600 28px 'Sora', sans-serif; letter-spacing: -.02em; color: var(--e); margin: 0; }
+.mp-head p { margin: 6px 0 0; font-size: 15px; color: var(--ash); max-width: 640px; }
+.mp-al-dia { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; background: #E6EFEA; color: #2F6B4F; font: 600 12.5px 'Inter', sans-serif; }
+.mp-cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.mp-cifras a { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px; align-items: center; padding: 14px 16px;
+  border-radius: 14px; background: var(--c); border: 1px solid var(--border); text-decoration: none; transition: border-color .15s, transform .15s; }
+.mp-cifras a:hover { border-color: var(--dorado); transform: translateY(-1px); }
+.mp-cifras span { grid-row: 1 / 3; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #E8EDF5; color: #142E59; }
+.mp-cifras b { font: 600 24px/1 'Sora', sans-serif; color: var(--e); }
+.mp-cifras small { font-size: 13px; color: var(--ash); }
+.mp-cifras .t-puntos span { background: #F4ECDD; color: #8A6A2F; }
+.mp-cifras .t-puntos.alerta { border-color: #E3C9A0; background: #FCF8F1; }
+.mp-cifras .t-personas span { background: #E9ECF1; color: #3B4A61; }
+.mp-cifras .t-docs span { background: #ECEFF3; color: #4A5A73; }
+
+.mp-punto { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.mp-punto:last-of-type { border-bottom: 0; }
+.mp-nivel { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: #AD9060; }
+.mp-punto.n-alto .mp-nivel { background: #B4412F; box-shadow: 0 0 0 4px #F8E4E0; }
+.mp-punto.n-medio .mp-nivel { background: #C08A2E; box-shadow: 0 0 0 4px #F7EDD9; }
+.mp-punto.n-bajo .mp-nivel { background: #8A94A6; box-shadow: 0 0 0 4px #EEF0F4; }
+.mp-punto.hecho .mp-nivel { background: #2F6B4F; box-shadow: none; }
+.mp-punto-tx { flex: 1; min-width: 0; }
+.mp-punto-tx b { display: block; font: 600 15px 'Inter', sans-serif; color: var(--fog); }
+.mp-punto-tx p { margin: 3px 0 6px; font-size: 14px; line-height: 1.5; color: #4A5A73; }
+.mp-punto.n-alto .mp-punto-tx b { color: #9A3324; }
+.mp-revisar { flex: none; }
+.mp-revisados { margin-top: 10px; border-top: 1px dashed var(--border-m); padding-top: 8px; }
+.mp-revisados summary { cursor: pointer; font: 600 13px 'Inter', sans-serif; color: var(--ash); padding: 6px 0; }
+.mp-revisados .mp-punto-tx b { color: var(--ash); font-weight: 500; text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
+.mp-fuente { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--border-m); background: #fff;
+  font: 600 12px 'Inter', sans-serif; color: #34496B; text-decoration: none; cursor: pointer; }
+.mp-fuente:hover { border-color: var(--dorado); color: var(--e); }
+.mp-vacio { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 14px; color: var(--ash); }
+
+.mp-filtro { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.12); }
+.mp-filtro button { border: 0; background: none; color: rgba(255,255,255,.82); font: 600 12.5px 'Inter', sans-serif; padding: 6px 11px; border-radius: 8px; cursor: pointer; }
+.mp-filtro button span { opacity: .7; margin-left: 3px; }
+.mp-filtro button.on { background: #fff; color: #142E59; }
+.mp-linea { list-style: none; margin: 0; padding: 0; position: relative; }
+.mp-linea::before { content: ''; position: absolute; left: 92px; top: 6px; bottom: 6px; width: 2px; background: #E3E7EE; }
+.mp-ev { position: relative; display: grid; grid-template-columns: 80px 26px 1fr; align-items: start; padding: 9px 0; }
+.mp-ev[hidden] { display: none; }
+.mp-fecha { text-align: right; padding-right: 4px; line-height: 1.15; }
+.mp-fecha b { display: block; font: 600 14px 'Sora', sans-serif; color: var(--e); }
+.mp-fecha small { font-size: 12px; color: var(--ash); }
+.mp-punto-l { justify-self: center; width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; background: #fff; border: 3px solid #4A5A73; position: relative; z-index: 1; }
+.mp-ev.c-juicio .mp-punto-l { border-color: #142E59; background: #142E59; }
+.mp-ev.futuro .mp-punto-l { background: #fff; }
+.mp-ev.futuro.c-juicio .mp-punto-l { background: #fff; border-color: #142E59; }
+.mp-ev-tx { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-left: 6px; min-width: 0; }
+.mp-ev-tx b { font: 600 14.5px 'Inter', sans-serif; color: var(--fog); }
+.mp-carril { font: 700 11px 'Inter', sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #8A94A6; }
+.mp-ev.c-juicio .mp-carril { color: #142E59; }
+.mp-ev.futuro .mp-ev-tx b { color: #4A5A73; }
+.mp-hoy { position: relative; display: grid; grid-template-columns: 80px 26px 1fr; padding: 6px 0; }
+.mp-hoy span { grid-column: 3; justify-self: start; padding: 3px 10px; border-radius: 99px; background: #AD9060; color: #fff; font: 700 11.5px 'Inter', sans-serif; letter-spacing: .03em; }
+.mp-hoy::after { content: ''; position: absolute; left: 86px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: #AD9060; box-shadow: 0 0 0 4px #F4ECDD; }
+
+.mp-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.mp-persona { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.mp-persona:last-child { border-bottom: 0; }
+.mp-av { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #142E59; color: #fff; font: 600 14px 'Inter', sans-serif; }
+.mp-persona.r-contra .mp-av { background: #8A94A6; }
+.mp-persona.r-autoridad .mp-av { background: #8A6A2F; }
+.mp-persona.r-equipo .mp-av { background: #3D6B6B; }
+.mp-persona > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.mp-persona small { font: 700 11px 'Inter', sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--ash); }
+.mp-persona b, .mp-persona a { font: 600 14.5px 'Inter', sans-serif; color: var(--fog); text-decoration: none; }
+.mp-persona a:hover { text-decoration: underline; text-decoration-color: var(--dorado); }
+.mp-persona em { font-style: normal; font-size: 13px; color: var(--ash); }
+.mp-doc { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--fog); }
+.mp-doc:last-child { border-bottom: 0; }
+.mp-doc-t { height: 30px; border-radius: 7px; display: grid; place-items: center; background: #ECEFF3; color: #4A5A73; font: 700 10.5px 'Inter', sans-serif; }
+.mp-doc b { font: 600 14px 'Inter', sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-doc small { font-size: 12.5px; color: var(--ash); white-space: nowrap; }
+.mp-doc:hover b { color: var(--e); text-decoration: underline; text-decoration-color: var(--dorado); }
+.mp-ia { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 14px 16px; border-radius: 14px; background: #F4F1EA; color: #4A5A73; font-size: 14px; line-height: 1.5; }
+.mp-ia svg { flex: none; color: var(--dorado); margin-top: 2px; }
+.mp-sub { font: 600 24px 'Sora', sans-serif; letter-spacing: -.02em; color: var(--e); margin: 0 0 14px; }
+
+@media (max-width: 860px) {
+  .mp-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mp-dos { grid-template-columns: 1fr; }
+  .mp-head h2 { font-size: 24px; }
+}
+@media (max-width: 560px) {
+  .mp-punto { flex-wrap: wrap; }
+  .mp-punto-tx { flex-basis: calc(100% - 24px); }
+  .mp-revisar { margin-left: 24px; }
+  .mp-linea::before { left: 70px; }
+  .mp-ev, .mp-hoy { grid-template-columns: 58px 26px 1fr; }
+  .mp-hoy::after { left: 64px; }
+  .mp-cifras a { padding: 12px; column-gap: 10px; }
+  .mp-cifras span { width: 34px; height: 34px; }
+}

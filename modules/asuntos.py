@@ -30,7 +30,7 @@ from flask import (
 from modules import boveda
 from modules import lector
 from modules.insights import casos as precedentes
-from modules.auth import login_required, role_required, tenant_required
+from modules.auth import log_activity, login_required, role_required, tenant_required
 
 asuntos_bp = Blueprint("asuntos", __name__)
 ZONA = ZoneInfo("America/Mexico_City")
@@ -937,9 +937,13 @@ def detalle(id: int):
                   "puede_borrar": h["autor_id"] == uid or rol in ("super_admin", "admin")}
                  for h in almacen.hallazgos(tdb, g.tenant_slug, id)]
 
+    from modules import mapa as mapa_mod
+    mapa = mapa_mod.construir(tdb, asunto, usuarios, responsable, colaboradores, documentos, sentencias, ficha,
+                              sin_mov, abierto, vencido)
+
     es_admin = rol in ("super_admin", "admin")
     return render_template(
-        "asuntos/detalle.html",
+        "asuntos/detalle.html", mapa=mapa,
         apertura=_fecha_corta(asunto.get("fecha_inicio") or asunto.get("fecha_alta")).split(" · ")[0],
         ultima_actividad=_fecha_corta(ultimo.isoformat()) if ultimo else "",
         asunto=asunto, responsable=responsable, colaboradores=colaboradores, abogados=abogados,
@@ -957,6 +961,21 @@ def detalle(id: int):
         recien_creado=request.args.get("nuevo") == "1",
         today_str=_hoy().isoformat(),
     )
+
+
+@asuntos_bp.route("/<int:id>/mapa/revisar", methods=["POST"])
+@login_required
+@tenant_required
+def mapa_revisar(id):
+    """Marca un punto del mapa como revisado (o lo vuelve a abrir)."""
+    from modules import mapa as mapa_mod
+    d = request.get_json(silent=True) or {}
+    clave = (d.get("clave") or "").strip()
+    if not clave:
+        return jsonify(ok=False, error="Falta el punto"), 400
+    mapa_mod.marcar(g.tenant_db, id, clave, session.get("user_id"), bool(d.get("revisado", True)))
+    log_activity("mapa_revisado" if d.get("revisado", True) else "mapa_reabierto", "asunto", id, {"clave": clave})
+    return jsonify(ok=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

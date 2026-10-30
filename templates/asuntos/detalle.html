@@ -470,6 +470,111 @@
 <!-- ── Estrategia ─────────────────────────────────────────────── -->
 <section class="xp-panel" id="p-estrategia" role="tabpanel">
   {% set pv = (ficha.probabilidad_exito if ficha else '') or '' %}
+  {# ── Mapa del expediente: el caso por tiempo, personas, documentos y puntos por revisar ── #}
+  {% macro fuente(x) -%}
+    {%- if x.url %}<a class="mp-fuente" href="{{ x.url }}"{% if x.url.startswith('/archivos/') %} target="_blank" rel="noopener"{% endif %}>{{ ic('doc', 13) }}{{ x.fuente }}</a>
+    {%- elif x.ir == 'datos' %}<a class="mp-fuente" href="#datos" data-datos>{{ ic('doc', 13) }}{{ x.fuente }}</a>
+    {%- elif x.ir %}<button type="button" class="mp-fuente" data-ir="{{ x.ir }}">{{ ic('doc', 13) }}{{ x.fuente }}</button>
+    {%- else %}<span class="mp-fuente">{{ ic('doc', 13) }}{{ x.fuente }}</span>{% endif -%}
+  {%- endmacro %}
+  <div class="mp" id="mapa">
+    <header class="mp-head">
+      <div>
+        <h2>Mapa del expediente</h2>
+        <p>Entiende el caso por tiempo, personas y documentos, con lo que requiere atención. Cada dato lleva a su fuente.</p>
+      </div>
+      <span class="mp-al-dia">{{ ic('check', 14) }} Al día: se arma solo con lo que registra el equipo</span>
+    </header>
+
+    <nav class="mp-cifras" aria-label="Secciones del mapa">
+      <a href="#mpPuntos" class="t-puntos{{ ' alerta' if mapa.puntos }}"><span>{{ ic('scale', 18) }}</span><b>{{ mapa.puntos | length }}</b><small>Por revisar</small></a>
+      <a href="#mpCrono" class="t-crono"><span>{{ ic('clock', 18) }}</span><b>{{ mapa.cronologia | length }}</b><small>En la cronología</small></a>
+      <a href="#mpPersonas" class="t-personas"><span>{{ ic('user', 18) }}</span><b>{{ mapa.personas | length }}</b><small>Personas y autoridades</small></a>
+      <a href="#mpDocs" class="t-docs"><span>{{ ic('doc', 18) }}</span><b>{{ mapa.documentos | length }}</b><small>Documentos</small></a>
+    </nav>
+
+    <article class="xp-card b-agenda mp-puntos" id="mpPuntos">
+      <div class="xp-card-h"><h2>Puntos por revisar</h2><small>Lo que conviene atender o confirmar</small></div>
+      <div class="xp-card-b">
+        {% for p in mapa.puntos %}
+        <div class="mp-punto n-{{ p.nivel }}">
+          <i class="mp-nivel" aria-hidden="true"></i>
+          <div class="mp-punto-tx"><b>{{ p.titulo }}</b><p>{{ p.detalle }}</p>{{ fuente(p) }}</div>
+          <button type="button" class="btn btn-ghost btn-sm mp-revisar" data-clave="{{ p.clave }}">{{ ic('check', 14) }} Marcar revisado</button>
+        </div>
+        {% else %}
+        <p class="mp-vacio">{{ ic('check', 16) }} Nada pendiente por ahora.</p>
+        {% endfor %}
+        {% if mapa.revisados %}
+        <details class="mp-revisados">
+          <summary>Revisados ({{ mapa.revisados | length }})</summary>
+          {% for p in mapa.revisados %}
+          <div class="mp-punto hecho"><i class="mp-nivel" aria-hidden="true"></i>
+            <div class="mp-punto-tx"><b>{{ p.titulo }}</b><p>Revisado por {{ p.revisado_por }}{% if p.revisado_el %} el {{ p.revisado_el }}{% endif %}</p></div>
+            <button type="button" class="link mp-reabrir" data-clave="{{ p.clave }}">Volver a abrir</button></div>
+          {% endfor %}
+        </details>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="xp-card b-resumen" id="mpCrono">
+      <div class="xp-card-h"><h2>Cronología</h2>
+        <div class="mp-filtro" role="tablist" aria-label="Qué mostrar">
+          <button type="button" class="on" data-carril="">Todo</button>
+          <button type="button" data-carril="juicio">Juicio <span>{{ mapa.juicio }}</span></button>
+          <button type="button" data-carril="gestion">Gestiones <span>{{ mapa.cronologia | length - mapa.juicio }}</span></button>
+        </div>
+      </div>
+      <div class="xp-card-b">
+        {% if mapa.cronologia %}
+        <ol class="mp-linea">
+          {% set ns = namespace(hoy=false) %}
+          {% for c in mapa.cronologia %}
+          {% if c.futuro and not ns.hoy %}{% set ns.hoy = true %}<li class="mp-hoy"><span>Hoy · {{ mapa.hoy.dia }} {{ mapa.hoy.mes }}</span></li>{% endif %}
+          <li class="mp-ev c-{{ c.carril }}{{ ' futuro' if c.futuro }}" data-carril="{{ c.carril }}">
+            <span class="mp-fecha"><b>{{ c.dia }} {{ c.mes }}</b><small>{{ c.anio }}</small></span>
+            <span class="mp-punto-l" aria-hidden="true"></span>
+            <div class="mp-ev-tx">
+              <span class="mp-carril">{{ 'Juicio' if c.carril == 'juicio' else 'Gestión' }} · {{ c.tipo }}</span>
+              <b>{{ c.titulo }}</b>
+              {{ fuente(c) }}
+            </div>
+          </li>
+          {% endfor %}
+          {% if not ns.hoy %}<li class="mp-hoy"><span>Hoy · {{ mapa.hoy.dia }} {{ mapa.hoy.mes }}</span></li>{% endif %}
+        </ol>
+        {% else %}<p class="mp-vacio">Aún no hay fechas registradas. Agenda audiencias o términos y sube documentos para ver la historia del caso.</p>{% endif %}
+      </div>
+    </article>
+
+    <div class="mp-dos">
+      <article class="xp-card b-equipo" id="mpPersonas">
+        <div class="xp-card-h"><h2>Personas y autoridades</h2></div>
+        <div class="xp-card-b">
+          {% for p in mapa.personas %}
+          <div class="mp-persona r-{{ p.clase }}">
+            <span class="mp-av" aria-hidden="true">{{ p.nombre[:1] }}</span>
+            <span><small>{{ p.rol }}</small>{% if p.url %}<a href="{{ p.url }}">{{ p.nombre }}</a>{% else %}<b>{{ p.nombre }}</b>{% endif %}{% if p.detalle %}<em>{{ p.detalle }}</em>{% endif %}</span>
+          </div>
+          {% else %}<p class="mp-vacio">Registra al cliente, la contraparte y el juzgado en Datos generales.</p>{% endfor %}
+        </div>
+      </article>
+      <article class="xp-card b-docs" id="mpDocs">
+        <div class="xp-card-h"><h2>Documentos</h2><button type="button" class="link" data-ir="documentos">Ver todos →</button></div>
+        <div class="xp-card-b">
+          {% for d in mapa.documentos[:8] %}
+          <a class="mp-doc"{% if d.url %} href="{{ d.url }}" target="_blank" rel="noopener"{% else %} href="#documentos" data-ir="documentos"{% endif %}>
+            <span class="mp-doc-t">{{ d.tipo }}</span><b>{{ d.nombre }}</b><small>{{ d.dia }}</small></a>
+          {% else %}<p class="mp-vacio">Sin documentos todavía.</p>{% endfor %}
+        </div>
+      </article>
+    </div>
+
+    <p class="mp-ia">{{ ic('spark', 15) }}<span>Cuando se conecte la IA, {{ config.ASISTENTE_NOMBRE }} leerá los documentos y sumará aquí hechos, fechas, montos y contradicciones con su cita y página. Aparecerán como <b>sugeridos</b> hasta que alguien del equipo los confirme.</span></p>
+  </div>
+
+  <h2 class="mp-sub">Tu estrategia</h2>
   <form class="xe" id="fFicha">
     <p class="xe-intro">Responde estas cinco preguntas. Así todo el equipo sabe a dónde va el caso, y {{ config.ASISTENTE_NOMBRE }} lo toma en cuenta.</p>
     <div class="xe-paso">
@@ -949,6 +1054,21 @@
     cargar();
     return { preguntar };
   })();
+  /* Mapa del expediente: filtro de la cronología y puntos revisados */
+  document.querySelectorAll('.mp-filtro button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.mp-filtro button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.mp-ev').forEach(li => { li.hidden = !!b.dataset.carril && li.dataset.carril !== b.dataset.carril; });
+  }));
+  document.querySelectorAll('.mp-revisar, .mp-reabrir').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    const r = await post(`/asuntos/${ID}/mapa/revisar`, { clave: b.dataset.clave, revisado: b.classList.contains('mp-revisar') });
+    r.ok ? recargar('estrategia') : (b.disabled = false, showToast('No se pudo guardar', 'error'));
+  }));
+  document.querySelectorAll('[data-datos]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); $('#xpEditar')?.click(); }));
+  document.querySelectorAll('.mp-cifras a').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault(); document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+
   /* Memoria del caso: puntos clave y descubrimientos del equipo */
   const memoria = (() => {
     const form = $('#xmForm'), texto = $('#xmTexto'), origen = $('#xmOrigen'), de = $('#xmDe'), lista = $('#xmLista');
