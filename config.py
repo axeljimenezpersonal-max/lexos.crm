@@ -47,7 +47,7 @@ class Config:
     PLATAFORMA_ADMINS = os.environ.get("PLATAFORMA_ADMINS", "")
     # Google Analytics (G-XXXXXXX): solo en páginas públicas y solo si la persona acepta cookies.
     GA_MEASUREMENT_ID = os.environ.get("GA_MEASUREMENT_ID", "")
-    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC", "")   # en Railway se llama ANTHROPIC
     ASISTENTE_MODELO = os.environ.get("ASISTENTE_MODELO", "claude-sonnet-5-5")
     ASISTENTE_MODELO_RAPIDO = os.environ.get("ASISTENTE_MODELO_RAPIDO", "claude-haiku-5-5")
     WTF_CSRF_ENABLED = True

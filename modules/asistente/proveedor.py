@@ -47,16 +47,24 @@ class ProveedorAnthropic:
         }
 
     def extraer(self, sistema: str, contenido: str, herramienta: dict, max_tokens: int = 8000) -> dict:
-        """Lectura estructurada: obliga al modelo a contestar llenando `herramienta` y devuelve sus datos."""
+        """Lectura estructurada: el modelo contesta llenando `herramienta` y se devuelven sus datos.
+        Los modelos actuales no aceptan forzar la herramienta (tool_choice "tool"), así que se pide en las
+        instrucciones; si aun así contesta en texto, se toma el JSON que haya escrito."""
+        nombre = herramienta["name"]
         r = self._cliente.messages.create(
-            model=self.modelo, max_tokens=max_tokens, system=sistema, tools=[herramienta],
-            tool_choice={"type": "tool", "name": herramienta["name"]},
+            model=self.modelo, max_tokens=max_tokens, tools=[herramienta], tool_choice={"type": "auto"},
+            system=f"{sistema}\n\nContesta únicamente llamando a la herramienta {nombre}, una sola vez, sin texto adicional.",
             messages=[{"role": "user", "content": contenido}],
         )
         for b in r.content:
-            if getattr(b, "type", "") == "tool_use":
+            if getattr(b, "type", "") == "tool_use" and b.name == nombre:
                 return b.input or {}
-        return {}
+        texto = "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
+        m = re.search(r"\{.*\}", texto, re.S)
+        try:
+            return json.loads(m.group(0)) if m else {}
+        except json.JSONDecodeError:
+            return {}
 
     def responder(self, sistema: str, mensajes: list[dict], max_tokens: int = 1800) -> Iterator[str]:
         with self._cliente.messages.stream(
