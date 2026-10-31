@@ -135,7 +135,7 @@ def index():
 
     tdb = g.tenant_db
     uid = session.get("user_id")
-    hoy = date.today()
+    hoy = datetime.now(ZONA).date()
     hoy_iso = hoy.isoformat()
 
     # Un abogado solo ve sus expedientes; el resto del equipo ve todos
@@ -165,10 +165,10 @@ def index():
 
     # ── Próximos vencimientos: términos vencidos + lo de los próximos 30 días ──
     terminos = ",".join("?" * len(TERMINO_TIPOS))
-    filtro_ev, filtro_p = "", []
-    if _solo_lo_suyo():
-        filtro_ev = f" AND (e.asunto_id IS NULL OR e.asunto_id IN (SELECT a.id FROM asuntos a WHERE {_FILTRO_PROPIOS}))"
-        filtro_p = [uid, uid, uid]
+    # Mismo alcance que el calendario: un abogado ve lo de sus expedientes, lo que creó y donde participa
+    from modules.calendario import alcance_eventos
+    alc_ev, filtro_p = alcance_eventos(uid)
+    filtro_ev = f" AND {alc_ev}"
     vencimientos = []
     for e in tdb.execute(
         f"""SELECT e.titulo, e.tipo, e.fecha_inicio, e.todo_el_dia, e.asunto_id,

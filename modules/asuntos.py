@@ -1449,16 +1449,27 @@ def agregar_actividad(id: int):
     # Opcionalmente crear evento en calendario
     if data.get("crear_evento"):
         try:
-            g.tenant_db.execute(
+            # Un término del expediente es término en el calendario; una nota pendiente, tarea
+            tipo_ev = {"audiencia": "audiencia", "diligencia": "diligencia", "vencimiento": "vencimiento",
+                       "reunion": "reunion", "nota": "tarea"}.get(tipo, "otro")
+            con_hora = len(fecha.replace("T", " ").strip()) > 10
+            fecha_ev = fecha.replace("T", " ")[:16] + ":00" if con_hora else fecha[:10]
+            fila = g.tenant_db.execute("SELECT cliente_id, abogado_responsable FROM asuntos WHERE id=?", (id,)).fetchone()
+            cur_ev = g.tenant_db.execute(
                 """INSERT INTO eventos_calendario
-                   (titulo, tipo, asunto_id, fecha_inicio, descripcion, creado_por)
-                   VALUES (?,?,?,?,?,?)""",
-                (titulo, tipo if tipo in ("audiencia","reunion","plazo","tarea") else "otro",
-                 id, fecha, data.get("descripcion") or None, session.get("user_id")),
+                   (titulo, tipo, asunto_id, cliente_id, fecha_inicio, todo_el_dia, descripcion, creado_por)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (titulo, tipo_ev, id, fila["cliente_id"] if fila else None, fecha_ev, 0 if con_hora else 1,
+                 data.get("descripcion") or None, session.get("user_id")),
             )
+            # Lo atiende el responsable del expediente (o quien lo agenda, si no hay)
+            quien = (fila["abogado_responsable"] if fila else None) or session.get("user_id")
+            if quien:
+                g.tenant_db.execute("INSERT INTO evento_participantes (evento_id, user_id) VALUES (?,?)",
+                                    (cur_ev.lastrowid, quien))
             g.tenant_db.commit()
         except Exception:
-            pass
+            current_app.logger.exception("No se pudo agendar la actividad en el calendario")
 
     _log("agregar_actividad", id, {"titulo": titulo})
     return jsonify(

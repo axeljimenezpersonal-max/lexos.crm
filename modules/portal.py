@@ -387,11 +387,14 @@ def cliente_inicio():
         (cid,),
     ).fetchall()
 
+    from modules.calendario import ahora_mx
+    ahora = ahora_mx()
     prox_evento = tdb.execute(
-        """SELECT titulo, fecha_inicio, tipo FROM eventos_calendario
-           WHERE cliente_id=? AND fecha_inicio >= datetime('now')
-           ORDER BY fecha_inicio ASC LIMIT 1""",
-        (cid,),
+        """SELECT id, titulo, fecha_inicio, tipo, todo_el_dia, lugar, respuesta_cliente FROM eventos_calendario
+           WHERE cliente_id=? AND COALESCE(estado,'pendiente')='pendiente'
+             AND ((todo_el_dia=1 AND date(fecha_inicio) >= ?) OR datetime(replace(fecha_inicio,'T',' ')) >= ?)
+           ORDER BY datetime(replace(fecha_inicio,'T',' ')) ASC LIMIT 1""",
+        (cid, ahora.date().isoformat(), ahora.strftime("%Y-%m-%d %H:%M:%S")),
     ).fetchone()
 
     ultima_factura = tdb.execute(
@@ -608,22 +611,23 @@ def cliente_evento_confirmar(evento_id):
     tdb = g.tenant_db
     cid = session["portal_cliente_id"]
     ev = tdb.execute(
-        "SELECT id FROM eventos_calendario WHERE id=? AND cliente_id=?",
+        "SELECT id, titulo, fecha_inicio, estado FROM eventos_calendario WHERE id=? AND cliente_id=?",
         (evento_id, cid),
     ).fetchone()
-    if not ev:
-        return jsonify(ok=False, error="Evento no encontrado"), 404
+    if not ev or (ev["estado"] or "pendiente") != "pendiente":
+        return jsonify(ok=False, error="Esta cita ya no está programada"), 404
 
-    accion = request.form.get("accion", "confirmar")
-    if accion == "confirmar":
-        tdb.execute("UPDATE eventos_calendario SET estado='confirmado' WHERE id=?", (evento_id,))
-        msg = "Reunión confirmada"
-    else:
-        tdb.execute("UPDATE eventos_calendario SET estado='cancelado' WHERE id=?", (evento_id,))
-        msg = "Reunión rechazada"
-    tdb.execute(
-        "INSERT INTO portal_mensajes (cliente_id, remitente, mensaje) VALUES (?,?,?)",
-        (cid, "cliente", f"[Evento #{evento_id}] {msg}"),
-    )
+    # El cliente avisa; no confirma ni cancela por el despacho (una audiencia no se cancela porque el cliente no pueda)
+    datos = request.get_json(silent=True) or request.form
+    accion = datos.get("accion", "confirmar")
+    respuesta = "confirmado" if accion == "confirmar" else "no_puede"
+    tdb.execute("UPDATE eventos_calendario SET respuesta_cliente=?, respuesta_cliente_fecha=CURRENT_TIMESTAMP WHERE id=?",
+                (respuesta, evento_id))
+    cuando = (ev["fecha_inicio"] or "")[:16].replace("T", " ")
+    msg = (f"Confirmó que asistirá a «{ev['titulo']}» ({cuando})." if respuesta == "confirmado"
+           else f"Avisó que NO puede asistir a «{ev['titulo']}» ({cuando}).")
+    tdb.execute("INSERT INTO portal_mensajes (cliente_id, remitente, mensaje) VALUES (?,?,?)", (cid, "cliente", msg))
     tdb.commit()
-    return jsonify(ok=True, message=msg)
+    return jsonify(ok=True, respuesta=respuesta,
+                   message="Gracias, tu abogado ya sabe que asistirás." if respuesta == "confirmado"
+                   else "Listo, le avisamos a tu abogado que no puedes; te contactará para ver otra fecha.")

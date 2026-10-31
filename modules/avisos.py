@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, g, jsonify, request, session, url_for
 
-from modules.asuntos import _FILTRO_PROPIOS, _solo_lo_suyo
 from modules.auth import login_required, tenant_required
 from modules.dashboard import DIAS, ZONA
 
@@ -53,10 +52,9 @@ def avisos(tdb, uid: int, limite: int = 20) -> list[dict]:
     asegurar(tdb)
     ahora = datetime.now(ZONA).replace(tzinfo=None)
     hoy = ahora.date()
-    alc, params = "1", []
-    if _solo_lo_suyo():
-        alc = f"(e.creado_por=? OR e.asunto_id IN (SELECT a.id FROM asuntos a WHERE {_FILTRO_PROPIOS}))"
-        params = [uid, uid, uid, uid]
+    # Mismo alcance que el calendario: un abogado, lo de sus expedientes, lo que creó y donde participa
+    from modules.calendario import alcance_eventos
+    alc, params = alcance_eventos(uid)
 
     salida = []
     filas = tdb.execute(

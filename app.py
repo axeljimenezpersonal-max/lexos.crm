@@ -176,17 +176,15 @@ def create_app(env="default"):
         if user and tenant and hasattr(g, "tenant_db"):
             try:
                 from modules.avisos import avisos as _avisos
-                from datetime import datetime as _dtz
-                from modules.dashboard import ZONA as _ZONA
                 notif_items = _avisos(g.tenant_db, session.get("user_id"))
                 notif_count = sum(1 for n in notif_items if not n["leido"])
-                hoy_agenda = g.tenant_db.execute(
-                    "SELECT COUNT(*) FROM eventos_calendario WHERE estado='pendiente' AND date(fecha_inicio)=?",
-                    (_dtz.now(_ZONA).date().isoformat(),)).fetchone()[0]
+                from modules.calendario import contar_hoy as _contar_hoy
+                hoy_agenda = _contar_hoy(g.tenant_db, session.get("user_id"))
             except Exception:
                 app.logger.exception("No se pudieron calcular los avisos")
 
         from datetime import datetime as _dt
+        from zoneinfo import ZoneInfo
         return {
             "tenant": tenant,
             "current_user": user,
@@ -197,7 +195,7 @@ def create_app(env="default"):
             "notif_items": notif_items,
             "hoy_agenda": hoy_agenda,
             "now": _dt.now,
-            "today_str": _dt.now().strftime("%Y-%m-%d"),
+            "today_str": _dt.now(ZoneInfo("America/Mexico_City")).strftime("%Y-%m-%d"),
         }
 
     # ─── Error handlers ──────────────────────────────────────────────────────

@@ -823,6 +823,9 @@ _MIGRATE_COLS = [
     ("eventos_calendario", "recurrencia",           "TEXT DEFAULT 'none'"),
     ("eventos_calendario", "recurrencia_parent_id", "INTEGER"),
     ("eventos_calendario", "gcal_event_id",         "TEXT"),
+    # Lo que contestó el cliente desde el portal: no cambia el estado del evento, lo decide el despacho
+    ("eventos_calendario", "respuesta_cliente",     "TEXT"),
+    ("eventos_calendario", "respuesta_cliente_fecha", "TEXT"),
     # ── Asistente: asuntos cuya información nunca sale del servidor ───────────
     ("asuntos", "privado",                          "INTEGER DEFAULT 0"),
     ("asuntos", "resultado",                        "TEXT"),
@@ -1218,6 +1221,18 @@ CREATE TABLE IF NOT EXISTS contraparte_asunto (
     notas           TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Días inhábiles que marca el despacho (vacaciones del juzgado, suspensiones de labores)
+CREATE TABLE IF NOT EXISTS dias_inhabiles (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    desde       DATE    NOT NULL,
+    hasta       DATE    NOT NULL,
+    motivo      TEXT    NOT NULL,
+    creado_por  INTEGER,
+    fecha_alta  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_eventos_asunto ON eventos_calendario(asunto_id);
+CREATE INDEX IF NOT EXISTS idx_evento_part_user ON evento_participantes(user_id, evento_id);
 """
 
 

@@ -88,11 +88,14 @@
   <div class="ptl-event-card">
     <div>
       <strong>{{ prox_evento.titulo }}</strong>
-      <div class="ptl-text-muted">{{ prox_evento.fecha_inicio }} · {{ prox_evento.tipo|capitalize if prox_evento.tipo else '' }}</div>
+      {% set f_ev = (prox_evento.fecha_inicio or '').replace('T', ' ') %}
+      <div class="ptl-text-muted">{{ f_ev[:10] }}{% if not prox_evento.todo_el_dia and f_ev|length > 10 %} a las {{ f_ev[11:16] }}{% endif %}{% if prox_evento.lugar %} · {{ prox_evento.lugar }}{% endif %}</div>
+      {% if prox_evento.respuesta_cliente == 'confirmado' %}<div class="ptl-text-muted" style="color:#2F5D5D;font-weight:600;margin-top:4px">Ya confirmaste que asistirás.</div>
+      {% elif prox_evento.respuesta_cliente %}<div class="ptl-text-muted" style="color:#B4412F;font-weight:600;margin-top:4px">Avisaste que no puedes asistir; tu abogado te contactará.</div>{% endif %}
     </div>
     <div class="ptl-event-actions">
-      <button class="ptl-btn ptl-btn-sm ptl-btn-success" onclick="confirmarEvento({{ prox_evento.id if prox_evento.id else 0 }}, 'confirmar')">Confirmar</button>
-      <button class="ptl-btn ptl-btn-sm ptl-btn-outline" onclick="confirmarEvento({{ prox_evento.id if prox_evento.id else 0 }}, 'rechazar')">Rechazar</button>
+      {% if prox_evento.respuesta_cliente != 'confirmado' %}<button class="ptl-btn ptl-btn-sm ptl-btn-success" onclick="confirmarEvento({{ prox_evento.id }}, 'confirmar')">Sí asistiré</button>{% endif %}
+      {% if prox_evento.respuesta_cliente != 'no_puede' %}<button class="ptl-btn ptl-btn-sm ptl-btn-outline" onclick="confirmarEvento({{ prox_evento.id }}, 'no_puedo')">No puedo asistir</button>{% endif %}
     </div>
   </div>
 </div>
@@ -109,7 +112,7 @@ function confirmarEvento(id, accion) {
     body: 'accion=' + accion
   }).then(r => r.json()).then(d => {
     if (d.ok) { alert(d.message); location.reload(); }
-    else alert(d.error || 'Error');
+    else alert(d.error || 'No se pudo enviar tu respuesta. Intenta de nuevo.');
   });
 }
 </script>

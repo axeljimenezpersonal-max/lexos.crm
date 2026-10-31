@@ -20,7 +20,7 @@
 <div class="cal-head">
   <div>
     <h1 class="page-title">Calendario</h1>
-    <p class="cal-sub">Audiencias, términos y citas de todo el despacho.</p>
+    <p class="cal-sub">{% if solo_lo_suyo %}Tus audiencias, términos y citas, y las de tus expedientes.{% else %}Audiencias, términos y citas de todo el despacho.{% endif %}</p>
   </div>
   <button class="btn btn-primary" onclick="openCreate()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -87,14 +87,14 @@
       </div>
       <label class="cal-field-label" for="filterAbogado">Abogado</label>
       <select class="cal-filter-sel" id="filterAbogado" onchange="reloadEvents()">
-        <option value="">Todo el equipo</option>
+        <option value="">{{ 'Todo lo mío' if solo_lo_suyo else 'Todo el equipo' }}</option>
         {% for ab in abogados %}
         <option value="{{ ab.id }}">{{ ab.nombre }} {{ ab.apellidos }}</option>
         {% endfor %}
       </select>
-      <label class="cal-field-label" for="filterAsunto">Asunto</label>
+      <label class="cal-field-label" for="filterAsunto">Expediente</label>
       <select class="cal-filter-sel" id="filterAsunto" onchange="reloadEvents()">
-        <option value="">Todos los asuntos</option>
+        <option value="">Todos los expedientes</option>
         {% for a in asuntos %}
         <option value="{{ a.id }}"{% if request.args.get('asunto') == a.id | string %} selected{% endif %}>{{ a.numero_expediente or a.titulo }}</option>
         {% endfor %}
@@ -105,17 +105,36 @@
       <div class="cal-side-title">Conectar y exportar</div>
       <div class="gcal-status {{ 'on' if gcal_active else 'off' }}" id="gcalStatus">
         <span class="gcal-dot"></span>
-        <span>Google Calendar: {{ 'sincronizado' if gcal_active else 'no conectado' }}</span>
+        <span>Google Calendar: {{ 'sincronizado' if gcal_active else ('no conectado' if gcal_disponible else 'aún no disponible') }}</span>
       </div>
       <div class="cal-side-actions">
         {% if gcal_active %}
         <button class="btn btn-ghost btn-sm" onclick="sincronizarGcal()">{{ icon_refresh(14, 14) }} Sincronizar</button>
         <button class="btn btn-ghost btn-sm" onclick="toggleGcal(false)">Desconectar</button>
-        {% else %}
+        {% elif gcal_disponible %}
         <a href="{{ url_for('calendario.oauth_google') }}" class="btn btn-ghost btn-sm">{{ icon_link(14, 14) }} Conectar Google</a>
         {% endif %}
         <button class="btn btn-ghost btn-sm" onclick="exportIcs()">{{ icon_calendar(14, 14) }} Descargar .ics</button>
       </div>
+    </section>
+
+    <section class="cal-side-card" id="inhCard">
+      <div class="cal-side-title">Días inhábiles</div>
+      <p class="cal-side-note">Los términos ya saltan sábados, domingos y los descansos oficiales. Aquí marca los que publique tu juzgado: vacaciones, suspensiones de labores.</p>
+      <div class="inh-list" id="inhList"></div>
+      <details class="inh-add">
+        <summary>+ Marcar días inhábiles</summary>
+        <div class="inh-form">
+          <label for="inhDesde">Desde</label>
+          <input type="date" id="inhDesde">
+          <label for="inhHasta">Hasta <small>(si es un solo día, déjalo vacío)</small></label>
+          <input type="date" id="inhHasta">
+          <label for="inhMotivo">Motivo</label>
+          <input type="text" id="inhMotivo" maxlength="120" placeholder="Ej. Vacaciones del Poder Judicial">
+          <p class="cf-err" id="inhErr" role="alert"></p>
+          <button type="button" class="btn btn-primary btn-sm" onclick="agregarInhabil()">Guardar</button>
+        </div>
+      </details>
     </section>
   </aside>
 
@@ -142,10 +161,10 @@
      EVENT DETAIL MODAL (on click)
      ══════════════════════════════════════════ -->
 <div class="cal-modal-overlay" id="detailModal" onclick="if(event.target===this)closeDetail()">
-  <div class="cal-modal" style="max-width:480px">
+  <div class="cal-modal" style="max-width:480px" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
     <div class="cal-modal-head" id="detailHead" style="border-bottom: 3px solid var(--accent)">
       <span class="cal-modal-title" id="detailTitle">Evento</span>
-      <button class="cal-modal-close" onclick="closeDetail()">×</button>
+      <button class="cal-modal-close" onclick="closeDetail()" aria-label="Cerrar">×</button>
     </div>
     <div class="cal-modal-body" style="padding:0">
       <!-- Color bar -->
@@ -177,7 +196,17 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
             </svg>
-            <span id="detailAsunto"></span>
+            <a id="detailAsunto" class="detail-link" href="#"></a>
+          </div>
+        </div>
+
+        <!-- Quién lo atiende -->
+        <div id="detailQuienWrap" style="display:none; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--text-2);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/>
+            </svg>
+            <span id="detailQuien"></span>
           </div>
         </div>
 
@@ -190,6 +219,9 @@
             <span id="detailCliente"></span>
           </div>
         </div>
+
+        <!-- Lo que contestó el cliente desde el portal -->
+        <div id="detailRespuesta" class="cal-respuesta" style="display:none; margin-bottom:8px;"></div>
 
         <!-- Lugar -->
         <div id="detailLugarWrap" style="display:none; margin-bottom:8px;">
@@ -223,7 +255,7 @@
         <button class="btn btn-danger btn-sm" onclick="deleteFromDetail()">{{ icon_trash(14, 14) }} Eliminar</button>
       </div>
       <div class="cal-modal-foot-right">
-        <button class="btn btn-ghost btn-sm" onclick="completeFromDetail()">✓ Marcar como hecho</button>
+        <button class="btn btn-ghost btn-sm" id="detailHechoBtn" onclick="completeFromDetail()">✓ Marcar como hecho</button>
         <button class="btn btn-primary btn-sm" onclick="editFromDetail()">{{ icon_edit(14, 14) }} Editar</button>
       </div>
     </div>
@@ -234,36 +266,59 @@
      CREATE / EDIT MODAL
      ══════════════════════════════════════════ -->
 <div class="cal-modal-overlay" id="evtModal" onclick="if(event.target===this)closeModal()">
-  <div class="cal-modal">
+  <div class="cal-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="cal-modal-head">
       <span class="cal-modal-title" id="modalTitle">Nuevo evento</span>
-      <button class="cal-modal-close" onclick="closeModal()">×</button>
+      <button class="cal-modal-close" onclick="closeModal()" aria-label="Cerrar">×</button>
     </div>
     <div class="cal-modal-body">
 
       <!-- ── SECCIÓN: Información básica ── -->
       <div class="cf-section">
-        <div class="cf-section-title">Qué es</div>
         <div class="cf-row">
           <div class="cf-g">
-            <label for="mTitulo">Título <span class="req">*</span></label>
-            <input type="text" id="mTitulo" placeholder="Ej. Audiencia de pruebas — García vs. López">
+            <label for="mTitulo">Qué es <span class="req">*</span></label>
+            <input type="text" id="mTitulo" maxlength="200" autocomplete="off" placeholder="Ej. Audiencia de pruebas — García vs. López" aria-describedby="errTitulo">
+            <p class="cf-err" id="errTitulo" role="alert"></p>
           </div>
         </div>
         <div class="cf-row">
           <div class="cf-g">
-            <label>Tipo de evento <span class="req">*</span></label>
-            <div class="tipo-picker" id="tipoPicker">
+            <label id="tipoLbl">Tipo</label>
+            <div class="tipo-picker" id="tipoPicker" role="radiogroup" aria-labelledby="tipoLbl">
               {% for key, t in tipos_evento.items() if not t.oculto %}
-              <div class="tipo-opt" data-tipo="{{ key }}" onclick="pickTipo('{{ key }}')"
+              <button type="button" class="tipo-opt" data-tipo="{{ key }}" onclick="pickTipo('{{ key }}')" role="radio" aria-checked="false"
                    style="--tc:{{ t.color }}" data-tip="{{ tipo_descs.get(key, '') }}">
                 <span class="tipo-opt-dot" style="background:{{ t.color }}"></span>
                 <span class="tipo-opt-icon">{{ icon(t.icon, 13, 13) }}</span>
                 <span>{{ t.label }}</span>
-              </div>
+              </button>
               {% endfor %}
             </div>
           </div>
+        </div>
+
+        <!-- Cómputo del término -->
+        <div class="plazo-box" id="plazoBox" hidden>
+          <div class="plazo-h">¿Cuándo vence? Calcúlalo en días hábiles</div>
+          <div class="plazo-row">
+            <div class="cf-g">
+              <label for="pDesde">Surtió efectos la notificación el</label>
+              <input type="date" id="pDesde" onchange="calcularPlazo()">
+              <p class="cf-err" id="errPDesde" role="alert"></p>
+            </div>
+            <div class="cf-g plazo-dias">
+              <label for="pDias">Días hábiles</label>
+              <input type="number" id="pDias" min="1" max="365" inputmode="numeric" placeholder="15" oninput="calcularPlazo()">
+              <p class="cf-err" id="errPDias" role="alert"></p>
+            </div>
+          </div>
+          <div class="plazo-res" id="plazoRes" hidden>
+            <div><span>Vence el</span> <b id="plazoFecha"></b></div>
+            <small id="plazoSaltados"></small>
+            <button type="button" class="btn btn-primary btn-sm" onclick="usarPlazo()">Usar esta fecha</button>
+          </div>
+          <p class="plazo-nota">Cuenta desde el día hábil siguiente y salta sábados, domingos, descansos oficiales y los días inhábiles que marcó el despacho. Confirma siempre con los días inhábiles que publique tu juzgado.</p>
         </div>
       </div>
 
@@ -278,17 +333,19 @@
         <!-- INICIO -->
         <div class="cf-row" style="margin-bottom:12px">
           <div class="cf-g">
-            <label>Inicio <span class="req">*</span></label>
-            <div class="fecha-btn empty" id="inicioBtnNormal"
-                 onclick="pickerInicio(this)">
+            <label id="inicioLbl">Día y hora <span class="req">*</span></label>
+            <div class="fecha-btn empty" id="inicioBtnNormal" role="button" tabindex="0" aria-labelledby="inicioLbl"
+                 onclick="pickerInicio(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickerInicio(this)}">
               <span class="fbtn-text">Seleccionar fecha y hora</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
-            <div class="fecha-btn empty" id="inicioBtnAllDay" style="display:none"
-                 onclick="pickerInicioAllDay(this)">
+            <div class="fecha-btn empty" id="inicioBtnAllDay" style="display:none" role="button" tabindex="0" aria-labelledby="inicioLbl"
+                 onclick="pickerInicioAllDay(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickerInicioAllDay(this)}">
               <span class="fbtn-text">Seleccionar fecha</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
+            <p class="cf-err" id="errInicio" role="alert"></p>
+            <p class="cf-hint" id="inicioInhabil" hidden></p>
           </div>
         </div>
 
@@ -312,39 +369,41 @@
         <!-- FIN -->
         <div id="finWrap" class="cf-row" style="margin-bottom:14px">
           <div class="cf-g">
-            <label>Fin</label>
+            <label id="finLbl">Termina</label>
             <!-- Solo lectura: chips fijos calculan el fin -->
             <div class="fin-static" id="finStaticDisplay">—</div>
             <!-- Editable: chip Personalizado (modo normal) -->
-            <div class="fecha-btn empty" id="finPickerBtn" style="display:none"
-                 onclick="pickerFin(this)">
+            <div class="fecha-btn empty" id="finPickerBtn" style="display:none" role="button" tabindex="0" aria-labelledby="finLbl"
+                 onclick="pickerFin(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickerFin(this)}">
               <span class="fbtn-text">Seleccionar fecha y hora</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
             <!-- Editable: todo el día (rango de fechas) -->
-            <div class="fecha-btn empty" id="finDateBtn" style="display:none"
-                 onclick="pickerFinDate(this)">
+            <div class="fecha-btn empty" id="finDateBtn" style="display:none" role="button" tabindex="0" aria-labelledby="finLbl"
+                 onclick="pickerFinDate(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickerFinDate(this)}">
               <span class="fbtn-text">Seleccionar fecha</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
+            <p class="cf-err" id="errFin" role="alert"></p>
           </div>
         </div>
 
         <div class="cf-row">
           <div class="cf-g">
-            <label>Recurrencia</label>
+            <label for="mRecurrencia">Se repite</label>
             <select id="mRecurrencia">
-              <option value="none">No recurrente</option>
-              <option value="diario">Diario</option>
-              <option value="semanal">Semanal</option>
-              <option value="mensual">Mensual</option>
-              <option value="anual">Anual</option>
+              <option value="none">No se repite</option>
+              <option value="diario">Cada día</option>
+              <option value="semanal">Cada semana</option>
+              <option value="mensual">Cada mes, el mismo día</option>
+              <option value="anual">Cada año</option>
             </select>
+            <small class="cf-hint" id="recurHint" hidden>La repetición se elige al crear el evento.</small>
           </div>
           <div class="cf-g">
-            <label>Recordatorio</label>
+            <label for="mRecordatorio">Avisarme</label>
             <select id="mRecordatorio">
-              <option value="">Sin recordatorio</option>
+              <option value="">Un día antes (normal)</option>
               {% for r in recordatorio_opciones %}
               <option value="{{ r.val }}">{{ r.label }}</option>
               {% endfor %}
@@ -355,79 +414,84 @@
 
       <!-- ── SECCIÓN: Vinculación ── -->
       <div class="cf-section">
-        <div class="cf-section-title">De qué asunto es</div>
+        <div class="cf-section-title">De qué expediente es y quién lo atiende</div>
         <div class="cf-row">
           <div class="cf-g">
-            <label>Asunto vinculado</label>
-            <select id="mAsunto" onchange="autoFillCliente()">
-              <option value="">— Sin asunto —</option>
-              {% for a in asuntos %}
-              <option value="{{ a.id }}" data-cliente="{{ a.cliente_id or '' }}">
-                {{ a.numero_expediente or '' }} {{ a.titulo }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="cf-g">
-            <label>Cliente vinculado</label>
-            <select id="mCliente">
-              <option value="">— Se llena con el asunto —</option>
-              {% for c in clientes %}
-              <option value="{{ c.id }}">
-                {{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}
-              </option>
-              {% endfor %}
-            </select>
+            <label for="mAsuntoBusca">Expediente</label>
+            <input type="hidden" id="mAsunto">
+            <div class="exp-pick">
+              <input type="text" id="mAsuntoBusca" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="mAsuntoLista"
+                     aria-autocomplete="list" placeholder="Busca por número, cliente o asunto" aria-describedby="errAsunto">
+              <button type="button" class="exp-clear" id="mAsuntoQuitar" onclick="elegirAsunto(null)" aria-label="Quitar expediente" hidden>×</button>
+              <div class="exp-list" id="mAsuntoLista" role="listbox" hidden></div>
+            </div>
+            <p class="cf-err" id="errAsunto" role="alert"></p>
           </div>
         </div>
         <div class="cf-row">
           <div class="cf-g">
-            <label>Participantes</label>
-            <div class="cf-participants">
+            <label id="quienLbl">Quién lo atiende</label>
+            <div class="cf-participants" role="group" aria-labelledby="quienLbl">
               {% for ab in abogados %}
               <label class="cf-part-check">
                 <input type="checkbox" class="part-cb" value="{{ ab.id }}">
-                {{ ab.nombre }} {{ ab.apellidos }}
+                {{ ab.nombre }} {{ ab.apellidos }}{% if ab.id == yo %} (yo){% endif %}
               </label>
               {% endfor %}
             </div>
+            <small class="cf-hint">Si no eliges a nadie, lo atiende el responsable del expediente o quien lo agenda.</small>
           </div>
         </div>
       </div>
 
       <!-- ── SECCIÓN: Detalles ── -->
       <div class="cf-section">
-        <div class="cf-section-title">Detalles</div>
         <div class="cf-row">
           <div class="cf-g">
-            <label for="mDesc">Descripción</label>
-            <textarea id="mDesc" rows="2" placeholder="Notas para el equipo…"></textarea>
+            <label for="mLugar">Dónde</label>
+            <input type="text" id="mLugar" maxlength="300" placeholder="Ej. Juzgado Cuarto de lo Civil, sala 3">
           </div>
         </div>
-        <div class="cf-row">
-          <div class="cf-g">
-            <label>Lugar</label>
-            <input type="text" id="mLugar" placeholder="Ej. Juzgado Cuarto de lo Civil, sala 3">
-          </div>
-        </div>
-        <div class="cf-row">
-          <div class="cf-g">
-            <label>Color (opcional)</label>
-            <div class="color-picker" id="colorPicker">
-              {% for c in ['#142E59','#4B6585','#34496B','#7A6440','#A23B33','#9A7536','#8A6A2F','#3D5A80','#0F766E','#60718D'] %}
-              <div class="color-swatch" style="background:{{ c }}" data-color="{{ c }}"
-                   onclick="pickColor('{{ c }}')"></div>
-              {% endfor %}
-              <div class="color-swatch" style="background:transparent; border:1px dashed var(--border)"
-                   data-color="" onclick="pickColor('')" title="Usar color del tipo">⟳</div>
+        <details class="cf-more" id="cfMore">
+          <summary>Más detalles: notas, cliente y color</summary>
+          <div class="cf-row" style="margin-top:12px">
+            <div class="cf-g">
+              <label for="mDesc">Notas</label>
+              <textarea id="mDesc" rows="2" placeholder="Qué llevar, con quién, número de sala…"></textarea>
             </div>
           </div>
-      </div>
+          <div class="cf-row">
+            <div class="cf-g">
+              <label for="mCliente">Cliente</label>
+              <select id="mCliente">
+                <option value="">— Se llena con el expediente —</option>
+                {% for c in clientes %}
+                <option value="{{ c.id }}">
+                  {{ c.razon_social or ((c.nombre or '') + ' ' + (c.apellidos or '')) }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="cf-row">
+            <div class="cf-g">
+              <label id="colorLbl">Color (opcional)</label>
+              <div class="color-picker" id="colorPicker" role="group" aria-labelledby="colorLbl">
+                {% for c in ['#142E59','#4B6585','#34496B','#7A6440','#A23B33','#9A7536','#8A6A2F','#3D5A80','#0F766E','#60718D'] %}
+                <button type="button" class="color-swatch" style="background:{{ c }}" data-color="{{ c }}"
+                     onclick="pickColor('{{ c }}')" aria-label="Color {{ c }}"></button>
+                {% endfor %}
+                <button type="button" class="color-swatch" style="background:transparent; border:1px dashed var(--border)"
+                     data-color="" onclick="pickColor('')" title="Usar color del tipo" aria-label="Usar el color del tipo">⟳</button>
+              </div>
+            </div>
+          </div>
+        </details>
       </div><!-- /cf-section detalles -->
 
-      <!-- Conflictos -->
-      <div id="conflictWarn" class="conflict-warn" style="display:none">
-        <div class="conflict-warn-title">{{ icon_alert_triangle(14, 14) }} Se empalma con otro evento. Se guardó de todos modos.</div>
+      <!-- Empalmes -->
+      <div id="conflictWarn" class="conflict-warn" style="display:none" role="alert">
+        <div class="conflict-warn-title">{{ icon_alert_triangle(14, 14) }} <span id="conflictTitle">Se empalma con otro evento</span></div>
         <div id="conflictItems"></div>
       </div>
 
@@ -464,6 +528,7 @@
     <div class="cp-footer">
       <button type="button" class="cp-clear" id="cpClear">Borrar</button>
       <button type="button" class="cp-today" id="cpToday">Hoy</button>
+      <button type="button" class="cp-done" id="cpDone">Listo</button>
     </div>
   </div>
   <!-- Divisor vertical -->
@@ -486,6 +551,8 @@
 /* ── Constants ───────────────────────────────── */
 const TIPOS   = {{ tipos_evento | tojson }};
 const ASUNTOS = {{ asuntos | tojson }};
+const YO      = {{ yo | tojson }};
+const TERMINOS = ["vencimiento", "fecha_limite", "plazo"];
 const CAL_ICON_SVGS = {
   gavel:          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2.5l5 5"/><path d="M9.5 7.5l5 5"/><path d="M5.5 11.5l5 5"/><line x1="2" y1="22" x2="22" y2="22"/><path d="M7.5 16.5L3 21"/></svg>',
   users:          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
@@ -497,7 +564,6 @@ const CAL_ICON_SVGS = {
   more_vertical:  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>',
 };
 const BUSY_DAYS = new Set({{ busy_days | tojson }});
-const TODAY   = new Date("{{ today_str }}");
 const DAY_NAMES  = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const DAY_FULL   = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 const MONTH_NAMES= ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -505,26 +571,48 @@ const START_HOUR = 7;
 const END_HOUR   = 22;
 const HOUR_H     = 64; /* px per hour */
 
+/* ── Fechas: siempre en hora local, nunca con toISOString (que pasa a UTC y cambia el día) ── */
+function pad2(n) { return n.toString().padStart(2,"0"); }
+function iso(d) { return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function iso16(d) { return `${iso(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+function parseDay(s) { const [y, m, d] = String(s).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); }
+/* «AAAA-MM-DD» o «AAAA-MM-DDTHH:MM» → Date local */
+function toDate(s) {
+  if (!s) return null;
+  const d = parseDay(s);
+  const t = String(s).replace(" ", "T").split("T")[1];
+  if (t) { const [h, mi] = t.split(":").map(Number); d.setHours(h || 0, mi || 0, 0, 0); }
+  return isNaN(d) ? null : d;
+}
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+
+/* «Hoy» es el de la Ciudad de México, que manda el servidor */
+const TODAY = parseDay("{{ today_str }}");
+
 /* ── State ───────────────────────────────────── */
 let currentDate  = new Date(TODAY);
 let currentView  = {% if request.args.get('asunto') %}"agenda"{% else %}null{% endif %} || (() => { try { return localStorage.getItem("lexos_cal_view"); } catch (_) { return null; } })()
                  || (window.innerWidth < 700 ? "agenda" : "week");
 let events       = [];
+let inhabiles    = {};
 let editingId    = null;
+let editingSerie = false;
 let selectedColor= "";
 let selectedTipo = "audiencia";
+let partTocado   = false;
+let confirmarEmpalme = false;
+let todoDiaAuto  = false;
+let cargaN       = 0;
 
 /* ── Utilities ───────────────────────────────── */
-function iso(d) { return d.toISOString().slice(0,10); }
-function pad2(n) { return n.toString().padStart(2,"0"); }
 function sameDay(a,b) { return iso(a)===iso(b); }
 function fmtTime(s) {
-  if (!s) return "";
-  const d = new Date(s);
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const d = toDate(s);
+  return d && String(s).length > 10 ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : "";
 }
-function fmtDate(d) {
-  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+function fmtRange(e) {
+  const a = fmtTime(e.inicio), b = fmtTime(e.fin);
+  return b ? `${a} – ${b}` : a;
 }
 function weekStart(d) {
   const w = new Date(d); w.setDate(w.getDate() - ((w.getDay()+6)%7)); // Monday
@@ -535,13 +623,24 @@ function evtColor(e) { return e.color || (TIPOS[e.tipo]||{}).color || "#60718D";
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+/* ¿El evento cae en ese día? Los de todo el día pueden abarcar varios días */
+function evtOnDay(e, ds) {
+  const ini = (e.inicio || "").slice(0, 10);
+  if (!e.todo_dia) return ini === ds;
+  const fin = (e.fin || e.inicio || "").slice(0, 10);
+  return ini <= ds && ds <= fin;
+}
+function evtClass(e) {
+  return (e.estado === "completado" ? " is-done" : "") + (e.vencido ? " is-overdue" : "");
+}
 /* Acomoda eventos que se empalman en carriles lado a lado */
 function layoutDay(dayEvts) {
   const items = dayEvts.map(e => {
-    const sd = new Date(e.inicio);
-    const ed = e.fin ? new Date(e.fin) : new Date(sd.getTime()+3600000);
-    const startMin = (sd.getHours()-START_HOUR)*60 + sd.getMinutes();
-    const endMin   = Math.max(startMin + 20, (ed.getHours()-START_HOUR)*60 + ed.getMinutes());
+    const sd = toDate(e.inicio);
+    const ed = e.fin ? toDate(e.fin) : new Date(sd.getTime()+3600000);
+    const startMin = Math.max(0, (sd.getHours()-START_HOUR)*60 + sd.getMinutes());
+    const endRaw   = sameDay(sd, ed) ? (ed.getHours()-START_HOUR)*60 + ed.getMinutes() : (END_HOUR-START_HOUR)*60;
+    const endMin   = Math.min((END_HOUR-START_HOUR)*60, Math.max(startMin + 20, endRaw));
     return {e, startMin, endMin};
   }).sort((a,b) => a.startMin - b.startMin || b.endMin - a.endMin);
   let cluster = [], lanes = [], clusterEnd = -1;
@@ -560,10 +659,13 @@ function evtBlock(it, extraStyle) {
   const top = Math.max(0, it.startMin * (HOUR_H/60));
   const height = Math.max(22, (it.endMin - it.startMin) * (HOUR_H/60));
   const w = 100 / it.size;
-  return `<div class="cal-evt" style="top:${top}px; height:${height}px; left:calc(${it.lane*w}% + 2px); width:calc(${w}% - 4px); --c:${clr};${extraStyle||""}" data-id="${e.id}">
+  return `<div class="cal-evt${evtClass(e)}" style="top:${top}px; height:${height}px; left:calc(${it.lane*w}% + 2px); width:calc(${w}% - 4px); --c:${clr};${extraStyle||""}" data-id="${e.id}" role="button" tabindex="0" aria-label="${esc(e.titulo)}, ${fmtRange(e)}">
     <div class="cal-evt-title">${esc(e.titulo)}${e.gcal?'<span class="gcal-badge">Google</span>':''}</div>
-    <div class="cal-evt-time">${fmtTime(e.inicio)} – ${fmtTime(e.fin)}</div>
+    <div class="cal-evt-time">${fmtRange(e)}</div>
   </div>`;
+}
+function allDayChip(e) {
+  return `<div class="cal-allday-evt${evtClass(e)}" style="--c:${evtColor(e)}" data-id="${e.id}" role="button" tabindex="0">${e.vencido ? "Vencido · " : ""}${esc(e.titulo)}</div>`;
 }
 
 /* ── Data loading ────────────────────────────── */
@@ -575,57 +677,69 @@ async function loadEvents(start, end) {
   if (tipo) qs.set("tipo", tipo);
   if (abog) qs.set("abogado", abog);
   if (asun) qs.set("asunto", asun);
-  const r = await fetch(`/calendario/ajax/eventos?${qs}`);
-  events = await r.json();
+  const n = ++cargaN;
+  try {
+    const [r, ri] = await Promise.all([
+      fetch(`/calendario/ajax/eventos?${qs}`),
+      fetch(`/calendario/ajax/inhabiles?${new URLSearchParams({start, end})}`),
+    ]);
+    if (!r.ok) throw new Error(r.status);
+    const evs = await r.json();
+    const inh = ri.ok ? await ri.json() : {};
+    if (n !== cargaN) return false;   /* llegó tarde: ya se pidió otro rango */
+    events = evs; inhabiles = inh || {};
+    return true;
+  } catch (_) {
+    if (n === cargaN) showToast("No se pudo cargar la agenda. Revisa tu conexión.", "error");
+    return false;
+  }
 }
 
+/* Rango visible: [inicio, fin) — el fin no se incluye */
 function getRange() {
   let s, e;
   if (currentView==="week") {
-    s = weekStart(currentDate);
-    e = new Date(s); e.setDate(e.getDate()+7);
+    s = weekStart(currentDate); e = addDays(s, 7);
   } else if (currentView==="month") {
     s = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    e = new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 0);
-    s.setDate(s.getDate() - ((s.getDay()+6)%7));
-    e.setDate(e.getDate() + (6-(e.getDay()+6)%7));
+    s = addDays(s, -((s.getDay()+6)%7)); e = addDays(s, 42);
   } else if (currentView==="day") {
-    s = new Date(currentDate); s.setHours(0,0,0,0);
-    e = new Date(s); e.setDate(e.getDate()+1);
+    s = new Date(currentDate); s.setHours(0,0,0,0); e = addDays(s, 1);
   } else {
-    s = new Date(currentDate); s.setHours(0,0,0,0);
-    e = new Date(s); e.setDate(e.getDate()+30);
+    s = new Date(currentDate); s.setHours(0,0,0,0); e = addDays(s, 30);
   }
   return [iso(s), iso(e)];
 }
 
 async function reloadEvents() {
   const [s,e] = getRange();
-  await loadEvents(s, e);
-  render();
+  updateLabel();
+  if (await loadEvents(s, e) !== false) render();
 }
 
 /* ── Navigation ──────────────────────────────── */
-function goToday() { currentDate = new Date(TODAY); reloadEvents(); }
+function goToday() { currentDate = new Date(TODAY); miniDate = new Date(TODAY); renderMini(); reloadEvents(); }
 function goPrev() {
   if (currentView==="week")  currentDate.setDate(currentDate.getDate()-7);
-  else if (currentView==="month") currentDate.setMonth(currentDate.getMonth()-1);
+  else if (currentView==="month") currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()-1, 1);
   else if (currentView==="day")   currentDate.setDate(currentDate.getDate()-1);
-  else                            currentDate.setDate(currentDate.getDate()-7);
+  else                            currentDate.setDate(currentDate.getDate()-30);
   reloadEvents();
 }
 function goNext() {
   if (currentView==="week")  currentDate.setDate(currentDate.getDate()+7);
-  else if (currentView==="month") currentDate.setMonth(currentDate.getMonth()+1);
+  else if (currentView==="month") currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 1);
   else if (currentView==="day")   currentDate.setDate(currentDate.getDate()+1);
-  else                            currentDate.setDate(currentDate.getDate()+7);
+  else                            currentDate.setDate(currentDate.getDate()+30);
   reloadEvents();
 }
 function setView(v) {
   currentView = v;
   try { localStorage.setItem("lexos_cal_view", v); } catch (_) {}
-  document.querySelectorAll(".cal-view-btn").forEach(b =>
-    b.classList.toggle("active", b.dataset.view===v));
+  document.querySelectorAll(".cal-view-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.view===v);
+    b.setAttribute("aria-selected", b.dataset.view===v ? "true" : "false");
+  });
   reloadEvents();
 }
 
@@ -634,14 +748,16 @@ function updateLabel() {
   let lbl = "";
   if (currentView==="week") {
     const s = weekStart(currentDate);
-    const e = new Date(s); e.setDate(e.getDate()+6);
+    const e = addDays(s, 6);
     lbl = `${s.getDate()} ${MONTH_NAMES[s.getMonth()].slice(0,3)} — ${e.getDate()} ${MONTH_NAMES[e.getMonth()].slice(0,3)} ${e.getFullYear()}`;
   } else if (currentView==="month") {
     lbl = `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
   } else if (currentView==="day") {
-    lbl = `${DAY_FULL[currentDate.getDay()]}, ${fmtDate(currentDate)}`;
+    lbl = `${DAY_FULL[currentDate.getDay()]}, ${currentDate.getDate()} ${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
   } else {
-    lbl = `Próximos 30 días`;
+    const e = addDays(currentDate, 29);
+    lbl = sameDay(currentDate, TODAY) ? "Próximos 30 días"
+        : `${currentDate.getDate()} ${MONTH_NAMES[currentDate.getMonth()].slice(0,3)} — ${e.getDate()} ${MONTH_NAMES[e.getMonth()].slice(0,3)} ${e.getFullYear()}`;
   }
   document.getElementById("dateLabel").textContent = lbl;
 }
@@ -658,14 +774,16 @@ function render() {
   bindEventClicks();
 }
 
-/* ── Bind click listeners via event delegation ── */
+/* ── Bind click listeners ── */
 function bindEventClicks() {
-  /* All .cal-evt and .cal-ag-item and .cal-month-evt */
   document.querySelectorAll('.cal-evt[data-id], .cal-ag-item[data-id], .cal-month-evt[data-id], .cal-allday-evt[data-id]').forEach(el => {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
       const id = parseInt(this.dataset.id);
       if (id) showPopover(id, e);
+    });
+    el.addEventListener('keydown', function(e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); showPopover(parseInt(this.dataset.id), e); }
     });
   });
 }
@@ -674,68 +792,55 @@ function bindEventClicks() {
 function renderWeek(container) {
   const ws = weekStart(currentDate);
   const days = [];
-  for (let i=0; i<7; i++) { const d=new Date(ws); d.setDate(d.getDate()+i); days.push(d); }
+  for (let i=0; i<7; i++) days.push(addDays(ws, i));
 
   let h = `<div class="cal-week">`;
-  /* Header */
   h += `<div class="cal-week-head"><div class="cal-week-gutter-h"></div>`;
   days.forEach(d => {
-    const isT = sameDay(d, TODAY);
-    h += `<div class="cal-day-header ${isT?'is-today':''}">
+    const isT = sameDay(d, TODAY), inh = inhabiles[iso(d)];
+    h += `<div class="cal-day-header ${isT?'is-today':''} ${inh?'is-inhabil':''}" ${inh?`title="Inhábil: ${esc(inh)}"`:''}>
       <div class="cal-day-name">${DAY_NAMES[d.getDay()]}</div>
       <div class="cal-day-num">${d.getDate()}</div>
+      ${inh ? `<div class="cal-day-inh">Inhábil</div>` : ""}
     </div>`;
   });
   h += `</div>`;
 
   /* Todo el día (términos, recordatorios) */
-  const allDayByDay = days.map(d => events.filter(e => e.todo_dia && (e.inicio||"").slice(0,10)===iso(d)));
+  const allDayByDay = days.map(d => events.filter(e => e.todo_dia && evtOnDay(e, iso(d))));
   if (allDayByDay.some(l => l.length)) {
     h += `<div class="cal-week-allday"><div class="cal-allday-label">Todo el día</div>`;
-    allDayByDay.forEach(list => {
-      h += `<div class="cal-allday-cell">${list.map(e =>
-        `<div class="cal-allday-evt" style="--c:${evtColor(e)}" data-id="${e.id}">${esc(e.titulo)}</div>`).join("")}</div>`;
-    });
+    allDayByDay.forEach(list => { h += `<div class="cal-allday-cell">${list.map(allDayChip).join("")}</div>`; });
     h += `</div>`;
   }
 
-  /* Body */
   h += `<div class="cal-week-body">`;
-  /* Time col */
   h += `<div class="cal-time-col">`;
-  for (let hr=START_HOUR; hr<=END_HOUR; hr++) {
-    h += `<div class="cal-time-label" style="height:${HOUR_H}px">${pad2(hr)}:00</div>`;
-  }
+  for (let hr=START_HOUR; hr<=END_HOUR; hr++) h += `<div class="cal-time-label" style="height:${HOUR_H}px">${pad2(hr)}:00</div>`;
   h += `</div>`;
 
-  /* Day columns */
   days.forEach(d => {
     const dateStr = iso(d);
-    h += `<div class="cal-day-col" data-date="${dateStr}" onclick="clickGrid(event,'${dateStr}')">`;
-    /* Hour lines */
+    h += `<div class="cal-day-col ${inhabiles[dateStr]?'is-inhabil':''}" data-date="${dateStr}" onclick="clickGrid(event,'${dateStr}')">`;
     for (let hr=START_HOUR; hr<=END_HOUR; hr++) {
       const top = (hr-START_HOUR)*HOUR_H;
       h += `<div class="cal-hour-line" style="top:${top}px"></div>`;
       if (hr<END_HOUR) h += `<div class="cal-half-line" style="top:${top+HOUR_H/2}px"></div>`;
     }
-    /* Now line */
-    if (sameDay(d, TODAY)) {
+    if (sameDay(d, new Date())) {
       const now = new Date();
       const minFromStart = (now.getHours()-START_HOUR)*60 + now.getMinutes();
       if (minFromStart>=0 && minFromStart<=(END_HOUR-START_HOUR)*60) {
-        const top = minFromStart * (HOUR_H/60);
-        h += `<div class="cal-now-line" style="top:${top}px"><div class="cal-now-dot"></div></div>`;
+        h += `<div class="cal-now-line" style="top:${minFromStart * (HOUR_H/60)}px"><div class="cal-now-dot"></div></div>`;
       }
     }
-    /* Events */
-    const dayEvts = events.filter(e => !e.todo_dia && (e.inicio||"").slice(0,10) === dateStr);
+    const dayEvts = events.filter(e => !e.todo_dia && evtOnDay(e, dateStr));
     layoutDay(dayEvts).forEach(it => { h += evtBlock(it); });
     h += `</div>`;
   });
   h += `</div></div>`;
   container.innerHTML = h;
 
-  /* Scroll to 8am */
   const body = container.querySelector(".cal-week-body");
   if (body) body.scrollTop = (8-START_HOUR)*HOUR_H;
 }
@@ -744,34 +849,30 @@ function renderWeek(container) {
 function renderMonth(container) {
   const y = currentDate.getFullYear(), m = currentDate.getMonth();
   const first = new Date(y, m, 1);
-  const startD = new Date(first);
-  startD.setDate(startD.getDate() - ((startD.getDay()+6)%7));
+  const startD = addDays(first, -((first.getDay()+6)%7));
 
   let h = `<div class="cal-month">`;
   h += `<div class="cal-month-head">`;
-  ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].forEach(d => {
-    h += `<div class="cal-month-wday">${d}</div>`;
-  });
+  ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].forEach(d => { h += `<div class="cal-month-wday">${d}</div>`; });
   h += `</div><div class="cal-month-grid">`;
 
-  const cur = new Date(startD);
   for (let i=0; i<42; i++) {
+    const cur = addDays(startD, i);
     const dateStr = iso(cur);
     const isT = sameDay(cur, TODAY);
     const isOther = cur.getMonth() !== m;
-    h += `<div class="cal-month-cell ${isT?'is-today':''} ${isOther?'other-month':''}"
-               data-date="${dateStr}" onclick="clickMonthCell('${dateStr}')">`;
+    const inh = inhabiles[dateStr];
+    h += `<div class="cal-month-cell ${isT?'is-today':''} ${isOther?'other-month':''} ${inh?'is-inhabil':''}"
+               data-date="${dateStr}" onclick="clickMonthCell('${dateStr}')" ${inh?`title="Inhábil: ${esc(inh)}"`:''}>`;
     h += `<div class="cal-month-day">${cur.getDate()}</div>`;
-    const dayEvts = events.filter(e => (e.inicio||"").slice(0,10)===dateStr);
+    if (inh) h += `<div class="cal-month-inh">${esc(inh)}</div>`;
+    const dayEvts = events.filter(e => evtOnDay(e, dateStr))
+      .sort((a, b) => (b.todo_dia - a.todo_dia) || (a.inicio||"").localeCompare(b.inicio||""));
     dayEvts.slice(0,3).forEach(e => {
-      const clr = evtColor(e);
-      h += `<div class="cal-month-evt" style="--c:${clr}" data-id="${e.id}">${e.todo_dia ? "" : `<span class="cal-month-time">${fmtTime(e.inicio)}</span>`}${esc(e.titulo)}</div>`;
+      h += `<div class="cal-month-evt${evtClass(e)}" style="--c:${evtColor(e)}" data-id="${e.id}" role="button" tabindex="0">${e.todo_dia ? "" : `<span class="cal-month-time">${fmtTime(e.inicio)}</span>`}${esc(e.titulo)}</div>`;
     });
-    if (dayEvts.length>3) {
-      h += `<div class="cal-month-more">+${dayEvts.length-3} más</div>`;
-    }
+    if (dayEvts.length>3) h += `<div class="cal-month-more">+${dayEvts.length-3} más</div>`;
     h += `</div>`;
-    cur.setDate(cur.getDate()+1);
   }
   h += `</div></div>`;
   container.innerHTML = h;
@@ -780,18 +881,14 @@ function renderMonth(container) {
 /* ── DAY VIEW ────────────────────────────────── */
 function renderDay(container) {
   const dateStr = iso(currentDate);
+  const inh = inhabiles[dateStr];
   let h = `<div class="cal-day-view">`;
-  const allDayList = events.filter(e => e.todo_dia && (e.inicio||"").slice(0,10)===dateStr);
-  h += `<div class="cal-day-view-head">${allDayList.length ? `<span class="cal-allday-label">Todo el día</span>${allDayList.map(e =>
-      `<div class="cal-allday-evt" style="--c:${evtColor(e)}" data-id="${e.id}">${esc(e.titulo)}</div>`).join("")}` : `<span class="cal-allday-label">Sin eventos de todo el día</span>`}</div>`;
+  const allDayList = events.filter(e => e.todo_dia && evtOnDay(e, dateStr));
+  h += `<div class="cal-day-view-head">${inh ? `<span class="cal-day-inh-tag">Día inhábil: ${esc(inh)}</span>` : ""}${allDayList.length ? `<span class="cal-allday-label">Todo el día</span>${allDayList.map(allDayChip).join("")}` : `<span class="cal-allday-label">Sin eventos de todo el día</span>`}</div>`;
   h += `<div class="cal-day-view-body">`;
-  /* Time col */
   h += `<div class="cal-time-col">`;
-  for (let hr=START_HOUR; hr<=END_HOUR; hr++) {
-    h += `<div class="cal-time-label" style="height:${HOUR_H}px">${pad2(hr)}:00</div>`;
-  }
+  for (let hr=START_HOUR; hr<=END_HOUR; hr++) h += `<div class="cal-time-label" style="height:${HOUR_H}px">${pad2(hr)}:00</div>`;
   h += `</div>`;
-  /* Day col */
   h += `<div class="cal-day-col" style="border-left:1px solid var(--border)" data-date="${dateStr}"
              onclick="clickGrid(event,'${dateStr}')">`;
   for (let hr=START_HOUR; hr<=END_HOUR; hr++) {
@@ -799,16 +896,14 @@ function renderDay(container) {
     h += `<div class="cal-hour-line" style="top:${top}px"></div>`;
     if (hr<END_HOUR) h += `<div class="cal-half-line" style="top:${top+HOUR_H/2}px"></div>`;
   }
-  /* Now line */
-  if (sameDay(currentDate, TODAY)) {
+  if (sameDay(currentDate, new Date())) {
     const now = new Date();
     const mins = (now.getHours()-START_HOUR)*60 + now.getMinutes();
-    if (mins>=0) {
+    if (mins>=0 && mins<=(END_HOUR-START_HOUR)*60) {
       h += `<div class="cal-now-line" style="top:${mins*(HOUR_H/60)}px"><div class="cal-now-dot"></div></div>`;
     }
   }
-  /* Events */
-  const dayEvts = events.filter(e => !e.todo_dia && (e.inicio||"").slice(0,10)===dateStr);
+  const dayEvts = events.filter(e => !e.todo_dia && evtOnDay(e, dateStr));
   layoutDay(dayEvts).forEach(it => { h += evtBlock(it); });
   h += `</div></div></div>`;
   container.innerHTML = h;
@@ -818,31 +913,37 @@ function renderDay(container) {
 
 /* ── AGENDA VIEW ─────────────────────────────── */
 function renderAgenda(container) {
-  if (!events.length) {
-    container.innerHTML = `<div class="cal-agenda"><div class="cal-ag-empty">{{ icon_calendar(14, 14) }} Nada agendado en los próximos 30 días.</div></div>`;
+  const [s, e] = getRange();
+  /* Un término de varios días se lista en su primer día visible */
+  const sorted = [...events].map(ev => ({ev, dia: (ev.inicio||"").slice(0,10) < s ? s : (ev.inicio||"").slice(0,10)}))
+    .filter(x => x.dia < e)
+    .sort((a,b) => a.dia.localeCompare(b.dia) || (b.ev.todo_dia - a.ev.todo_dia) || (a.ev.inicio||"").localeCompare(b.ev.inicio||""));
+  if (!sorted.length) {
+    container.innerHTML = `<div class="cal-agenda"><div class="cal-ag-empty">{{ icon_calendar(14, 14) }} Nada agendado en estos 30 días.</div></div>`;
     return;
   }
-  const sorted = [...events].sort((a,b) => (a.inicio||"").localeCompare(b.inicio||""));
   let h = `<div class="cal-agenda">`;
   let lastDay = "";
-  sorted.forEach(e => {
-    const dayStr = (e.inicio||"").slice(0,10);
-    if (dayStr !== lastDay) {
-      const dd = new Date(dayStr+"T12:00");
-      h += `<div class="cal-ag-day-head">${DAY_FULL[dd.getDay()]}, ${dd.getDate()} ${MONTH_NAMES[dd.getMonth()]}</div>`;
-      lastDay = dayStr;
+  sorted.forEach(({ev, dia}) => {
+    if (dia !== lastDay) {
+      const dd = parseDay(dia), inh = inhabiles[dia];
+      const rel = sameDay(dd, TODAY) ? "Hoy · " : (sameDay(dd, addDays(TODAY, 1)) ? "Mañana · " : "");
+      h += `<div class="cal-ag-day-head">${rel}${DAY_FULL[dd.getDay()]}, ${dd.getDate()} ${MONTH_NAMES[dd.getMonth()]}${inh ? ` <span class="cal-ag-inh">Inhábil: ${esc(inh)}</span>` : ""}</div>`;
+      lastDay = dia;
     }
-    const clr = evtColor(e);
-    h += `<div class="cal-ag-item" data-id="${e.id}">
-      <div class="cal-ag-time">${e.todo_dia ? 'Todo el día' : fmtTime(e.inicio)}</div>
+    const clr = evtColor(ev), tipo = TIPOS[ev.tipo] || {};
+    const meta = [
+      `${CAL_ICON_SVGS[tipo.icon]||""} ${esc(tipo.label||ev.tipo)}`,
+      ev.expediente || ev.asunto ? esc(ev.expediente || ev.asunto) : "",
+      ev.lugar ? esc(ev.lugar) : "",
+      (ev.responsables||[]).length ? esc(ev.responsables.join(", ")) : "",
+    ].filter(Boolean).join(" · ");
+    h += `<div class="cal-ag-item${evtClass(ev)}" data-id="${ev.id}" role="button" tabindex="0">
+      <div class="cal-ag-time">${ev.todo_dia ? 'Todo el día' : fmtTime(ev.inicio)}</div>
       <div class="cal-ag-color" style="background:${clr}"></div>
       <div class="cal-ag-info">
-        <div class="cal-ag-title">${esc(e.titulo)}${e.gcal?'<span class="gcal-badge">Google</span>':''}</div>
-        <div class="cal-ag-meta">
-          ${CAL_ICON_SVGS[(TIPOS[e.tipo]||{}).icon]||""} ${(TIPOS[e.tipo]||{}).label||e.tipo}
-          ${e.asunto ? ' · <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> '+esc(e.asunto) : ''}
-          ${e.lugar  ? ' · <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> '+esc(e.lugar)  : ''}
-        </div>
+        <div class="cal-ag-title">${ev.vencido ? '<span class="cal-ag-flag">Vencido</span>' : ''}${ev.estado === "completado" ? '<span class="cal-ag-flag ok">Hecho</span>' : ''}${esc(ev.titulo)}${ev.gcal?'<span class="gcal-badge">Google</span>':''}</div>
+        <div class="cal-ag-meta">${meta}</div>
       </div>
     </div>`;
   });
@@ -853,151 +954,181 @@ function renderAgenda(container) {
 /* ── Click on grid → open create ─────────────── */
 function clickGrid(ev, dateStr) {
   const rect = ev.currentTarget.getBoundingClientRect();
-  const y = ev.clientY - rect.top + ev.currentTarget.scrollTop;
-  const mins = Math.floor(y / (HOUR_H/60));
-  const hr = START_HOUR + Math.floor(mins/60);
+  const y = ev.clientY - rect.top;
+  const mins = Math.max(0, Math.floor(y / (HOUR_H/60)));
+  const hr = Math.min(END_HOUR - 1, START_HOUR + Math.floor(mins/60));
   const mn = Math.floor(mins%60/30)*30;
   openCreate(dateStr, `${pad2(hr)}:${pad2(mn)}`);
 }
 function clickMonthCell(dateStr) {
-  currentDate = new Date(dateStr+"T12:00");
+  currentDate = parseDay(dateStr);
   setView("day");
 }
 
+/* ── Errores junto a cada campo ─────────────── */
+const ERR_IDS = {titulo: "errTitulo", fecha_inicio: "errInicio", fecha_fin: "errFin", asunto_id: "errAsunto", cliente_id: "errAsunto"};
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg || "";
+  const campo = el.closest(".cf-g");
+  if (campo) campo.classList.toggle("has-err", !!msg);
+}
+function clearErrs() { document.querySelectorAll("#evtModal .cf-err").forEach(el => showErr(el.id, "")); }
+
 /* ── CREATE / EDIT MODAL ─────────────────────── */
+function setModo(todoDia) {
+  document.getElementById("mTodoDia").checked = todoDia;
+  document.getElementById("inicioBtnNormal").style.display = todoDia ? "none" : "";
+  document.getElementById("inicioBtnAllDay").style.display = todoDia ? "" : "none";
+  document.getElementById("timedChips").style.display      = todoDia ? "none" : "";
+  document.getElementById("finStaticDisplay").style.display = "none";
+  document.getElementById("finPickerBtn").style.display    = "none";
+  document.getElementById("finDateBtn").style.display      = todoDia ? "" : "none";
+  document.getElementById("finLbl").textContent = todoDia ? "Último día" : "Termina";
+}
+function resetForm() {
+  clearErrs();
+  resetEmpalme();
+  ["mTitulo", "mDesc", "mLugar", "mCliente", "pDesde", "pDias"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("mRecurrencia").value = "none";
+  document.getElementById("mRecordatorio").value = "";
+  document.getElementById("plazoRes").hidden = true;
+  document.getElementById("inicioInhabil").hidden = true;
+  document.getElementById("cfMore").open = false;
+  document.querySelectorAll(".part-cb").forEach(c => c.checked = false);
+  partTocado = false; todoDiaAuto = false;
+  elegirAsunto(null, true);
+  pickColor("");
+}
+
 function openCreate(dateStr, time) {
-  editingId = null;
+  editingId = null; editingSerie = false;
   document.getElementById("modalTitle").textContent = "Nuevo evento";
   document.getElementById("modalSubmitBtn").textContent = "Crear evento";
   document.getElementById("modalDeleteBtn").style.display = "none";
-  document.getElementById("conflictWarn").style.display = "none";
-
-  /* Reset form */
-  document.getElementById("mTitulo").value = "";
-  document.getElementById("mDesc").value = "";
-  document.getElementById("mLugar").value = "";
-  document.getElementById("mAsunto").value = "";
-  document.getElementById("mCliente").value = "";
-  document.getElementById("mRecurrencia").value = "none";
-  document.getElementById("mRecordatorio").value = "";
-  document.getElementById("mTodoDia").checked = false;
-  document.querySelectorAll(".part-cb").forEach(c => c.checked = false);
+  document.getElementById("mRecurrencia").disabled = false;
+  document.getElementById("recurHint").hidden = true;
+  resetForm();
+  /* Quien agenda lo atiende, hasta que elija otra cosa o un expediente */
+  const yo = document.querySelector(`.part-cb[value="${YO}"]`);
+  if (yo) yo.checked = true;
   pickTipo("audiencia");
-  pickColor("");
 
-  /* Resetear modo: normal (con hora) */
-  document.getElementById("inicioBtnNormal").style.display = "";
-  document.getElementById("inicioBtnAllDay").style.display = "none";
-  document.getElementById("timedChips").style.display = "";
-  document.getElementById("finStaticDisplay").style.display = "";
-  document.getElementById("finPickerBtn").style.display = "none";
-  document.getElementById("finDateBtn").style.display = "none";
-  /* Reset chips — "1h" activo */
-  document.querySelectorAll("#timedChips .dur-chip").forEach(c =>
-    c.classList.toggle("active", c.dataset.mins === "60"));
-
-  /* Set fecha/hora de inicio */
+  setModo(false);
   let initVal;
   if (dateStr) {
     initVal = `${dateStr}T${time || "09:00"}`;
   } else {
-    const now    = new Date();
-    const startH = Math.min(now.getHours() + 1, 22);
-    initVal = `${iso(now)}T${pad2(startH)}:00`;
+    /* La siguiente hora en punto; de noche, mañana a las 9 */
+    const now = new Date();
+    initVal = now.getHours() >= 20 ? `${iso(addDays(now, 1))}T09:00` : `${iso(now)}T${pad2(Math.max(8, now.getHours() + 1))}:00`;
   }
   document.getElementById("mInicio").value = initVal;
   setFechaBtn("inicioBtnNormal", fmtAmPm(initVal));
-
-  /* Chip "1h" por defecto → muestra Fin como texto estático */
+  document.querySelectorAll("#timedChips .dur-chip").forEach(c => c.classList.toggle("active", c.dataset.mins === "60"));
   setDuration(60);
+  /* Desde la agenda de un expediente, el evento ya va ligado a él */
+  const fa = document.getElementById("filterAsunto").value;
+  const af = fa && ASUNTOS.find(x => x.id === +fa);
+  if (af) elegirAsunto(af);
+  revisarInhabil();
 
-  document.getElementById("evtModal").classList.add("open");
+  abrirModal("evtModal");
+  setTimeout(() => document.getElementById("mTitulo").focus(), 60);
 }
 
 async function openEdit(id) {
-  const r = await fetch(`/calendario/ajax/${id}`);
-  const j = await r.json();
-  if (!j.ok) return;
+  let j;
+  try {
+    const r = await fetch(`/calendario/ajax/${id}`);
+    j = await r.json();
+  } catch (_) { j = {ok: false}; }
+  if (!j.ok) { showToast(j.error || "No se pudo abrir el evento", "error"); return; }
   const e = j.evento;
-  editingId = id;
+  editingId = id; editingSerie = !!e.serie;
   document.getElementById("modalTitle").textContent = "Editar evento";
   document.getElementById("modalSubmitBtn").textContent = "Guardar cambios";
   document.getElementById("modalDeleteBtn").style.display = "inline-flex";
-  document.getElementById("conflictWarn").style.display = "none";
+  resetForm();
+  partTocado = true;
 
   document.getElementById("mTitulo").value = e.titulo || "";
   document.getElementById("mDesc").value   = e.descripcion || "";
   document.getElementById("mLugar").value  = e.lugar || "";
   const todoDia = !!e.todo_el_dia;
-  document.getElementById("mTodoDia").checked = todoDia;
+  setModo(todoDia);
 
   if (todoDia) {
-    /* ── MODO TODO EL DÍA ── */
     const dateVal    = (e.fecha_inicio||"").slice(0, 10);
     const finDateVal = (e.fecha_fin||"").slice(0, 10) || dateVal;
-    document.getElementById("mInicio").value           = dateVal;
-    document.getElementById("inicioBtnNormal").style.display = "none";
-    document.getElementById("inicioBtnAllDay").style.display = "";
+    document.getElementById("mInicio").value = dateVal;
     setFechaBtn("inicioBtnAllDay", dateVal ? fmtDate(dateVal) : "Seleccionar fecha");
-    document.getElementById("timedChips").style.display    = "none";
-    document.getElementById("finPickerBtn").style.display  = "none";
-    document.getElementById("finStaticDisplay").style.display = "none";
-    document.getElementById("mFin").value                  = finDateVal;
-    document.getElementById("finDateBtn").style.display    = "";
+    document.getElementById("mFin").value = finDateVal;
     setFechaBtn("finDateBtn", finDateVal ? fmtDate(finDateVal) : "Seleccionar fecha");
   } else {
-    /* ── MODO NORMAL (con hora) ── */
     const inicioVal = (e.fecha_inicio||"").slice(0, 16);
-    document.getElementById("mInicio").value               = inicioVal;
-    document.getElementById("inicioBtnAllDay").style.display = "none";
-    document.getElementById("inicioBtnNormal").style.display = "";
+    document.getElementById("mInicio").value = inicioVal;
     setFechaBtn("inicioBtnNormal", inicioVal ? fmtAmPm(inicioVal) : "Seleccionar fecha y hora");
-    document.getElementById("timedChips").style.display    = "";
-    document.getElementById("finDateBtn").style.display    = "none";
-    /* Detectar chip de duración */
-    const inicioD  = new Date(e.fecha_inicio||"");
-    const finD     = new Date(e.fecha_fin||"");
-    const diffMins = Math.round((finD - inicioD) / 60000);
-    const known    = [30, 60, 120, 180];
     const finVal   = (e.fecha_fin||"").slice(0, 16);
+    const diffMins = finVal ? Math.round((toDate(finVal) - toDate(inicioVal)) / 60000) : 60;
+    const known    = [30, 60, 120, 180];
     document.querySelectorAll("#timedChips .dur-chip").forEach(c => {
-      const cm = parseInt(c.dataset.mins);
-      c.classList.toggle("active",
-        known.includes(diffMins) ? cm === diffMins : c.dataset.mins === "-1");
+      c.classList.toggle("active", known.includes(diffMins) ? +c.dataset.mins === diffMins : c.dataset.mins === "-1");
     });
     if (known.includes(diffMins)) {
-      document.getElementById("finStaticDisplay").textContent = finVal ? fmtAmPm(finVal) : "—";
-      document.getElementById("finStaticDisplay").style.display = "";
-      document.getElementById("finPickerBtn").style.display = "none";
-      document.getElementById("mFin").value = finVal;
+      setDuration(diffMins);
     } else {
-      document.getElementById("mFin").value                  = finVal;
-      document.getElementById("finStaticDisplay").style.display = "none";
-      document.getElementById("finPickerBtn").style.display  = "";
+      document.getElementById("mFin").value = finVal;
+      document.getElementById("finPickerBtn").style.display = "";
       setFechaBtn("finPickerBtn", finVal ? fmtAmPm(finVal) : "Seleccionar fecha y hora");
     }
   }
-  document.getElementById("mAsunto").value    = e.asunto_id || "";
+  const a = ASUNTOS.find(x => x.id === e.asunto_id);
+  if (a) elegirAsunto(a, true);
+  else if (e.asunto_id) elegirAsunto({id: e.asunto_id, titulo: e.asunto_titulo || "Expediente", numero_expediente: e.numero_expediente}, true);
   document.getElementById("mCliente").value   = e.cliente_id || "";
   document.getElementById("mRecurrencia").value = e.recurrencia || "none";
+  document.getElementById("mRecurrencia").disabled = true;
+  document.getElementById("recurHint").hidden = false;
   document.getElementById("mRecordatorio").value= e.recordatorio || "";
   pickTipo(e.tipo || "otro");
   pickColor(e.color_custom || "");
+  if (e.descripcion || e.color_custom) document.getElementById("cfMore").open = true;
   document.querySelectorAll(".part-cb").forEach(c => {
     c.checked = (e.participante_ids||[]).includes(parseInt(c.value));
   });
-
-  document.getElementById("evtModal").classList.add("open");
+  revisarInhabil();
+  abrirModal("evtModal");
 }
 
+let ultimoFoco = null;
+function abrirModal(id) {
+  ultimoFoco = document.activeElement;
+  document.getElementById(id).classList.add("open");
+}
 function closeModal() {
+  CustomPicker.close();
   document.getElementById("evtModal").classList.remove("open");
+  if (ultimoFoco && ultimoFoco.focus) ultimoFoco.focus();
 }
 
 function pickTipo(tipo) {
+  const antes = selectedTipo;
   selectedTipo = tipo;
-  document.querySelectorAll(".tipo-opt").forEach(o =>
-    o.classList.toggle("active", o.dataset.tipo===tipo));
+  document.querySelectorAll(".tipo-opt").forEach(o => {
+    o.classList.toggle("active", o.dataset.tipo===tipo);
+    o.setAttribute("aria-checked", o.dataset.tipo===tipo ? "true" : "false");
+  });
+  const esTermino = TERMINOS.includes(tipo);
+  document.getElementById("plazoBox").hidden = !esTermino;
+  /* Un término vence en un día, no a una hora: al crear se pone «todo el día» */
+  if (!editingId && esTermino && !document.getElementById("mTodoDia").checked) {
+    document.getElementById("mTodoDia").checked = true; toggleTodoDia(); todoDiaAuto = true;
+  } else if (!editingId && !esTermino && TERMINOS.includes(antes) && todoDiaAuto && document.getElementById("mTodoDia").checked) {
+    document.getElementById("mTodoDia").checked = false; toggleTodoDia(); todoDiaAuto = false;
+  }
+  revisarInhabil();
 }
 function pickColor(color) {
   selectedColor = color;
@@ -1006,21 +1137,17 @@ function pickColor(color) {
 }
 /* ── Formatters ───────────────────────────────── */
 function fmtAmPm(isoStr) {
-  if (!isoStr) return "—";
-  const d = new Date(isoStr.includes("T") ? isoStr : isoStr + "T00:00");
-  if (isNaN(d)) return "—";
-  const day = pad2(d.getDate()), mon = pad2(d.getMonth()+1), yr = d.getFullYear();
+  const d = toDate(isoStr);
+  if (!d) return "—";
   let h = d.getHours();
-  const min = pad2(d.getMinutes());
   const ampm = h >= 12 ? "p.m." : "a.m.";
   h = h % 12 || 12;
-  return `${day}/${mon}/${yr} — ${h}:${min} ${ampm}`;
+  return `${DAY_NAMES[d.getDay()]} ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} — ${h}:${pad2(d.getMinutes())} ${ampm}`;
 }
 function fmtDate(isoStr) {
-  if (!isoStr) return "—";
-  const d = new Date(isoStr.length === 10 ? isoStr + "T12:00" : isoStr);
-  if (isNaN(d)) return "—";
-  return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`;
+  const d = toDate(isoStr);
+  if (!d) return "—";
+  return `${DAY_NAMES[d.getDay()]} ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`;
 }
 function setFechaBtn(id, text) {
   const btn = document.getElementById(id);
@@ -1029,9 +1156,6 @@ function setFechaBtn(id, text) {
   btn.classList.toggle("empty", text === "—" || text === "Seleccionar fecha y hora" || text === "Seleccionar fecha");
 }
 
-/* ════════════════════════════════════════════════════════════════════════
-   CustomPicker — date/time picker (clean rewrite)
-   ════════════════════════════════════════════════════════════════════════ */
 const CustomPicker = (() => {
   const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
                   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -1045,11 +1169,13 @@ const CustomPicker = (() => {
     document.getElementById("cpNavPrev").addEventListener("click", () => nav(-1));
     document.getElementById("cpNavNext").addEventListener("click", () => nav(+1));
     document.getElementById("cpClear").addEventListener("click", () => { cb(""); close(); });
+    document.getElementById("cpDone").addEventListener("click", () => { apply(); close(); });
     document.getElementById("cpToday").addEventListener("click", () => {
       const t = new Date();
       selY = t.getFullYear(); selM = t.getMonth(); selD = t.getDate();
       viewY = selY; viewM = selM;
-      buildGrid(); confirm();
+      buildHeader(); buildGrid();
+      if (mode === "date") confirm(); else apply();
     });
     document.addEventListener("click", e => {
       if (!wrap.classList.contains("open")) return;
@@ -1063,8 +1189,8 @@ const CustomPicker = (() => {
     const now = new Date();
     let d = now;
     if (currentVal) {
-      const p = new Date(currentVal.length === 10 ? currentVal + "T12:00" : currentVal);
-      if (!isNaN(p)) d = p;
+      const p = toDate(currentVal);
+      if (p && !isNaN(p)) d = p;
     }
     selY = viewY = d.getFullYear();
     selM = viewM = d.getMonth();
@@ -1081,6 +1207,7 @@ const CustomPicker = (() => {
     const showTime = (mode !== "date");
     document.getElementById("cpTimePanel").style.display = showTime ? "" : "none";
     document.getElementById("cpDivider").style.display   = showTime ? "" : "none";
+    document.getElementById("cpDone").style.display      = showTime ? "" : "none";
 
     buildHeader(); buildGrid();
     if (showTime) { buildHours(); buildMinutes(); buildAmpm(); }
@@ -1144,7 +1271,9 @@ const CustomPicker = (() => {
     daysEl.querySelectorAll("div").forEach(el => el.addEventListener("click", () => {
       selY = +el.dataset.y; selM = +el.dataset.m; selD = +el.dataset.d;
       viewY = selY; viewM = selM;
-      buildGrid(); confirm();
+      buildHeader(); buildGrid();
+      /* Con hora: el día no cierra el selector; se elige la hora y «Listo» */
+      if (mode === "date") confirm(); else apply();
     }));
   }
 
@@ -1155,7 +1284,7 @@ const CustomPicker = (() => {
       html += `<div class="${h === selH ? "active" : ""}" data-v="${h}">${h}</div>`;
     col.innerHTML = html;
     col.querySelectorAll("div").forEach(el => el.addEventListener("click", () => {
-      selH = +el.dataset.v; buildHours();
+      selH = +el.dataset.v; buildHours(); apply();
     }));
     requestAnimationFrame(() => col.querySelector(".active")?.scrollIntoView({block:"nearest"}));
   }
@@ -1167,7 +1296,7 @@ const CustomPicker = (() => {
       html += `<div class="${m === selMin ? "active" : ""}" data-v="${m}">${String(m).padStart(2,"0")}</div>`;
     col.innerHTML = html;
     col.querySelectorAll("div").forEach(el => el.addEventListener("click", () => {
-      selMin = +el.dataset.v; buildMinutes();
+      selMin = +el.dataset.v; buildMinutes(); apply();
     }));
     requestAnimationFrame(() => col.querySelector(".active")?.scrollIntoView({block:"nearest"}));
   }
@@ -1178,31 +1307,37 @@ const CustomPicker = (() => {
       `<div class="${selAp === "am" ? "active" : ""}" data-v="am">a.m.</div>` +
       `<div class="${selAp === "pm" ? "active" : ""}" data-v="pm">p.m.</div>`;
     col.querySelectorAll("div").forEach(el => el.addEventListener("click", () => {
-      selAp = el.dataset.v; buildAmpm();
+      selAp = el.dataset.v; buildAmpm(); apply();
     }));
   }
 
-  function confirm() {
+  function apply() { cb(value()); }
+  function confirm() { cb(value()); close(); }
+  function value() {
     let h24 = selH;
     if (mode !== "date") {
       if (selAp === "pm" && selH !== 12) h24 = selH + 12;
       if (selAp === "am" && selH === 12) h24 = 0;
     }
-    const iso = mode === "date"
+    return mode === "date"
       ? `${selY}-${String(selM+1).padStart(2,"0")}-${String(selD).padStart(2,"0")}`
       : `${selY}-${String(selM+1).padStart(2,"0")}-${String(selD).padStart(2,"0")}T${String(h24).padStart(2,"0")}:${String(selMin).padStart(2,"0")}`;
-    cb(iso); close();
   }
 
-  return { init, open };
+  return { init, open, close };
 })();
+
+
 
 /* ── Funciones de apertura por botón ── */
 function pickerInicio(anchorEl) {
   CustomPicker.open(anchorEl, "datetime", document.getElementById("mInicio").value, function(val) {
+    const viejoIni = toDate(document.getElementById("mInicio").value), viejoFin = toDate(document.getElementById("mFin").value);
+    if (viejoIni && viejoFin && viejoFin > viejoIni) duracionPers = Math.round((viejoFin - viejoIni) / 60000);
     document.getElementById("mInicio").value = val;
     setFechaBtn("inicioBtnNormal", val ? fmtAmPm(val) : "Seleccionar fecha y hora");
     applyActiveDuration();
+    showErr("errInicio", ""); resetEmpalme(); revisarInhabil();
   });
 }
 function pickerInicioAllDay(anchorEl) {
@@ -1210,10 +1345,11 @@ function pickerInicioAllDay(anchorEl) {
     document.getElementById("mInicio").value = val;
     setFechaBtn("inicioBtnAllDay", val ? fmtDate(val) : "Seleccionar fecha");
     const finVal = document.getElementById("mFin").value;
-    if (!finVal || finVal < val) {
+    if (val && (!finVal || finVal < val)) {
       document.getElementById("mFin").value = val;
-      setFechaBtn("finDateBtn", val ? fmtDate(val) : "Seleccionar fecha");
+      setFechaBtn("finDateBtn", fmtDate(val));
     }
+    showErr("errInicio", ""); revisarInhabil();
   });
 }
 function pickerFin(anchorEl) {
@@ -1222,12 +1358,14 @@ function pickerFin(anchorEl) {
   CustomPicker.open(anchor, "datetime", document.getElementById("mFin").value || minVal, function(val) {
     document.getElementById("mFin").value = val;
     setFechaBtn("finPickerBtn", val ? fmtAmPm(val) : "Seleccionar fecha y hora");
+    showErr("errFin", ""); resetEmpalme();
   });
 }
 function pickerFinDate(anchorEl) {
   CustomPicker.open(anchorEl, "date", document.getElementById("mFin").value, function(val) {
     document.getElementById("mFin").value = val;
     setFechaBtn("finDateBtn", val ? fmtDate(val) : "Seleccionar fecha");
+    showErr("errFin", "");
   });
 }
 
@@ -1235,145 +1373,317 @@ function pickerFinDate(anchorEl) {
 function toggleTodoDia() {
   const checked   = document.getElementById("mTodoDia").checked;
   const inicioVal = document.getElementById("mInicio").value;
+  todoDiaAuto = false;
+  const dateVal = inicioVal ? inicioVal.slice(0, 10) : iso(new Date());
+  setModo(checked);
   if (checked) {
-    const dateVal = inicioVal ? inicioVal.slice(0, 10) : iso(new Date());
     document.getElementById("mInicio").value = dateVal;
-    document.getElementById("inicioBtnNormal").style.display  = "none";
-    document.getElementById("inicioBtnAllDay").style.display  = "";
     setFechaBtn("inicioBtnAllDay", fmtDate(dateVal));
-    document.getElementById("timedChips").style.display       = "none";
-    document.getElementById("finStaticDisplay").style.display = "none";
-    document.getElementById("finPickerBtn").style.display     = "none";
     document.getElementById("mFin").value = dateVal;
     setFechaBtn("finDateBtn", fmtDate(dateVal));
-    document.getElementById("finDateBtn").style.display       = "";
-    document.getElementById("finWrap").style.display          = "";
   } else {
-    const dateVal = inicioVal ? inicioVal.slice(0, 10) : iso(new Date());
     const initVal = dateVal + "T09:00";
     document.getElementById("mInicio").value = initVal;
-    document.getElementById("inicioBtnAllDay").style.display  = "none";
-    document.getElementById("inicioBtnNormal").style.display  = "";
     setFechaBtn("inicioBtnNormal", fmtAmPm(initVal));
-    document.getElementById("timedChips").style.display       = "";
-    document.getElementById("finDateBtn").style.display       = "none";
     applyActiveDuration();
   }
+  showErr("errInicio", ""); showErr("errFin", ""); resetEmpalme();
 }
 
 /* ── Chips de duración ────────────────────────── */
-function setDuration(mins) {
+function setDuration(mins, abrir = true) {
   document.querySelectorAll("#timedChips .dur-chip").forEach(c =>
     c.classList.toggle("active",
       mins === -1 ? c.dataset.mins === "-1" : parseInt(c.dataset.mins) === mins));
   const inicioVal = document.getElementById("mInicio").value;
+  const ini = toDate(inicioVal);
   if (mins === -1) {
-    const defVal = inicioVal
-      ? (() => { const d = new Date(new Date(inicioVal).getTime() + 3600000);
-          return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; })()
-      : "";
+    /* Personalizado: se conserva lo que ya duraba; si no hay fin, una hora */
+    const finAnt = toDate(document.getElementById("mFin").value);
+    const fin = ini ? (finAnt && finAnt > ini ? finAnt : new Date(ini.getTime() + 3600000)) : null;
     document.getElementById("finStaticDisplay").style.display = "none";
     document.getElementById("finPickerBtn").style.display = "";
-    if (defVal) {
-      document.getElementById("mFin").value = defVal;
-      setFechaBtn("finPickerBtn", fmtAmPm(defVal));
+    if (fin) {
+      document.getElementById("mFin").value = iso16(fin);
+      setFechaBtn("finPickerBtn", fmtAmPm(iso16(fin)));
     }
-    document.getElementById("finWrap").style.display = "";
-    setTimeout(() => pickerFin(document.getElementById("finPickerBtn")), 50);
+    if (abrir) setTimeout(() => pickerFin(document.getElementById("finPickerBtn")), 50);
     return;
   }
   document.getElementById("finPickerBtn").style.display = "none";
-  if (!inicioVal) {
-    document.getElementById("finStaticDisplay").textContent = "—";
-    document.getElementById("finStaticDisplay").style.display = "";
-    document.getElementById("finWrap").style.display = "";
-    return;
-  }
-  const fin    = new Date(new Date(inicioVal).getTime() + mins * 60000);
-  const finStr = `${fin.getFullYear()}-${pad2(fin.getMonth()+1)}-${pad2(fin.getDate())}T${pad2(fin.getHours())}:${pad2(fin.getMinutes())}`;
+  document.getElementById("finStaticDisplay").style.display = "";
+  if (!ini) { document.getElementById("finStaticDisplay").textContent = "—"; return; }
+  const finStr = iso16(new Date(ini.getTime() + mins * 60000));
   document.getElementById("mFin").value = finStr;
   document.getElementById("finStaticDisplay").textContent = fmtAmPm(finStr);
-  document.getElementById("finStaticDisplay").style.display = "";
-  document.getElementById("finWrap").style.display = "";
+  resetEmpalme();
 }
+/* Al cambiar el inicio, el fin se recorre con la misma duración */
+let duracionPers = 60;
 function applyActiveDuration() {
   const active = document.querySelector("#timedChips .dur-chip.active");
-  setDuration(active ? parseInt(active.dataset.mins) : 60);
+  const mins = active ? parseInt(active.dataset.mins) : 60;
+  if (mins === -1) {
+    const ini = toDate(document.getElementById("mInicio").value);
+    if (ini) {
+      const fin = iso16(new Date(ini.getTime() + duracionPers * 60000));
+      document.getElementById("mFin").value = fin;
+      setFechaBtn("finPickerBtn", fmtAmPm(fin));
+    }
+    return;
+  }
+  setDuration(mins, false);
 }
 
-function autoFillCliente() {
-  const opt = document.getElementById("mAsunto").selectedOptions[0];
-  const cid = opt ? opt.dataset.cliente : "";
-  if (cid) document.getElementById("mCliente").value = cid;
+/* ── Expediente: buscador ─────────────────────── */
+function sinAcentos(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+function asuntoTexto(a) { return [a.numero_expediente, a.titulo].filter(Boolean).join(" · "); }
+let asuntoOpciones = [], asuntoActivo = -1;
+function buscarAsuntos() {
+  const inp = document.getElementById("mAsuntoBusca");
+  const q = sinAcentos(inp.value).trim();
+  document.getElementById("mAsunto").value = "";
+  document.getElementById("mAsuntoQuitar").hidden = !inp.value;
+  showErr("errAsunto", "");
+  const palabras = q.split(/\s+/).filter(Boolean);
+  asuntoOpciones = ASUNTOS.filter(a => {
+    const t = sinAcentos(`${a.numero_expediente || ""} ${a.titulo || ""} ${a.cliente || ""}`);
+    return palabras.every(p => t.includes(p));
+  }).slice(0, 8);
+  asuntoActivo = asuntoOpciones.length ? 0 : -1;
+  pintarAsuntos(!!q || document.activeElement === inp);
+}
+function pintarAsuntos(mostrar) {
+  const lista = document.getElementById("mAsuntoLista");
+  const inp = document.getElementById("mAsuntoBusca");
+  if (!mostrar) { lista.hidden = true; inp.setAttribute("aria-expanded", "false"); return; }
+  lista.innerHTML = asuntoOpciones.length
+    ? asuntoOpciones.map((a, i) => `<button type="button" role="option" id="expOp${i}" class="exp-op${i === asuntoActivo ? " on" : ""}" aria-selected="${i === asuntoActivo}" data-i="${i}">
+        <b>${esc(a.numero_expediente || "Sin número")}</b><span>${esc(a.titulo)}</span>${a.cliente ? `<small>${esc(a.cliente)}</small>` : ""}</button>`).join("")
+    : `<div class="exp-none">${ASUNTOS.length ? "Ningún expediente coincide." : "No tienes expedientes abiertos."}</div>`;
+  lista.hidden = false;
+  inp.setAttribute("aria-expanded", "true");
+  inp.setAttribute("aria-activedescendant", asuntoActivo >= 0 ? `expOp${asuntoActivo}` : "");
+  lista.querySelectorAll(".exp-op").forEach(b => b.addEventListener("mousedown", ev => {
+    ev.preventDefault(); elegirAsunto(asuntoOpciones[+b.dataset.i]);
+  }));
+}
+function elegirAsunto(a, silencioso) {
+  const inp = document.getElementById("mAsuntoBusca");
+  document.getElementById("mAsunto").value = a ? a.id : "";
+  inp.value = a ? asuntoTexto(a) : "";
+  document.getElementById("mAsuntoQuitar").hidden = !a;
+  pintarAsuntos(false);
+  showErr("errAsunto", "");
+  if (silencioso) return;
+  if (a && a.cliente_id) document.getElementById("mCliente").value = a.cliente_id;
+  /* Lo atiende el responsable del expediente, si nadie eligió a mano */
+  if (a && a.abogado_responsable && !partTocado) {
+    document.querySelectorAll(".part-cb").forEach(c => c.checked = +c.value === a.abogado_responsable);
+  }
+  resetEmpalme();
+}
+(function initAsuntoPicker() {
+  const inp = document.getElementById("mAsuntoBusca");
+  inp.addEventListener("input", buscarAsuntos);
+  inp.addEventListener("focus", () => { if (!document.getElementById("mAsunto").value) buscarAsuntos(); });
+  inp.addEventListener("blur", () => setTimeout(() => pintarAsuntos(false), 120));
+  inp.addEventListener("keydown", ev => {
+    const lista = document.getElementById("mAsuntoLista");
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      if (lista.hidden) buscarAsuntos();
+      if (!asuntoOpciones.length) return;
+      ev.preventDefault();
+      asuntoActivo = (asuntoActivo + (ev.key === "ArrowDown" ? 1 : -1) + asuntoOpciones.length) % asuntoOpciones.length;
+      pintarAsuntos(true);
+    } else if (ev.key === "Enter") {
+      if (!lista.hidden && asuntoActivo >= 0) { ev.preventDefault(); elegirAsunto(asuntoOpciones[asuntoActivo]); }
+    } else if (ev.key === "Escape" && !lista.hidden) {
+      ev.stopPropagation(); pintarAsuntos(false);
+    }
+  });
+  document.querySelectorAll(".part-cb").forEach(c => c.addEventListener("change", () => { partTocado = true; resetEmpalme(); }));
+})();
+
+/* ── Término: días hábiles ────────────────────── */
+let plazoTimer = null, plazoVence = null;
+function calcularPlazo() {
+  clearTimeout(plazoTimer);
+  plazoTimer = setTimeout(async () => {
+    const desde = document.getElementById("pDesde").value;
+    const dias = document.getElementById("pDias").value;
+    showErr("errPDesde", ""); showErr("errPDias", "");
+    document.getElementById("plazoRes").hidden = true;
+    plazoVence = null;
+    if (!desde || !dias) return;
+    let j;
+    try {
+      const r = await fetch(`/calendario/ajax/plazo?${new URLSearchParams({desde, dias})}`);
+      j = await r.json();
+    } catch (_) { j = {ok: false, error: "No se pudo calcular. Revisa tu conexión."}; }
+    if (!j.ok) {
+      const er = j.errores || {};
+      if (er.desde) showErr("errPDesde", er.desde);
+      if (er.dias) showErr("errPDias", er.dias);
+      if (!er.desde && !er.dias) showErr("errPDias", j.error || "No se pudo calcular.");
+      return;
+    }
+    plazoVence = j.vence;
+    document.getElementById("plazoFecha").textContent = j.vence_txt;
+    document.getElementById("plazoSaltados").textContent = j.saltados.length
+      ? "Se saltaron entre semana: " + j.saltados.map(s => `${s.txt} (${s.motivo})`).join("; ") + "."
+      : "Solo se saltaron sábados y domingos.";
+    document.getElementById("plazoRes").hidden = false;
+  }, 250);
+}
+function usarPlazo() {
+  if (!plazoVence) return;
+  if (!document.getElementById("mTodoDia").checked) { document.getElementById("mTodoDia").checked = true; toggleTodoDia(); }
+  document.getElementById("mInicio").value = plazoVence;
+  document.getElementById("mFin").value = plazoVence;
+  setFechaBtn("inicioBtnAllDay", fmtDate(plazoVence));
+  setFechaBtn("finDateBtn", fmtDate(plazoVence));
+  const dias = document.getElementById("pDias").value, desde = document.getElementById("pDesde").value;
+  const desc = document.getElementById("mDesc");
+  const nota = `Término de ${dias} días hábiles desde el ${fmtDate(desde)} (surtió efectos la notificación).`;
+  if (!desc.value.includes("días hábiles desde")) desc.value = (desc.value ? desc.value + "\n" : "") + nota;
+  showErr("errInicio", ""); revisarInhabil();
+  showToast(`Vence el ${document.getElementById("plazoFecha").textContent}`);
 }
 
+/* ¿El día elegido es inhábil? Se avisa sin impedir guardar */
+let inhabilN = 0;
+async function revisarInhabil() {
+  const hint = document.getElementById("inicioInhabil");
+  const v = document.getElementById("mInicio").value;
+  hint.hidden = true;
+  if (!v || !["audiencia", "diligencia", "vencimiento", "fecha_limite"].includes(selectedTipo)) return;
+  const d = parseDay(v), ds = iso(d), n = ++inhabilN;
+  let motivo = d.getDay() === 0 ? "es domingo" : (d.getDay() === 6 ? "es sábado" : "");
+  if (!motivo) {
+    try {
+      const r = await fetch(`/calendario/ajax/inhabiles?${new URLSearchParams({start: ds, end: iso(addDays(d, 1))})}`);
+      const j = r.ok ? await r.json() : {};
+      if (j[ds]) motivo = `es día inhábil (${j[ds]})`;
+    } catch (_) {}
+  }
+  if (n !== inhabilN || !motivo) return;
+  hint.textContent = `Ojo: el ${fmtDate(ds)} ${motivo}. Revisa que el juzgado sí actúe ese día.`;
+  hint.hidden = false;
+}
+
+/* ── Empalmes ─────────────────────────────────── */
+function resetEmpalme() {
+  confirmarEmpalme = false;
+  const warn = document.getElementById("conflictWarn");
+  if (warn) warn.style.display = "none";
+  const btn = document.getElementById("modalSubmitBtn");
+  if (btn) btn.textContent = editingId ? "Guardar cambios" : "Crear evento";
+}
+function mostrarEmpalme(lista) {
+  document.getElementById("conflictTitle").textContent = lista.length === 1
+    ? "Se empalma con otro evento de la misma persona" : `Se empalma con ${lista.length} eventos`;
+  document.getElementById("conflictItems").innerHTML = lista.map(c =>
+    `<div class="conflict-item">${c.persona ? `<b>${esc(c.persona)}</b> ya tiene ` : ""}${esc(c.tipo_label || "")} «${esc(c.titulo)}» a las ${esc(c.hora || "")}</div>`
+  ).join("") + `<div class="conflict-item">Si de todos modos quieres guardarlo, vuelve a pulsar el botón.</div>`;
+  document.getElementById("conflictWarn").style.display = "block";
+  document.getElementById("modalSubmitBtn").textContent = "Guardar de todos modos";
+  confirmarEmpalme = true;
+  document.getElementById("conflictWarn").scrollIntoView({block: "nearest", behavior: "smooth"});
+}
+
+let guardando = false;
 async function submitEvent() {
+  if (guardando) return;
+  clearErrs();
   const titulo = document.getElementById("mTitulo").value.trim();
-  if (!titulo) { showToast("Escribe un título para el evento", "error"); document.getElementById("mTitulo").focus(); return; }
   const inicio = document.getElementById("mInicio").value;
-  if (!inicio) { showToast("Elige la fecha de inicio", "error"); return; }
   const fin = document.getElementById("mFin").value;
-  if (fin && fin <= inicio) { showToast("El fin debe ser después del inicio", "error"); return; }
+  const todoDia = document.getElementById("mTodoDia").checked;
+  let mal = false;
+  if (!titulo) { showErr("errTitulo", "Escribe qué es: por ejemplo, «Audiencia de pruebas»."); mal = true; }
+  if (!inicio) { showErr("errInicio", todoDia ? "Elige el día." : "Elige el día y la hora."); mal = true; }
+  if (inicio && fin && (todoDia ? fin < inicio.slice(0, 10) : fin <= inicio)) {
+    showErr("errFin", todoDia ? "El último día no puede ser antes del primero." : "La hora de fin debe ser después de la de inicio."); mal = true;
+  }
+  if (document.getElementById("mAsuntoBusca").value.trim() && !document.getElementById("mAsunto").value) {
+    showErr("errAsunto", "Elige el expediente de la lista, o borra lo que escribiste."); mal = true;
+  }
+  if (mal) { document.querySelector("#evtModal .has-err input, #evtModal .has-err .fecha-btn")?.focus(); return; }
 
   const participantes = [...document.querySelectorAll(".part-cb:checked")].map(c => parseInt(c.value));
-
   const body = {
     titulo, tipo: selectedTipo,
     descripcion:    document.getElementById("mDesc").value.trim() || null,
     fecha_inicio:   inicio,
-    fecha_fin:      document.getElementById("mFin").value || null,
-    todo_dia:       document.getElementById("mTodoDia").checked,
-    recurrencia:    document.getElementById("mRecurrencia").value,
+    fecha_fin:      fin || null,
+    todo_dia:       todoDia,
     recordatorio:   document.getElementById("mRecordatorio").value || null,
     asunto_id:      document.getElementById("mAsunto").value || null,
     cliente_id:     document.getElementById("mCliente").value || null,
     lugar:          document.getElementById("mLugar").value.trim() || null,
     color_custom:   selectedColor || null,
     participantes,
+    revisar_conflictos: true,
+    confirmar_conflicto: confirmarEmpalme,
   };
+  if (!editingId) body.recurrencia = document.getElementById("mRecurrencia").value;
 
-  const url = editingId
-    ? `/calendario/ajax/${editingId}/editar`
-    : `/calendario/ajax/crear`;
+  const url = editingId ? `/calendario/ajax/${editingId}/editar` : `/calendario/ajax/crear`;
+  const btn = document.getElementById("modalSubmitBtn");
+  guardando = true; btn.disabled = true;
+  let j;
+  try {
+    const r = await fetch(url, {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)});
+    j = await r.json();
+  } catch (_) {
+    j = {ok: false, error: "No se pudo guardar. Revisa tu conexión e intenta de nuevo."};
+  } finally { guardando = false; btn.disabled = false; }
 
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(body),
-  });
-  const j = await r.json();
-  if (!j.ok) { showToast(j.error || "No se pudo guardar", "error"); return; }
-
-  /* Show conflicts */
-  if (j.conflictos && j.conflictos.length) {
-    const warn = document.getElementById("conflictWarn");
-    document.getElementById("conflictItems").innerHTML = j.conflictos.map(c =>
-      `<div class="conflict-item">{{ icon_alert_triangle(14, 14) }} ${esc(c.titulo)} — ${(c.fecha_inicio||"").slice(11,16)}</div>`
-    ).join("");
-    warn.style.display = "block";
-    /* Don't close modal so user can see conflicts, but event is already saved */
-    setTimeout(() => { closeModal(); reloadEvents(); }, 2000);
-  } else {
-    closeModal();
-    reloadEvents();
-    showToast(editingId ? "Cambios guardados" : "Evento creado");
+  if (j.necesita_confirmar) { mostrarEmpalme(j.conflictos || []); return; }
+  if (!j.ok) {
+    const er = j.errores || {};
+    let puesto = false;
+    Object.entries(er).forEach(([k, msg]) => { if (ERR_IDS[k]) { showErr(ERR_IDS[k], msg); puesto = true; } });
+    if (!puesto) showToast(j.error || "No se pudo guardar", "error");
+    return;
   }
+  const eraNuevo = !editingId;
+  closeModal();
+  /* Ir a la fecha del evento para verlo */
+  currentDate = parseDay(inicio);
+  miniDate = new Date(currentDate); renderMini();
+  reloadEvents();
+  let msg = eraNuevo ? "Evento agendado" : "Cambios guardados";
+  if (j.repeticiones) msg += ` (y ${j.repeticiones} repeticiones)`;
+  showToast(msg);
 }
 
+async function borrar(id, serie) {
+  let pedirSerie = false;
+  if (!confirm("¿Borrar este evento del calendario?")) return false;
+  if (serie) pedirSerie = confirm("Este evento se repite. ¿Borrar también las repeticiones que siguen?\n\nAceptar: esta y las siguientes · Cancelar: solo esta");
+  let j;
+  try {
+    const r = await fetch(`/calendario/ajax/${id}/eliminar`, {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({serie: pedirSerie}),
+    });
+    j = await r.json();
+  } catch (_) { j = {ok: false}; }
+  if (!j.ok) { showToast(j.error || "No se pudo borrar", "error"); return false; }
+  showToast(j.eliminados > 1 ? `Se borraron ${j.eliminados} eventos` : "Evento borrado");
+  reloadEvents();
+  return true;
+}
 async function deleteEvent() {
   if (!editingId) return;
-  const delSeries = confirm("¿Eliminar también los eventos recurrentes de esta serie?");
-  await fetch(`/calendario/ajax/${editingId}/eliminar`, {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({delete_series: delSeries}),
-  });
-  closeModal(); reloadEvents();
+  if (await borrar(editingId, editingSerie)) closeModal();
 }
 
 /* ── DETAIL MODAL ────────────────────────────── */
 let detailEvtId = null;
 
-function showPopover(id, ev) {
+function showPopover(id) {
   const e = events.find(x => x.id === id);
   if (!e) return;
   detailEvtId = id;
@@ -1383,59 +1693,69 @@ function showPopover(id, ev) {
   document.getElementById("detailHead").style.borderBottomColor = clr;
   document.getElementById("detailColorBar").style.background = clr;
   document.getElementById("detailTitle").textContent = e.titulo;
-  document.getElementById("detailTipo").innerHTML = `${CAL_ICON_SVGS[tipo.icon]||""} ${tipo.label||e.tipo}`;
+  document.getElementById("detailTipo").innerHTML = `${CAL_ICON_SVGS[tipo.icon]||""} ${esc(tipo.label||e.tipo)}`;
   document.getElementById("detailTipo").style.color = clr;
 
-  /* Date & time */
-  const startD = e.inicio ? new Date(e.inicio.length === 10 ? e.inicio + "T12:00" : e.inicio) : null;
+  const startD = toDate(e.inicio);
   if (startD) {
-    document.getElementById("detailDate").textContent =
-      `${DAY_FULL[startD.getDay()]} ${startD.getDate()} de ${MONTH_NAMES[startD.getMonth()].toLowerCase()} de ${startD.getFullYear()}`;
+    let txt = `${DAY_FULL[startD.getDay()]} ${startD.getDate()} de ${MONTH_NAMES[startD.getMonth()].toLowerCase()} de ${startD.getFullYear()}`;
+    if (e.todo_dia && e.fin && e.fin.slice(0, 10) !== e.inicio.slice(0, 10)) {
+      const f = toDate(e.fin);
+      txt += ` al ${DAY_FULL[f.getDay()].toLowerCase()} ${f.getDate()} de ${MONTH_NAMES[f.getMonth()].toLowerCase()}`;
+    }
+    document.getElementById("detailDate").textContent = txt;
   }
-  document.getElementById("detailTime").textContent = e.todo_dia
-    ? "Todo el día"
-    : `${fmtTime(e.inicio)} — ${fmtTime(e.fin)}`;
+  document.getElementById("detailTime").textContent = e.todo_dia ? "Todo el día" : fmtRange(e);
 
-  /* Asunto */
   const asW = document.getElementById("detailAsuntoWrap");
-  if (e.asunto) { document.getElementById("detailAsunto").textContent = e.asunto; asW.style.display="block"; }
-  else asW.style.display="none";
+  if (e.asunto) {
+    const a = document.getElementById("detailAsunto");
+    a.textContent = [e.expediente, e.asunto].filter(Boolean).join(" · ");
+    a.href = e.asunto_id ? `/asuntos/${e.asunto_id}` : "#";
+    asW.style.display = "block";
+  } else asW.style.display = "none";
 
-  /* Cliente */
+  const qW = document.getElementById("detailQuienWrap");
+  if ((e.responsables||[]).length) { document.getElementById("detailQuien").textContent = "Lo atiende: " + e.responsables.join(", "); qW.style.display = "block"; }
+  else qW.style.display = "none";
+
   const clW = document.getElementById("detailClienteWrap");
   if (e.cliente) { document.getElementById("detailCliente").textContent = e.cliente; clW.style.display="block"; }
   else clW.style.display="none";
 
-  /* Lugar */
+  const rc = document.getElementById("detailRespuesta");
+  rc.style.display = e.respuesta_cliente ? "block" : "none";
+  rc.className = "cal-respuesta " + (e.respuesta_cliente === "confirmado" ? "si" : "no");
+  rc.textContent = e.respuesta_cliente === "confirmado" ? "El cliente confirmó desde el portal que asistirá"
+                 : e.respuesta_cliente ? "El cliente avisó desde el portal que NO puede asistir" : "";
+
   const luW = document.getElementById("detailLugarWrap");
   if (e.lugar) { document.getElementById("detailLugar").textContent = e.lugar; luW.style.display="block"; }
   else luW.style.display="none";
 
-  /* Descripción */
   const deW = document.getElementById("detailDescWrap");
   if (e.descripcion) { document.getElementById("detailDesc").textContent = e.descripcion; deW.style.display="block"; }
   else deW.style.display="none";
 
-  /* GCal */
   document.getElementById("detailGcalWrap").style.display = e.gcal ? "block" : "none";
 
-  /* Estado */
   const estEl = document.getElementById("detailEstado");
-  const estColors = {pendiente:"#B08A4A", completado:"#4F6D8A", cancelado:"#B5483F"};
-  const estLabels = {pendiente:"Pendiente", completado:"Completado", cancelado:"Cancelado"};
-  const est = e.estado || "pendiente";
+  const est = e.vencido ? "vencido" : (e.estado || "pendiente");
+  const estColors = {pendiente:"#8A6A2F", completado:"#2F6B4F", cancelado:"#B5483F", vencido:"#A23B33"};
+  const estLabels = {pendiente:"Pendiente", completado:"Hecho", cancelado:"Cancelado", vencido:"Término vencido sin marcar como hecho"};
   estEl.textContent = estLabels[est] || est;
   estEl.style.background = (estColors[est]||"#60718D") + "18";
   estEl.style.color = estColors[est] || "#60718D";
+  document.getElementById("detailHechoBtn").textContent = e.estado === "completado" ? "↺ Volver a pendiente" : "✓ Marcar como hecho";
 
-  document.getElementById("detailModal").classList.add("open");
+  abrirModal("detailModal");
 }
 
 function closeDetail() {
   document.getElementById("detailModal").classList.remove("open");
   detailEvtId = null;
 }
-function closePopover() { closeDetail(); } /* backwards compat */
+function closePopover() { closeDetail(); }
 
 function editFromDetail() {
   const id = detailEvtId;
@@ -1444,14 +1764,23 @@ function editFromDetail() {
 }
 async function completeFromDetail() {
   if (!detailEvtId) return;
-  await fetch(`/calendario/ajax/${detailEvtId}/completar`, {method:"POST",headers:{"Content-Type":"application/json"}});
+  const e = events.find(x => x.id === detailEvtId);
+  const hecho = !(e && e.estado === "completado");
+  let j;
+  try {
+    const r = await fetch(`/calendario/ajax/${detailEvtId}/completar`, {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({hecho}),
+    });
+    j = await r.json();
+  } catch (_) { j = {ok: false}; }
+  if (!j.ok) { showToast(j.error || "No se pudo actualizar", "error"); return; }
   closeDetail(); reloadEvents();
+  showToast(hecho ? "Marcado como hecho" : "De nuevo pendiente");
 }
 async function deleteFromDetail() {
   if (!detailEvtId) return;
-  if (!confirm("¿Eliminar este evento?")) return;
-  await fetch(`/calendario/ajax/${detailEvtId}/eliminar`, {method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
-  closeDetail(); reloadEvents();
+  const e = events.find(x => x.id === detailEvtId);
+  if (await borrar(detailEvtId, e && e.serie)) closeDetail();
 }
 
 /* ── MINI CALENDAR ───────────────────────────── */
@@ -1462,8 +1791,7 @@ function renderMini() {
   const first = new Date(y, m, 1);
   const startOff = (first.getDay()+6)%7;
   const dim = daysInMonth(y, m);
-  let h = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(d =>
-    `<div class="mini-cal-wday">${d}</div>`).join("");
+  let h = ["Lu","Ma","Mi","Ju","Vi","Sá","Do"].map(d => `<div class="mini-cal-wday">${d}</div>`).join("");
   for (let i=0; i<startOff; i++) {
     const d = new Date(y, m, 1-startOff+i);
     h += `<div class="mini-cal-day other-month" onclick="miniJump('${iso(d)}')">${d.getDate()}</div>`;
@@ -1483,10 +1811,10 @@ function renderMini() {
   }
   document.getElementById("miniGrid").innerHTML = h;
 }
-function miniPrev() { miniDate.setMonth(miniDate.getMonth()-1); renderMini(); }
-function miniNext() { miniDate.setMonth(miniDate.getMonth()+1); renderMini(); }
+function miniPrev() { miniDate = new Date(miniDate.getFullYear(), miniDate.getMonth()-1, 1); renderMini(); }
+function miniNext() { miniDate = new Date(miniDate.getFullYear(), miniDate.getMonth()+1, 1); renderMini(); }
 function miniJump(dateStr) {
-  currentDate = new Date(dateStr+"T12:00");
+  currentDate = parseDay(dateStr);
   miniDate = new Date(currentDate);
   renderMini();
   if (currentView==="month") reloadEvents();
@@ -1495,10 +1823,12 @@ function miniJump(dateStr) {
 
 /* ── Google Calendar ─────────────────────────── */
 async function sincronizarGcal() {
-  const r = await fetch("/calendario/ajax/sincronizar", {method:"POST", headers:{"Content-Type":"application/json"}});
-  const j = await r.json();
-  if (j.ok) { showToast(`Sincronizado: ${j.importados} eventos importados`); reloadEvents(); }
-  else showToast(j.error || "No se pudo sincronizar", "error");
+  try {
+    const r = await fetch("/calendario/ajax/sincronizar", {method:"POST", headers:{"Content-Type":"application/json"}});
+    const j = await r.json();
+    if (j.ok) { showToast(`Sincronizado: ${j.importados} eventos importados`); reloadEvents(); }
+    else showToast(j.error || "No se pudo sincronizar", "error");
+  } catch (_) { showToast("No se pudo sincronizar", "error"); }
 }
 async function toggleGcal(activo) {
   await fetch("/calendario/ajax/toggle-gcal", {
@@ -1511,14 +1841,17 @@ async function toggleGcal(activo) {
 /* ── Filtro por tipo y salto a fecha ─────────── */
 function filterByTipo(tipo) {
   document.getElementById("filterTipo").value = tipo;
-  document.querySelectorAll("#tipoFilter .tf-chip").forEach(c => c.classList.toggle("active", c.dataset.tipo === tipo));
+  document.querySelectorAll("#tipoFilter .tf-chip").forEach(c => {
+    c.classList.toggle("active", c.dataset.tipo === tipo);
+    c.setAttribute("aria-pressed", c.dataset.tipo === tipo ? "true" : "false");
+  });
   reloadEvents();
 }
 function jumpTo(dateStr) {
-  currentDate = new Date(dateStr + "T12:00");
+  currentDate = parseDay(dateStr);
   miniDate = new Date(currentDate);
   renderMini();
-  if (currentView === "agenda" || currentView === "month") setView("week"); else reloadEvents();
+  if (currentView === "agenda" || currentView === "month") setView(window.innerWidth < 700 ? "day" : "week"); else reloadEvents();
 }
 
 /* ── Export .ics ─────────────────────────────── */
@@ -1527,20 +1860,77 @@ function exportIcs() {
   window.open(`/calendario/exportar-ics?start=${s}&end=${e}`, "_blank");
 }
 
+/* ── Días inhábiles del despacho ─────────────── */
+async function cargarInhabiles() {
+  const box = document.getElementById("inhList");
+  try {
+    const r = await fetch("/calendario/ajax/inhabiles");
+    const lista = r.ok ? await r.json() : [];
+    const hoy = iso(TODAY);
+    const vigentes = lista.filter(x => x.hasta >= hoy);
+    box.innerHTML = vigentes.length ? vigentes.map(x => `<div class="inh-row">
+        <span><b>${esc(x.desde === x.hasta ? fmtDate(x.desde) : `${fmtDate(x.desde)} al ${fmtDate(x.hasta)}`)}</b><small>${esc(x.motivo)}</small></span>
+        <button type="button" class="inh-del" onclick="quitarInhabil(${x.id})" aria-label="Quitar ${esc(x.motivo)}">×</button></div>`).join("")
+      : `<p class="cal-side-empty">Ninguno marcado por ahora.</p>`;
+  } catch (_) { box.innerHTML = ""; }
+}
+async function agregarInhabil() {
+  const desde = document.getElementById("inhDesde").value, hasta = document.getElementById("inhHasta").value;
+  const motivo = document.getElementById("inhMotivo").value.trim();
+  const err = document.getElementById("inhErr");
+  err.textContent = "";
+  if (!desde) { err.textContent = "Elige el primer día."; return; }
+  if (!motivo) { err.textContent = "Escribe el motivo, por ejemplo «Vacaciones del Poder Judicial»."; return; }
+  let j;
+  try {
+    const r = await fetch("/calendario/ajax/inhabiles", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({desde, hasta: hasta || desde, motivo})});
+    j = await r.json();
+  } catch (_) { j = {ok: false, error: "No se pudo guardar. Revisa tu conexión."}; }
+  if (!j.ok) { err.textContent = j.error || "No se pudo guardar."; return; }
+  ["inhDesde", "inhHasta", "inhMotivo"].forEach(id => document.getElementById(id).value = "");
+  document.querySelector(".inh-add").open = false;
+  cargarInhabiles(); reloadEvents();
+  showToast("Días inhábiles guardados");
+}
+async function quitarInhabil(id) {
+  if (!confirm("¿Quitar estos días inhábiles?")) return;
+  const r = await fetch(`/calendario/ajax/inhabiles/${id}/eliminar`, {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"});
+  const j = await r.json().catch(() => ({}));
+  if (!j.ok) { showToast(j.error || "No se pudo quitar", "error"); return; }
+  cargarInhabiles(); reloadEvents();
+}
+
+/* ── «+ Nuevo evento» desde el menú: /calendario/#nuevo o #nuevo-asunto-ID ── */
+function abrirDesdeHash() {
+  const nuevo = location.hash.match(/^#nuevo(?:-asunto-(\d+))?$/);
+  if (!nuevo) return;
+  openCreate();
+  if (nuevo[1]) {
+    const a = ASUNTOS.find(x => x.id === +nuevo[1]);
+    if (a) elegirAsunto(a);
+  }
+  history.replaceState(null, "", location.pathname + location.search);
+}
+
 /* ── Init ────────────────────────────────────── */
 (function init() {
   CustomPicker.init();
-  document.querySelectorAll(".cal-view-btn").forEach(b =>
-    b.classList.toggle("active", b.dataset.view===currentView));
+  document.querySelectorAll(".cal-view-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.view===currentView);
+    b.setAttribute("aria-selected", b.dataset.view===currentView ? "true" : "false");
+  });
   renderMini();
   reloadEvents();
-  const nuevo = location.hash.match(/^#nuevo(?:-asunto-(\d+))?$/);
-  if (nuevo) {
-    openCreate(iso(new Date()));
-    const sel = document.getElementById("mAsunto");
-    if (nuevo[1] && sel.querySelector(`option[value="${nuevo[1]}"]`)) { sel.value = nuevo[1]; autoFillCliente(); }
-    history.replaceState(null, "", location.pathname + location.search);
-  }
+  cargarInhabiles();
+  abrirDesdeHash();
+  window.addEventListener("hashchange", abrirDesdeHash);
+  document.addEventListener("keydown", ev => {
+    if (ev.key !== "Escape") return;
+    if (document.getElementById("customPicker").classList.contains("open")) { CustomPicker.close(); return; }
+    if (document.getElementById("evtModal").classList.contains("open")) closeModal();
+    else if (document.getElementById("detailModal").classList.contains("open")) closeDetail();
+  });
 })();
 </script>
 {% endblock %}

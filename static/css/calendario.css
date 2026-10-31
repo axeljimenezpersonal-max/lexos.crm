@@ -364,3 +364,108 @@
 .cal-solo a{margin-left:auto;font-weight:600;color:var(--e);text-decoration:none;font-size:13.5px}
 .cal-solo a + a{margin-left:0}
 .cal-solo a:hover{text-decoration:underline;text-decoration-color:var(--dorado);text-underline-offset:3px}
+
+/* ── Errores y ayudas junto a cada campo ── */
+.cf-err { margin: 0; font-size: 12.5px; color: var(--danger); font-weight: 500; line-height: 1.35; }
+.cf-err:empty { display: none; }
+.cf-g.has-err input:not([type="checkbox"]), .cf-g.has-err .fecha-btn, .cf-g.has-err select { border-color: var(--danger); }
+.cf-hint { font-size: 12px; color: var(--ash); line-height: 1.4; margin: 0; }
+p.cf-hint#inicioInhabil { color: #74592A; background: #F7F0E1; border: 1px solid #E6D3A8; border-radius: 8px; padding: 6px 10px; }
+
+/* Botones con aspecto de chip */
+.tipo-opt { font-family: inherit; }
+.color-swatch { padding: 0; }
+.tipo-opt:focus-visible, .color-swatch:focus-visible, .fecha-btn:focus-visible, .exp-op:focus-visible {
+  outline: 2px solid var(--e); outline-offset: 2px;
+}
+
+/* ── Cómputo del término ── */
+.plazo-box { margin-top: 4px; padding: 14px; border: 1px solid #E6D3A8; background: #FBF7EE; border-radius: 12px; }
+.plazo-h { font: 600 13.5px 'Sora', sans-serif; color: var(--tinta); margin-bottom: 10px; }
+.plazo-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.plazo-row .cf-g { min-width: 150px; }
+.plazo-row .plazo-dias { flex: 0 1 130px; min-width: 110px; }
+.plazo-res { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.plazo-res > div { font-size: 14px; color: #3B4A61; }
+.plazo-res b { color: var(--danger); font-weight: 700; }
+.plazo-res small { font-size: 12px; color: var(--ash); line-height: 1.4; }
+.plazo-nota { margin: 10px 0 0; font-size: 12px; color: #74592A; line-height: 1.45; }
+
+/* ── Buscador de expediente ── */
+.exp-pick { position: relative; }
+.exp-pick input { width: 100%; padding-right: 36px !important; }
+.exp-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border: 0; background: none; color: var(--ash); font-size: 18px; border-radius: 6px; cursor: pointer; }
+.exp-clear:hover { background: var(--c2); color: var(--fog); }
+.exp-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60; background: var(--c); border: 1px solid var(--border-m); border-radius: 12px; box-shadow: 0 16px 40px -14px rgba(19,34,56,.35); max-height: 280px; overflow-y: auto; padding: 4px; }
+.exp-op { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; color: var(--fog); }
+.exp-op b { font-size: 12.5px; color: var(--e); white-space: nowrap; }
+.exp-op span { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exp-op small { grid-column: 2; font-size: 12px; color: var(--ash); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exp-op.on, .exp-op:hover { background: var(--edim); }
+.exp-none { padding: 10px; font-size: 13px; color: var(--ash); }
+
+.cf-more summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--e); padding: 4px 0; list-style-position: inside; }
+
+/* ── Estados en las vistas ── */
+.is-done { opacity: .55; }
+.is-done .cal-evt-title, .cal-month-evt.is-done, .cal-allday-evt.is-done, .cal-ag-item.is-done .cal-ag-title { text-decoration: line-through; }
+.cal-allday-evt.is-overdue, .cal-month-evt.is-overdue { box-shadow: inset 0 0 0 1px var(--danger); }
+.cal-ag-flag { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 5px; padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
+.cal-ag-flag.ok { background: var(--ok); }
+
+/* Días inhábiles en las vistas */
+.cal-day-header.is-inhabil, .cal-month-cell.is-inhabil, .cal-day-col.is-inhabil {
+  background-image: repeating-linear-gradient(135deg, transparent 0 8px, rgba(162,59,51,.05) 8px 16px);
+}
+.cal-day-inh { font-size: 10px; font-weight: 700; color: var(--danger); text-transform: uppercase; letter-spacing: .04em; }
+.cal-month-inh { font-size: 10.5px; color: var(--danger); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-day-inh-tag { font-size: 12px; font-weight: 600; color: var(--danger); margin-right: 8px; }
+.cal-ag-inh { font: 600 11.5px 'Inter', sans-serif; color: var(--danger); margin-left: 6px; }
+
+/* Panel de días inhábiles */
+.cal-side-note { font-size: 12.5px; color: var(--ash); line-height: 1.45; margin: -4px 0 10px; }
+.inh-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.inh-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.inh-row span { min-width: 0; }
+.inh-row b { display: block; font-size: 12.5px; font-weight: 600; color: var(--fog); }
+.inh-row small { display: block; font-size: 12px; color: var(--ash); overflow: hidden; text-overflow: ellipsis; }
+.inh-del { flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--ash); font-size: 17px; cursor: pointer; }
+.inh-del:hover { background: var(--c2); color: var(--danger); }
+.inh-add summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--e); padding: 4px 0; }
+.inh-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.inh-form label { font-size: 12px; font-weight: 600; color: var(--ash); }
+.inh-form label small { font-weight: 400; }
+.inh-form input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: 400 13.5px 'Inter', sans-serif; color: var(--fog); background: var(--c); }
+.inh-form .btn { align-self: flex-start; margin-top: 4px; }
+
+.cp-done { background: var(--e); border: none; color: #fff; font: 600 13px 'Inter', sans-serif; cursor: pointer; padding: 4px 12px; border-radius: 6px; }
+.detail-link { color: var(--e); font-weight: 600; text-decoration: none; }
+.detail-link:hover { text-decoration: underline; }
+
+/* ── Teléfono y tableta ── */
+@media (max-width: 900px) {
+  .cal-modal-overlay { padding: 24px 12px; }
+}
+@media (max-width: 600px) {
+  .cal-week-head, .cal-week-allday, .cal-week-body { grid-template-columns: 40px repeat(7, minmax(0, 1fr)); }
+  .cal-time-label { padding: 0 4px; font-size: 10.5px; }
+  .cal-day-name { font-size: 10px; letter-spacing: 0; }
+  .cal-day-inh { font-size: 8.5px; }
+  .cal-allday-label { font-size: 9.5px; padding: 6px 2px; }
+  .cal-allday-evt { font-size: 10.5px; padding: 2px 4px; }
+  .cal-month-inh { display: none; }
+  /* La hoja ocupa toda la pantalla y crece con su contenido (si no, el fondo se corta al bajar) */
+  .cal-modal-overlay { padding: 0; align-items: flex-start; }
+  .cal-modal { min-height: 100%; }
+  .cal-modal-foot { position: sticky; bottom: 0; background: var(--c); z-index: 5; }
+  .cal-modal-foot-right { flex: 1; justify-content: flex-end; }
+  .cal-ag-time { min-width: 64px; font-size: 12.5px; }
+  .cal-agenda { padding: 4px 12px 12px; }
+  .tipo-opt[data-tip]:hover::after { display: none; }
+  .cp-footer { gap: 4px; }
+}
+
+/* Respuesta del cliente desde el portal, en el detalle del evento */
+.cal-respuesta { padding: 8px 12px; border-radius: 10px; font: 600 13px 'Inter', sans-serif; }
+.cal-respuesta.si { background: #E2EEEC; color: #2F5D5D; }
+.cal-respuesta.no { background: #F8E4E0; color: #B4412F; }
