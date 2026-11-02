@@ -4,6 +4,8 @@ Contrapartes: las que se registran a mano y las que ya aparecen en los expedient
 (campo «contraparte»), juntas, con el historial del despacho contra cada una y sus abogados.
 """
 
+import re
+
 from flask import Blueprint, g, jsonify, render_template, request, session, url_for
 
 from modules.asuntos import ABIERTOS, TIPOS_DERECHO, _FILTRO_PROPIOS, _solo_lo_suyo
@@ -20,6 +22,40 @@ def _clave(nombre: str) -> str:
     """Mismo nombre aunque cambien acentos, comas o «S.A. de C.V.»."""
     n = normalizar(nombre).replace(",", " ").replace(".", " ")
     return " ".join(n.split())
+
+
+def clave_persona(nombre: str) -> str:
+    """Para comparar personas entre Clientes y Contrapartes: solo letras y números, sin acentos.
+    «Constructora Omega, S.A. de C.V.» y «CONSTRUCTORA OMEGA SA DE CV» quedan iguales."""
+    return "".join(ch for ch in normalizar(nombre) if ch.isalnum())
+
+
+def coincidencias(tdb, nombre: str, rfc: str | None = None) -> list[dict]:
+    """Dónde aparece esta persona como contraparte del despacho (posible conflicto de interés).
+    Revisa todos los expedientes, pero a un abogado no le muestra el título de los que no lleva."""
+    k = clave_persona(nombre or "")
+    if len(k) < 5:
+        return []
+    visibles = None
+    if _solo_lo_suyo():
+        uid = session.get("user_id")
+        visibles = {r[0] for r in tdb.execute(f"SELECT a.id FROM asuntos a WHERE {_FILTRO_PROPIOS}", (uid, uid, uid))}
+    salida = []
+    for a in tdb.execute("SELECT id, titulo, numero_expediente, contrario_nombre FROM asuntos "
+                         "WHERE COALESCE(contrario_nombre, '') != '' ORDER BY fecha_alta DESC").fetchall():
+        if clave_persona(a["contrario_nombre"]) != k:
+            continue
+        if visibles is not None and a["id"] not in visibles:
+            salida.append({"texto": "un expediente que lleva otro abogado", "url": None})
+        else:
+            salida.append({"texto": f"«{a['titulo']}» ({a['numero_expediente'] or '#' + str(a['id'])})",
+                           "url": url_for("asuntos.detalle", id=a["id"])})
+    if not salida:
+        for r in tdb.execute("SELECT nombre, rfc FROM contrapartes WHERE activo=1").fetchall():
+            if clave_persona(r["nombre"]) == k or (rfc and (r["rfc"] or "").upper() == rfc.upper()):
+                salida.append({"texto": "la lista de Contrapartes", "url": url_for("contrapartes.index", q=r["nombre"])})
+                break
+    return salida[:4]
 
 
 def _iniciales(nombre: str) -> str:
@@ -67,6 +103,13 @@ def _contrapartes(tdb) -> list[dict]:
             "url": url_for("asuntos.detalle", id=a["id"]),
         })
 
+    clientes = {}
+    for c in tdb.execute("SELECT id, COALESCE(NULLIF(razon_social, ''), TRIM(nombre || ' ' || COALESCE(apellidos, ''))) AS n, rfc "
+                         "FROM clientes WHERE activo=1").fetchall():
+        clientes[clave_persona(c["n"])] = c["id"]
+        if c["rfc"]:
+            clientes["rfc:" + c["rfc"].upper()] = c["id"]
+
     salida = []
     for i, f in enumerate(sorted(fichas.values(), key=lambda x: (-len(x["asuntos"]), normalizar(x["nombre"])))):
         cerrados = [a for a in f["asuntos"] if not a["abierto"] and a["resultado"]]
@@ -76,6 +119,7 @@ def _contrapartes(tdb) -> list[dict]:
         f["abogados"], f["despachos"] = sorted(f["abogados"]), sorted(f["despachos"])
         f["iniciales"], f["color"] = _iniciales(f["nombre"]), _COLORES[i % len(_COLORES)]
         f["empresa"] = f["tipo"] == "persona_moral" or any(s in f["nombre"].upper() for s in ("S.A.", "S.C.", "S. DE R.L", "SAPI", "A.C."))
+        f["cliente_id"] = clientes.get(clave_persona(f["nombre"])) or (f["rfc"] and clientes.get("rfc:" + f["rfc"].upper()))
         f["_pajar"] = normalizar(" ".join([f["nombre"], *f["abogados"], *f["despachos"], f["ciudad"],
                                            *[a["titulo"] + " " + a["numero"] for a in f["asuntos"]]]))
         salida.append(f)
@@ -112,55 +156,83 @@ def index():
     )
 
 
+TIPOS = ("persona_fisica", "persona_moral")
+RE_RFC = re.compile(r"^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}$")
+
+
+def _leer(d: dict):
+    """Valida el formulario de contraparte. Regresa (valores, error)."""
+    texto = lambda k, n: ((d.get(k) or "").strip()[:n] or None)  # noqa: E731
+    v = {"nombre": texto("nombre", 200), "tipo": d.get("tipo") if d.get("tipo") in TIPOS else "persona_fisica",
+         "rfc": re.sub(r"[\s-]", "", (d.get("rfc") or "").upper()) or None, "email": (texto("email", 160) or "").lower() or None,
+         "telefono": texto("telefono", 30), "abogado_nombre": texto("abogado_nombre", 200),
+         "abogado_email": (texto("abogado_email", 160) or "").lower() or None, "despacho": texto("despacho", 200),
+         "ciudad": texto("ciudad", 80), "notas": texto("notas", 2000)}
+    if not v["nombre"]:
+        return None, "Escribe el nombre de la contraparte"
+    if v["rfc"] and not RE_RFC.match(v["rfc"]):
+        return None, "El RFC no tiene un formato válido (12 caracteres para empresa, 13 para persona)"
+    return v, None
+
+
+def _repetida(tdb, nombre: str, excepto: int = 0):
+    k = _clave(nombre)
+    return next((r for r in tdb.execute("SELECT id, nombre FROM contrapartes WHERE activo=1 AND id != ?", (excepto,)).fetchall()
+                 if _clave(r["nombre"]) == k), None)
+
+
 @contrapartes_bp.route("/crear", methods=["POST"])
 @login_required
 @tenant_required
 def crear():
-    d = request.get_json() or {}
-    nombre = (d.get("nombre") or "").strip()
-    if not nombre:
-        return jsonify(ok=False, error="Escribe el nombre de la contraparte"), 400
-
-    cur = g.tenant_db.execute(
-        """
-        INSERT INTO contrapartes
-          (nombre, tipo, rfc, email, telefono,
-           abogado_nombre, abogado_email, despacho, ciudad, notas)
-        VALUES (?,?,?,?,?,?,?,?,?,?)
-        """,
-        (
-            nombre,
-            d.get("tipo", "persona_fisica"),
-            (d.get("rfc") or "").upper().strip() or None,
-            (d.get("email") or "").strip() or None,
-            (d.get("telefono") or "").strip() or None,
-            (d.get("abogado_nombre") or "").strip() or None,
-            (d.get("abogado_email") or "").strip() or None,
-            (d.get("despacho") or "").strip() or None,
-            (d.get("ciudad") or "").strip() or None,
-            (d.get("notas") or "").strip() or None,
-        ),
-    )
-    g.tenant_db.commit()
+    tdb = g.tenant_db
+    v, err = _leer(request.get_json(silent=True) or {})
+    if err:
+        return jsonify(ok=False, error=err), 400
+    if _repetida(tdb, v["nombre"]):
+        return jsonify(ok=False, error=f"«{v['nombre']}» ya está registrada en Contrapartes"), 409
+    cur = tdb.execute(f"INSERT INTO contrapartes ({', '.join(v)}) VALUES ({', '.join('?' * len(v))})", tuple(v.values()))
+    tdb.commit()
     return jsonify(ok=True, id=cur.lastrowid)
 
 
-@contrapartes_bp.route("/<int:id>/vincular", methods=["POST"])
+@contrapartes_bp.route("/<int:id>/datos")
 @login_required
 @tenant_required
-def vincular_asunto(id):
-    d = request.get_json() or {}
-    asunto_id = d.get("asunto_id")
-    if not asunto_id:
-        return jsonify(ok=False, error="asunto_id requerido"), 400
+def datos(id: int):
+    r = g.tenant_db.execute("SELECT * FROM contrapartes WHERE id=? AND activo=1", (id,)).fetchone()
+    if not r:
+        return jsonify(ok=False, error="No encontrada"), 404
+    return jsonify(ok=True, **{k: r[k] for k in ("nombre", "tipo", "rfc", "email", "telefono", "abogado_nombre",
+                                                  "abogado_email", "despacho", "ciudad", "notas")})
 
-    g.tenant_db.execute(
-        """
-        INSERT OR REPLACE INTO contraparte_asunto
-          (contraparte_id, asunto_id, resultado, notas)
-        VALUES (?,?,?,?)
-        """,
-        (id, asunto_id, d.get("resultado", "en_proceso"), d.get("notas", "")),
-    )
-    g.tenant_db.commit()
+
+@contrapartes_bp.route("/<int:id>/editar", methods=["POST"])
+@login_required
+@tenant_required
+def editar(id: int):
+    tdb = g.tenant_db
+    if not tdb.execute("SELECT 1 FROM contrapartes WHERE id=? AND activo=1", (id,)).fetchone():
+        return jsonify(ok=False, error="No encontrada"), 404
+    v, err = _leer(request.get_json(silent=True) or {})
+    if err:
+        return jsonify(ok=False, error=err), 400
+    if _repetida(tdb, v["nombre"], id):
+        return jsonify(ok=False, error=f"Ya hay otra contraparte llamada «{v['nombre']}»"), 409
+    tdb.execute(f"UPDATE contrapartes SET {', '.join(k + '=?' for k in v)}, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (*v.values(), id))
+    tdb.commit()
+    return jsonify(ok=True)
+
+
+@contrapartes_bp.route("/<int:id>/quitar", methods=["POST"])
+@login_required
+@tenant_required
+def quitar(id: int):
+    """Quita el registro hecho a mano. Si la contraparte sale en expedientes, sigue apareciendo por ellos."""
+    tdb = g.tenant_db
+    cur = tdb.execute("UPDATE contrapartes SET activo=0, updated_at=CURRENT_TIMESTAMP WHERE id=? AND activo=1", (id,))
+    tdb.commit()
+    if not cur.rowcount:
+        return jsonify(ok=False, error="No encontrada"), 404
     return jsonify(ok=True)

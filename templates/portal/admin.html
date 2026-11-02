@@ -236,14 +236,14 @@
         <label>Cliente
           <select class="form-control" name="cliente" required>
             <option value="">Elige un cliente…</option>
-            {% for c in disponibles %}<option value="{{ url_for('portal.invitar', cliente_id=c.id) }}" data-email="{{ c.email }}" data-enlace="{{ url_for('portal.generar_magic_link', cliente_id=c.id) }}">{{ c.nombre }}</option>{% endfor %}
+            {% for c in disponibles %}<option value="{{ url_for('portal.invitar', cliente_id=c.id) }}" data-cliente="{{ c.id }}" data-email="{{ c.email }}" data-enlace="{{ url_for('portal.generar_magic_link', cliente_id=c.id) }}">{{ c.nombre }}</option>{% endfor %}
           </select>
         </label>
         <label>Correo con el que va a entrar
           <input class="form-control" type="email" name="email" placeholder="cliente@correo.com" autocomplete="off" required>
         </label>
         <label>Contraseña <small>Opcional. Si no le pones una, entra con el enlace que le mandas (dura 24 horas) y puedes darle otro cuando lo necesite.</small>
-          <input class="form-control" type="text" name="password" autocomplete="new-password" placeholder="Déjalo vacío para usar solo el enlace">
+          <input class="form-control" type="text" name="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres, o déjalo vacío" minlength="8">
         </label>
         <button class="btn btn-primary" type="submit">Dar acceso</button>
       </form>
@@ -385,6 +385,14 @@
       correo.value = (op && op.dataset.email) || '';
       if (!correo.value) correo.focus();
     });
+    // Desde la ficha del cliente: «Darle acceso al portal» llega con ?dar=<id>
+    const dar = new URLSearchParams(location.search).get('dar');
+    const elegido = dar && [...sel.options].find(o => o.dataset.cliente === dar);
+    if (elegido) {
+      sel.value = elegido.value; sel.dispatchEvent(new Event('change'));
+      document.getElementById('paDar').scrollIntoView({ block: 'center' });
+      (correo.value ? form.password : correo).focus();
+    }
     form.addEventListener('submit', e => {
       e.preventDefault();
       const url = sel.value;

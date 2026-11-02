@@ -78,7 +78,7 @@
     form.rfc.maxLength = moral ? 12 : 13;
   }
   form.addEventListener('change', e => { if (e.target.name === 'tipo') tipo(); });
-  form.addEventListener('input', e => { if (['rfc', 'email', 'celular'].includes(e.target.name)) { dup.hidden = true; form.forzar.value = ''; } });
+  form.addEventListener('input', e => { if (['rfc', 'email', 'celular', 'nombre', 'apellidos', 'razon_social'].includes(e.target.name)) { dup.hidden = true; form.forzar.value = ''; } });
   modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-cerrar]')) modal.classList.remove('open'); });
 
   window.abrirCliente = async (id) => {
@@ -114,13 +114,28 @@
     try {
       const r = await fetch(editando ? `/clientes/${editando}/editar` : '/clientes/crear', { method: 'POST', headers: XHR, body: new FormData(form) });
       const d = await r.json().catch(() => ({}));
-      if (r.status === 409 && d.duplicados) {
-        dup.innerHTML = '<b>¿Ya lo tienes registrado?</b> ';
-        d.duplicados.forEach((x, i) => {
-          const a = document.createElement('a'); a.href = x.url; a.textContent = x.nombre; a.target = '_blank';
-          dup.append(i ? ', ' : '', a, ` tiene ${x.motivo}`);
-        });
-        dup.append('. Si es otra persona, vuelve a guardar.');
+      if (r.status === 409 && (d.duplicados || d.conflictos)) {
+        dup.innerHTML = '';
+        if ((d.duplicados || []).length) {
+          const p = document.createElement('p'); p.style.margin = '0';
+          p.innerHTML = '<b>¿Ya lo tienes registrado?</b> ';
+          d.duplicados.forEach((x, i) => {
+            const a = document.createElement('a'); a.href = x.url; a.textContent = x.nombre; a.target = '_blank';
+            p.append(i ? ', ' : '', a, ` tiene ${x.motivo}`);
+          });
+          p.append('.'); dup.append(p);
+        }
+        if ((d.conflictos || []).length) {
+          const p = document.createElement('p'); p.style.margin = (d.duplicados || []).length ? '8px 0 0' : '0';
+          p.innerHTML = '<b>Posible conflicto de interés:</b> esta persona aparece como contraparte en ';
+          d.conflictos.forEach((x, i) => {
+            const el = x.url ? Object.assign(document.createElement('a'), { href: x.url, target: '_blank' }) : document.createElement('span');
+            el.textContent = x.texto; p.append(i ? ', ' : '', el);
+          });
+          p.append('. Revísalo con el responsable antes de aceptarla como cliente.'); dup.append(p);
+        }
+        const fin = document.createElement('p'); fin.style.margin = '8px 0 0';
+        fin.textContent = 'Si aun así quieres guardarla, vuelve a presionar Guardar.'; dup.append(fin);
         dup.hidden = false; form.forzar.value = '1'; dup.scrollIntoView({ block: 'nearest' });
         return;
       }

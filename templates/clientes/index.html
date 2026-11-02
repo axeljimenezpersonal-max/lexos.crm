@@ -104,7 +104,11 @@
       </span>
       <span class="cl-card-num">
         <span class="cl-n{{ ' cero' if not c.en_curso }}"><b>{{ c.en_curso or '—' }}</b><small>{{ 'en curso' if c.en_curso else ('concluidos: ' ~ c.asuntos_total if c.asuntos_total else 'sin asuntos') }}</small></span>
-        <span class="cl-n{{ ' rojo' if c.vencido }}{{ ' cero' if not c.saldo }}"><b>{{ c.saldo | dinero(decimales=False) if c.saldo else '—' }}</b><small>{{ ('vencido' if c.vencido else 'por cobrar') if c.saldo else 'al corriente' }}</small></span>
+        {% if c.saldo or not c.otras %}
+        <span class="cl-n{{ ' rojo' if c.vencido }}{{ ' cero' if not c.saldo }}"><b>{{ c.saldo | dinero(decimales=False) if c.saldo else '—' }}</b><small>{{ ('vencido' if c.vencido else 'por cobrar') if c.saldo else 'al corriente' }}{% if c.otras %} · y {{ c.otras | join(', ') }}{% endif %}</small></span>
+        {% else %}
+        <span class="cl-n"><b>{{ c.otras[0] }}</b><small>por cobrar{% if c.otras | length > 1 %} · y {{ c.otras[1:] | join(', ') }}{% endif %}</small></span>
+        {% endif %}
       </span>
     </a>
     {% endfor %}
@@ -153,7 +157,7 @@
     <div class="as-modal-b" id="impPaso2" hidden>
       <div class="cl-imp-resumen" id="impResumen"></div>
       <div class="cl-imp-lista" id="impLista"></div>
-      <p style="font-size:12.5px">Las filas con error y los RFC que ya tienes registrados no se importan.</p>
+      <p style="font-size:12.5px">No se importan las filas con error ni las personas que ya tienes registradas (mismo RFC o correo).</p>
     </div>
     <div class="as-modal-f">
       <button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button>
@@ -198,10 +202,10 @@
     const rep = d.rows_ok.length - filas.length;
     const res = document.getElementById('impResumen'), lista = document.getElementById('impLista');
     res.innerHTML = `<span><b>${filas.length}</b> listos para importar</span>` +
-      (rep ? `<span><b>${rep}</b> ya registrados</span>` : '') + (d.total_err ? `<span><b>${d.total_err}</b> con error</span>` : '');
+      (rep ? `<span><b>${rep}</b> repetidos</span>` : '') + (d.total_err ? `<span><b>${d.total_err}</b> con error</span>` : '');
     lista.innerHTML = '';
     [...d.rows_err.map(x => ({ ...x, k: 'error', nota: `Fila ${x.fila}: ${x.errores.join(', ')}` })),
-     ...d.rows_ok.map(x => ({ ...x, k: x.repetido ? 'rep' : '', nota: x.repetido ? 'Ya existe ese RFC' : (x.tipo === 'persona_moral' ? 'Empresa' : 'Persona física') }))]
+     ...d.rows_ok.map(x => ({ ...x, k: x.repetido ? 'rep' : '', nota: x.repetido ? x.repetido : (x.tipo === 'persona_moral' ? 'Empresa' : 'Persona física') }))]
       .forEach(x => {
         const f = document.createElement('div'); f.className = 'cl-imp-fila ' + x.k;
         f.innerHTML = '<span></span><small></small>';
@@ -218,7 +222,7 @@
     const d = await r.json().catch(() => ({}));
     conf.disabled = false;
     if (!r.ok || !d.ok) { showToast(d.error || 'No se pudo importar', 'error'); return; }
-    try { sessionStorage.setItem('clToast', `${d.insertados} cliente${d.insertados === 1 ? '' : 's'} importado${d.insertados === 1 ? '' : 's'}`); } catch (_) {}
+    try { sessionStorage.setItem('clToast', `${d.insertados} cliente${d.insertados === 1 ? '' : 's'} importado${d.insertados === 1 ? '' : 's'}` + (d.omitidos ? ` · ${d.omitidos} omitido${d.omitidos === 1 ? '' : 's'}` : '')); } catch (_) {}
     location.reload();
   });
 })();

@@ -20,3 +20,18 @@
 .ct-desp b{font:600 14px 'Inter',sans-serif;color:var(--e)}
 .ct-desp small{font-size:12.5px;color:var(--ash)}
 @media (max-width:1080px){.ct-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Cliente y contraparte a la vez · acciones de la tarjeta */
+.ct-conflicto{display:block;margin:6px 0 2px;padding:7px 10px;border-radius:10px;background:#F8E9E7;color:#8E2F28;font-size:12.5px;font-weight:600;line-height:1.4;text-decoration:none}
+.ct-conflicto:hover{background:#F3DCD8}
+.ct-notas{display:block;margin-top:4px;white-space:pre-line}
+.ct-acc{display:flex;gap:14px;margin-top:8px}
+.ct-acc .link{background:none;border:0;padding:0;cursor:pointer;font:600 12.5px "Inter",sans-serif;color:var(--e,#142E59)}
+.ct-acc .link:hover{text-decoration:underline}
+.ct-acc .ct-quitar{color:#8E2F28}
+@media (max-width:560px){
+  .ct-asunto{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:start}
+  .ct-asunto em{grid-column:1;font-size:12.5px}
+  .ct-asunto .as-chip,.ct-asunto .ct-chip{grid-column:2;grid-row:1;margin:0}
+  .ct-asunto{line-height:1.35}
+}

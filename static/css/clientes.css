@@ -175,3 +175,20 @@
   .ex-tabs.pe-tabs nav{gap:2px}
   .ex-tabs.pe-tabs nav a{padding:9px 11px;font-size:13.5px}
 }
+
+/* Ficha: subir documentos diciendo qué son */
+.xd-subir.pf-subir{cursor:default;justify-content:flex-start;gap:10px;padding:14px}
+.pf-que{display:flex;flex-direction:column;gap:5px;width:100%;text-align:left;font-size:12.5px;font-weight:600;color:var(--e)}
+.pf-que .as-select{width:100%;font-size:13px}
+.pf-drop{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;
+  border-radius:12px;padding:10px;cursor:pointer;transition:background .15s}
+.pf-drop:hover,.pf-drop.sobre{background:#F6EFE0}
+.pf-drop b{font:600 15px 'Sora',sans-serif;color:var(--e)}
+.pf-drop small{font-size:12.5px;color:var(--ash);line-height:1.45}
+.af-tag.pf-portal{display:inline-flex;align-items:center;gap:5px}
+@media (max-width:860px){
+  .xd-subir.pf-subir{grid-column:1 / -1;min-height:auto}
+  .pf-drop{flex-direction:row;flex-wrap:wrap;gap:4px 12px;text-align:left;justify-content:flex-start}
+  .pf-drop .xd-mas{width:40px;height:40px;font-size:24px;margin:0}
+  .pf-drop small{flex-basis:100%}
+}

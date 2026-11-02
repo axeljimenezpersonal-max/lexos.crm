@@ -7,6 +7,7 @@ Secciones: Inicio, Mis Asuntos, Mis Documentos, Mis Facturas, Mensajes.
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
@@ -60,7 +61,8 @@ def portal_login_required(f):
         if not tdb:
             return redirect(url_for("portal.cliente_login"))
         pc = tdb.execute(
-            "SELECT id FROM portal_clientes WHERE id=? AND cliente_id=? AND activo=1",
+            "SELECT pc.id FROM portal_clientes pc JOIN clientes c ON c.id=pc.cliente_id "
+            "WHERE pc.id=? AND pc.cliente_id=? AND pc.activo=1 AND c.activo=1",
             (session.get("portal_pc_id"), session["portal_cliente_id"])
         ).fetchone()
         if not pc:
@@ -128,15 +130,17 @@ def index():
 def invitar(cliente_id):
     """Create or reactivate portal access for a client."""
     tdb = g.tenant_db
-    cliente = tdb.execute("SELECT * FROM clientes WHERE id=?", (cliente_id,)).fetchone()
+    cliente = tdb.execute("SELECT * FROM clientes WHERE id=? AND activo=1", (cliente_id,)).fetchone()
     if not cliente:
         return jsonify(ok=False, error="Cliente no encontrado"), 404
 
-    email = (request.form.get("email") or cliente["email"] or "").strip()
+    email = (request.form.get("email") or cliente["email"] or "").strip().lower()
     password = request.form.get("password", "").strip()
 
-    if not email or "@" not in email:
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         return jsonify(ok=False, error="Escribe el correo del cliente"), 400
+    if password and len(password) < 8:
+        return jsonify(ok=False, error="La contraseña debe tener al menos 8 caracteres"), 400
 
     # Un mismo correo no puede entrar por dos clientes distintos
     otro = tdb.execute(
@@ -170,7 +174,7 @@ def invitar(cliente_id):
 @tenant_required
 @role_required("super_admin", "admin")
 def desactivar(cliente_id):
-    g.tenant_db.execute("UPDATE portal_clientes SET activo=0 WHERE cliente_id=?", (cliente_id,))
+    g.tenant_db.execute("UPDATE portal_clientes SET activo=0, magic_token=NULL WHERE cliente_id=?", (cliente_id,))
     g.tenant_db.execute("UPDATE clientes SET invitar_portal=0 WHERE id=?", (cliente_id,))
     g.tenant_db.commit()
     return jsonify(ok=True)
@@ -186,7 +190,8 @@ def generar_magic_link(cliente_id):
     token = secrets.token_urlsafe(48)
     expires = (datetime.now() + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
     cur = tdb.execute(
-        "UPDATE portal_clientes SET magic_token=?, magic_expires=? WHERE cliente_id=? AND activo=1",
+        "UPDATE portal_clientes SET magic_token=?, magic_expires=? WHERE cliente_id=? AND activo=1 "
+        "AND cliente_id IN (SELECT id FROM clientes WHERE activo=1)",
         (token, expires, cliente_id),
     )
     if not cur.rowcount:
@@ -275,12 +280,12 @@ def cliente_auth():
     pc = tdb.execute(
         """SELECT pc.*, c.nombre, c.apellidos
            FROM portal_clientes pc JOIN clientes c ON pc.cliente_id=c.id
-           WHERE LOWER(pc.email)=? AND pc.activo=1""",
+           WHERE LOWER(pc.email)=? AND pc.activo=1 AND c.activo=1""",
         (email,),
     ).fetchone()
 
-    if not pc:
-        return render_template("portal/login.html", error="Email no registrado")
+    if not pc:   # mismo mensaje que con contraseña equivocada: no se revela qué correos tienen acceso
+        return render_template("portal/login.html", error="Correo o contraseña incorrectos")
 
     # Rate limiting: 5 attempts, 15 min block
     if pc["bloqueado_hasta"]:
@@ -309,10 +314,8 @@ def cliente_auth():
             tdb.execute("UPDATE portal_clientes SET intentos_login=? WHERE id=?",
                         (intentos, pc["id"]))
         tdb.commit()
-        remaining = 5 - intentos
-        if remaining > 0:
-            return render_template("portal/login.html",
-                                   error=f"Contraseña incorrecta. {remaining} intentos restantes.")
+        if intentos < 5:
+            return render_template("portal/login.html", error="Correo o contraseña incorrectos")
         return render_template("portal/login.html",
                                error="Cuenta bloqueada por 15 minutos.")
 
@@ -334,7 +337,7 @@ def magic_login(token):
     pc = tdb.execute(
         """SELECT pc.*, c.nombre, c.apellidos
            FROM portal_clientes pc JOIN clientes c ON pc.cliente_id=c.id
-           WHERE pc.magic_token=? AND pc.activo=1""",
+           WHERE pc.magic_token=? AND pc.activo=1 AND c.activo=1""",
         (token,),
     ).fetchone()
 

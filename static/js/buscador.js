@@ -105,6 +105,7 @@
   // Buscadores dentro de las páginas
   document.querySelectorAll('form.bz').forEach(form => {
     const input = form.querySelector('.bz-input'), panel = form.querySelector('.bz-panel');
+    if (!input || !panel) return;   // buscador sencillo (sin sugerencias), p. ej. Contrapartes
     const en = form.dataset.en || 'todo';
     const accion = form.getAttribute('action');
     const ctl = conectar({

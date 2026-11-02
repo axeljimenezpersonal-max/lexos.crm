@@ -69,6 +69,7 @@
           </div>
           {% endif %}
         </div>
+        {% if portal %}<span class="af-tag pf-portal" style="--t:var(--e)" title="{{ 'Entró al portal ' ~ portal.entro | lower if portal.entro else 'Todavía no entra al portal' }}">{{ ic('portal', 13) }} Portal{% if not portal.entro %} · sin entrar{% endif %}</span>{% endif %}
         {% for t in cliente.etiquetas %}<span class="af-tag" style="--t:var(--e)">{{ t }}</span>{% endfor %}
       </div>
       <h1 class="xp2-titulo">{{ cliente.nombre_v }}</h1>
@@ -91,7 +92,7 @@
       {% else %}{{ responsable.nombre if responsable else 'Sin asignar' }}{% endif %}</dd></div>
     <div><dt>{{ ic('pin', 14) }} Domicilio</dt><dd>{{ domicilio or '—' }}</dd></div>
     <div><dt>{{ ic('folder', 14) }} Expedientes</dt><dd>{{ en_curso }} en curso{% if asuntos | length > en_curso %} · {{ asuntos | length - en_curso }} concluido{{ 's' if asuntos | length - en_curso != 1 }}{% endif %}</dd></div>
-    <div><dt>{{ ic('money', 14) }} Saldo</dt><dd class="{{ 'pf-rojo' if dinero.vencido }}">{% if dinero.saldo %}{{ dinero.saldo | dinero(decimales=False) }}{% if dinero.vencido %} · {{ dinero.vencido | dinero(decimales=False) }} vencido{% endif %}{% else %}No debe nada{% endif %}</dd></div>
+    <div><dt>{{ ic('money', 14) }} Saldo</dt><dd class="{{ 'pf-rojo' if dinero.vencido or dinero.otras | selectattr('vencido') | list }}">{% if dinero.saldo %}{{ dinero.saldo | dinero(decimales=False) }}{% if dinero.vencido %} · {{ dinero.vencido | dinero(decimales=False) }} vencido{% endif %}{% elif not dinero.otras %}No debe nada{% endif %}{% for o in dinero.otras %}{% if dinero.saldo or not loop.first %} · {% endif %}{{ o.saldo | dinero(o.moneda, decimales=False) }}{% if o.vencido %} ({{ o.vencido | dinero(o.moneda, decimales=False) }} vencido){% endif %}{% endfor %}</dd></div>
   </dl>
   <div class="xp2-acciones">
     {% if puede_editar %}
@@ -104,6 +105,7 @@
       <div class="af-menu" id="clMasMenu" role="menu">
         <a href="{{ url_for('clientes.exportar_pdf', id=cliente.id) }}">{{ ic('doc', 15) }} Ficha en PDF</a>
         {% if cobros %}<a href="{{ url_for('cobranzas.estado_cuenta_pdf', cliente_id=cliente.id) }}">{{ ic('money', 15) }} Estado de cuenta</a>{% endif %}
+        {% if es_admin %}<a href="{{ url_for('portal.index', dar=cliente.id) if not portal else url_for('portal.index') }}">{{ ic('portal', 15) }} {{ 'Ver su acceso al portal' if portal else 'Darle acceso al portal' }}</a>{% endif %}
         {% if es_admin %}<hr><button type="button" class="peligro" id="clEliminar">{{ ic('trash', 15) }} Eliminar cliente</button>{% endif %}
       </div>
     </div>
@@ -132,7 +134,7 @@
         {% for p in resumen.parrafos if p %}<p>{{ p }}</p>{% endfor %}
         {% if resumen.atencion %}
         <ul class="xr-atencion" aria-label="Puntos de atención">
-          {% for a in resumen.atencion %}<li class="t-{{ a.tono }}"><i aria-hidden="true"></i>{{ a.texto }}</li>{% endfor %}
+          {% for a in resumen.atencion %}<li class="t-{{ a.tono }}"><i aria-hidden="true"></i>{% if a.url %}<a href="{{ a.url }}" style="color:inherit">{{ a.texto }}</a>{% else %}{{ a.texto }}{% endif %}</li>{% endfor %}
         </ul>
         {% endif %}
       </div>
@@ -190,6 +192,7 @@
           <div class="xr-progreso"><i style="width:{{ ((dinero.cobrado / dinero.facturado * 100) | round | int) if dinero.facturado else 0 }}%"></i></div></div>
         <div class="xp-kv"><span>Saldo pendiente</span><b style="color:{{ '#A23B33' if dinero.vencido else 'var(--e)' }}">{{ dinero.saldo | dinero }}</b></div>
         {% if dinero.vencido %}<div class="xp-kv"><span>Vencido</span><b style="color:#A23B33">{{ dinero.vencido | dinero }}</b></div>{% endif %}
+        {% for o in dinero.otras %}<div class="xp-kv"><span>Saldo en {{ o.moneda }}</span><b style="color:{{ '#A23B33' if o.vencido else 'var(--e)' }}">{{ o.saldo | dinero(o.moneda) }}</b></div>{% endfor %}
       </div>
     </article>
     <article class="xp-card b-docs">
@@ -291,7 +294,9 @@
       <div class="cb-kv"><span>Facturado</span><b>{{ dinero.facturado | dinero }}</b></div>
       <div class="cb-kv"><span>Pagado</span><b style="color:#3D5A80">{{ dinero.cobrado | dinero }}</b></div>
       <div class="cb-kv total"><span>Saldo pendiente</span><b{% if dinero.vencido %} style="color:#A23B33"{% endif %}>{{ dinero.saldo | dinero }}</b></div>
+      {% for o in dinero.otras %}<div class="cb-kv total"><span>Saldo en {{ o.moneda }}</span><b{% if o.vencido %} style="color:#A23B33"{% endif %}>{{ o.saldo | dinero(o.moneda) }}</b></div>{% endfor %}
     </div>
+    {% if dinero.otras %}<p class="as-empty" style="margin:0 0 10px">Facturado y pagado están en pesos; lo que se cobra en otra moneda se muestra aparte, sin convertir.</p>{% endif %}
     {% endif %}
     {% for c in cobros %}
     <a class="cl-cobro" href="{{ url_for('cobranzas.index') }}#cobro-{{ c.id }}">
@@ -309,10 +314,18 @@
   <div class="xd-h"><h2>Documentos personales <span>{{ documentos | length }}</span></h2></div>
   <p class="as-empty" style="margin:-6px 0 14px">Identificaciones, poderes, actas constitutivas, comprobantes de domicilio… Los escritos de cada juicio van en su expediente.</p>
   <div class="xd-grid">
-    <label class="xd-subir" id="clDrop">
-      <input type="file" id="clArchivo" hidden multiple>
-      <span class="xd-mas">+</span><b>Subir documentos</b><small>Arrastra aquí o haz clic. Se guardan cifrados.</small>
-    </label>
+    <div class="xd-subir pf-subir">
+      <label class="pf-que" for="clQueEs">¿Qué vas a subir?
+        <select class="as-select" id="clQueEs">
+          <option value="">Que lo reconozca por el nombre</option>
+          {% for t in tipos_doc %}<option value="{{ t.clave }}">{{ t.etiqueta }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="pf-drop" id="clDrop">
+        <input type="file" id="clArchivo" hidden multiple>
+        <span class="xd-mas">+</span><b>Subir documentos</b><small>Arrastra aquí o haz clic. Se guardan cifrados.</small>
+      </label>
+    </div>
     {% for d in documentos %}
     <article class="dc-doc">
       <a class="dc-hoja t-{{ d.ext | lower }}" href="{{ d.archivo_url }}" target="_blank" rel="noopener">
@@ -321,6 +334,7 @@
       </a>
       <div class="dc-info">
         <b title="{{ d.nombre }}">{{ d.nombre }}</b>
+        {% if d.tipo_txt %}<span class="dc-exp"><b style="font-weight:600">{{ d.tipo_txt }}</b>{% if d.tipo_estado == 'sugerido' %} <span title="Lo reconocí por el nombre del archivo">(sugerido)</span>{% endif %}</span>{% endif %}
         <span class="dc-exp">{{ d.fecha_txt }}{% if d.autor %} · {{ d.autor.corto }}{% endif %}{% if d.tamanio %} · {{ (d.tamanio / 1024) | round | int }} KB{% endif %}</span>
         <span class="dc-pie"><a class="link" href="{{ d.archivo_url }}?descargar=1">Descargar</a>{% if d.borrable %}<button type="button" class="link pf-borrar" data-doc="{{ d.id }}" aria-label="Borrar {{ d.nombre }}">Borrar</button>{% endif %}</span>
       </div>
@@ -388,7 +402,7 @@
   $('#clResp')?.addEventListener('change', e => campo('abogado_id', e.target.value, 'Responsable actualizado'));
 
   $('#clEliminar')?.addEventListener('click', async () => {
-    if (!confirm('¿Eliminar este cliente? Dejará de aparecer en la lista; sus asuntos concluidos y cobros se conservan.')) return;
+    if (!confirm('¿Eliminar este cliente? Dejará de aparecer en la lista y pierde el acceso al portal; sus asuntos concluidos y cobros se conservan.')) return;
     const d = await post(`/clientes/${ID}/eliminar`);
     if (d) location.href = '{{ url_for("clientes.index") }}';
   });
@@ -432,6 +446,7 @@
     let n = 0;
     for (const f of archivos) {
       const fd = new FormData(); fd.append('archivo', f);
+      if ($('#clQueEs').value) fd.append('tipo_documento', $('#clQueEs').value);
       if (await post(`/clientes/${ID}/documentos`, { body: fd })) n++;
     }
     if (n) recargar(`${n} documento${n === 1 ? '' : 's'} guardado${n === 1 ? '' : 's'}`, 'documentos');

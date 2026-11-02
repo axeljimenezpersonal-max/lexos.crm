@@ -20,7 +20,8 @@ from flask import (
     request, send_file, session, url_for,
 )
 
-from modules import boveda, cobranzas, lector
+from modules import boveda, cobranzas, contrapartes, lector, tipos_documento
+from modules.buscador import normalizar as buscador_normalizar
 from modules.asuntos import (
     ABIERTOS, ESTADOS as ESTADOS_ASUNTO, EVENTO_LABEL, TIPOS_DERECHO, _FILTRO_PROPIOS, _MESES,
     _fecha, _hace as _hace_asunto, _hoy, _local, _proximos, _solo_lo_suyo, _ultimos_movimientos, _usuarios,
@@ -67,7 +68,6 @@ BITACORA = {
     "correo":   "Correo",
 }
 TIPOS_NOTA = list(BITACORA) + ["otro"]
-TIPOS_COMUNICACION = ["llamada", "correo", "reunion", "whatsapp", "otro"]
 
 NOMBRE_SQL = "COALESCE(NULLIF(c.razon_social, ''), TRIM(c.nombre || ' ' || COALESCE(c.apellidos, '')))"
 RE_RFC = re.compile(r"^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}$")
@@ -243,10 +243,13 @@ def index():
                 AND {cobranzas.EN_PESOS} AND {alc_c}) AS saldo,
           (SELECT COALESCE(SUM({cobranzas.SALDO}),0) FROM cobros co WHERE co.cliente_id=c.id AND {cobranzas.ABIERTO_SQL}
                 AND {cobranzas.EN_PESOS} AND date(co.fecha_vencimiento) < ? AND {alc_c}) AS vencido,
+          (SELECT GROUP_CONCAT(m || ':' || s) FROM (SELECT co.moneda AS m, SUM({cobranzas.SALDO}) AS s FROM cobros co
+                WHERE co.cliente_id=c.id AND {cobranzas.ABIERTO_SQL} AND NOT {cobranzas.EN_PESOS} AND {alc_c}
+                GROUP BY co.moneda HAVING s > 0.005)) AS saldo_otras,
           MAX(COALESCE((SELECT MAX(fecha) FROM cliente_notas n WHERE n.cliente_id=c.id), ''),
               COALESCE((SELECT MAX(fecha) FROM cliente_comunicaciones m WHERE m.cliente_id=c.id), '')) AS ultimo_contacto
         FROM clientes c WHERE {clause}"""
-    col_params = pa + pa + pc + [hoy.isoformat()] + pc
+    col_params = pa + pa + pc + [hoy.isoformat()] + pc + pc
     orden_sql = {"nombre": "nombre_v COLLATE NOCASE", "saldo": "saldo DESC, nombre_v COLLATE NOCASE",
                  "contacto": "ultimo_contacto DESC", "recientes": "c.fecha_alta DESC, c.id DESC"}[orden]
 
@@ -265,6 +268,8 @@ def index():
         c["contacto_hace"] = _hace(_local(c["ultimo_contacto"])) if c["ultimo_contacto"] else None
         c["responsable"] = usuarios.get(c.get("abogado_id"))
         c["tel"] = c.get("celular") or c.get("telefono")
+        c["otras"] = [cobranzas.dinero(float(x.split(":")[1]), x.split(":")[0], decimales=False)
+                      for x in (c.get("saldo_otras") or "").split(",") if ":" in x]
         clientes.append(c)
 
     # Resumen
@@ -387,8 +392,11 @@ def crear():
     v, err, dup = _leer_cliente(tdb)
     if err:
         return jsonify(ok=False, error=err), 400
-    if dup and request.form.get("forzar") != "1":
-        return jsonify(ok=False, duplicados=dup, error="Ya hay un cliente parecido"), 409
+    # Conflicto de interés: ¿esta persona ya es contraparte en algún expediente del despacho?
+    conflictos = contrapartes.coincidencias(tdb, nombre_de(v), v["rfc"])
+    if (dup or conflictos) and request.form.get("forzar") != "1":
+        return jsonify(ok=False, duplicados=dup, conflictos=conflictos,
+                       error="Revisa antes de guardar: ya hay alguien parecido"), 409
     if not v["abogado_id"] and session.get("role") in ("abogado", "admin", "super_admin"):
         v["abogado_id"] = session.get("user_id")
     v["creado_por"] = session.get("user_id")
@@ -433,14 +441,14 @@ def datos(id: int):
     return jsonify(d)
 
 
-_EDITABLE_FIELDS = {"estatus", "abogado_id", "invitar_portal"}
+_EDITABLE_FIELDS = {"estatus", "abogado_id"}
 
 
 @clientes_bp.route("/<int:id>/editar-campo", methods=["POST"])
 @login_required
 @tenant_required
 def editar_campo(id: int):
-    """Cambios rápidos desde la ficha: estatus, responsable y acceso al portal."""
+    """Cambios rápidos desde la ficha: estatus y responsable (el acceso al portal se da en el Portal)."""
     tdb = g.tenant_db
     if not tdb.execute("SELECT id FROM clientes WHERE id=? AND activo=1", (id,)).fetchone():
         return jsonify(ok=False, error="Cliente no encontrado"), 404
@@ -454,31 +462,10 @@ def editar_campo(id: int):
         valor = _safe_int(valor, None)
         if valor and valor not in {a["id"] for a in _get_abogados()}:
             return jsonify(ok=False, error="Responsable no válido"), 400
-    if campo == "invitar_portal":
-        valor = 1 if valor else 0
     tdb.execute(f"UPDATE clientes SET {campo}=? WHERE id=?", (valor, id))
     tdb.commit()
     _log("actualizar_cliente", "cliente", id, {"campo": campo})
     return jsonify(ok=True)
-
-
-@clientes_bp.route("/crear-rapido", methods=["POST"])
-@login_required
-@tenant_required
-def crear_rapido():
-    data = request.get_json(silent=True) or {}
-    nombre = (data.get("nombre") or "").strip()[:160]
-    if not nombre:
-        return jsonify(ok=False, error="Nombre requerido"), 400
-    tipo = data.get("tipo") if data.get("tipo") in TIPOS else "persona_fisica"
-    cur = g.tenant_db.execute(
-        "INSERT INTO clientes (nombre, razon_social, tipo, telefono, email, rfc, activo, creado_por) VALUES (?,?,?,?,?,?,1,?)",
-        (nombre, nombre if tipo == "persona_moral" else None, tipo,
-         (data.get("telefono") or "").strip() or None, (data.get("email") or "").strip().lower() or None,
-         (data.get("rfc") or "").upper().strip() or None, session.get("user_id")))
-    g.tenant_db.commit()
-    _log("crear_cliente_rapido", "cliente", cur.lastrowid, {"nombre": nombre})
-    return jsonify(ok=True, id=cur.lastrowid, nombre=nombre)
 
 
 @clientes_bp.route("/<int:id>/eliminar", methods=["POST"])
@@ -494,39 +481,13 @@ def eliminar(id: int):
     en_curso = tdb.execute(f"SELECT COUNT(*) FROM asuntos WHERE cliente_id=? AND estado IN ({abiertos})", (id,)).fetchone()[0]
     if en_curso:
         return jsonify(ok=False, error=f"Tiene {en_curso} asunto{'s' if en_curso > 1 else ''} en curso. Concluye o reasigna sus asuntos antes de eliminarlo."), 400
-    tdb.execute("UPDATE clientes SET activo=0 WHERE id=?", (id,))
+    tdb.execute("UPDATE clientes SET activo=0, invitar_portal=0 WHERE id=?", (id,))
+    tdb.execute("UPDATE portal_clientes SET activo=0, magic_token=NULL WHERE cliente_id=?", (id,))
     tdb.commit()
     _log("eliminar_cliente", "cliente", id, {"nombre": row["n"]})
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify(ok=True)
     return redirect(url_for("clientes.index"))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  AJAX — abogados y búsqueda rápida (autocomplete para otros módulos)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-@clientes_bp.route("/ajax/abogados")
-@login_required
-@tenant_required
-def ajax_abogados():
-    return jsonify(_get_abogados())
-
-
-@clientes_bp.route("/ajax/buscar")
-@login_required
-@tenant_required
-def ajax_buscar():
-    q = request.args.get("q", "").strip()
-    if len(q) < 2:
-        return jsonify([])
-    like = f"%{q}%"
-    rows = g.tenant_db.execute(
-        f"""SELECT id, {NOMBRE_SQL} AS label, tipo, email, celular FROM clientes c
-            WHERE activo=1 AND ({NOMBRE_SQL} LIKE ? OR rfc LIKE ? OR email LIKE ?)
-            ORDER BY label LIMIT 10""", (like, like, like)).fetchall()
-    return jsonify([dict(r) for r in rows])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -574,11 +535,32 @@ def _bitacora(tdb, id: int, usuarios: dict, cobros_ids: list) -> list:
     return grupos
 
 
-def _dinero(v: float) -> str:
-    return f"${v:,.0f}"
+def _dinero(v: float, moneda: str = "MXN") -> str:
+    return cobranzas.dinero(v, moneda, decimales=False)
 
 
-def _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultimo, documentos) -> dict:
+def _totales(cobros: list) -> dict:
+    """Facturado, pagado y saldo en pesos; lo que se debe en otra moneda va aparte (no se suman)."""
+    vigentes = [c for c in cobros if c["estado"] != "cancelado"]
+    pesos = [c for c in vigentes if (c.get("moneda") or "MXN") == "MXN"]
+    vencido = lambda c: c["vence"] and (c["vence"]["dias"] or 0) < 0  # noqa: E731
+    otras: dict[str, dict] = {}
+    for c in vigentes:
+        m = c.get("moneda") or "MXN"
+        if m != "MXN" and c["saldo_v"] > 0.005:
+            o = otras.setdefault(m, {"moneda": m, "saldo": 0.0, "vencido": 0.0})
+            o["saldo"] += c["saldo_v"]
+            o["vencido"] += c["saldo_v"] if vencido(c) else 0
+    return {
+        "facturado": sum(c["total_v"] for c in pesos),
+        "cobrado": sum(c["pagado_v"] for c in pesos),
+        "saldo": sum(c["saldo_v"] for c in pesos),
+        "vencido": sum(c["saldo_v"] for c in pesos if vencido(c)),
+        "otras": list(otras.values()),
+    }
+
+
+def _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultimo, documentos, conflictos=()) -> dict:
     """Resumen que se escribe solo con lo que el despacho sabe de esta persona."""
     nombre = cliente["nombre_v"]
     es_empresa = cliente.get("tipo") == "persona_moral"
@@ -616,8 +598,11 @@ def _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultim
         else:
             frase += " y va al corriente."
         p2.append(frase)
-    elif dinero["facturado"]:
+    elif dinero["facturado"] and not dinero["otras"]:
         p2.append(f"Está al corriente: ha pagado {_dinero(dinero['cobrado'])}.")
+    for o in dinero["otras"]:
+        p2.append(f"{'Además debe' if dinero['saldo'] else 'Debe'} {_dinero(o['saldo'], o['moneda'])} en {o['moneda']}"
+                  + (", ya vencidos." if o["vencido"] >= o["saldo"] else "."))
     if ultimo:
         dias = (_hoy() - ultimo["cuando"].date()).days if ultimo.get("cuando") else None
         quien = f" con {ultimo['autor']['corto']}" if ultimo.get("autor") else ""
@@ -625,9 +610,13 @@ def _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultim
         hace = "hoy" if dias == 0 else ("ayer" if dias == 1 else f"hace {dias} días") if dias is not None else ""
         p2.append(f"El último contacto fue {('una ' if tipo in ('nota', 'llamada', 'reunión') else 'por ') + tipo}{quien} {hace}.".replace("  ", " "))
 
-    atencion = []
+    atencion = [{"tono": "rojo", "texto": "Aparece como contraparte en " + c["texto"] + ": revisa si hay conflicto de interés",
+                 "url": c["url"]} for c in conflictos[:1]]
     if dinero["vencido"]:
         atencion.append({"tono": "rojo", "texto": f"{_dinero(dinero['vencido'])} vencidos por cobrar"})
+    for o in dinero["otras"]:
+        if o["vencido"]:
+            atencion.append({"tono": "rojo", "texto": f"{_dinero(o['vencido'], o['moneda'])} vencidos por cobrar"})
     if eventos and eventos[0]["dias"] <= 2:
         atencion.append({"tono": "rojo", "texto": f"{eventos[0]['etiqueta']} {('hoy' if eventos[0]['dias'] == 0 else 'mañana' if eventos[0]['dias'] == 1 else 'en 2 días')}: {eventos[0]['titulo']}"})
     if en_curso and (not ultimo or (ultimo.get("cuando") and (_hoy() - ultimo["cuando"].date()).days > 30)):
@@ -692,9 +681,9 @@ def detalle(id: int):
     for e in tdb.execute(
         f"""SELECT e.id, e.titulo, e.tipo, e.fecha_inicio, e.todo_el_dia, e.asunto_id, a.titulo AS asunto
             FROM eventos_calendario e LEFT JOIN asuntos a ON a.id = e.asunto_id
-            WHERE e.estado = 'pendiente' AND date(e.fecha_inicio) >= date('now', '-1 day')
+            WHERE e.estado = 'pendiente' AND date(e.fecha_inicio) >= ?
               AND (e.asunto_id IN ({marcas}) OR e.cliente_id = ?)
-            ORDER BY e.fecha_inicio LIMIT 5""", (*ids_, id)).fetchall():
+            ORDER BY e.fecha_inicio LIMIT 5""", (hoy.isoformat(), *ids_, id)).fetchall():
         f = _fecha(e["fecha_inicio"])
         if not f:
             continue
@@ -712,13 +701,7 @@ def detalle(id: int):
     cobros = [cobranzas._decorar(r) for r in tdb.execute(
         f"{cobranzas.BASE_SQL} WHERE co.cliente_id=? AND {alc_c} "
         f"ORDER BY co.estado IN ('pagado','cancelado'), date(co.fecha_vencimiento), co.id DESC", (id, *pc)).fetchall()]
-    vigentes = [c for c in cobros if c["estado"] != "cancelado"]
-    dinero = {
-        "facturado": sum(c["total_v"] for c in vigentes),
-        "cobrado": sum(c["pagado_v"] for c in vigentes),
-        "saldo": sum(c["saldo_v"] for c in vigentes),
-        "vencido": sum(c["saldo_v"] for c in vigentes if c["vence"] and (c["vence"]["dias"] or 0) < 0),
-    }
+    dinero = _totales(cobros)
 
     documentos = []
     for d in tdb.execute("SELECT * FROM cliente_documentos WHERE cliente_id=? ORDER BY fecha_subida DESC", (id,)).fetchall():
@@ -727,6 +710,7 @@ def detalle(id: int):
         d["autor"] = usuarios.get(d.get("subido_por"))
         d["ext"] = (d.get("archivo_nombre") or d.get("nombre") or "").rsplit(".", 1)[-1].upper()[:4] if "." in (d.get("archivo_nombre") or "") else "DOC"
         d["borrable"] = _es_admin() or d.get("subido_por") == session.get("user_id")
+        d["tipo_txt"] = tipos_documento.etiqueta(d.get("tipo_documento"))
         documentos.append(d)
 
     bitacora = _bitacora(tdb, id, usuarios, [c["id"] for c in cobros])
@@ -742,7 +726,11 @@ def detalle(id: int):
 
     alta = _local(cliente.get("fecha_alta"))
     responsable = usuarios.get(cliente.get("abogado_id"))
-    resumen = _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultimo, documentos)
+    conflictos = contrapartes.coincidencias(tdb, cliente["nombre_v"], cliente.get("rfc"))
+    resumen = _resumen_persona(cliente, responsable, alta, asuntos, eventos, dinero, ultimo, documentos, conflictos)
+    portal = tdb.execute("SELECT activo, ultimo_login FROM portal_clientes WHERE cliente_id=?", (id,)).fetchone()
+    portal = {"activo": bool(portal["activo"]), "entro": _hace(_local(portal["ultimo_login"])) if portal["ultimo_login"] else None} \
+        if portal and portal["activo"] else None
     return render_template(
         "clientes/detalle.html",
         cliente=cliente, asuntos=asuntos, ocultos=ocultos, cobros=cobros, dinero=dinero,
@@ -753,7 +741,9 @@ def detalle(id: int):
         en_curso=sum(1 for a in asuntos if a["abierto"]), alta_txt=_fecha_txt(alta), alta_hace=_hace(alta),
         nacimiento=_fecha_txt(cliente.get("fecha_nacimiento")) if cliente.get("fecha_nacimiento") else None,
         es_admin=_es_admin(), puede_editar=session.get("role") in ("super_admin", "admin", "abogado", "asistente"),
-        recien_creado=request.args.get("nuevo") == "1", hoy=hoy.isoformat(),
+        recien_creado=request.args.get("nuevo") == "1", hoy=hoy.isoformat(), portal=portal,
+        tipos_doc=[t for g_ in tipos_documento.por_grupo() for t in g_["tipos"]
+                   if t["clave"] in set(tipos_documento.tipos_de_destino("personas"))],
     )
 
 
@@ -797,21 +787,6 @@ def borrar_nota(id: int, nid: int):
     return jsonify(ok=True)
 
 
-@clientes_bp.route("/<int:id>/comunicaciones", methods=["POST"])
-@login_required
-@tenant_required
-def agregar_comunicacion(id: int):
-    data = request.get_json(silent=True) or {}
-    resumen = (data.get("resumen") or "").strip()[:5000]
-    tipo = data.get("tipo") if data.get("tipo") in TIPOS_COMUNICACION else "llamada"
-    if not resumen:
-        return jsonify(ok=False, error="Resumen requerido"), 400
-    cur = g.tenant_db.execute("INSERT INTO cliente_comunicaciones (cliente_id, tipo, resumen, creado_por) VALUES (?,?,?,?)",
-                              (id, tipo, resumen, session.get("user_id")))
-    g.tenant_db.commit()
-    return jsonify(ok=True, id=cur.lastrowid)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  DOCUMENTOS Y FOTO
 # ─────────────────────────────────────────────────────────────────────────────
@@ -839,7 +814,6 @@ def subir_documento(id: int):
         (id, nombre or info["nombre"], descripcion, info["url"], info["nombre"], info["tamanio"], info["mime"],
          session.get("user_id")))
     # «¿Qué es?» (modules/tipos_documento): lo que eligió la persona o, si no dijo, sugerido por el nombre
-    from modules import tipos_documento
     tipos_documento.asegurar(tdb)
     tipos_documento.al_subir(tdb, "cliente_documentos", cur.lastrowid, request.form.get("tipo_documento"),
                              info["nombre"], request.form.get("fecha_documento"))
@@ -870,6 +844,10 @@ def borrar_documento(id: int, did: int):
 @login_required
 @tenant_required
 def subir_foto(id: int):
+    if session.get("role") not in ("super_admin", "admin", "abogado", "asistente"):
+        return jsonify(ok=False, error="No tienes permiso para cambiar la foto"), 403
+    if not g.tenant_db.execute("SELECT 1 FROM clientes WHERE id=? AND activo=1", (id,)).fetchone():
+        return jsonify(ok=False, error="Cliente no encontrado"), 404
     f = request.files.get("foto")
     if not f or not f.filename:
         return jsonify(ok=False, error="Archivo requerido"), 400
@@ -973,42 +951,116 @@ def plantilla_importar():
                      as_attachment=True, download_name="plantilla_clientes.xlsx")
 
 
+def _celda(v) -> str:
+    """Texto de una celda de Excel: 5512345678.0 → «5512345678», fechas → «AAAA-MM-DD»."""
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    if hasattr(v, "date") and hasattr(v, "year"):
+        return v.date().isoformat() if hasattr(v, "hour") else v.isoformat()
+    return str(v).strip()
+
+
+_ESTADOS_PLANO = {re.sub(r"[^a-z]", "", buscador_normalizar(e)): e for e in ESTADOS_MX}
+_ESTADOS_PLANO.update({"cdmx": "Ciudad de México", "df": "Ciudad de México", "distritofederal": "Ciudad de México",
+                       "edomex": "Estado de México", "mexico": "Estado de México", "coahuila": "Coahuila de Zaragoza",
+                       "michoacan": "Michoacán de Ocampo", "veracruz": "Veracruz de Ignacio de la Llave",
+                       "nl": "Nuevo León", "bc": "Baja California", "bcs": "Baja California Sur", "qroo": "Quintana Roo",
+                       "slp": "San Luis Potosí"})
+
+
+def _estado_mx(v: str) -> str | None:
+    return _ESTADOS_PLANO.get(re.sub(r"[^a-z]", "", buscador_normalizar(v or ""))) if v else None
+
+
+def _registro_importado(r: dict) -> tuple[dict, list[str]]:
+    """Limpia y valida una fila (del Excel o de la vista previa). Regresa (registro, problemas)."""
+    r = {k: _celda(r.get(k))[:300] for k in _IMPORT_COLS}
+    tipo = r["tipo"] if r["tipo"] in TIPOS else ("persona_moral" if r["razon_social"] and not r["apellidos"] else "persona_fisica")
+    rfc = re.sub(r"[\s-]", "", r["rfc"].upper())
+    curp = re.sub(r"\s", "", r["curp"].upper())
+    email = r["email"].lower()
+    cp = re.sub(r"\D", "", r["cp"])
+    cp = cp.zfill(5) if 3 < len(cp) < 5 else cp   # Excel le quita el cero: 3100 → 03100
+    problemas = []
+    if not (r["nombre"] or r["razon_social"]):
+        problemas.append("falta el nombre")
+    if rfc and (not RE_RFC.match(rfc) or len(rfc) != (12 if tipo == "persona_moral" else 13)):
+        problemas.append("RFC con formato inválido")
+    if curp and not RE_CURP.match(curp):
+        problemas.append("CURP con formato inválido")
+    if email and not RE_EMAIL.match(email):
+        problemas.append("correo inválido")
+    if cp and len(cp) != 5:
+        problemas.append("C.P. de 5 dígitos")
+    for campo in ("celular", "telefono"):
+        if r[campo] and len(re.sub(r"\D", "", r[campo])) < 10:
+            problemas.append(f"{campo} con menos de 10 dígitos")
+    nombre_ = (r["razon_social"] or r["nombre"]) if tipo == "persona_moral" else r["nombre"]
+    estatus = r["estatus"].lower()
+    origen = next((o for o in ORIGENES if buscador_normalizar(o) == buscador_normalizar(r["origen_cliente"])), None)
+    return {
+        "tipo": tipo, "nombre": nombre_[:200],
+        "apellidos": None if tipo == "persona_moral" else (r["apellidos"][:120] or None),
+        "razon_social": nombre_[:200] if tipo == "persona_moral" else None,
+        "rfc": rfc or None, "curp": (curp if tipo == "persona_fisica" else "") or None, "email": email or None,
+        "telefono": r["telefono"][:30] or None, "celular": r["celular"][:30] or None, "direccion": r["direccion"][:200] or None,
+        "colonia": r["colonia"][:120] or None, "municipio": r["municipio"][:120] or None, "ciudad": r["ciudad"][:120] or None,
+        "estado": _estado_mx(r["estado"]), "cp": cp or None, "origen_cliente": origen,
+        "estatus": estatus if estatus in ESTATUS else "activo",
+        "etiquetas": json.dumps([t.strip()[:30] for t in r["etiquetas"].split(",") if t.strip()][:12], ensure_ascii=False),
+    }, problemas
+
+
+def _ya_registrados(tdb) -> tuple[set, set]:
+    rfcs, correos = set(), set()
+    for rfc, email in tdb.execute("SELECT rfc, LOWER(email) FROM clientes WHERE activo=1").fetchall():
+        if rfc:
+            rfcs.add(rfc.upper())
+        if email:
+            correos.add(email)
+    return rfcs, correos
+
+
+def _marcar_repetidos(tdb, filas: list[dict]) -> None:
+    """Marca las filas cuyo RFC o correo ya está registrado, o que se repiten dentro del mismo archivo."""
+    rfcs, correos = _ya_registrados(tdb)
+    vistos_rfc, vistos_correo = set(), set()
+    for r in filas:
+        if (r["rfc"] and r["rfc"] in rfcs) or (r["email"] and r["email"] in correos):
+            r["repetido"] = "Ya está registrado (mismo " + ("RFC" if r["rfc"] and r["rfc"] in rfcs else "correo") + ")"
+        elif (r["rfc"] and r["rfc"] in vistos_rfc) or (r["email"] and r["email"] in vistos_correo):
+            r["repetido"] = "Se repite en el archivo"
+        else:
+            r["repetido"] = ""
+        if r["rfc"]:
+            vistos_rfc.add(r["rfc"])
+        if r["email"]:
+            vistos_correo.add(r["email"])
+
+
 def _parse_import_xlsx(file_obj) -> tuple[list[dict], list[dict]]:
     from openpyxl import load_workbook
     ws = load_workbook(file_obj, data_only=True, read_only=True).active
     ok, errores = [], []
-    for fila, row in enumerate(ws.iter_rows(min_row=3, max_col=len(_IMPORT_COLS), values_only=True), start=3):
-        if not any(row):
+    for fila, row in enumerate(ws.iter_rows(min_row=2, max_col=len(_IMPORT_COLS), values_only=True), start=2):
+        if not any(c not in (None, "") for c in row):
             continue
-        r = {k: (str(row[i]).strip() if i < len(row) and row[i] is not None else "") for i, k in enumerate(_IMPORT_COLS)}
-        if r["nombre"].startswith("Nombre de la persona"):
-            continue
-        tipo = r["tipo"] if r["tipo"] in TIPOS else ("persona_moral" if r["razon_social"] and not r["apellidos"] else "persona_fisica")
-        rfc = re.sub(r"[\s-]", "", r["rfc"].upper())
-        problemas = []
-        if not (r["nombre"] or r["razon_social"]):
-            problemas.append("falta el nombre")
-        if rfc and not RE_RFC.match(rfc):
-            problemas.append("RFC con formato inválido")
-        if r["email"] and not RE_EMAIL.match(r["email"]):
-            problemas.append("correo inválido")
-        registro = {
-            "fila": fila, "tipo": tipo,
-            "nombre": (r["razon_social"] or r["nombre"]) if tipo == "persona_moral" else r["nombre"],
-            "apellidos": None if tipo == "persona_moral" else (r["apellidos"] or None),
-            "razon_social": (r["razon_social"] or r["nombre"]) if tipo == "persona_moral" else None,
-            "rfc": rfc or None, "curp": r["curp"].upper() or None, "email": r["email"].lower() or None,
-            "telefono": r["telefono"] or None, "celular": r["celular"] or None, "direccion": r["direccion"] or None,
-            "colonia": r["colonia"] or None, "municipio": r["municipio"] or None, "ciudad": r["ciudad"] or None,
-            "estado": r["estado"] or None, "cp": r["cp"][:5] or None, "origen_cliente": r["origen_cliente"] or None,
-            "estatus": r["estatus"].lower() if r["estatus"].lower() in ESTATUS else "activo",
-            "etiquetas": json.dumps([t.strip() for t in r["etiquetas"].split(",") if t.strip()][:12], ensure_ascii=False),
-        }
+        crudo = {k: (row[i] if i < len(row) else None) for i, k in enumerate(_IMPORT_COLS)}
+        nombre = _celda(crudo["nombre"])
+        if nombre.startswith("Nombre de la persona") or _celda(crudo["tipo"]).startswith("persona_fisica o") \
+                or _celda(crudo["rfc"]).upper() == "PEGJ900101AB1":
+            continue   # renglones de ayuda y de ejemplo de la plantilla
+        registro, problemas = _registro_importado(crudo)
+        registro["fila"] = fila
         if problemas:
             registro["errores"] = problemas
             errores.append(registro)
         else:
             ok.append(registro)
+    if len(ok) + len(errores) > 5000:
+        raise ValueError("demasiadas filas")
     return ok, errores
 
 
@@ -1022,11 +1074,11 @@ def importar_preview():
         return jsonify(ok=False, error="Elige el archivo de Excel"), 400
     try:
         rows_ok, rows_err = _parse_import_xlsx(f)
+    except ValueError:
+        return jsonify(ok=False, error="El archivo tiene más de 5,000 clientes. Divídelo en varios archivos."), 400
     except Exception:
         return jsonify(ok=False, error="No se pudo leer el archivo. Usa la plantilla de Excel (.xlsx)."), 400
-    existentes = {r[0] for r in g.tenant_db.execute("SELECT rfc FROM clientes WHERE activo=1 AND rfc IS NOT NULL")}
-    for r in rows_ok:
-        r["repetido"] = bool(r["rfc"] and r["rfc"] in existentes)
+    _marcar_repetidos(g.tenant_db, rows_ok)
     return jsonify(ok=True, rows_ok=rows_ok, rows_err=rows_err, total_ok=len(rows_ok), total_err=len(rows_err))
 
 
@@ -1035,26 +1087,30 @@ def importar_preview():
 @tenant_required
 @role_required("super_admin", "admin", "abogado", "asistente")
 def importar_confirmar():
-    rows = (request.get_json(silent=True) or {}).get("rows", [])[:5000]
-    if not rows:
+    rows = (request.get_json(silent=True) or {}).get("rows", [])
+    if not isinstance(rows, list) or not rows:
         return jsonify(ok=False, error="Sin filas para importar"), 400
+    if len(rows) > 5000:
+        return jsonify(ok=False, error="Son más de 5,000 filas. Divídelo en varios archivos."), 400
     tdb = g.tenant_db
-    cols = [c for c in _IMPORT_COLS]
-    insertados = 0
+    # Lo que llega del navegador se vuelve a validar: no se confía en la vista previa
+    limpios = []
     for r in rows:
-        if not r.get("nombre") or r.get("repetido"):
+        if not isinstance(r, dict):
             continue
-        r["tipo"] = r.get("tipo") if r.get("tipo") in TIPOS else "persona_fisica"
-        r["estatus"] = r.get("estatus") if r.get("estatus") in ESTATUS else "activo"
-        try:
-            tdb.execute(f"INSERT INTO clientes ({', '.join(cols)}, creado_por) VALUES ({', '.join('?' * len(cols))}, ?)",
-                        (*[(str(r.get(c))[:300] if r.get(c) is not None else None) for c in cols], session.get("user_id")))
-            insertados += 1
-        except Exception:
-            pass
+        registro, problemas = _registro_importado(r)
+        if not problemas:
+            limpios.append(registro)
+    _marcar_repetidos(tdb, limpios)
+    nuevos = [r for r in limpios if not r.pop("repetido")]
+    cols = list(_IMPORT_COLS)
+    for r in nuevos:
+        tdb.execute(f"INSERT INTO clientes ({', '.join(cols)}, creado_por) VALUES ({', '.join('?' * len(cols))}, ?)",
+                    (*[r.get(c) for c in cols], session.get("user_id")))
     tdb.commit()
-    _log("importar_clientes", "cliente", detalles={"insertados": insertados})
-    return jsonify(ok=True, insertados=insertados)
+    omitidos = len(rows) - len(nuevos)
+    _log("importar_clientes", "cliente", detalles={"insertados": len(nuevos), "omitidos": omitidos})
+    return jsonify(ok=True, insertados=len(nuevos), omitidos=omitidos)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1136,9 +1192,10 @@ def exportar_pdf(id: int):
 
     if cobros:
         story.append(Paragraph("Cobranza", s_h))
-        tabla_kv([("Facturado", cobranzas.dinero(sum(x["total_v"] for x in cobros))),
-                  ("Pagado", cobranzas.dinero(sum(x["pagado_v"] for x in cobros))),
-                  ("Saldo pendiente", cobranzas.dinero(sum(x["saldo_v"] for x in cobros)))])
+        t = _totales(cobros)
+        tabla_kv([("Facturado", cobranzas.dinero(t["facturado"])), ("Pagado", cobranzas.dinero(t["cobrado"])),
+                  ("Saldo pendiente", cobranzas.dinero(t["saldo"]))]
+                 + [(f"Saldo en {o['moneda']}", cobranzas.dinero(o["saldo"], o["moneda"])) for o in t["otras"]])
 
     story += [Spacer(1, 18), Paragraph(f"{e(despacho)} · Documento confidencial · Generado el {_fecha_txt(_hoy())} con Habeas Corpus",
                                        st("p", fontSize=7.5, textColor=GRIS))]

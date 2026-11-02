@@ -40,6 +40,7 @@
         <span class="cl-av lg" style="--av:{{ c.color }}">{{ c.iniciales }}</span>
         <div class="cl-card-c">
           <span class="cl-card-top"><b>{{ c.nombre }}</b>{% if c.en_curso %}<span class="cl-est ct-vivo">En juicio</span>{% endif %}</span>
+          {% if c.cliente_id %}<a class="ct-conflicto" href="{{ url_for('clientes.detalle', id=c.cliente_id) }}">También es cliente del despacho: revisa si hay conflicto de interés →</a>{% endif %}
           <small class="cl-tipo">{{ 'Empresa' if c.empresa else 'Persona' }}{% if c.rfc %} · {{ c.rfc }}{% endif %}{% if c.ciudad %} · {{ c.ciudad }}{% endif %}</small>
           {% if c.abogados or c.despachos %}
           <span class="ct-abog">
@@ -53,7 +54,16 @@
             <a href="{{ a.url }}" class="ct-asunto"><em>{{ a.numero }}</em>{{ a.titulo }}{% if a.resultado %}<span class="as-chip" style="--c-c:{{ a.resultado.color }};--c-f:{{ a.resultado.fondo }}">{{ a.resultado.label }}</span>{% elif a.abierto %}<span class="ct-chip">En curso</span>{% endif %}</a>
             {% endfor %}
           </span>
-          {% elif c.notas %}<span class="cl-tipo">{{ c.notas }}</span>{% endif %}
+          {% endif %}
+          {% if c.notas %}<span class="cl-tipo ct-notas">{{ c.notas }}</span>{% endif %}
+          <span class="ct-acc">
+            {% if c.id %}
+            <button type="button" class="link" data-editar="{{ c.id }}">Editar</button>
+            <button type="button" class="link ct-quitar" data-quitar="{{ c.id }}" data-nombre="{{ c.nombre }}" data-en-exp="{{ c.asuntos | length }}">Quitar</button>
+            {% else %}
+            <button type="button" class="link" data-agregar="{{ c.nombre }}" data-abogado="{{ c.abogados[0] if c.abogados else '' }}" data-despacho="{{ c.despachos[0] if c.despachos else '' }}" data-tipo="{{ 'persona_moral' if c.empresa else 'persona_fisica' }}">+ Agregar sus datos</button>
+            {% endif %}
+          </span>
         </div>
         <span class="cl-card-num">
           <span class="cl-n{{ ' cero' if not c.asuntos }}"><b>{{ c.asuntos | length or '—' }}</b><small>{{ 'expediente' if c.asuntos | length == 1 else 'expedientes' }}</small></span>
@@ -109,12 +119,16 @@
         <div><label class="as-label" for="cpDespacho">Su despacho</label><input class="as-input" id="cpDespacho" name="despacho" maxlength="200"></div>
       </div>
       <div class="as-fila2">
+        <div><label class="as-label" for="cpEmail">Correo</label><input class="as-input" id="cpEmail" name="email" type="email" maxlength="160"></div>
+        <div><label class="as-label" for="cpAbEmail">Correo de su abogado</label><input class="as-input" id="cpAbEmail" name="abogado_email" type="email" maxlength="160"></div>
+      </div>
+      <div class="as-fila2">
         <div><label class="as-label" for="cpTel">Teléfono</label><input class="as-input" id="cpTel" name="telefono" maxlength="30"></div>
         <div><label class="as-label" for="cpCiudad">Ciudad</label><input class="as-input" id="cpCiudad" name="ciudad" maxlength="80"></div>
       </div>
       <div><label class="as-label" for="cpNotas">Notas <small>(opcional)</small></label><textarea class="as-textarea" id="cpNotas" name="notas" rows="2" maxlength="2000" placeholder="Cómo litigan, con quién conviene negociar…"></textarea></div>
     </div>
-    <div class="as-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button class="btn btn-primary">Guardar contraparte</button></div>
+    <div class="as-modal-f"><button type="button" class="btn btn-ghost" data-cerrar>Cancelar</button><button class="btn btn-primary" id="ctGuardar">Guardar contraparte</button></div>
   </form>
 </div>
 {% endblock %}
@@ -123,19 +137,46 @@
 <script>
 (() => {
   const modal = document.getElementById('ctModal'), form = document.getElementById('ctForm');
-  const abrir = () => { modal.classList.add('open'); setTimeout(() => document.getElementById('cpNombre').focus(), 80); };
-  document.getElementById('ctNueva').addEventListener('click', abrir);
+  const titulo = document.getElementById('ctModalT'), btn = document.getElementById('ctGuardar');
+  const JSONH = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+  let editando = null;
+  function abrir(datos, id, nombreModal) {
+    form.reset(); editando = id || null;
+    Object.entries(datos || {}).forEach(([k, v]) => { if (form.elements[k]) form.elements[k].value = v ?? ''; });
+    titulo.textContent = nombreModal || (editando ? 'Editar contraparte' : 'Nueva contraparte');
+    btn.textContent = editando ? 'Guardar cambios' : 'Guardar contraparte';
+    modal.classList.add('open'); setTimeout(() => document.getElementById('cpNombre').focus(), 80);
+  }
+  document.getElementById('ctNueva').addEventListener('click', () => abrir());
   if (location.hash === '#nuevo') abrir();
   modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-cerrar]')) modal.classList.remove('open'); });
+  document.querySelectorAll('[data-agregar]').forEach(b => b.addEventListener('click', () =>
+    abrir({ nombre: b.dataset.agregar, abogado_nombre: b.dataset.abogado, despacho: b.dataset.despacho, tipo: b.dataset.tipo }, null, 'Agregar datos de la contraparte')));
+  document.querySelectorAll('[data-editar]').forEach(b => b.addEventListener('click', async () => {
+    const r = await fetch(`/contrapartes/${b.dataset.editar}/datos`, { headers: JSONH });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) { showToast(d.error || 'No se pudo abrir', 'error'); return; }
+    delete d.ok; abrir(d, b.dataset.editar);
+  }));
+  document.querySelectorAll('[data-quitar]').forEach(b => b.addEventListener('click', async () => {
+    const n = +b.dataset.enExp;
+    if (!confirm(`¿Quitar a «${b.dataset.nombre}» de Contrapartes?` + (n ? `\n\nSeguirá apareciendo porque está en ${n} expediente${n === 1 ? '' : 's'}; solo se borran los datos que capturaste aquí.` : ''))) return;
+    const r = await fetch(`/contrapartes/${b.dataset.quitar}/quitar`, { method: 'POST', headers: JSONH });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) { showToast(d.error || 'No se pudo quitar', 'error'); return; }
+    location.reload();
+  }));
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const btn = form.querySelector('.btn-primary'); btn.disabled = true;
-    const r = await fetch('/contrapartes/crear', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify(Object.fromEntries(new FormData(form))) });
-    const d = await r.json().catch(() => ({}));
-    btn.disabled = false;
-    if (!r.ok || !d.ok) { showToast(d.error || 'No se pudo guardar', 'error'); return; }
-    location.href = location.pathname;
+    btn.disabled = true;
+    try {
+      const r = await fetch(editando ? `/contrapartes/${editando}/editar` : '/contrapartes/crear', { method: 'POST', headers: JSONH,
+        body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) { showToast(d.error || 'No se pudo guardar', 'error'); return; }
+      location.href = location.pathname + location.search;
+    } catch (_) { showToast('Sin conexión con el servidor', 'error'); }
+    finally { btn.disabled = false; }
   });
 })();
 </script>
