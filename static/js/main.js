@@ -252,7 +252,48 @@ window.LexCharts = {
   },
 };
 
+/* Contraparte de un expediente que también es cliente del despacho (posible conflicto de interés).
+   <input data-aviso-cliente="idDelAviso" data-cliente-de="idDelSelectDeCliente"> */
+function avisoContraparteCliente(input) {
+  const caja = document.getElementById(input.dataset.avisoCliente);
+  const sel = document.getElementById(input.dataset.clienteDe);
+  if (!caja) return;
+  let espera, ultimo = null, encontrados = [];
+  const pintar = () => {
+    caja.textContent = "";
+    encontrados.forEach((c, i) => {
+      const a = document.createElement("a");
+      a.href = c.url; a.target = "_blank";
+      a.textContent = (sel && String(c.id) === sel.value ? "Es el mismo cliente de este expediente" : `«${c.nombre}» también es cliente del despacho`)
+        + ": revisa si hay conflicto de interés →";
+      if (i) caja.append(document.createElement("br"));
+      caja.append(a);
+    });
+    caja.hidden = !encontrados.length;
+  };
+  const revisar = async () => {
+    const v = input.value.trim();
+    if (v === ultimo) return;
+    ultimo = v;
+    if (v.length < 5) { encontrados = []; pintar(); return; }
+    try {
+      const r = await fetch("/contrapartes/es-cliente", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ nombre: v }),
+      });
+      const d = await r.json();
+      if (input.value.trim() !== v) return;
+      encontrados = d.clientes || []; pintar();
+    } catch (_) { /* sin conexión: no se avisa */ }
+  };
+  input.addEventListener("input", () => { clearTimeout(espera); espera = setTimeout(revisar, 350); });
+  input.addEventListener("change", revisar);
+  sel?.addEventListener("change", pintar);
+  if (input.value.trim()) revisar();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   if (typeof Chart !== "undefined") LexCharts.defaults();
   window.initFab();
+  document.querySelectorAll("[data-aviso-cliente]").forEach(avisoContraparteCliente);
 });

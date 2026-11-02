@@ -842,6 +842,9 @@ def detalle(id: int):
     asunto["cliente"] = _cliente_nombre(row)
     asunto["tipo_info"] = TIPOS_DERECHO.get(asunto.get("tipo_asunto") or "otro", TIPOS_DERECHO["otro"])
     asunto["estado_info"] = ESTADOS.get(asunto["estado"], ESTADOS["activo"])
+    # La contraparte también es cliente del despacho: posible conflicto de interés
+    from modules.contrapartes import clientes_con_nombre
+    asunto["contra_es_cliente"] = clientes_con_nombre(tdb, asunto.get("contrario_nombre") or "")
 
     uid, rol = session.get("user_id"), session.get("role")
     usuarios = _usuarios()

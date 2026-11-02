@@ -250,7 +250,8 @@
         {% if asunto.contrario_nombre %}
         <div class="xp-parte"><span class="av gris">{{ asunto.contrario_nombre[:1] }}</span>
           <div><em>Contraparte</em><b>{{ asunto.contrario_nombre }}</b>
-            {% if asunto.contrario_abogado or asunto.contrario_despacho %}<span>{{ [asunto.contrario_abogado, asunto.contrario_despacho] | select | join(' · ') }}</span>{% endif %}</div></div>
+            {% if asunto.contrario_abogado or asunto.contrario_despacho %}<span>{{ [asunto.contrario_abogado, asunto.contrario_despacho] | select | join(' · ') }}</span>{% endif %}
+            {% for c in asunto.contra_es_cliente %}<a class="xp-conflicto" href="{{ c.url }}">{{ 'Es el mismo cliente de este expediente' if c.id == asunto.cliente_id else 'También es cliente del despacho' }}: revisa si hay conflicto de interés →</a>{% endfor %}</div></div>
         {% endif %}
         {% if responsable %}
         <div class="xp-parte"><span class="av dorado" style="background:{{ responsable.color }}">{{ responsable.iniciales }}</span>
@@ -741,7 +742,8 @@
     <div><label class="as-label" for="dJui">Número de juicio <small>(del juzgado)</small></label><input class="as-input" id="dJui" name="numero_juicio" value="{{ asunto.numero_juicio or '' }}" maxlength="60"></div>
     <div class="full"><label class="as-label" for="dJuz">Juzgado o autoridad</label><input class="as-input" id="dJuz" name="juzgado" value="{{ asunto.juzgado or '' }}" maxlength="200"></div>
     <h4>La contraparte</h4>
-    <div class="full"><label class="as-label" for="dCon">Nombre</label><input class="as-input" id="dCon" name="contrario_nombre" value="{{ asunto.contrario_nombre or '' }}" maxlength="200"></div>
+    <div class="full"><label class="as-label" for="dCon">Nombre</label><input class="as-input" id="dCon" name="contrario_nombre" value="{{ asunto.contrario_nombre or '' }}" maxlength="200" autocomplete="off" data-aviso-cliente="dConAviso" data-cliente-de="dCliente">
+      <p class="xp-conflicto" id="dConAviso" role="status" hidden></p></div>
     <div><label class="as-label" for="dConAb">Su abogado</label><input class="as-input" id="dConAb" name="contrario_abogado" value="{{ asunto.contrario_abogado or '' }}" maxlength="200"></div>
     <div><label class="as-label" for="dConDes">Su despacho</label><input class="as-input" id="dConDes" name="contrario_despacho" value="{{ asunto.contrario_despacho or '' }}" maxlength="200"></div>
     <h4>Dinero</h4>

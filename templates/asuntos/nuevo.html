@@ -109,7 +109,8 @@
             </div>
             <div>
               <label class="as-label" for="anCon">Contraparte</label>
-              <input class="as-input" id="anCon" name="contrario_nombre" maxlength="200" value="{{ f.get('contrario_nombre', '') }}" placeholder="Persona o empresa contraria">
+              <input class="as-input" id="anCon" name="contrario_nombre" maxlength="200" value="{{ f.get('contrario_nombre', '') }}" placeholder="Persona o empresa contraria" autocomplete="off" data-aviso-cliente="anConAviso" data-cliente-de="anCliente">
+              <p class="xp-conflicto" id="anConAviso" role="status" hidden></p>
             </div>
             <div>
               <label class="as-label" for="anConAb">Su abogado</label>
@@ -276,6 +277,9 @@
 
   document.getElementById('anForm').addEventListener('submit', e => {
     if (!titulo.value.trim()) { e.preventDefault(); titulo.focus(); showToast('Escribe el título del expediente', 'error'); return; }
+    // Si la contraparte ya es cliente, se pide confirmar antes de crear el expediente
+    const aviso = document.getElementById('anConAviso');
+    if (!aviso.hidden && !confirm(aviso.textContent.replace(' →', '') + '\n\n¿Crear el expediente de todos modos?')) { e.preventDefault(); return; }
     document.getElementById('anCrear').disabled = true;
   });
   pintarSubtipos();

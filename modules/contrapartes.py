@@ -58,6 +58,19 @@ def coincidencias(tdb, nombre: str, rfc: str | None = None) -> list[dict]:
     return salida[:4]
 
 
+def clientes_con_nombre(tdb, nombre: str) -> list[dict]:
+    """Clientes activos que se llaman igual que esta contraparte (posible conflicto de interés)."""
+    k = clave_persona(nombre or "")
+    if len(k) < 5:
+        return []
+    salida = []
+    for c in tdb.execute("SELECT id, COALESCE(NULLIF(razon_social, ''), TRIM(nombre || ' ' || COALESCE(apellidos, ''))) AS n "
+                         "FROM clientes WHERE activo=1").fetchall():
+        if clave_persona(c["n"]) == k:
+            salida.append({"id": c["id"], "nombre": c["n"], "url": url_for("clientes.detalle", id=c["id"])})
+    return salida[:3]
+
+
 def _iniciales(nombre: str) -> str:
     partes = [p for p in nombre.replace(",", " ").split() if p[:1].isalpha()]
     return ((partes[0][0] + partes[1][0]) if len(partes) > 1 else nombre[:2]).upper()
@@ -179,6 +192,15 @@ def _repetida(tdb, nombre: str, excepto: int = 0):
     k = _clave(nombre)
     return next((r for r in tdb.execute("SELECT id, nombre FROM contrapartes WHERE activo=1 AND id != ?", (excepto,)).fetchall()
                  if _clave(r["nombre"]) == k), None)
+
+
+@contrapartes_bp.route("/es-cliente", methods=["POST"])
+@login_required
+@tenant_required
+def es_cliente():
+    """Para avisar al escribir la contraparte de un expediente. El nombre va en el cuerpo, no en la dirección."""
+    nombre = str((request.get_json(silent=True) or {}).get("nombre") or "")[:200]
+    return jsonify(ok=True, clientes=clientes_con_nombre(g.tenant_db, nombre))
 
 
 @contrapartes_bp.route("/crear", methods=["POST"])
