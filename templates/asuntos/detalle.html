@@ -251,7 +251,7 @@
         <div class="xp-parte"><span class="av gris">{{ asunto.contrario_nombre[:1] }}</span>
           <div><em>Contraparte</em><b>{{ asunto.contrario_nombre }}</b>
             {% if asunto.contrario_abogado or asunto.contrario_despacho %}<span>{{ [asunto.contrario_abogado, asunto.contrario_despacho] | select | join(' · ') }}</span>{% endif %}
-            {% for c in asunto.contra_es_cliente %}<a class="xp-conflicto" href="{{ c.url }}">{{ 'Es el mismo cliente de este expediente' if c.id == asunto.cliente_id else 'También es cliente del despacho' }}: revisa si hay conflicto de interés →</a>{% endfor %}</div></div>
+            {% for c in asunto.contra_es_cliente %}<a class="xp-conflicto" href="{{ c.url }}">{% if c.parecido %}Se parece a «{{ c.nombre }}»{{ ', el cliente de este expediente' if c.id == asunto.cliente_id else ', cliente del despacho' }}: revisa si es la misma persona y si hay conflicto de interés →{% else %}{{ 'Es el mismo cliente de este expediente' if c.id == asunto.cliente_id else 'También es cliente del despacho' }}: revisa si hay conflicto de interés →{% endif %}</a>{% endfor %}</div></div>
         {% endif %}
         {% if responsable %}
         <div class="xp-parte"><span class="av dorado" style="background:{{ responsable.color }}">{{ responsable.iniciales }}</span>

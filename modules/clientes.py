@@ -380,6 +380,15 @@ def _leer_cliente(tdb, cid: int | None = None):
                       "el mismo correo" if v["email"] and (r["email"] or "").lower() == v["email"] else "el mismo celular")
             dup.append({"id": r["id"], "nombre": r["nombre_v"], "motivo": motivo,
                         "url": url_for("clientes.detalle", id=r["id"])})
+    # Al darlo de alta: alguien con el mismo nombre o uno parecido («Juan Pérez» y «Juan Pérez García»)
+    if not cid:
+        ya = {x["id"] for x in dup}
+        for r in tdb.execute(f"SELECT c.id, {NOMBRE_SQL} AS nombre_v FROM clientes c WHERE activo=1").fetchall():
+            como = contrapartes.parecido(nombre_de(v), r["nombre_v"])
+            if como and r["id"] not in ya and len(dup) < 4:
+                dup.append({"id": r["id"], "nombre": r["nombre_v"],
+                            "motivo": "el mismo nombre" if como == "mismo" else "un nombre parecido",
+                            "url": url_for("clientes.detalle", id=r["id"])})
     return v, None, dup
 
 

@@ -40,7 +40,7 @@
         <span class="cl-av lg" style="--av:{{ c.color }}">{{ c.iniciales }}</span>
         <div class="cl-card-c">
           <span class="cl-card-top"><b>{{ c.nombre }}</b>{% if c.en_curso %}<span class="cl-est ct-vivo">En juicio</span>{% endif %}</span>
-          {% if c.cliente_id %}<a class="ct-conflicto" href="{{ url_for('clientes.detalle', id=c.cliente_id) }}">También es cliente del despacho: revisa si hay conflicto de interés →</a>{% endif %}
+          {% if c.cliente_id %}<a class="ct-conflicto" href="{{ url_for('clientes.detalle', id=c.cliente_id) }}">{% if c.cliente_parecido %}Se parece a «{{ c.cliente_nombre }}», cliente del despacho: revisa si es la misma persona y si hay conflicto de interés →{% else %}También es cliente del despacho: revisa si hay conflicto de interés →{% endif %}</a>{% endif %}
           <small class="cl-tipo">{{ 'Empresa' if c.empresa else 'Persona' }}{% if c.rfc %} · {{ c.rfc }}{% endif %}{% if c.ciudad %} · {{ c.ciudad }}{% endif %}</small>
           {% if c.abogados or c.despachos %}
           <span class="ct-abog">

@@ -30,11 +30,39 @@ def clave_persona(nombre: str) -> str:
     return "".join(ch for ch in normalizar(nombre) if ch.isalnum())
 
 
+# Palabras que no distinguen a una persona: tipo de sociedad y artículos («de la», «S.A. de C.V.»)
+_NO_DISTINGUEN = set("""de del la las el los y e sa cv sc srl rl sapi sab sas spr scp ac ap iap
+sociedad anonima capital variable responsabilidad limitada civil asociacion""".split())
+
+
+def palabras_persona(nombre: str) -> frozenset:
+    """Las palabras que sí distinguen el nombre, sin acentos, sin iniciales sueltas y sin el tipo de sociedad."""
+    n = "".join(ch if ch.isalnum() else " " for ch in normalizar(nombre or ""))
+    return frozenset(p for p in n.split() if len(p) > 1 and p not in _NO_DISTINGUEN)
+
+
+def parecido(a: str, b: str) -> str | None:
+    """«mismo» si es el mismo nombre escrito distinto; «parecido» si uno contiene al otro
+    con al menos dos palabras («Juan Pérez» y «Juan Pérez García», o «Pérez García Juan»)."""
+    ka, kb = clave_persona(a or ""), clave_persona(b or "")
+    if len(ka) < 5 or len(kb) < 5:
+        return None
+    if ka == kb:
+        return "mismo"
+    pa, pb = palabras_persona(a), palabras_persona(b)
+    if pa and pa == pb and len("".join(pa)) >= 5:
+        return "mismo"
+    chico, grande = (pa, pb) if len(pa) <= len(pb) else (pb, pa)
+    if len(chico) >= 2 and chico <= grande:
+        return "parecido"
+    return None
+
+
 def coincidencias(tdb, nombre: str, rfc: str | None = None) -> list[dict]:
-    """Dónde aparece esta persona como contraparte del despacho (posible conflicto de interés).
-    Revisa todos los expedientes, pero a un abogado no le muestra el título de los que no lleva."""
-    k = clave_persona(nombre or "")
-    if len(k) < 5:
+    """Dónde aparece esta persona (o alguien con nombre parecido) como contraparte del despacho:
+    posible conflicto de interés. Revisa todos los expedientes, pero a un abogado no le muestra
+    el título ni la contraparte de los que no lleva."""
+    if len(clave_persona(nombre or "")) < 5:
         return []
     visibles = None
     if _solo_lo_suyo():
@@ -43,31 +71,41 @@ def coincidencias(tdb, nombre: str, rfc: str | None = None) -> list[dict]:
     salida = []
     for a in tdb.execute("SELECT id, titulo, numero_expediente, contrario_nombre FROM asuntos "
                          "WHERE COALESCE(contrario_nombre, '') != '' ORDER BY fecha_alta DESC").fetchall():
-        if clave_persona(a["contrario_nombre"]) != k:
+        como = parecido(nombre, a["contrario_nombre"])
+        if not como:
             continue
         if visibles is not None and a["id"] not in visibles:
-            salida.append({"texto": "un expediente que lleva otro abogado", "url": None})
+            texto = "un expediente que lleva otro abogado" + (", con un nombre parecido" if como == "parecido" else "")
+            salida.append({"texto": texto, "url": None, "como": como})
         else:
-            salida.append({"texto": f"«{a['titulo']}» ({a['numero_expediente'] or '#' + str(a['id'])})",
-                           "url": url_for("asuntos.detalle", id=a["id"])})
+            texto = f"«{a['titulo']}» ({a['numero_expediente'] or '#' + str(a['id'])})"
+            if como == "parecido":
+                texto += f", con el nombre «{a['contrario_nombre']}»"
+            salida.append({"texto": texto, "url": url_for("asuntos.detalle", id=a["id"]), "como": como})
     if not salida:
         for r in tdb.execute("SELECT nombre, rfc FROM contrapartes WHERE activo=1").fetchall():
-            if clave_persona(r["nombre"]) == k or (rfc and (r["rfc"] or "").upper() == rfc.upper()):
-                salida.append({"texto": "la lista de Contrapartes", "url": url_for("contrapartes.index", q=r["nombre"])})
+            como = "mismo" if rfc and (r["rfc"] or "").upper() == rfc.upper() else parecido(nombre, r["nombre"])
+            if como:
+                texto = "la lista de Contrapartes" + (f", con el nombre «{r['nombre']}»" if como == "parecido" else "")
+                salida.append({"texto": texto, "url": url_for("contrapartes.index", q=r["nombre"]), "como": como})
                 break
+    # Primero lo que es el mismo nombre; luego lo parecido
+    salida.sort(key=lambda x: x["como"] != "mismo")
     return salida[:4]
 
 
 def clientes_con_nombre(tdb, nombre: str) -> list[dict]:
-    """Clientes activos que se llaman igual que esta contraparte (posible conflicto de interés)."""
-    k = clave_persona(nombre or "")
-    if len(k) < 5:
+    """Clientes activos que se llaman igual (o parecido) que esta contraparte: posible conflicto de interés."""
+    if len(clave_persona(nombre or "")) < 5:
         return []
     salida = []
     for c in tdb.execute("SELECT id, COALESCE(NULLIF(razon_social, ''), TRIM(nombre || ' ' || COALESCE(apellidos, ''))) AS n "
                          "FROM clientes WHERE activo=1").fetchall():
-        if clave_persona(c["n"]) == k:
-            salida.append({"id": c["id"], "nombre": c["n"], "url": url_for("clientes.detalle", id=c["id"])})
+        como = parecido(nombre, c["n"])
+        if como:
+            salida.append({"id": c["id"], "nombre": c["n"], "parecido": como == "parecido",
+                           "url": url_for("clientes.detalle", id=c["id"])})
+    salida.sort(key=lambda x: x["parecido"])
     return salida[:3]
 
 
@@ -116,12 +154,18 @@ def _contrapartes(tdb) -> list[dict]:
             "url": url_for("asuntos.detalle", id=a["id"]),
         })
 
-    clientes = {}
-    for c in tdb.execute("SELECT id, COALESCE(NULLIF(razon_social, ''), TRIM(nombre || ' ' || COALESCE(apellidos, ''))) AS n, rfc "
-                         "FROM clientes WHERE activo=1").fetchall():
-        clientes[clave_persona(c["n"])] = c["id"]
-        if c["rfc"]:
-            clientes["rfc:" + c["rfc"].upper()] = c["id"]
+    clientes = [dict(c) for c in tdb.execute(
+        "SELECT id, COALESCE(NULLIF(razon_social, ''), TRIM(nombre || ' ' || COALESCE(apellidos, ''))) AS n, rfc "
+        "FROM clientes WHERE activo=1").fetchall()]
+
+    def cliente_de(f):
+        """El cliente que es (o se parece a) esta contraparte: el mismo RFC o nombre gana a uno parecido."""
+        por_rfc = f["rfc"] and next((c for c in clientes if (c["rfc"] or "").upper() == f["rfc"].upper()), None)
+        if por_rfc:
+            return por_rfc, False
+        hallados = [(c, parecido(f["nombre"], c["n"])) for c in clientes]
+        hallados = sorted((h for h in hallados if h[1]), key=lambda h: h[1] != "mismo")
+        return (hallados[0][0], hallados[0][1] == "parecido") if hallados else (None, False)
 
     salida = []
     for i, f in enumerate(sorted(fichas.values(), key=lambda x: (-len(x["asuntos"]), normalizar(x["nombre"])))):
@@ -132,7 +176,8 @@ def _contrapartes(tdb) -> list[dict]:
         f["abogados"], f["despachos"] = sorted(f["abogados"]), sorted(f["despachos"])
         f["iniciales"], f["color"] = _iniciales(f["nombre"]), _COLORES[i % len(_COLORES)]
         f["empresa"] = f["tipo"] == "persona_moral" or any(s in f["nombre"].upper() for s in ("S.A.", "S.C.", "S. DE R.L", "SAPI", "A.C."))
-        f["cliente_id"] = clientes.get(clave_persona(f["nombre"])) or (f["rfc"] and clientes.get("rfc:" + f["rfc"].upper()))
+        cli, solo_parecido = cliente_de(f)
+        f["cliente_id"], f["cliente_nombre"], f["cliente_parecido"] = (cli["id"], cli["n"], solo_parecido) if cli else (None, "", False)
         f["_pajar"] = normalizar(" ".join([f["nombre"], *f["abogados"], *f["despachos"], f["ciudad"],
                                            *[a["titulo"] + " " + a["numero"] for a in f["asuntos"]]]))
         salida.append(f)

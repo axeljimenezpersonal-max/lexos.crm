@@ -264,8 +264,10 @@ function avisoContraparteCliente(input) {
     encontrados.forEach((c, i) => {
       const a = document.createElement("a");
       a.href = c.url; a.target = "_blank";
-      a.textContent = (sel && String(c.id) === sel.value ? "Es el mismo cliente de este expediente" : `«${c.nombre}» también es cliente del despacho`)
-        + ": revisa si hay conflicto de interés →";
+      const suyo = sel && String(c.id) === sel.value;
+      a.textContent = c.parecido
+        ? `Se parece a «${c.nombre}», ${suyo ? "el cliente de este expediente" : "cliente del despacho"}: revisa si es la misma persona y si hay conflicto de interés →`
+        : (suyo ? "Es el mismo cliente de este expediente" : `«${c.nombre}» también es cliente del despacho`) + ": revisa si hay conflicto de interés →";
       if (i) caja.append(document.createElement("br"));
       caja.append(a);
     });
