@@ -374,7 +374,8 @@ Reglas estrictas:
 - "titulo": una línea clara de máximo 90 caracteres. "detalle": máximo 2 frases.
 - No repitas lo que ya está registrado en el sistema (te lo indico abajo).
 - Prefiere pocos elementos útiles a muchos obvios. Máximo {maximo}.
-- Escribe en español de México, en tono profesional."""
+- Escribe en español de México, en tono profesional.
+- {marcas} En las citas copia las marcas tal como aparecen."""
 
 HERRAMIENTA = {
     "name": "registrar_hallazgos",
@@ -517,11 +518,13 @@ def lectura(tdb, asunto_id: int) -> dict | None:
 
 def iniciar(app, slug: str, tdb, asunto: dict, uid) -> tuple[bool, str]:
     """Pone a Dictum a leer el expediente en segundo plano."""
-    from modules.asistente import proveedor
+    from modules.asistente import marcas, proveedor
     if asunto.get("privado"):
         return False, "Este expediente es privado: sus documentos no salen del servidor."
     if proveedor.obtener(app.config) is None:
         return False, "Falta conectar la IA."
+    if not marcas.disponible():
+        return False, "Por seguridad no se leyó: la protección de datos personales no está disponible en este momento."
     previa = lectura(tdb, asunto["id"])
     if previa and previa["estado"] == "leyendo":
         return False, "Dictum ya está leyendo este expediente."
@@ -537,7 +540,7 @@ def iniciar(app, slug: str, tdb, asunto: dict, uid) -> tuple[bool, str]:
 
 def _leer(app, slug: str, asunto_id: int) -> None:
     from modules import boveda
-    from modules.asistente import proveedor
+    from modules.asistente import marcas, proveedor
     from modules.lector.indice import _conexion
     with app.app_context():
         conn = _conexion(slug)
@@ -545,34 +548,44 @@ def _leer(app, slug: str, asunto_id: int) -> None:
             asunto = dict(conn.execute("SELECT * FROM asuntos WHERE id=?", (asunto_id,)).fetchone())
             docs, _ = _documentos(slug, conn, asunto_id)
             modelo = proveedor.obtener(app.config)
-            contenido, recortado = _contenido(docs, _registrado(conn, asunto))
-            sistema = SISTEMA_LECTURA.format(nombre=app.config.get("ASISTENTE_NOMBRE", "Dictum"), maximo=MAX_SUGERENCIAS)
+            # El modelo lee y cita con marcas; aquí se verifica contra ese mismo texto y se guarda el original.
+            ocultos = marcas.Marcas()
+            marcas.conocer_asunto(conn, ocultos, asunto_id)
+            marcas.conocer_despacho(conn, ocultos)
+            con_marcas = [{**d, "nombre": ocultos.poner(d["nombre"]),
+                           "paginas": [(p, ocultos.poner(t)) for p, t in d["paginas"]]} for d in docs]
+            contenido, recortado = _contenido(con_marcas, ocultos.poner(_registrado(conn, asunto)))
+            sistema = SISTEMA_LECTURA.format(nombre=app.config.get("ASISTENTE_NOMBRE", "Dictum"),
+                                             maximo=MAX_SUGERENCIAS, marcas=marcas.INSTRUCCION)
             datos = modelo.extraer(sistema, contenido, HERRAMIENTA)
 
             por_id = {d["id"]: d for d in docs}
+            marcados_por_id = {d["id"]: d for d in con_marcas}
             nuevas = descartadas = 0
             for h in (datos.get("hallazgos") or [])[:MAX_SUGERENCIAS * 2]:
                 tipo = h.get("tipo")
-                titulo = " ".join(str(h.get("titulo") or "").split())[:140]
+                titulo = " ".join(ocultos.quitar(str(h.get("titulo") or "")).split())[:140]
                 if tipo not in TIPOS_SUGERENCIA or not titulo:
                     descartadas += 1
                     continue
                 citas = []
                 for c in (h.get("citas") or [])[:2]:
                     doc = por_id.get(c.get("documento"))
-                    pagina = _verificar(str(c.get("texto") or ""), doc) if doc else None
+                    cita = str(c.get("texto") or "")
+                    pagina = _verificar(cita, marcados_por_id[doc["id"]]) if doc else None
                     if pagina is not None:
+                        original = dict(doc["paginas"]).get(pagina, "")
                         citas.append({"doc_id": doc["id"], "documento": doc["nombre"], "url": doc["url"],
-                                      "pagina": pagina, "texto": " ".join(str(c["texto"]).split())[:300]})
+                                      "pagina": pagina, "texto": ocultos.literal(cita, original)[:300]})
                 fecha = _fecha_valida(h.get("fecha"))
                 if not citas or (tipo == "contradiccion" and len(citas) < 2) or (tipo == "hecho" and not fecha):
                     descartadas += 1
                     continue
                 s = {"tipo": tipo, "fecha": fecha, "titulo": titulo,
-                     "detalle": " ".join(str(h.get("detalle") or "").split())[:400],
+                     "detalle": " ".join(ocultos.quitar(str(h.get("detalle") or "")).split())[:400],
                      "carril": "juicio" if h.get("carril") == "juicio" else "gestion",
                      "clase": h.get("clase") if h.get("clase") in CLASES_ACTO else "otro",
-                     "rol": " ".join(str(h.get("rol") or "").split())[:80], "citas": citas}
+                     "rol": " ".join(ocultos.quitar(str(h.get("rol") or "")).split())[:80], "citas": citas}
                 cur = conn.execute(
                     "INSERT OR IGNORE INTO asunto_mapa_sugerencias (asunto_id, clave, tipo, fecha, datos_cifrados) "
                     "VALUES (?,?,?,?,?)",

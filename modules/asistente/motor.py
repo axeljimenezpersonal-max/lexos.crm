@@ -4,13 +4,16 @@ Flujo de una pregunta al asistente:
   2. El modelo rápido decide si es legal y reformula la pregunta en términos jurídicos.
   3. Se busca en la base legal de México y en la memoria del despacho.
   4. El modelo principal responde citando únicamente esas fuentes con [n].
+
+Lo que es del despacho sale con marcas en lugar de nombres (modules/asistente/marcas.py) y aquí se
+vuelven a poner los reales. La ley se manda tal cual: es pública. Sin detector de nombres, nada sale.
 """
 from __future__ import annotations
 
 import logging
 from typing import Iterator
 
-from modules.asistente import almacen
+from modules.asistente import almacen, marcas
 from modules.asistente import proveedor as proveedores
 from modules.corpus import indice as corpus
 from modules.insights import casos as precedentes
@@ -40,6 +43,7 @@ Cómo respondes:
   con…"). No son ley ni jurisprudencia: no las presentes como criterio obligatorio.
 - Solo advierte que tu respuesta no sustituye el criterio del abogado cuando haya un riesgo real (plazos, penal,
   consecuencias graves), no en cada respuesta.
+- {marcas}
 
 Formato: párrafos cortos; listas con guiones cuando ayuden; **negritas** solo para lo esencial."""
 
@@ -49,23 +53,25 @@ def _evento(tipo: str, **datos) -> dict:
 
 
 def _precedentes(app, tdb, consulta: str, asunto_id, para_modelo: bool) -> list[dict]:
-    """Asuntos concluidos parecidos. Al modelo nunca van asuntos privados ni el título (puede traer nombres)."""
+    """Asuntos concluidos parecidos. Al modelo nunca van asuntos privados ni el título (puede traer nombres).
+    Los casos de otro equipo llegan anónimos, y el abogado no ve de quién son."""
     try:
         if asunto_id:
             fichas = precedentes.similares(app, tdb, asunto_id, limite=3)["casos"]
             fichas = [f for f in fichas if not (para_modelo and f["privado"])]
         else:
             fichas = precedentes.por_texto(app, tdb, consulta, limite=2, incluir_privados=not para_modelo)
+        fichas = precedentes.segun_acceso(tdb, fichas)
     except Exception as exc:
         log.warning("Asistente: no se pudieron buscar precedentes (%s)", type(exc).__name__)
         return []
     salida = []
     for f in fichas:
-        etiqueta = f"Asunto {f['numero_expediente'] or '#' + str(f['id'])}"
         salida.append({
-            "tipo": "caso", "titulo": etiqueta, "titulo_visible": f["titulo"],
+            "tipo": "caso", "titulo": "Asunto concluido", "titulo_visible": f["titulo"], "asunto_id": f["id"],
+            "visible": f["visible"],
             "referencia": f["resultado_info"]["label"] if f["resultado_info"] else "Concluido",
-            "url": f"/asuntos/{f['id']}", "detalle": "Precedente del despacho",
+            "url": f"/asuntos/{f['id']}" if f["visible"] else None, "detalle": "Precedente del despacho",
             "texto": precedentes.texto_para_modelo(f),
         })
     return salida
@@ -126,6 +132,18 @@ def _buscar(app, config, slug, tdb, consulta: str, extra: str, asunto_id, para_m
     return fuentes[:10] + _precedentes(app, tdb, consulta, asunto_id, para_modelo)
 
 
+def _con_marcas(tdb, m: marcas.Marcas, fuentes: list[dict]) -> list[dict]:
+    """Lo que el modelo lee de cada fuente: lo del despacho con marcas; la ley, tal cual."""
+    salida = []
+    for f in fuentes:
+        if f["tipo"] == "caso" and f.get("visible"):
+            marcas.conocer_asunto(tdb, m, f["asunto_id"], principal=False)
+        if f["tipo"] in ("despacho", "caso"):
+            f = {**f, "titulo": m.poner(f["titulo"]), "texto": m.poner(f["texto"])}
+        salida.append(f)
+    return salida
+
+
 def _bloque_fuentes(fuentes: list[dict]) -> str:
     partes = []
     for i, f in enumerate(fuentes, start=1):
@@ -147,6 +165,9 @@ def responder(app, config, slug: str, tdb, pregunta: str, historial: list[dict],
               asunto: dict | None, privado: bool) -> Iterator[dict]:
     asunto_id = asunto["id"] if asunto else None
     proveedor = None if privado else proveedores.obtener(config)
+    sin_detector = proveedor is not None and not marcas.disponible()
+    if sin_detector:
+        proveedor = None
 
     if proveedor is None:
         fuentes = _buscar(app, config, slug, tdb, pregunta, "", asunto_id, para_modelo=False)
@@ -154,6 +175,9 @@ def responder(app, config, slug: str, tdb, pregunta: str, historial: list[dict],
         if privado:
             texto = ("**Modo privado:** esta consulta no salió del servidor y no se usó ningún modelo externo. "
                      "Estos son los pasajes más relevantes que encontré en la ley y en los documentos del despacho:")
+        elif sin_detector:
+            texto = ("Por seguridad, esta consulta no salió del servidor: la protección de datos personales no está "
+                     "disponible en este momento. Estos son los pasajes más relevantes que encontré:")
         else:
             texto = ("El asistente todavía no tiene conectado el modelo de lenguaje, así que no puedo redactar una "
                      "respuesta. Estos son los pasajes más relevantes que encontré:")
@@ -163,9 +187,20 @@ def responder(app, config, slug: str, tdb, pregunta: str, historial: list[dict],
         yield _evento("fin", modelo=None)
         return
 
-    contexto = "\n".join(f"{m['rol']}: {m['texto'][:400]}" for m in historial[-4:])
+    # Las marcas valen solo para esta pregunta. Primero las partes del asunto, para que lleven su papel.
+    ocultos = marcas.Marcas()
+    if asunto_id:
+        marcas.conocer_asunto(tdb, ocultos, asunto_id)
+    marcas.conocer_despacho(tdb, ocultos)
+    pregunta_marcada = ocultos.poner(pregunta)
+    historial_marcado = [{**m, "texto": ocultos.poner(m["texto"])} for m in historial[-max(HISTORIAL, 4):]]
+
+    contexto = "\n".join(f"{m['rol']}: {m['texto'][:400]}" for m in historial_marcado[-4:])
     try:
-        plan = proveedor.reformular(pregunta, contexto)
+        plan = proveedor.reformular(pregunta_marcada, contexto)
+        # La búsqueda es local: necesita los nombres reales, no las marcas.
+        plan["consulta"] = ocultos.quitar(plan["consulta"])
+        plan["terminos"] = [ocultos.quitar(t) for t in plan["terminos"]]
     except Exception as exc:
         log.warning("Asistente: falló la reformulación (%s)", type(exc).__name__)
         plan = {"es_legal": True, "consulta": pregunta, "terminos": [], "materia": ""}
@@ -180,9 +215,9 @@ def responder(app, config, slug: str, tdb, pregunta: str, historial: list[dict],
     fuentes = _buscar(app, config, slug, tdb, plan["consulta"], " ".join(plan["terminos"]) or pregunta, asunto_id)
     yield _evento("fuentes", fuentes=publicas(fuentes))
 
-    sistema = SISTEMA.format(nombre=config.get("ASISTENTE_NOMBRE", "Dictum"))
+    sistema = SISTEMA.format(nombre=config.get("ASISTENTE_NOMBRE", "Dictum"), marcas=marcas.INSTRUCCION)
     mensajes: list[dict] = []
-    for m in historial[-HISTORIAL:]:
+    for m in historial_marcado[-HISTORIAL:]:
         rol = "user" if m["rol"] == "usuario" else "assistant"
         if not mensajes and rol == "assistant":
             continue
@@ -194,19 +229,25 @@ def responder(app, config, slug: str, tdb, pregunta: str, historial: list[dict],
         mensajes.pop()
     encabezado = ""
     if asunto:
-        encabezado = (f"Contexto: la consulta es sobre el asunto «{asunto['titulo']}»"
-                      f"{' (expediente ' + asunto['numero_expediente'] + ')' if asunto.get('numero_expediente') else ''}"
+        encabezado = (f"Contexto: la consulta es sobre el asunto «{ocultos.poner(asunto['titulo'])}»"
                       f", materia {asunto.get('tipo_asunto') or 'no indicada'}.\n\n")
         recuerdos = almacen.hallazgos(tdb, slug, asunto_id, limite=20)
         if recuerdos:
             encabezado += ("MEMORIA DEL CASO (puntos clave y descubrimientos que el equipo guardó; tómalos en cuenta, "
                            "pero no los cites como fuente legal):\n"
-                           + "\n".join(f"- [{almacen.TIPOS_HALLAZGO.get(h['tipo'], 'Punto clave')}] {h['texto'][:500]}"
+                           + "\n".join(f"- [{almacen.TIPOS_HALLAZGO.get(h['tipo'], 'Punto clave')}] {ocultos.poner(h['texto'][:500])}"
                                         for h in reversed(recuerdos)) + "\n\n")
-    mensajes.append({"role": "user", "content": f"{encabezado}FUENTES:\n{_bloque_fuentes(fuentes)}\n\nPREGUNTA: {pregunta}"})
+    bloque = _bloque_fuentes(_con_marcas(tdb, ocultos, fuentes))
+    mensajes.append({"role": "user", "content": f"{encabezado}FUENTES:\n{bloque}\n\nPREGUNTA: {pregunta_marcada}"})
+    restaurador = marcas.Restaurador(ocultos)
     try:
         for trozo in proveedor.responder(sistema, mensajes):
-            yield _evento("texto", texto=trozo)
+            texto = restaurador.trozo(trozo)
+            if texto:
+                yield _evento("texto", texto=texto)
+        texto = restaurador.fin()
+        if texto:
+            yield _evento("texto", texto=texto)
     except Exception as exc:
         log.warning("Asistente: falló la respuesta (%s)", type(exc).__name__)
         yield _evento("error", mensaje="No pude completar la respuesta. Intenta de nuevo en un momento.")

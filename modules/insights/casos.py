@@ -213,8 +213,42 @@ def por_texto(app, tdb, consulta: str, limite: int = 3, incluir_privados: bool =
     return [_ficha(a, p) for p, a in puntuados[:limite] if p >= UMBRAL_TEXTO]
 
 
+def anonima(tdb, f: dict) -> dict:
+    """Un caso de otro equipo: se aprende de cómo terminó, pero no se sabe de quién es ni dónde se llevó."""
+    from modules.asistente import marcas
+    limpio = marcas.Marcas(reservado=True)
+    marcas.conocer_asunto(tdb, limpio, f["id"], principal=False)
+    hay_detector = marcas.disponible()
+    materia = (f["tipo_asunto"] or "").strip()
+    return {
+        **f, "titulo": f"Caso de otro equipo{' · ' + materia.capitalize() if materia else ''}",
+        "numero_expediente": None, "juzgado": None, "contrario_despacho": None,
+        "resultado_notas": limpio.poner(f["resultado_notas"]) if hay_detector else "",
+        "sentencias": [{**s, "titulo": limpio.poner(s["titulo"]) if hay_detector else "Resolución"}
+                       for s in f["sentencias"]],
+        "visible": False,
+    }
+
+
+def segun_acceso(tdb, fichas: list[dict]) -> list[dict]:
+    """Quien no tiene acceso a un caso lo ve anónimo, y si es privado no lo ve."""
+    from modules.asuntos import puede_ver
+    salida = []
+    for f in fichas:
+        if puede_ver(tdb, f["id"]):
+            salida.append({**f, "visible": True})
+        elif not f["privado"]:
+            anon = anonima(tdb, f)
+            if "_texto" in f:
+                anon["_texto"] = _plano(" ".join(str(x or "") for x in (
+                    anon["titulo"], anon["tipo_asunto"], anon["sub_tipo"], anon["resultado_notas"],
+                    (anon["resultado_info"] or {}).get("label"), " ".join(s["titulo"] for s in anon["sentencias"]))))
+            salida.append(anon)
+    return salida
+
+
 def texto_para_modelo(f: dict) -> str:
-    """Lo que Dictum lee de un precedente: datos del caso y cómo terminó, sin datos del cliente."""
+    """Lo que Dictum lee de un precedente: datos del caso y cómo terminó. Pasa por las marcas antes de salir."""
     lineas = [
         f"Materia: {f['tipo_asunto'] or 'no indicada'}{' / ' + f['sub_tipo'] if f['sub_tipo'] else ''}",
         f"Resultado para el despacho: {f['resultado_info']['label'] if f['resultado_info'] else 'sin registrar'}",
@@ -310,7 +344,8 @@ def buscar(app, tdb, consulta: str, fichas: list[dict] | None = None) -> list[di
     puntuados = []
     for f in fichas:
         hallado = sum(1 for p in palabras if p in f["_texto"]) / len(palabras) if palabras else 0.0
-        sim = semantico.get(f["id"], 0) / 100
+        # Un caso de otro equipo solo se busca por lo anónimo: su parecido viene del texto con nombres.
+        sim = semantico.get(f["id"], 0) / 100 if f.get("visible", True) else 0
         # Por palabras: todas, o casi todas si escribió una frase larga. Lo literal pesa más.
         if hallado == 1 or (len(palabras) >= 3 and hallado >= 0.66) or sim:
             puntuados.append(((2.0 if hallado == 1 else hallado) + sim, f))

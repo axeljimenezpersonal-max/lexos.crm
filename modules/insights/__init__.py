@@ -53,14 +53,14 @@ def _asuntos_para_elegir(tdb):
 def index():
     tdb = g.tenant_db
     seccion = "machotes" if request.args.get("seccion") == "machotes" else "precedentes"
-    lista = casos.concluidos(tdb)
+    lista = casos.segun_acceso(tdb, casos.concluidos(tdb))
     q = (request.args.get("q") or "").strip()[:200]
     materia = (request.args.get("materia") or "").strip().lower()
     resultado = request.args.get("resultado") or ""
     if resultado not in casos.RESULTADOS:
         resultado = ""
 
-    from modules.asuntos import TIPOS_DERECHO, puede_ver
+    from modules.asuntos import TIPOS_DERECHO
     materias = []
     for m in sorted({(f["tipo_asunto"] or "").strip().lower() for f in lista} - {""}):
         info = TIPOS_DERECHO.get(m)
@@ -76,7 +76,7 @@ def index():
                        if (not materia or (f["tipo_asunto"] or "").strip().lower() == materia)
                        and (not resultado or f["resultado"] == resultado)]
         for f in encontrados:
-            f["url"] = url_for("asuntos.detalle", id=f["id"]) if puede_ver(tdb, f["id"]) else None
+            f["url"] = url_for("asuntos.detalle", id=f["id"]) if f["visible"] else None
             info = TIPOS_DERECHO.get((f["tipo_asunto"] or "").strip().lower())
             f["materia_label"] = info["label"] if info else (f["tipo_asunto"] or "").capitalize()
 
@@ -99,12 +99,15 @@ def index():
 @login_required
 @tenant_required
 def parecidos(asunto_id):
-    if not g.tenant_db.execute("SELECT 1 FROM asuntos WHERE id=?", (asunto_id,)).fetchone():
-        abort(404)
     from modules.asuntos import puede_ver
+    if not g.tenant_db.execute("SELECT 1 FROM asuntos WHERE id=?", (asunto_id,)).fetchone() \
+            or not puede_ver(g.tenant_db, asunto_id):
+        abort(404)
     datos = casos.similares(current_app._get_current_object(), g.tenant_db, asunto_id)
+    datos["casos"] = casos.segun_acceso(g.tenant_db, datos["casos"])
+    datos["resumen"] = casos.resumen(datos["casos"])
     for c in datos["casos"]:
-        c["url"] = url_for("asuntos.detalle", id=c["id"]) if puede_ver(g.tenant_db, c["id"]) else None
+        c["url"] = url_for("asuntos.detalle", id=c["id"]) if c["visible"] else None
     return jsonify(ok=True, **datos)
 
 

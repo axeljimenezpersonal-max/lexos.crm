@@ -28,6 +28,10 @@ numpy>=2.0
 # Asistente jurídico
 anthropic>=0.70
 
+# Detector local de nombres: cambia datos personales por marcas antes de llamar al modelo (licencia MIT)
+spacy>=3.8,<3.9
+xx_ent_wiki_sm @ https://github.com/explosion/spacy-models/releases/download/xx_ent_wiki_sm-3.8.0/xx_ent_wiki_sm-3.8.0-py3-none-any.whl
+
 # Servidor de producción
 gunicorn>=23.0
 
