@@ -8,6 +8,8 @@
     <p class="ex-sub">
       {%- if activa == 'reportes' -%}
         Listas del despacho que puedes revisar aquí y descargar en Excel o PDF.
+      {%- elif current_role == 'abogado' -%}
+        Cómo van tus expedientes: clientes, cobranza y actividad.
       {%- else -%}
         Cómo va el despacho: expedientes, clientes, cobranza y carga del equipo.
       {%- endif -%}

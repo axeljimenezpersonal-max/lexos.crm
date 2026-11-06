@@ -32,6 +32,7 @@
     <label>Hasta</label>
     <input type="date" name="hasta" value="{{ hasta_c }}">
   </div>
+  {% if not solo_lo_suyo %}
   <div class="est-filt-group">
     <label>Abogado</label>
     <select name="abogado">
@@ -41,6 +42,7 @@
       {% endfor %}
     </select>
   </div>
+  {% endif %}
   <div class="est-filt-group">
     <label>Tipo de derecho</label>
     <select name="tipo_derecho">
@@ -178,7 +180,7 @@
 </div>
 
 <!-- FILA 3 — Clientes nuevos + Carga abogado -->
-<div class="est-charts-row est-charts-2col">
+<div class="est-charts-row {{ 'est-charts-2col' if not solo_lo_suyo }}">
   <div class="est-chart-card">
     <div class="est-chart-header">
       <span>Clientes nuevos por mes</span>
@@ -189,6 +191,7 @@
     <div class="est-chart-body"><canvas id="chartClientes"></canvas></div>
   </div>
 
+  {% if not solo_lo_suyo %}
   <div class="est-chart-card">
     <div class="est-chart-header">
       <span>Carga por abogado</span>
@@ -198,6 +201,7 @@
     </div>
     <div class="est-chart-body"><canvas id="chartCarga"></canvas></div>
   </div>
+  {% endif %}
 </div>
 
 <!-- FILA 4 — Heatmap + Top clientes -->
@@ -468,6 +472,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  {% if not solo_lo_suyo %}
   // ── 5. Carga por abogado (agrupadas) ──
   const cargaData = {{ ch_carga_abogado | tojson }};
   new Chart(document.getElementById('chartCarga'), {
@@ -486,6 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 y: { beginAtZero: true, grid: { color: 'rgba(20,46,89,.07)' } } }
     }
   });
+  {% endif %}
 
   // ── 6. Heatmap (custom canvas) ──
   const hmData = {{ ch_heatmap | tojson }};

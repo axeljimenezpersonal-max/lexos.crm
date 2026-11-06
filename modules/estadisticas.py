@@ -10,7 +10,8 @@ from datetime import date, datetime, timedelta
 
 from flask import Blueprint, g, jsonify, render_template, request, session
 
-from modules.asuntos import TIPOS_DERECHO
+from modules import cobranzas
+from modules.asuntos import TIPOS_DERECHO, _FILTRO_PROPIOS, _solo_lo_suyo
 from modules.auth import login_required, tenant_required
 
 estadisticas_bp = Blueprint("estadisticas", __name__)
@@ -43,6 +44,18 @@ def _get_abogados():
         ).fetchall()]
     except Exception:
         return []
+
+
+def _alcances():
+    """(asuntos, cobros, clientes) que esta persona puede ver: un abogado solo cuenta lo suyo."""
+    if not _solo_lo_suyo():
+        return "1", "1", "1"
+    uid = str(int(session["user_id"]))
+    asuntos = _FILTRO_PROPIOS.replace("?", uid)
+    cobros = cobranzas._alcance()[0].replace("?", uid)
+    clientes = (f"(c.id IN (SELECT a.cliente_id FROM asuntos a WHERE {asuntos}) "
+                f"OR c.id IN (SELECT co.cliente_id FROM cobros co WHERE {cobros}))")
+    return asuntos, cobros, clientes
 
 
 def _period_range(periodo, desde_c=None, hasta_c=None):
@@ -110,13 +123,19 @@ def index():
         start, end = _period_range(periodo)
     prev_start, prev_end = _prev_period(start, end)
 
-    abogados = _get_abogados()
+    # Un abogado solo ve sus números: sin filtro por colega ni carga del equipo
+    solo_lo_suyo = _solo_lo_suyo()
+    alc_a, alc_c, alc_cli = _alcances()
+    alc_h = f"asunto_id IN (SELECT a.id FROM asuntos a WHERE {alc_a})" if solo_lo_suyo else "1"
+    if solo_lo_suyo:
+        abogado_f = None
+    abogados = [] if solo_lo_suyo else _get_abogados()
 
     # ── Clause builders ──
     def aw(extra="", prefix="a"):
         """Asuntos WHERE clause."""
         p = f"{prefix}." if prefix else ""
-        w = [f"{p}fecha_alta >= '{start}'", f"{p}fecha_alta <= '{end} 23:59:59'"]
+        w = [f"{p}fecha_alta >= '{start}'", f"{p}fecha_alta <= '{end} 23:59:59'", alc_a.replace("a.", p)]
         if abogado_f:
             w.append(f"{p}abogado_responsable={abogado_f}")
         if tipo_f:
@@ -125,11 +144,11 @@ def index():
             w.append(extra)
         return " AND ".join(w)
 
-    def cw(extra=""):
-        """Cobros WHERE clause."""
-        w = [f"fecha_emision >= '{start}'", f"fecha_emision <= '{end}'"]
+    def cw(extra="", desde=None, hasta=None):
+        """Cobros WHERE clause. La consulta debe llamar «co» a la tabla de cobros."""
+        w = [f"co.fecha_emision >= '{desde or start}'", f"co.fecha_emision <= '{hasta or end}'", alc_c]
         if abogado_f:
-            w.append(f"abogado_id={abogado_f}")
+            w.append(f"co.abogado_id={abogado_f}")
         if extra:
             w.append(extra)
         return " AND ".join(w)
@@ -154,10 +173,10 @@ def index():
 
     # Clientes
     kpi_clientes_activos = tdb.execute(
-        "SELECT COUNT(*) FROM clientes WHERE activo=1 AND estatus='activo'"
+        f"SELECT COUNT(*) FROM clientes c WHERE c.activo=1 AND c.estatus='activo' AND {alc_cli}"
     ).fetchone()[0]
     kpi_clientes_prospectos = tdb.execute(
-        "SELECT COUNT(*) FROM clientes WHERE estatus='prospecto'"
+        f"SELECT COUNT(*) FROM clientes c WHERE c.estatus='prospecto' AND {alc_cli}"
     ).fetchone()[0]
 
     # Facturación
@@ -165,7 +184,7 @@ def index():
         SELECT COALESCE(SUM(COALESCE(total,monto)),0) as facturado,
                COALESCE(SUM(CASE WHEN estado='pagado' THEN COALESCE(total,monto) ELSE 0 END),0) as cobrado,
                COALESCE(SUM(CASE WHEN estado IN ('pendiente','abono','vencido') THEN COALESCE(total,monto) ELSE 0 END),0) as pendiente
-        FROM cobros WHERE {cw()} AND estado != 'cancelado' AND {PESOS}
+        FROM cobros co WHERE {cw()} AND estado != 'cancelado' AND {PESOS}
     """).fetchone()
     kpi_facturado = float(r_fac["facturado"])
     kpi_cobrado   = float(r_fac["cobrado"])
@@ -174,8 +193,8 @@ def index():
 
     # Previous period for comparison
     prev_fac = tdb.execute(f"""
-        SELECT COALESCE(SUM(COALESCE(total,monto)),0) FROM cobros
-        WHERE fecha_emision >= '{prev_start}' AND fecha_emision <= '{prev_end}'
+        SELECT COALESCE(SUM(COALESCE(total,monto)),0) FROM cobros co
+        WHERE {cw(desde=prev_start, hasta=prev_end)}
           AND estado != 'cancelado' AND {PESOS}
     """).fetchone()[0]
     kpi_fac_delta = round(((kpi_facturado - float(prev_fac)) / float(prev_fac) * 100), 1) if prev_fac else 0
@@ -183,13 +202,13 @@ def index():
     # Horas
     kpi_horas = tdb.execute(f"""
         SELECT COALESCE(SUM(horas),0) FROM asunto_horas
-        WHERE fecha >= '{start}' AND fecha <= '{end}'
+        WHERE fecha >= '{start}' AND fecha <= '{end}' AND {alc_h}
         {"AND user_id=" + str(abogado_f) if abogado_f else ""}
     """).fetchone()[0]
 
     # Vencidos
     kpi_vencidos = tdb.execute(
-        "SELECT COUNT(*) FROM asuntos WHERE estado='activo' AND fecha_limite IS NOT NULL "
+        f"SELECT COUNT(*) FROM asuntos WHERE estado='activo' AND fecha_limite IS NOT NULL AND {alc_a.replace('a.', '')} "
         f"AND fecha_limite < date('now') {'AND abogado_responsable=' + str(abogado_f) if abogado_f else ''}"
     ).fetchone()[0]
 
@@ -218,8 +237,8 @@ def index():
         row = tdb.execute(f"""
             SELECT COALESCE(SUM(COALESCE(total,monto)),0) as facturado,
                    COALESCE(SUM(CASE WHEN estado='pagado' THEN COALESCE(total,monto) ELSE 0 END),0) as cobrado
-            FROM cobros WHERE strftime('%Y-%m', fecha_emision) = ?
-              AND estado != 'cancelado' AND {PESOS}
+            FROM cobros co WHERE strftime('%Y-%m', fecha_emision) = ?
+              AND estado != 'cancelado' AND {PESOS} AND {alc_c}
               {"AND abogado_id=" + str(abogado_f) if abogado_f else ""}
         """, (ym,)).fetchone()
         ch_facturacion.append({
@@ -233,7 +252,7 @@ def index():
         y = today.year - ((today.month - i - 1) // 12)
         ym = f"{y:04d}-{m:02d}"
         cnt = tdb.execute(
-            "SELECT COUNT(*) FROM clientes WHERE strftime('%Y-%m', fecha_alta)=?", (ym,)
+            f"SELECT COUNT(*) FROM clientes c WHERE strftime('%Y-%m', c.fecha_alta)=? AND {alc_cli}", (ym,)
         ).fetchone()[0]
         ch_clientes_mes.append({"label": f"{MESES_ES[m-1]} {str(y)[2:]}", "total": cnt})
 
@@ -262,8 +281,9 @@ def index():
         FROM actividad_log
         WHERE fecha >= date('now', '-30 days')
     """
-    if abogado_f:
-        hm_query += f" AND user_id={abogado_f}"
+    hm_user = int(session["user_id"]) if solo_lo_suyo else abogado_f
+    if hm_user:
+        hm_query += f" AND user_id={hm_user}"
     hm_query += " GROUP BY dow, hour"
     for r in tdb.execute(hm_query).fetchall():
         ch_heatmap.append({"day": r["dow"], "hour": r["hour"], "count": r["cnt"]})
@@ -300,9 +320,9 @@ def index():
 
     tab_clientes = [dict(r) for r in tdb.execute(f"""
         SELECT c.*,
-               (SELECT COUNT(*) FROM asuntos WHERE cliente_id=c.id AND estado='activo') as asuntos_activos,
-               (SELECT COALESCE(SUM(COALESCE(total,monto)),0) FROM cobros WHERE cliente_id=c.id AND estado='pagado' AND {PESOS}) as total_cobrado
-        FROM clientes c WHERE c.activo=1 ORDER BY total_cobrado DESC LIMIT 100
+               (SELECT COUNT(*) FROM asuntos a WHERE a.cliente_id=c.id AND a.estado='activo' AND {alc_a}) as asuntos_activos,
+               (SELECT COALESCE(SUM(COALESCE(co.total,co.monto)),0) FROM cobros co WHERE co.cliente_id=c.id AND co.estado='pagado' AND {PESOS} AND {alc_c}) as total_cobrado
+        FROM clientes c WHERE c.activo=1 AND {alc_cli} ORDER BY total_cobrado DESC LIMIT 100
     """).fetchall()]
 
     tab_facturacion = [dict(r) for r in tdb.execute(f"""
@@ -322,7 +342,7 @@ def index():
                julianday('now') - julianday(MAX(al.fecha)) as dias_sin
         FROM asuntos a
         LEFT JOIN actividad_log al ON al.entidad='asunto' AND al.entidad_id=a.id
-        WHERE a.estado='activo'
+        WHERE a.estado='activo' AND {alc_a}
         {"AND a.abogado_responsable=" + str(abogado_f) if abogado_f else ""}
         GROUP BY a.id
         HAVING dias_sin > {dias_inactivos} OR ultima_actividad IS NULL
@@ -333,7 +353,7 @@ def index():
         "estadisticas/index.html",
         # Filtros
         periodo=periodo, desde_c=desde_c, hasta_c=hasta_c,
-        abogado_f=abogado_f, tipo_f=tipo_f,
+        abogado_f=abogado_f, tipo_f=tipo_f, solo_lo_suyo=solo_lo_suyo,
         start=start, end=end,
         abogados=abogados, tipos_asunto=TIPOS_ASUNTO,
         # KPIs
